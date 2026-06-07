@@ -1,0 +1,789 @@
+"""Download a track from YouTube and tag it with the chosen metadata."""
+
+from __future__ import annotations
+
+import os
+import re
+import re as _re
+from pathlib import Path
+from typing import Any, Callable, Optional
+
+import requests
+import yt_dlp
+from loguru import logger
+from mutagen.flac import FLAC, Picture
+from mutagen.id3 import (
+    APIC,
+    ID3,
+    TALB,
+    TCON,
+    TDOR,
+    TDRC,
+    TIT2,
+    TPE1,
+    TPE2,
+    TPOS,
+    TRCK,
+    TXXX,
+    USLT,
+)
+from mutagen.mp3 import MP3
+from mutagen.mp4 import MP4, MP4Cover
+from mutagen.oggopus import OggOpus
+from mutagen.oggvorbis import OggVorbis
+
+from . import lyrics as lyrics_mod
+from .jellyfin_meta import format_for_jellyfin
+from .m3u import sanitize_playlist_name
+from .providers import enrich_from_match, find_match, find_match_for_video
+
+_INVALID_FS_CHARS = re.compile(r'[\\/:*?"<>|\x00-\x1f]')
+
+ProgressCallback = Callable[[float, str], None]
+
+
+def _sanitize(text: str) -> str:
+    safe = _INVALID_FS_CHARS.sub('', text or '').strip().strip('.')
+    return safe or 'unknown'
+
+
+_DEFAULT_YT_PLAYER_CLIENTS = (
+    'ios',
+    'android',
+    'web_embedded',
+    'mweb',
+    'web',
+    'tv',
+)
+
+_SUPPRESSED_YT_WARNING_FRAGMENTS = (
+    'GVS PO Token which was not provided',
+    'Some tv client https formats have been skipped as they are DRM',
+    'Signature solving failed: Some formats may be missing',
+    'n challenge solving failed: Some formats may be missing',
+)
+
+
+class _YtdlpLogger:
+    @staticmethod
+    def debug(msg: str) -> None:
+        pass
+
+    @staticmethod
+    def info(msg: str) -> None:
+        pass
+
+    @staticmethod
+    def warning(msg: str) -> None:
+        if not any(frag in msg for frag in _SUPPRESSED_YT_WARNING_FRAGMENTS):
+            logger.warning('yt-dlp: {}', msg)
+
+    @staticmethod
+    def error(msg: str) -> None:
+        logger.error('yt-dlp: {}', msg)
+
+
+def _yt_player_clients() -> list[str]:
+    raw = os.getenv('DOWNTIFY_YT_PLAYER_CLIENTS', '').strip()
+    if not raw:
+        return list(_DEFAULT_YT_PLAYER_CLIENTS)
+    clients = [c.strip() for c in raw.split(',') if c.strip()]
+    return clients or list(_DEFAULT_YT_PLAYER_CLIENTS)
+
+
+class Downloader:
+    """Wraps ``yt-dlp`` plus ``mutagen`` tagging."""
+
+    def __init__(
+        self,
+        download_dir: Path | str,
+        audio_format: str = 'mp3',
+        audio_bitrate: str = '320',
+        output_template: str = '{artists} - {title}',
+        lyrics_providers: Optional[list[str]] = None,
+        organize_by_artist: bool = False,
+        organize_by_album: bool = False,
+    ):
+        self.download_dir = Path(download_dir)
+        self.download_dir.mkdir(parents=True, exist_ok=True)
+        self.audio_format = audio_format
+        self.audio_bitrate = audio_bitrate
+        self.output_template = output_template
+        self.lyrics_providers = list(lyrics_providers or [])
+        self.organize_by_artist = organize_by_artist
+        self.organize_by_album = organize_by_album
+
+    @staticmethod
+    def _artist_subdir(song: dict[str, Any]) -> str:
+        artists = song.get('artists') or []
+        return _sanitize(artists[0] if artists else 'unknown')
+
+    @staticmethod
+    def _album_subdir(song: dict[str, Any]) -> str:
+        album = (song.get('album_name') or '').strip()
+        return _sanitize(album) if album else 'Unknown Album'
+
+    def _content_subdir(
+        self,
+        song: dict[str, Any],
+        subdir: Optional[str] = None,
+    ) -> Optional[str]:
+        if self.organize_by_artist:
+            parts = [self._artist_subdir(song)]
+            if self.organize_by_album:
+                parts.append(self._album_subdir(song))
+            return '/'.join(parts)
+        return subdir
+
+    def _format_basename(self, song: dict[str, Any]) -> str:
+        artists = ', '.join(song.get('artists') or []) or 'Unknown Artist'
+        template = self.output_template.replace('.{output-ext}', '')
+        try:
+            rendered = template.format(
+                title=song.get('name', 'Unknown'),
+                artists=artists,
+                artist=artists,
+                album=song.get('album_name', ''),
+            )
+        except (KeyError, IndexError):
+            rendered = f'{artists} - {song.get("name", "Unknown")}'
+        return _sanitize(rendered)
+
+    def existing_filename_for(
+        self,
+        song: dict[str, Any],
+        subdir: Optional[str] = None,
+    ) -> Optional[str]:
+        basename = self._format_basename(song)
+        effective_subdir = self._content_subdir(song, subdir)
+        target_dir, prefix = self._resolve_target_dir(effective_subdir)
+        primary = target_dir / f'{basename}.{self.audio_format}'
+        if primary.exists():
+            return f'{prefix}{primary.name}'
+        for candidate in target_dir.glob(f'{basename}.*'):
+            if candidate.is_file():
+                return f'{prefix}{candidate.name}'
+        return None
+
+    def _resolve_target_dir(self, subdir: Optional[str]) -> tuple[Path, str]:
+        if not subdir:
+            return self.download_dir, ''
+        parts = [
+            sanitize_playlist_name(part)
+            for part in subdir.replace('\\', '/').split('/')
+            if part.strip()
+        ]
+        if not parts:
+            return self.download_dir, ''
+        target = self.download_dir
+        for part in parts:
+            target = target / part
+        return target, f"{'/'.join(parts)}/"
+
+    def download(
+        self,
+        song: dict[str, Any],
+        progress_cb: Optional[ProgressCallback] = None,
+        subdir: Optional[str] = None,
+    ) -> str:
+        video_id = song.get('youtube_id')
+        if not video_id and (song.get('source') == 'youtube'):
+            video_id = song.get('song_id')
+
+        match: Optional[dict[str, Any]] = None
+        if not video_id:
+            video_id, match = find_match(song)
+        elif not song.get('album_name') or not song.get('cover_url'):
+            try:
+                match = find_match_for_video(song, video_id)
+            except Exception:
+                logger.opt(exception=True).debug('enrichment match failed')
+                match = None
+
+        if not video_id:
+            raise RuntimeError(
+                f'Could not find a YouTube match for {song.get("name")!r}'
+            )
+
+        song = enrich_from_match(song, match)
+
+        basename = self._format_basename(song)
+        effective_subdir = self._content_subdir(song, subdir)
+        target_dir, rel_prefix = self._resolve_target_dir(effective_subdir)
+        target_dir.mkdir(parents=True, exist_ok=True)
+        out_template = str(target_dir / f'{basename}.%(ext)s')
+
+        def hook(data: dict[str, Any]) -> None:
+            if progress_cb is None:
+                return
+            try:
+                status = data.get('status')
+                if status == 'downloading':
+                    total = (
+                        data.get('total_bytes')
+                        or data.get('total_bytes_estimate')
+                        or 0
+                    )
+                    downloaded = data.get('downloaded_bytes') or 0
+                    if total:
+                        progress_cb(
+                            min(95.0, downloaded / total * 95.0),
+                            'Downloading',
+                        )
+                elif status == 'finished':
+                    progress_cb(96.0, 'Converting')
+            except Exception:
+                logger.opt(exception=True).debug('progress hook error')
+
+        ydl_opts = {
+            'format': 'bestaudio/best',
+            'outtmpl': out_template,
+            'quiet': True,
+            'noprogress': True,
+            'logger': _YtdlpLogger(),
+            'noplaylist': True,
+            'nocheckcertificate': True,
+            'overwrites': True,
+            'progress_hooks': [hook],
+            'retries': 10,
+            'fragment_retries': 10,
+            'extractor_retries': 3,
+            'socket_timeout': 30,
+            'extractor_args': {
+                'youtube': {'player_client': _yt_player_clients()}
+            },
+            'sleep_interval_requests': 1,
+            'postprocessors': [
+                {
+                    'key': 'FFmpegExtractAudio',
+                    'preferredcodec': self.audio_format,
+                    'preferredquality': self.audio_bitrate,
+                }
+            ],
+        }
+
+        if os.getenv('DOWNTIFY_FORCE_IPV4', '').strip() in {
+            '1',
+            'true',
+            'yes',
+        }:
+            ydl_opts['source_address'] = '0.0.0.0'
+
+        cookies_file = os.getenv('DOWNTIFY_COOKIES_FILE', '').strip()
+        if cookies_file:
+            ydl_opts['cookiefile'] = cookies_file
+
+        cookies_browser = os.getenv('DOWNTIFY_COOKIES_FROM_BROWSER', '').strip()
+        if cookies_browser:
+            parts = cookies_browser.split(':', 1)
+            ydl_opts['cookiesfrombrowser'] = (
+                (parts[0],) if len(parts) == 1 else (parts[0], parts[1])
+            )
+
+        url = f'https://music.youtube.com/watch?v={video_id}'
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([url])
+
+        final_path = target_dir / f'{basename}.{self.audio_format}'
+        if not final_path.exists():
+            for candidate in target_dir.glob(f'{basename}.*'):
+                if candidate.is_file():
+                    final_path = candidate
+                    break
+
+        try:
+            embed_metadata(final_path, song)
+        except Exception:
+            logger.exception('Failed to embed metadata into {}', final_path)
+
+        if self.lyrics_providers:
+            try:
+                fetched = lyrics_mod.fetch(song, self.lyrics_providers)
+            except Exception:
+                logger.exception('Lyrics fetch crashed for {}', final_path)
+                fetched = None
+            if fetched is not None:
+                try:
+                    embed_lyrics(final_path, fetched)
+                except Exception:
+                    logger.exception(
+                        'Failed to embed lyrics into {}', final_path
+                    )
+
+        if progress_cb:
+            progress_cb(100.0, 'Done')
+        return f'{rel_prefix}{final_path.name}'
+
+
+def _download_cover(url: str) -> Optional[bytes]:
+    if not url:
+        return None
+    try:
+        response = requests.get(url, timeout=15)
+        response.raise_for_status()
+    except Exception:
+        logger.opt(exception=True).warning('Failed to fetch cover art {}', url)
+        return None
+    return response.content
+
+
+def _album_track_index_for_tags(
+    song: dict[str, Any],
+) -> tuple[Optional[int], Optional[int]]:
+    raw_n = song.get('track_number')
+    raw_tot = song.get('album_track_total')
+    try:
+        n = int(raw_n)
+    except (TypeError, ValueError):
+        return None, None
+    if n <= 0:
+        return None, None
+    tot: Optional[int] = None
+    if raw_tot is not None and raw_tot != '':
+        try:
+            t = int(raw_tot)
+        except (TypeError, ValueError):
+            pass
+        else:
+            if t > 0:
+                tot = t
+    return n, tot
+
+
+def _recording_date_for_tags(song: dict[str, Any]) -> str:
+    rd = str(song.get('release_date') or '').strip()
+    if rd:
+        return rd
+    return str(song.get('year') or '').strip()
+
+
+def embed_metadata(path: Path, song: dict[str, Any]) -> None:
+    if not path.exists():
+        return
+
+    song = format_for_jellyfin(song)
+
+    title = song.get('name', '')
+    artists = song.get('artists') or []
+    album = song.get('album_name', '') or ''
+    recording_date = _recording_date_for_tags(song)
+    genre = (song.get('genre') or '').strip()
+    cover_bytes = _download_cover(song.get('cover_url', ''))
+    track_number, album_track_total = _album_track_index_for_tags(song)
+    album_artist = song.get('album_artist')
+    disc_number = song.get('disc_number')
+    disc_total = song.get('disc_total')
+    compilation = bool(song.get('compilation'))
+
+    if track_number is None:
+        logger.info(
+            'Tag embed: no track_number/disc position for file={} song_id={} '
+            'title={!r} raw_track_number={!r} raw_total={!r}',
+            path.name,
+            song.get('song_id'),
+            title,
+            song.get('track_number'),
+            song.get('album_track_total'),
+        )
+    if not recording_date:
+        logger.info(
+            'Tag embed: no recording date (year/release_date) for file={} '
+            'song_id={} title={!r} raw_year={!r} raw_release_date={!r}',
+            path.name,
+            song.get('song_id'),
+            title,
+            song.get('year'),
+            song.get('release_date'),
+        )
+
+    logger.debug(
+        'Tag embed summary: {} track={}/{} date={!r}',
+        path.name,
+        track_number,
+        album_track_total,
+        recording_date,
+    )
+
+    suffix = path.suffix.lower().lstrip('.')
+
+    if suffix == 'mp3':
+        _tag_mp3(
+            path,
+            title,
+            artists,
+            album,
+            recording_date,
+            genre,
+            cover_bytes,
+            track_number,
+            album_track_total,
+            album_artist=album_artist,
+            disc_number=disc_number,
+            disc_total=disc_total,
+            compilation=compilation,
+        )
+    elif suffix in {'m4a', 'mp4', 'aac'}:
+        _tag_mp4(
+            path,
+            title,
+            artists,
+            album,
+            recording_date,
+            genre,
+            cover_bytes,
+            track_number,
+            album_track_total,
+            album_artist=album_artist,
+            disc_number=disc_number,
+            disc_total=disc_total,
+            compilation=compilation,
+        )
+    elif suffix == 'flac':
+        _tag_flac(
+            path,
+            title,
+            artists,
+            album,
+            recording_date,
+            genre,
+            cover_bytes,
+            track_number,
+            album_track_total,
+            album_artist=album_artist,
+            disc_number=disc_number,
+            disc_total=disc_total,
+            compilation=compilation,
+        )
+    elif suffix in {'ogg', 'oga'}:
+        _tag_ogg_vorbis(
+            path,
+            title,
+            artists,
+            album,
+            recording_date,
+            genre,
+            cover_bytes,
+            track_number,
+            album_track_total,
+            album_artist=album_artist,
+            disc_number=disc_number,
+            disc_total=disc_total,
+            compilation=compilation,
+        )
+    elif suffix == 'opus':
+        _tag_opus(
+            path,
+            title,
+            artists,
+            album,
+            recording_date,
+            genre,
+            cover_bytes,
+            track_number,
+            album_track_total,
+            album_artist=album_artist,
+            disc_number=disc_number,
+            disc_total=disc_total,
+            compilation=compilation,
+        )
+
+
+def _tag_mp3(
+    path: Path,
+    title: str,
+    artists: list[str],
+    album: str,
+    year: str,
+    genre: str,
+    cover_bytes: Optional[bytes],
+    track_number: Optional[int],
+    album_track_total: Optional[int],
+    album_artist: Optional[str] = None,
+    disc_number: Optional[int] = None,
+    disc_total: Optional[int] = None,
+    compilation: bool = False,
+) -> None:
+    audio = MP3(str(path), ID3=ID3)
+    if audio.tags is None:
+        audio.add_tags()
+    audio.tags.delall('APIC')
+    audio.tags.add(TIT2(encoding=3, text=title))
+    if artists:
+        audio.tags.add(TPE1(encoding=3, text=' / '.join(artists)))
+        audio.tags.add(TPE2(encoding=3, text=album_artist or artists[0]))
+        audio.tags.add(TXXX(encoding=3, desc='ARTISTS', text='\x00'.join(artists)))
+    if album:
+        audio.tags.add(TALB(encoding=3, text=album))
+    if track_number is not None:
+        trck = (
+            f'{track_number}/{album_track_total}'
+            if album_track_total is not None
+            else str(track_number)
+        )
+        audio.tags.add(TRCK(encoding=3, text=trck))
+    if disc_number is not None:
+        tpos = (
+            f'{disc_number}/{disc_total}'
+            if disc_total is not None
+            else str(disc_number)
+        )
+        audio.tags.add(TPOS(encoding=3, text=tpos))
+    if year:
+        audio.tags.add(TDRC(encoding=3, text=year))
+        audio.tags.add(TDOR(encoding=3, text=year[:4]))
+    if genre:
+        audio.tags.add(TCON(encoding=3, text=genre))
+    if compilation:
+        audio.tags.add(TXXX(encoding=3, desc='COMPILATION', text='1'))
+    if cover_bytes:
+        audio.tags.add(
+            APIC(
+                encoding=3,
+                mime='image/jpeg',
+                type=3,
+                desc='Cover',
+                data=cover_bytes,
+            )
+        )
+    audio.save(v2_version=3)
+
+
+def _tag_mp4(
+    path: Path,
+    title: str,
+    artists: list[str],
+    album: str,
+    year: str,
+    genre: str,
+    cover_bytes: Optional[bytes],
+    track_number: Optional[int],
+    album_track_total: Optional[int],
+    album_artist: Optional[str] = None,
+    disc_number: Optional[int] = None,
+    disc_total: Optional[int] = None,
+    compilation: bool = False,
+) -> None:
+    audio = MP4(str(path))
+    audio['\xa9nam'] = title
+    if artists:
+        audio['\xa9ART'] = artists
+        audio['aART'] = [album_artist or artists[0]]
+    if album:
+        audio['\xa9alb'] = album
+    if track_number is not None:
+        total = album_track_total if album_track_total is not None else 0
+        audio['trkn'] = [(track_number, total)]
+    if disc_number is not None:
+        total = disc_total if disc_total is not None else 0
+        audio['disk'] = [(disc_number, total)]
+    if year:
+        audio['\xa9day'] = year
+    if genre:
+        audio['\xa9gen'] = genre
+    if compilation:
+        audio['cpil'] = [1]
+    if cover_bytes:
+        audio['covr'] = [
+            MP4Cover(cover_bytes, imageformat=MP4Cover.FORMAT_JPEG)
+        ]
+    audio.save()
+
+
+def _tag_flac(
+    path: Path,
+    title: str,
+    artists: list[str],
+    album: str,
+    year: str,
+    genre: str,
+    cover_bytes: Optional[bytes],
+    track_number: Optional[int],
+    album_track_total: Optional[int],
+    album_artist: Optional[str] = None,
+    disc_number: Optional[int] = None,
+    disc_total: Optional[int] = None,
+    compilation: bool = False,
+) -> None:
+    audio = FLAC(str(path))
+    audio['title'] = title
+    if artists:
+        audio['artist'] = artists
+        audio['albumartist'] = album_artist or artists[0]
+    if album:
+        audio['album'] = album
+    if track_number is not None:
+        audio['tracknumber'] = str(track_number)
+        if album_track_total is not None:
+            audio['tracktotal'] = str(album_track_total)
+    if disc_number is not None:
+        audio['discnumber'] = str(disc_number)
+        if disc_total is not None:
+            audio['disctotal'] = str(disc_total)
+    if year:
+        audio['date'] = year
+    if year and len(year) >= 4:
+        audio['originaldate'] = year[:4]
+    if genre:
+        audio['genre'] = genre
+    if compilation:
+        audio['compilation'] = '1'
+    if cover_bytes:
+        picture = Picture()
+        picture.data = cover_bytes
+        picture.type = 3
+        picture.mime = 'image/jpeg'
+        audio.clear_pictures()
+        audio.add_picture(picture)
+    audio.save()
+
+
+def _tag_ogg_vorbis(
+    path: Path,
+    title: str,
+    artists: list[str],
+    album: str,
+    year: str,
+    genre: str,
+    track_number: Optional[int],
+    album_track_total: Optional[int],
+    album_artist: Optional[str] = None,
+    disc_number: Optional[int] = None,
+    disc_total: Optional[int] = None,
+    compilation: bool = False,
+) -> None:
+    audio = OggVorbis(str(path))
+    _apply_vorbis_comments(
+        audio,
+        title,
+        artists,
+        album,
+        year,
+        genre,
+        track_number,
+        album_track_total,
+        album_artist,
+        disc_number,
+        disc_total,
+        compilation,
+    )
+    audio.save()
+
+
+def _tag_opus(
+    path: Path,
+    title: str,
+    artists: list[str],
+    album: str,
+    year: str,
+    genre: str,
+    track_number: Optional[int],
+    album_track_total: Optional[int],
+    album_artist: Optional[str] = None,
+    disc_number: Optional[int] = None,
+    disc_total: Optional[int] = None,
+    compilation: bool = False,
+) -> None:
+    audio = OggOpus(str(path))
+    _apply_vorbis_comments(
+        audio,
+        title,
+        artists,
+        album,
+        year,
+        genre,
+        track_number,
+        album_track_total,
+        album_artist,
+        disc_number,
+        disc_total,
+        compilation,
+    )
+    audio.save()
+
+
+def _apply_vorbis_comments(
+    audio,
+    title,
+    artists,
+    album,
+    year,
+    genre,
+    track_number: Optional[int],
+    album_track_total: Optional[int],
+    album_artist: Optional[str] = None,
+    disc_number: Optional[int] = None,
+    disc_total: Optional[int] = None,
+    compilation: bool = False,
+):
+    audio['title'] = title
+    if artists:
+        audio['artist'] = artists
+        audio['albumartist'] = album_artist or artists[0]
+    if album:
+        audio['album'] = album
+    if track_number is not None:
+        audio['TRACKNUMBER'] = str(track_number)
+        if album_track_total is not None:
+            audio['TRACKTOTAL'] = str(album_track_total)
+    if disc_number is not None:
+        audio['DISCNUMBER'] = str(disc_number)
+        if disc_total is not None:
+            audio['DISCTOTAL'] = str(disc_total)
+    if year:
+        audio['date'] = year
+    if year and len(year) >= 4:
+        audio['originaldate'] = year[:4]
+    if genre:
+        audio['genre'] = genre
+    if compilation:
+        audio['compilation'] = '1'
+
+
+def embed_lyrics(path: Path, lyrics: 'lyrics_mod.Lyrics') -> None:
+    if not path.exists() or not lyrics.has_any():
+        return
+
+    if lyrics.synced:
+        sidecar = path.with_suffix('.lrc')
+        try:
+            sidecar.write_text(lyrics.synced, encoding='utf-8')
+        except OSError:
+            logger.opt(exception=True).warning(
+                'Could not write LRC sidecar {}', sidecar
+            )
+
+    text = lyrics.plain or _strip_lrc_timestamps(lyrics.synced or '')
+    if not text:
+        return
+
+    suffix = path.suffix.lower().lstrip('.')
+    if suffix == 'mp3':
+        audio = MP3(str(path), ID3=ID3)
+        if audio.tags is None:
+            audio.add_tags()
+        audio.tags.delall('USLT')
+        audio.tags.add(USLT(encoding=3, lang='eng', desc='', text=text))
+        audio.save(v2_version=3)
+    elif suffix in {'m4a', 'mp4', 'aac'}:
+        audio = MP4(str(path))
+        audio['\xa9lyr'] = text
+        audio.save()
+    elif suffix == 'flac':
+        audio = FLAC(str(path))
+        audio['lyrics'] = text
+        audio.save()
+    elif suffix in {'ogg', 'oga'}:
+        audio = OggVorbis(str(path))
+        audio['lyrics'] = text
+        audio.save()
+    elif suffix == 'opus':
+        audio = OggOpus(str(path))
+        audio['lyrics'] = text
+        audio.save()
+
+
+def _strip_lrc_timestamps(synced: str) -> str:
+    cleaned = _re.sub(r'\[\d{1,2}:\d{2}(?:\.\d{1,3})?]', '', synced)
+    return '\n'.join(
+        line.strip() for line in cleaned.splitlines() if line.strip()
+    )
