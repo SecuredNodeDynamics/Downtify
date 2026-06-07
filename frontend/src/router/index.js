@@ -5,6 +5,7 @@ import Download from '/src/views/Download.vue'
 import List from '/src/views/Downloads.vue'
 import Monitor from '/src/views/Monitor.vue'
 import Player from '/src/views/Player.vue'
+import Preview from '/src/views/Preview.vue'
 import config from '/src/config'
 
 const routes = [
@@ -38,6 +39,11 @@ const routes = [
     name: 'Player',
     component: Player,
   },
+  {
+    path: '/preview',
+    name: 'Preview',
+    component: Preview
+   },
 ]
 
 const router = createRouter({
