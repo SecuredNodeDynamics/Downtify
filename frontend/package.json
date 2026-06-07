@@ -1,6 +1,6 @@
 {
   "name": "downtify-web",
-  "version": "2.7.5",
+  "version": "2.7.6",
   "scripts": {
     "dev": "vite",
     "build": "node ../version.js patch && vite build",
