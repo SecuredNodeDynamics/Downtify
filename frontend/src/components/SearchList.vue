@@ -629,22 +629,43 @@ function formatDuration(seconds) {
 }
 
 function embedUrlFor(song) {
-  if (!song?.url) return ''
-  const spotifyMatch = song.url.match(
-    /open\.spotify\.com\/(?:intl-[a-z]{2}\/)?(track|album|playlist)\/([A-Za-z0-9]+)/
-  )
-  if (spotifyMatch) {
-    return `https://open.spotify.com/embed/${spotifyMatch[1]}/${spotifyMatch[2]}`
+  if (!song) return ''
+  if (song.url) {
+    const spotifyMatch = song.url.match(
+      /open\.spotify\.com\/(?:intl-[a-z]{2}\/)?(track|album|playlist)\/([A-Za-z0-9]+)/
+    )
+    if (spotifyMatch) {
+      return `https://open.spotify.com/embed/${spotifyMatch[1]}/${spotifyMatch[2]}`
+    }
   }
+
+  const spotifySearchUrl = spotifySearchEmbedUrlFor(song)
+  if (spotifySearchUrl) return spotifySearchUrl
 
   const youtubeId =
     song.song_id ||
-    song.url.match(/[?&]v=([A-Za-z0-9_-]{6,})/)?.[1] ||
-    song.url.match(/youtu\.be\/([A-Za-z0-9_-]{6,})/)?.[1]
+    song.url?.match(/[?&]v=([A-Za-z0-9_-]{6,})/)?.[1] ||
+    song.url?.match(/youtu\.be\/([A-Za-z0-9_-]{6,})/)?.[1]
   if (song.source === 'youtube' && youtubeId && !String(youtubeId).startsWith('album:')) {
     return `https://www.youtube.com/embed/${youtubeId}`
   }
   return ''
+}
+
+function spotifySearchEmbedUrlFor(song) {
+  if (song.source !== 'youtube') return ''
+  const query = [
+    song.name,
+    artistsOf(song),
+    song.album_name,
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  return query
+    ? `https://open.spotify.com/embed/search/${encodeURIComponent(query)}`
+    : ''
 }
 </script>
 
