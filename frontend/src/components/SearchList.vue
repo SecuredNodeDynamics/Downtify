@@ -304,7 +304,7 @@
                     v-else-if="!activeDemoTrack?.preview_url"
                     class="mt-3 text-xs italic text-base-content/40"
                   >
-                    {{ t('search.noPreview') }}
+                    No playable preview is available for this track.
                   </p>
 
                   <div class="mt-5 flex flex-wrap items-center gap-2">

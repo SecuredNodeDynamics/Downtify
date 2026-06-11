@@ -57,15 +57,30 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import SearchInput from './SearchInput.vue'
 import { useI18n } from '../i18n'
 
 const { t } = useI18n()
+const backendVersion = ref('')
 
 const versionLabel = computed(() =>
-  __APP_VERSION__ === '0.0.0'
+  (backendVersion.value || __APP_VERSION__) === '0.0.0'
     ? 'Swag Daddy Version'
-    : `v${__APP_VERSION__}`
+    : `v${backendVersion.value || __APP_VERSION__}`
 )
+
+onMounted(async () => {
+  try {
+    const res = await fetch(`/api/version?t=${Date.now()}`, {
+      cache: 'no-store',
+    })
+    const version = String(await res.json()).trim()
+    if (/^\d+\.\d+\.\d+$/.test(version)) {
+      backendVersion.value = version
+    }
+  } catch {
+    backendVersion.value = ''
+  }
+})
 </script>

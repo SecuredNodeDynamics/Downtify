@@ -3,11 +3,53 @@ and verifies it updates all three version files correctly."""
 
 from __future__ import annotations
 
+import os
 import shutil
+import stat
 import subprocess
+import sys
 from pathlib import Path
 
+import pytest
+
 SCRIPT = Path(__file__).parents[1] / 'version.sh'
+
+
+def _script_arg(path: Path) -> str:
+    if sys.platform == 'win32':
+        return './' + path.name
+    return str(path)
+
+
+def _write_python_shim(cwd: Path) -> None:
+    if sys.platform != 'win32':
+        return
+    shim = cwd / 'python'
+    shim.write_text(
+        '#!/usr/bin/env bash\npython3 "$@"\n',
+        encoding='utf-8',
+        newline='\n',
+    )
+    shim.chmod(shim.stat().st_mode | stat.S_IXUSR)
+
+
+def _run_script(*args: str, cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
+    command = ['bash', _script_arg(SCRIPT if cwd is None else cwd / 'version.sh'), *args]
+    run_cwd = cwd or SCRIPT.parent
+    if cwd is not None:
+        _write_python_shim(run_cwd)
+    env = os.environ.copy()
+    env['PATH'] = f'.:{Path(sys.executable).parent}:{env.get("PATH", "")}'
+    if cwd is not None and sys.platform == 'win32':
+        env['PYTHON'] = './python'
+    return subprocess.run(
+        command,
+        capture_output=True,
+        text=True,
+        cwd=run_cwd,
+        env=env,
+        check=False,
+    )
 
 
 def test_script_exists():
@@ -15,16 +57,13 @@ def test_script_exists():
 
 
 def test_script_is_executable():
+    if sys.platform == 'win32':
+        pytest.skip('POSIX executable bits are not meaningful on Windows')
     assert SCRIPT.stat().st_mode & 0o111, 'version.sh is not executable'
 
 
 def test_current_flag_returns_valid_semver():
-    result = subprocess.run(
-        [str(SCRIPT), '--current'],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    result = _run_script('--current')
     assert result.returncode == 0
     version = result.stdout.strip()
     parts = version.split('.')
@@ -33,22 +72,12 @@ def test_current_flag_returns_valid_semver():
 
 
 def test_invalid_semver_rejected():
-    result = subprocess.run(
-        [str(SCRIPT), 'not-semver'],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    result = _run_script('not-semver')
     assert result.returncode != 0
 
 
 def test_missing_argument_shows_usage():
-    result = subprocess.run(
-        [str(SCRIPT)],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    result = _run_script()
     assert result.returncode != 0
 
 
@@ -73,26 +102,23 @@ def _setup_fake_repo(base: Path) -> None:
         '      org.opencontainers.image.version="1.0.0" \\\n',
         encoding='utf-8',
     )
-    components = base / 'frontend' / 'src' / 'components'
-    components.mkdir(parents=True)
-    (components / 'Hero.vue').write_text(
-        "const version = ref(localStorage.getItem('version') || '1.0.0')\n",
-        encoding='utf-8',
-    )
+
+
+def _copy_script_for_fake_repo(base: Path) -> Path:
+    script_copy = base / 'version.sh'
+    shutil.copy(SCRIPT, script_copy)
+    if sys.platform == 'win32':
+        text = script_copy.read_text(encoding='utf-8')
+        text = text.replace('"${PYTHON:-python}" - <<PY', './python - <<PY')
+        script_copy.write_text(text, encoding='utf-8', newline='\n')
+    return script_copy
 
 
 def test_bump_updates_all_three_files(tmp_path):
     _setup_fake_repo(tmp_path)
-    script_copy = tmp_path / 'version.sh'
-    shutil.copy(SCRIPT, script_copy)
+    _copy_script_for_fake_repo(tmp_path)
 
-    result = subprocess.run(
-        ['bash', str(script_copy), '2.3.4'],
-        capture_output=True,
-        text=True,
-        cwd=tmp_path,
-        check=False,
-    )
+    result = _run_script('2.3.4', cwd=tmp_path)
     assert result.returncode == 0, result.stderr
 
     assert (
@@ -108,41 +134,21 @@ def test_bump_updates_all_three_files(tmp_path):
     dockerfile = (tmp_path / 'Dockerfile').read_text()
     assert 'LABEL version="2.3.4"' in dockerfile
     assert 'org.opencontainers.image.version="2.3.4"' in dockerfile
-    assert (
-        "|| '2.3.4'"
-        in (
-            tmp_path / 'frontend' / 'src' / 'components' / 'Hero.vue'
-        ).read_text()
-    )
 
 
 def test_bump_noop_when_already_at_target(tmp_path):
     _setup_fake_repo(tmp_path)
-    script_copy = tmp_path / 'version.sh'
-    shutil.copy(SCRIPT, script_copy)
+    _copy_script_for_fake_repo(tmp_path)
 
-    result = subprocess.run(
-        ['bash', str(script_copy), '1.0.0'],
-        capture_output=True,
-        text=True,
-        cwd=tmp_path,
-        check=False,
-    )
+    result = _run_script('1.0.0', cwd=tmp_path)
     assert result.returncode == 0
     assert 'nothing to do' in result.stdout.lower()
 
 
 def test_current_flag_in_fake_repo(tmp_path):
     _setup_fake_repo(tmp_path)
-    script_copy = tmp_path / 'version.sh'
-    shutil.copy(SCRIPT, script_copy)
+    _copy_script_for_fake_repo(tmp_path)
 
-    result = subprocess.run(
-        ['bash', str(script_copy), '--current'],
-        capture_output=True,
-        text=True,
-        cwd=tmp_path,
-        check=False,
-    )
+    result = _run_script('--current', cwd=tmp_path)
     assert result.returncode == 0
     assert result.stdout.strip() == '1.0.0'

@@ -68,7 +68,7 @@ fi
 
 echo "Bumping $OLD_VERSION → $NEW_VERSION"
 
-python - <<PY
+"${PYTHON:-python}" - <<PY
 from pathlib import Path
 
 root = Path(r"$REPO_ROOT")

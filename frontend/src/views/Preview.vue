@@ -80,7 +80,7 @@
 
               <!-- Play overlay -->
               <button
-                v-if="song.preview_url"
+                v-if="song.preview_url || embedUrlFor(song)"
                 class="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 hover:opacity-100 transition-opacity"
                 :class="{ 'opacity-100': currentTrack?.song_id === song.song_id }"
                 @click="togglePlay(song)"
@@ -105,8 +105,8 @@
                 {{ song.album_name }}
               </p>
               <!-- No preview notice -->
-              <p v-if="!song.preview_url" class="text-xs text-base-content/30 mt-0.5 italic">
-                No preview available
+              <p v-if="!song.preview_url && !embedUrlFor(song)" class="text-xs text-base-content/30 mt-0.5 italic">
+                No playable preview available
               </p>
             </div>
 
@@ -170,7 +170,10 @@
         </div>
 
         <!-- Progress -->
-        <div class="hidden sm:flex flex-1 items-center gap-2 max-w-sm">
+        <div
+          v-if="currentTrack.preview_url"
+          class="hidden sm:flex flex-1 items-center gap-2 max-w-sm"
+        >
           <span class="text-xs text-base-content/40 tabular-nums w-8 text-right">{{ formatDuration(Math.floor(audioProgress)) }}</span>
           <input
             type="range"
@@ -181,6 +184,18 @@
             @input="seek($event.target.value)"
           />
           <span class="text-xs text-base-content/40 tabular-nums w-8">{{ formatDuration(Math.floor(audioDuration)) }}</span>
+        </div>
+        <div
+          v-else-if="currentEmbedUrl"
+          class="hidden sm:block flex-1 max-w-md overflow-hidden rounded-xl border border-white/10 bg-black/20"
+        >
+          <iframe
+            :key="currentEmbedUrl"
+            :src="currentEmbedUrl"
+            class="h-20 w-full"
+            allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+            loading="lazy"
+          />
         </div>
 
         <!-- Controls -->
@@ -212,6 +227,7 @@
 
 <script setup>
 import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 
@@ -237,6 +253,7 @@ const currentTrack = ref(null)
 const isPlaying = ref(false)
 const audioProgress = ref(0)
 const audioDuration = ref(30)
+const currentEmbedUrl = computed(() => embedUrlFor(currentTrack.value))
 
 audio.addEventListener('timeupdate', () => {
   audioProgress.value = audio.currentTime
@@ -275,7 +292,14 @@ onMounted(async () => {
 
 // ── Playback ─────────────────────────────────────────────────────────────────
 function togglePlay(song) {
-  if (!song.preview_url) return
+  if (!song.preview_url) {
+    if (embedUrlFor(song)) {
+      audio.pause()
+      currentTrack.value = song
+      isPlaying.value = false
+    }
+    return
+  }
 
   if (currentTrack.value?.song_id === song.song_id) {
     // Same track — toggle pause/play
@@ -343,6 +367,25 @@ function formatDuration(seconds) {
   const m = Math.floor(seconds / 60)
   const s = Math.floor(seconds % 60)
   return `${m}:${s.toString().padStart(2, '0')}`
+}
+
+function embedUrlFor(song) {
+  if (!song?.url) return ''
+  const spotifyMatch = song.url.match(
+    /open\.spotify\.com\/(?:intl-[a-z]{2}\/)?(track|album|playlist)\/([A-Za-z0-9]+)/
+  )
+  if (spotifyMatch) {
+    return `https://open.spotify.com/embed/${spotifyMatch[1]}/${spotifyMatch[2]}`
+  }
+
+  const youtubeId =
+    song.song_id ||
+    song.url.match(/[?&]v=([A-Za-z0-9_-]{6,})/)?.[1] ||
+    song.url.match(/youtu\.be\/([A-Za-z0-9_-]{6,})/)?.[1]
+  if (song.source === 'youtube' && youtubeId && !String(youtubeId).startsWith('album:')) {
+    return `https://www.youtube.com/embed/${youtubeId}`
+  }
+  return ''
 }
 </script>
 
