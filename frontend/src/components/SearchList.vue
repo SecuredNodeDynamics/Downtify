@@ -14,8 +14,8 @@
           >
             {{
               props.data.length === 1
-                ? t('search.songsCount', { count: props.data.length })
-                : t('search.songsCountPlural', { count: props.data.length })
+                ? t('search.resultsCount', { count: props.data.length })
+                : t('search.resultsCountPlural', { count: props.data.length })
             }}
           </template>
         </template>
@@ -106,6 +106,14 @@
 
         <!-- Actions -->
         <div class="flex items-center gap-1 shrink-0">
+          <span
+            class="media-type-pill"
+            :class="mediaTypeClass(song)"
+            :title="mediaTypeLabel(song)"
+          >
+            {{ mediaTypeLabel(song) }}
+          </span>
+
           <a
             v-if="song.url"
             class="icon-btn"
@@ -217,6 +225,22 @@ function artistsOf(song) {
     return song.artists.join(', ')
   }
   return song.artist || t('common.unknownArtist')
+}
+
+function mediaType(song) {
+  return song?.media_type === 'album' ? 'album' : 'track'
+}
+
+function mediaTypeLabel(song) {
+  return mediaType(song) === 'album'
+    ? t('search.albumType')
+    : t('search.trackType')
+}
+
+function mediaTypeClass(song) {
+  return mediaType(song) === 'album'
+    ? 'media-type-pill-album'
+    : 'media-type-pill-track'
 }
 
 function downloadState(song) {

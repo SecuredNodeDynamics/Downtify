@@ -147,6 +147,16 @@
     @apply bg-black/5 border-black/10;
   }
 
+  .media-type-pill {
+    @apply pill h-8 shrink-0 rounded-full px-3 text-[11px] font-semibold uppercase;
+  }
+  .media-type-pill-track {
+    @apply bg-primary/15 text-primary border border-primary/20;
+  }
+  .media-type-pill-album {
+    @apply bg-info/15 text-info border border-info/25;
+  }
+
   .card-hover-glow {
     @apply transition-all duration-300 hover:-translate-y-0.5 hover:shadow-glow-sm;
   }
