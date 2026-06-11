@@ -198,7 +198,7 @@
           @click.self="closeDemo"
         >
           <div
-            class="surface-strong w-full max-w-2xl overflow-hidden rounded-t-3xl shadow-2xl sm:rounded-3xl"
+            class="surface-strong w-full max-w-3xl overflow-hidden rounded-t-3xl shadow-2xl sm:rounded-3xl"
           >
             <div class="flex items-center justify-between border-b border-white/5 px-5 py-4">
               <div class="min-w-0">
@@ -330,7 +330,7 @@
                     Preview will be available shortly.
                   </p>
 
-                  <div class="mt-5 flex flex-wrap items-center gap-2 sm:flex-nowrap">
+                  <div class="mt-5 flex flex-wrap items-center gap-2 lg:flex-nowrap">
                     <button
                       v-if="demoType === 'album' && demoSourceItem"
                       class="btn btn-primary btn-sm gap-2 rounded-full"
