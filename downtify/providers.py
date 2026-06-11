@@ -102,6 +102,7 @@ def _result_to_song(result: dict[str, Any]) -> Optional[dict[str, Any]]:
     cover = _upgrade_thumbnail(cover)
     album = result.get('album') or {}
     album_name = album.get('name', '') if isinstance(album, dict) else ''
+    album_id = album.get('id', '') if isinstance(album, dict) else ''
     duration = result.get('duration_seconds') or _parse_duration(
         result.get('duration')
     )
@@ -115,6 +116,7 @@ def _result_to_song(result: dict[str, Any]) -> Optional[dict[str, Any]]:
         'name': result.get('title', ''),
         'artists': artists,
         'album_name': album_name,
+        'album_browse_id': album_id,
         'cover_url': cover,
         'duration': duration,
         'url': f'https://music.youtube.com/watch?v={video_id}',
@@ -154,6 +156,33 @@ def _result_to_album(result: dict[str, Any]) -> Optional[dict[str, Any]]:
         'year': year,
         'release_date': year if len(year) == 4 and year.isdigit() else '',
         'track_count': result.get('trackCount') or result.get('count'),
+        'url': f'https://music.youtube.com/browse/{browse_id}',
+        'source': 'youtube',
+    }
+
+
+def _song_result_to_album(result: dict[str, Any]) -> Optional[dict[str, Any]]:
+    album = result.get('album') or {}
+    if not isinstance(album, dict):
+        return None
+    browse_id = str(album.get('id') or '').strip()
+    title = str(album.get('name') or '').strip()
+    if not browse_id or not title:
+        return None
+    artists = _artists_from_result(result)
+    thumbs = result.get('thumbnails') or []
+    cover = thumbs[-1].get('url', '') if thumbs else ''
+    return {
+        'song_id': f'album:{browse_id}',
+        'media_type': 'album',
+        'browse_id': browse_id,
+        'name': title,
+        'artists': artists,
+        'artist': ', '.join(artists),
+        'album_name': title,
+        'cover_url': _upgrade_thumbnail(cover),
+        'year': '',
+        'release_date': '',
         'url': f'https://music.youtube.com/browse/{browse_id}',
         'source': 'youtube',
     }
@@ -200,6 +229,33 @@ def search_songs(query: str, limit: int = 20) -> list[dict[str, Any]]:
     return songs
 
 
+def _albums_from_song_search(query: str, limit: int = 10) -> list[dict[str, Any]]:
+    if not query.strip():
+        return []
+    try:
+        results = _ytm().search(query, filter='songs', limit=max(limit, 20))
+    except Exception:
+        logger.exception('YouTube Music album hint search failed')
+        return []
+
+    albums: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for result in results:
+        if not isinstance(result, dict):
+            continue
+        album = _song_result_to_album(result)
+        if not album:
+            continue
+        browse_id = album['browse_id']
+        if browse_id in seen:
+            continue
+        seen.add(browse_id)
+        albums.append(album)
+        if len(albums) >= limit:
+            break
+    return albums
+
+
 def search_albums(query: str, limit: int = 10) -> list[dict[str, Any]]:
     if not query.strip():
         return []
@@ -238,7 +294,13 @@ def search_media(query: str, limit: int = 20) -> list[dict[str, Any]]:
     album_limit = max(1, min(10, limit // 2))
     songs = search_songs(query, limit=song_limit)
     albums = search_albums(query, limit=album_limit)
-    return [*albums, *songs][: limit + album_limit]
+    seen_album_ids = {a.get('browse_id') for a in albums if a.get('browse_id')}
+    for album in _albums_from_song_search(query, limit=album_limit):
+        if album.get('browse_id') in seen_album_ids:
+            continue
+        seen_album_ids.add(album.get('browse_id'))
+        albums.append(album)
+    return [*albums[:album_limit], *songs][: limit + album_limit]
 
 
 def album_tracks_from_browse_id(browse_id: str) -> list[dict[str, Any]]:

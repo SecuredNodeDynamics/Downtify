@@ -148,3 +148,36 @@ def test_search_songs_falls_back_to_broad_search(monkeypatch):
 
     assert results[0]['song_id'] == 'abc12345678'
     assert results[0]['name'] == 'Fallback Song'
+
+
+def test_search_media_derives_albums_from_song_hits(monkeypatch):
+    class FakeYTMusic:
+        def search(self, query, filter=None, limit=20):
+            if filter == 'albums':
+                return []
+            if filter == 'songs':
+                return [
+                    {
+                        'videoId': 'abc12345678',
+                        'title': 'Track One',
+                        'artists': [{'name': 'Artist'}],
+                        'album': {'name': 'Album One', 'id': 'MPREb_album'},
+                        'thumbnails': [{'url': 'https://img=w60-h60'}],
+                    },
+                    {
+                        'videoId': 'def12345678',
+                        'title': 'Track Two',
+                        'artists': [{'name': 'Artist'}],
+                        'album': {'name': 'Album One', 'id': 'MPREb_album'},
+                    },
+                ]
+            return []
+
+    monkeypatch.setattr(providers, '_ytm', lambda: FakeYTMusic())
+
+    results = providers.search_media('artist album', limit=5)
+
+    assert results[0]['media_type'] == 'album'
+    assert results[0]['name'] == 'Album One'
+    assert results[0]['browse_id'] == 'MPREb_album'
+    assert [r['media_type'] for r in results].count('album') == 1
