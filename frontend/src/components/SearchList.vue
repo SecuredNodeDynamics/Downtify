@@ -287,33 +287,37 @@
                     <span class="w-9 text-xs tabular-nums text-base-content/40">
                       {{ formatDuration(Math.floor(demoDuration)) }}
                     </span>
-                    <div class="relative shrink-0">
+                    <div ref="demoVolumeRoot" class="relative shrink-0">
                       <button
                         class="icon-btn h-8 w-8 text-base-content/60 hover:text-base-content"
                         :class="{ 'bg-white/10 text-base-content': demoVolumeOpen }"
                         type="button"
-                        aria-label="Volume"
+                        :aria-label="t('player.volume')"
+                        :aria-expanded="demoVolumeOpen"
                         @click="toggleDemoVolume"
                       >
                         <Icon :icon="demoVolumeIcon" class="h-4 w-4" />
                       </button>
                       <div
                         v-if="demoVolumeOpen"
-                        class="absolute bottom-full right-0 z-10 mb-2 flex h-36 w-14 flex-col items-center gap-2 rounded-2xl border border-white/10 bg-base-100/95 px-3 py-3 text-base-content/60 shadow-2xl"
+                        class="absolute bottom-full right-0 z-20 mb-2 flex flex-col items-center gap-1 rounded-2xl border border-white/10 bg-base-100/95 px-3 py-3 text-base-content/60 shadow-2xl backdrop-blur"
+                        @pointerdown.stop
                       >
-                        <span class="text-[10px] tabular-nums">
+                        <span class="text-[10px] tabular-nums leading-none">
                           {{ Math.round(demoVolume * 100) }}
                         </span>
-                        <input
-                          type="range"
-                          min="0"
-                          max="1"
-                          step="0.01"
-                          :value="demoVolume"
-                          class="volume-slider-vertical flex-1 cursor-pointer accent-primary"
-                          aria-label="Volume"
-                          @input="setDemoVolume($event.target.value)"
-                        />
+                        <div class="volume-slider-shell">
+                          <input
+                            type="range"
+                            min="0"
+                            max="1"
+                            step="0.01"
+                            :value="demoVolume"
+                            class="volume-slider-vertical"
+                            :aria-label="t('player.volume')"
+                            @input="setDemoVolume($event.target.value)"
+                          />
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -437,6 +441,8 @@
 
 <script setup>
 import { ref, computed, watch, onBeforeUnmount } from 'vue'
+
+const DEMO_VOLUME_KEY = 'downtify-player-volume'
 import { Icon } from '@iconify/vue'
 
 import { useSearchManager } from '../model/search'
@@ -467,7 +473,10 @@ const demoDuration = ref(30)
 const demoPlaying = ref(false)
 const demoAudioResolving = ref(false)
 const demoAudioError = ref('')
-const demoVolume = ref(1)
+const demoVolumeRoot = ref(null)
+const demoVolume = ref(
+  parseFloat(localStorage.getItem(DEMO_VOLUME_KEY) || '0.85')
+)
 const demoVolumeOpen = ref(false)
 const resolvedDemoAudioUrls = ref({})
 const resolvingDemoAudioKeys = ref({})
@@ -487,7 +496,16 @@ demoAudio.addEventListener('ended', () => {
 })
 
 onBeforeUnmount(() => {
+  document.removeEventListener('pointerdown', onDemoVolumeOutsideClick)
   stopDemoPlayback()
+})
+
+watch(demoVolumeOpen, (open) => {
+  if (open) {
+    document.addEventListener('pointerdown', onDemoVolumeOutsideClick)
+  } else {
+    document.removeEventListener('pointerdown', onDemoVolumeOutsideClick)
+  }
 })
 
 const totalPages = computed(() =>
@@ -730,10 +748,21 @@ function setDemoVolume(value) {
   const volume = Math.min(1, Math.max(0, Number(value)))
   demoVolume.value = volume
   demoAudio.volume = volume
+  try {
+    localStorage.setItem(DEMO_VOLUME_KEY, String(volume))
+  } catch {
+    // ignore
+  }
 }
 
 function toggleDemoVolume() {
   demoVolumeOpen.value = !demoVolumeOpen.value
+}
+
+function onDemoVolumeOutsideClick(event) {
+  if (!demoVolumeOpen.value) return
+  if (demoVolumeRoot.value?.contains(event.target)) return
+  demoVolumeOpen.value = false
 }
 
 function downloadFromDemo() {
@@ -929,9 +958,63 @@ function formatDuration(seconds) {
   opacity: 0;
 }
 
+.volume-slider-shell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 5.5rem;
+}
+
 .volume-slider-vertical {
-  writing-mode: vertical-lr;
-  direction: rtl;
-  width: 1rem;
+  -webkit-appearance: none;
+  appearance: none;
+  width: 5.5rem;
+  height: 0.25rem;
+  margin: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.15);
+  cursor: pointer;
+  outline: none;
+  transform: rotate(-90deg);
+  transform-origin: center;
+}
+
+[data-theme='downtify-light'] .volume-slider-vertical {
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.volume-slider-vertical::-webkit-slider-runnable-track {
+  height: 0.25rem;
+  border-radius: 999px;
+  background: transparent;
+}
+
+.volume-slider-vertical::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 0.75rem;
+  height: 0.75rem;
+  margin-top: -0.25rem;
+  border-radius: 999px;
+  background: #1ad05c;
+  box-shadow: 0 0 10px rgba(26, 208, 92, 0.45);
+  cursor: pointer;
+}
+
+.volume-slider-vertical::-moz-range-track {
+  height: 0.25rem;
+  border-radius: 999px;
+  background: transparent;
+}
+
+.volume-slider-vertical::-moz-range-thumb {
+  width: 0.75rem;
+  height: 0.75rem;
+  border: none;
+  border-radius: 999px;
+  background: #1ad05c;
+  box-shadow: 0 0 10px rgba(26, 208, 92, 0.45);
+  cursor: pointer;
 }
 </style>
