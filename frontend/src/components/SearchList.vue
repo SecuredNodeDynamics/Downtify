@@ -287,26 +287,35 @@
                     <span class="w-9 text-xs tabular-nums text-base-content/40">
                       {{ formatDuration(Math.floor(demoDuration)) }}
                     </span>
-                  </div>
-
-                  <div
-                    v-if="demoVolumeActive"
-                    class="mt-3 flex items-center gap-2 text-base-content/50"
-                  >
-                    <Icon :icon="demoVolumeIcon" class="h-4 w-4 shrink-0" />
-                    <input
-                      type="range"
-                      min="0"
-                      max="1"
-                      step="0.01"
-                      :value="demoVolume"
-                      class="h-1 w-32 cursor-pointer accent-primary sm:w-40"
-                      aria-label="Volume"
-                      @input="setDemoVolume($event.target.value)"
-                    />
-                    <span class="w-9 text-xs tabular-nums">
-                      {{ Math.round(demoVolume * 100) }}%
-                    </span>
+                    <div class="relative shrink-0">
+                      <button
+                        class="icon-btn h-8 w-8 text-base-content/60 hover:text-base-content"
+                        :class="{ 'bg-white/10 text-base-content': demoVolumeOpen }"
+                        type="button"
+                        aria-label="Volume"
+                        @click="toggleDemoVolume"
+                      >
+                        <Icon :icon="demoVolumeIcon" class="h-4 w-4" />
+                      </button>
+                      <div
+                        v-if="demoVolumeOpen"
+                        class="absolute bottom-full right-0 z-10 mb-2 flex h-36 w-14 flex-col items-center gap-2 rounded-2xl border border-white/10 bg-base-100/95 px-3 py-3 text-base-content/60 shadow-2xl"
+                      >
+                        <span class="text-[10px] tabular-nums">
+                          {{ Math.round(demoVolume * 100) }}
+                        </span>
+                        <input
+                          type="range"
+                          min="0"
+                          max="1"
+                          step="0.01"
+                          :value="demoVolume"
+                          class="volume-slider-vertical flex-1 cursor-pointer accent-primary"
+                          aria-label="Volume"
+                          @input="setDemoVolume($event.target.value)"
+                        />
+                      </div>
+                    </div>
                   </div>
 
                   <p
@@ -459,7 +468,7 @@ const demoPlaying = ref(false)
 const demoAudioResolving = ref(false)
 const demoAudioError = ref('')
 const demoVolume = ref(1)
-const demoVolumeActive = ref(false)
+const demoVolumeOpen = ref(false)
 const resolvedDemoAudioUrls = ref({})
 const resolvingDemoAudioKeys = ref({})
 const failedDemoAudioKeys = ref({})
@@ -622,7 +631,7 @@ async function openDemo(song) {
   demoSourceItem.value = song
   activeDemoTrack.value = null
   demoAudioError.value = ''
-  demoVolumeActive.value = false
+  demoVolumeOpen.value = false
   stopDemoPlayback()
 
   try {
@@ -654,6 +663,7 @@ async function openDemo(song) {
 
 function closeDemo() {
   demoOpen.value = false
+  demoVolumeOpen.value = false
   stopDemoPlayback()
 }
 
@@ -661,6 +671,7 @@ function selectDemoTrack(track) {
   const wasPlaying = demoPlaying.value
   activeDemoTrack.value = track
   demoAudioError.value = ''
+  demoVolumeOpen.value = false
   stopDemoPlayback()
   warmDemoAudio(track)
   warmNextDemoTrack(track)
@@ -684,7 +695,6 @@ async function toggleDemoPlay(track) {
     } else {
       await demoAudio.play()
       demoPlaying.value = true
-      demoVolumeActive.value = true
     }
     return
   }
@@ -697,7 +707,6 @@ async function toggleDemoPlay(track) {
   try {
     await demoAudio.play()
     demoPlaying.value = true
-    demoVolumeActive.value = true
   } catch (err) {
     demoAudioError.value = err.message || 'Preview playback failed.'
     demoPlaying.value = false
@@ -721,6 +730,10 @@ function setDemoVolume(value) {
   const volume = Math.min(1, Math.max(0, Number(value)))
   demoVolume.value = volume
   demoAudio.volume = volume
+}
+
+function toggleDemoVolume() {
+  demoVolumeOpen.value = !demoVolumeOpen.value
 }
 
 function downloadFromDemo() {
@@ -914,5 +927,11 @@ function formatDuration(seconds) {
 .demo-modal-leave-to > div {
   transform: translateY(16px);
   opacity: 0;
+}
+
+.volume-slider-vertical {
+  writing-mode: vertical-lr;
+  direction: rtl;
+  width: 1rem;
 }
 </style>
