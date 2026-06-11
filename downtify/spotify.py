@@ -422,17 +422,6 @@ def _track_dict(
             album_name or fallback_album,
             entity.get('releaseDate'),
         )
-
-    # ← back at function body level, NOT inside the if above
-    preview_url: Optional[str] = None
-    audio_preview = entity.get('audioPreview')
-    if isinstance(audio_preview, dict):
-        preview_url = audio_preview.get('url') or None
-    if not preview_url:
-        preview_url = (
-            entity.get('previewUrl') or entity.get('preview_url') or None
-        )
-
     return {
         'song_id': track_id,
         'name': entity.get('name') or entity.get('title') or '',
@@ -448,7 +437,6 @@ def _track_dict(
         'release_date': release_date,
         'year': year,
         'source': 'spotify',
-        'preview_url': preview_url,
     }
 
 
@@ -598,16 +586,6 @@ def _track_dict_from_graphql_item(
             album_name,
             sorted(album.keys()) if isinstance(album, dict) else (),
         )
-
-    gql_preview: Optional[str] = None
-    audio_preview = track.get('audioPreview')
-    if isinstance(audio_preview, dict):
-        gql_preview = audio_preview.get('url') or None
-    if not gql_preview:
-        gql_preview = (
-            track.get('previewUrl') or track.get('preview_url') or None
-        )
-
     return {
         'song_id': track_id,
         'name': track.get('name') or '',
@@ -621,7 +599,6 @@ def _track_dict_from_graphql_item(
         'release_date': gql_release,
         'year': _year_from_release_date(gql_release),
         'source': 'spotify',
-        'preview_url': gql_preview,
     }
 
 

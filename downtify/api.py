@@ -147,7 +147,17 @@ def check_update() -> Optional[dict[str, Any]]:
 
 @router.get('/api/songs/search')
 def search_endpoint(query: str = Query('')) -> list[dict[str, Any]]:
-    return providers.search_songs(query, limit=20)
+    return providers.search_media(query, limit=20)
+
+
+@router.get('/api/album/youtube')
+def youtube_album_endpoint(browse_id: str = Query(...)) -> list[dict[str, Any]]:
+    tracks = providers.album_tracks_from_browse_id(browse_id)
+    if not tracks:
+        raise HTTPException(
+            status_code=404, detail='No tracks found for this album'
+        )
+    return tracks
 
 
 @router.get('/api/song/url')

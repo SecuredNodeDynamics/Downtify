@@ -72,6 +72,10 @@ function open(songURL) {
   return API.get('/api/song/url', { params: { url: songURL } })
 }
 
+function openYoutubeAlbum(browseId) {
+  return API.get('/api/album/youtube', { params: { browse_id: browseId } })
+}
+
 function download(songURL) {
   const url = typeof songURL === 'string' ? songURL : songURL.url
   const hints = typeof songURL === 'string' ? undefined : songURL
@@ -84,15 +88,14 @@ function downloadBatch(payload) {
   return API.post('/api/download/batch', payload)
 }
 
-function preview(url) {
-  return API.get('/api/preview', { params: { url } })
-}
-
 function check_for_update() {
   return API.get('/api/check_update')
 }
 
 function encodePath(fileName) {
+  // Encode each path segment individually so '/' separators survive —
+  // playlist downloads land under '<playlist>/<song>.mp3' and we need
+  // the URL to hit '/downloads/<playlist>/<song>.mp3' literally.
   return String(fileName || '')
     .split('/')
     .map(encodeURIComponent)
@@ -134,7 +137,6 @@ function clearQueue() {
 function getSettings() {
   return API.get('/api/settings', { params: { client_id: sessionID } })
 }
-
 function setSettings(settings) {
   return API.post('/api/settings/update', settings, {
     params: { client_id: sessionID },
@@ -144,7 +146,6 @@ function setSettings(settings) {
 function ws_onmessage(fn) {
   return (wsConnection.onmessage = fn)
 }
-
 function ws_onerror(fn) {
   return (wsConnection.onerror = fn)
 }
@@ -152,9 +153,9 @@ function ws_onerror(fn) {
 export default {
   search,
   open,
+  openYoutubeAlbum,
   download,
   downloadBatch,
-  preview,
   downloadFileURL,
   coverFileURL,
   listDownloads,

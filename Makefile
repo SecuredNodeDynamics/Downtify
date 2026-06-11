@@ -1,6 +1,6 @@
 #!make
 
-DOWNTIFY_VERSION := 2.7.6
+DOWNTIFY_VERSION := 2.7.3
 TARGET := henriquesebastiao/downtify
 
 all: build latest
@@ -46,8 +46,9 @@ test:
 
 version:
 	@VERSION=$(word 2,$(MAKECMDGOALS)); \
-	echo "Downtify version: $$VERSION"; \
-	./version.sh $$VERSION
+	if [ -z "$$VERSION" ]; then VERSION=patch; fi; \
+	echo "Downtify version bump: $$VERSION"; \
+	node version.js $$VERSION
 	npm install --prefix frontend
 	npm run build --prefix frontend
 	uv run ruff format .; ruff check . --fix

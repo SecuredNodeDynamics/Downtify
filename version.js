@@ -11,6 +11,18 @@ function write(file, content) {
   fs.writeFileSync(path.join(root, file), content, 'utf8');
 }
 
+function writeJson(file, updater) {
+  const filePath = path.join(root, file);
+  if (!fs.existsSync(filePath)) return false;
+  const json = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  const original = JSON.stringify(json);
+  updater(json);
+  if (JSON.stringify(json) === original) return false;
+  fs.writeFileSync(filePath, `${JSON.stringify(json, null, 2)}\n`, 'utf8');
+  console.log(`updated ${file}`);
+  return true;
+}
+
 function currentVersion() {
   const text = read('downtify/__init__.py');
   const match = text.match(/__version__\s*=\s*['"]([^'"]+)['"]/);
@@ -36,21 +48,24 @@ function bump(version, part) {
 
 const arg = process.argv[2] || 'patch';
 const oldVersion = currentVersion();
-const newVersion = bump(oldVersion, arg);
 
-if (oldVersion === newVersion) {
-  console.log(`Already at version ${newVersion}`);
+if (arg === '--current') {
+  console.log(oldVersion);
   process.exit(0);
 }
 
-console.log(`Bumping ${oldVersion} -> ${newVersion}`);
+const newVersion = bump(oldVersion, arg);
+
+if (oldVersion === newVersion) {
+  console.log(`Syncing version ${newVersion}`);
+} else {
+  console.log(`Bumping ${oldVersion} -> ${newVersion}`);
+}
 
 const replacements = [
   ['downtify/__init__.py', /__version__\s*=\s*['"][^'"]+['"]/, `__version__ = '${newVersion}'`],
   ['pyproject.toml', /version\s*=\s*["'][^"']+["']/, `version = "${newVersion}"`],
-  ['frontend/package.json', /"version"\s*:\s*"[^"]+"/, `"version": "${newVersion}"`],
   ['Makefile', /DOWNTIFY_VERSION := .*/, `DOWNTIFY_VERSION := ${newVersion}`],
-  ['frontend/src/components/Hero.vue', /\|\|\s*'[^']+'/, `|| '${newVersion}'`],
 ];
 
 for (const [file, pattern, replacement] of replacements) {
@@ -63,6 +78,17 @@ for (const [file, pattern, replacement] of replacements) {
     console.log(`updated ${file}`);
   }
 }
+
+writeJson('frontend/package.json', (json) => {
+  json.version = newVersion;
+});
+
+writeJson('frontend/package-lock.json', (json) => {
+  json.version = newVersion;
+  if (json.packages && json.packages['']) {
+    json.packages[''].version = newVersion;
+  }
+});
 
 const dockerfile = path.join(root, 'Dockerfile');
 if (fs.existsSync(dockerfile)) {

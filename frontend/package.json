@@ -1,9 +1,9 @@
 {
   "name": "downtify-web",
-  "version": "2.7.6",
+  "version": "2.7.3",
   "scripts": {
     "dev": "vite",
-    "build": "node ../version.js patch && vite build",
+    "build": "vite build",
     "preview": "vite preview",
     "format": "prettier --write src/.",
     "test": "vitest run"

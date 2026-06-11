@@ -12,9 +12,9 @@ import requests
 import yt_dlp
 from loguru import logger
 from mutagen.flac import FLAC, Picture
-from mutagen.id3 import (
+from mutagen.id3 import ID3
+from mutagen.id3._frames import (
     APIC,
-    ID3,
     TALB,
     TCON,
     TDOR,

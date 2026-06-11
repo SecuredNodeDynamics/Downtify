@@ -155,9 +155,25 @@ _hydrateFromServer()
 export function useDownloadManager() {
   const loading = ref(false)
   const settingsManager = useSettingsManager()
+
+  function queueBatch(songs, playlistUrl = '') {
+    const generateM3u = settingsManager.settings.value.generate_m3u !== false
+    for (const song of songs) {
+      if (!progressTracker.getBySong(song)) {
+        progressTracker.appendSong(song)
+      }
+    }
+    return API.downloadBatch({
+      songs,
+      playlist_url: playlistUrl,
+      generate_m3u: generateM3u,
+    }).catch((err) => {
+      console.log('Batch submit failed:', err.message)
+    })
+  }
+
   function fromURL(url) {
     const isPlaylistURL = (url || '').includes('://open.spotify.com/playlist/')
-    const generateM3u = settingsManager.settings.value.generate_m3u !== false
     loading.value = true
     return API.open(url)
       .then((res) => {
@@ -168,18 +184,7 @@ export function useDownloadManager() {
         }
         const songs = res.data
         if (Array.isArray(songs)) {
-          for (const song of songs) {
-            if (!progressTracker.getBySong(song)) {
-              progressTracker.appendSong(song)
-            }
-          }
-          return API.downloadBatch({
-            songs,
-            playlist_url: isPlaylistURL ? url : '',
-            generate_m3u: generateM3u,
-          }).catch((err) => {
-            console.log('Batch submit failed:', err.message)
-          })
+          return queueBatch(songs, isPlaylistURL ? url : '')
         } else {
           console.log('Opened Song:', songs)
           queue(songs)
@@ -187,6 +192,23 @@ export function useDownloadManager() {
       })
       .catch((err) => {
         console.log('Other Error:', err.message)
+      })
+      .finally(() => {
+        loading.value = false
+      })
+  }
+
+  function queueAlbum(album) {
+    if (!album.browse_id) return Promise.resolve()
+    loading.value = true
+    return API.openYoutubeAlbum(album.browse_id)
+      .then((res) => {
+        if (res.status === 200 && Array.isArray(res.data)) {
+          return queueBatch(res.data)
+        }
+      })
+      .catch((err) => {
+        console.log('Album queue failed:', err.message)
       })
       .finally(() => {
         loading.value = false
@@ -222,6 +244,7 @@ export function useDownloadManager() {
   }
 
   function queue(song, beginDownload = true) {
+    if (song && song.media_type === 'album') return queueAlbum(song)
     progressTracker.appendSong(song)
     if (beginDownload) return download(song)
     return Promise.resolve({ song, filename: null })

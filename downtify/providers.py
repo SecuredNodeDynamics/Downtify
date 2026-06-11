@@ -111,6 +111,7 @@ def _result_to_song(result: dict[str, Any]) -> Optional[dict[str, Any]]:
     )
     return {
         'song_id': video_id,
+        'media_type': 'track',
         'name': result.get('title', ''),
         'artists': artists,
         'album_name': album_name,
@@ -120,6 +121,40 @@ def _result_to_song(result: dict[str, Any]) -> Optional[dict[str, Any]]:
         'explicit': bool(result.get('isExplicit')),
         'year': year_str,
         'release_date': release_date,
+        'source': 'youtube',
+    }
+
+
+def _artists_from_result(result: dict[str, Any]) -> list[str]:
+    return [
+        a.get('name', '')
+        for a in (result.get('artists') or [])
+        if isinstance(a, dict) and a.get('name')
+    ]
+
+
+def _result_to_album(result: dict[str, Any]) -> Optional[dict[str, Any]]:
+    browse_id = result.get('browseId')
+    if not browse_id:
+        return None
+    thumbs = result.get('thumbnails') or []
+    cover = thumbs[-1].get('url', '') if thumbs else ''
+    title = result.get('title') or ''
+    artists = _artists_from_result(result)
+    year = str(result.get('year') or '').strip()
+    return {
+        'song_id': f'album:{browse_id}',
+        'media_type': 'album',
+        'browse_id': browse_id,
+        'name': title,
+        'artists': artists,
+        'artist': ', '.join(artists),
+        'album_name': title,
+        'cover_url': _upgrade_thumbnail(cover),
+        'year': year,
+        'release_date': year if len(year) == 4 and year.isdigit() else '',
+        'track_count': result.get('trackCount') or result.get('count'),
+        'url': f'https://music.youtube.com/browse/{browse_id}',
         'source': 'youtube',
     }
 
@@ -150,6 +185,88 @@ def search_songs(query: str, limit: int = 20) -> list[dict[str, Any]]:
         song = _result_to_song(result)
         if song:
             songs.append(song)
+    return songs
+
+
+def search_albums(query: str, limit: int = 10) -> list[dict[str, Any]]:
+    if not query.strip():
+        return []
+    try:
+        results = _ytm().search(query, filter='albums', limit=limit)
+    except Exception:
+        logger.exception('YouTube Music album search failed')
+        return []
+    titles = [
+        str(r.get('title') or '')[:60]
+        for r in results[:8]
+        if isinstance(r, dict)
+    ]
+    _log_ytm_summary_search(
+        phase='browse',
+        query=query,
+        filt='albums',
+        results_len=len(results),
+        first_titles=titles,
+    )
+    _log_ytm_response(f'search albums q={query[:80]!r}', results)
+    albums: list[dict[str, Any]] = []
+    for result in results:
+        if not isinstance(result, dict):
+            continue
+        album = _result_to_album(result)
+        if album:
+            albums.append(album)
+    return albums
+
+
+def search_media(query: str, limit: int = 20) -> list[dict[str, Any]]:
+    if not query.strip():
+        return []
+    song_limit = max(1, limit)
+    album_limit = max(1, min(10, limit // 2))
+    songs = search_songs(query, limit=song_limit)
+    albums = search_albums(query, limit=album_limit)
+    return [*albums, *songs][: limit + album_limit]
+
+
+def album_tracks_from_browse_id(browse_id: str) -> list[dict[str, Any]]:
+    if not browse_id.strip():
+        return []
+    try:
+        data = _ytm().get_album(browse_id) or {}
+    except Exception:
+        logger.exception('YouTube Music get_album failed for {}', browse_id)
+        return []
+
+    album_name = str(data.get('title') or '').strip()
+    album_artists = _artists_from_result(data)
+    year = str(data.get('year') or '').strip()
+    release_date = year if len(year) == 4 and year.isdigit() else ''
+    thumbs = data.get('thumbnails') or []
+    cover = thumbs[-1].get('url', '') if thumbs else ''
+    tracks = [t for t in (data.get('tracks') or []) if isinstance(t, dict)]
+    total = data.get('trackCount') or len(tracks)
+    songs: list[dict[str, Any]] = []
+    for index, track in enumerate(tracks, start=1):
+        song = _result_to_song({
+            **track,
+            'album': {'name': album_name, 'id': browse_id},
+            'artists': track.get('artists') or data.get('artists') or [],
+            'year': year,
+            'thumbnails': track.get('thumbnails') or thumbs,
+        })
+        if not song:
+            continue
+        if not song.get('artists') and album_artists:
+            song['artists'] = album_artists
+            song['artist'] = ', '.join(album_artists)
+        song['album_name'] = album_name
+        song['cover_url'] = song.get('cover_url') or _upgrade_thumbnail(cover)
+        song['year'] = year
+        song['release_date'] = release_date
+        song['track_number'] = index
+        song['album_track_total'] = total
+        songs.append(song)
     return songs
 
 

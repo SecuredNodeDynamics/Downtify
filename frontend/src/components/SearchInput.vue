@@ -84,7 +84,7 @@ function lookUp(query) {
   if (!query || !query.trim()) return
   if (sm.isValidURL(query)) {
     dm.fromURL(query)
-    router.push({ name: 'Preview', query: { url: query } })
+    router.push({ name: 'Download' })
   } else if (sm.isValidSearch(query)) {
     router.push({ name: 'Search', params: { query } })
   }
