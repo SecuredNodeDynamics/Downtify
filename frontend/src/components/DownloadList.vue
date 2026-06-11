@@ -81,7 +81,7 @@
         <!-- Progress / actions -->
         <div class="flex items-center gap-2 shrink-0">
           <a
-            v-if="item.isDownloaded()"
+            v-if="item.isDownloaded() && !dd.isLocal.value"
             class="icon-btn text-primary hover:bg-primary/10"
             href="javascript:;"
             @click="forceDownload(item.web_download_url)"
@@ -156,12 +156,14 @@
 import { ref, computed, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useProgressTracker, useDownloadManager } from '../model/download'
+import { useDownloadDestination } from '../model/downloadDestination'
 import { useI18n } from '../i18n'
 
 const PAGE_SIZE = 10
 
 const pt = useProgressTracker()
 const dm = useDownloadManager()
+const dd = useDownloadDestination()
 const { t } = useI18n()
 
 async function onClearAll() {

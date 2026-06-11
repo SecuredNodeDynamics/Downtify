@@ -176,6 +176,19 @@ export default {
     saveError: 'No se pudieron guardar los ajustes.',
     language: 'Idioma',
     languageHint: 'Elige el idioma de la interfaz',
+    downloadDestination: 'Ubicación de descarga',
+    downloadDestinationServer: 'Servidor',
+    downloadDestinationLocal: 'Este dispositivo',
+    downloadDestinationServerHint:
+      'Los archivos permanecen en el servidor de Downtify. Puedes reproducirlos en el reproductor integrado y guardar copias manualmente desde la cola.',
+    downloadDestinationLocalHint:
+      'Cuando termine una descarga, Downtify guardará una copia en este dispositivo automáticamente.',
+    chooseLocalFolder: 'Elegir carpeta…',
+    clearLocalFolder: 'Usar descargas del navegador',
+    localFolderSelected: 'Guardando en {name}',
+    localFolderDefault:
+      'Sin carpeta elegida — los archivos van a la carpeta de descargas predeterminada del navegador.',
+    localFolderError: 'No se pudo acceder a la carpeta elegida.',
   },
   player: {
     title: 'Reproductor',

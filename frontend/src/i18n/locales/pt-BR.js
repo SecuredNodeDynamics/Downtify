@@ -175,6 +175,19 @@ export default {
     saveError: 'Não foi possível salvar as configurações.',
     language: 'Idioma',
     languageHint: 'Escolha o idioma da interface',
+    downloadDestination: 'Local de download',
+    downloadDestinationServer: 'Servidor',
+    downloadDestinationLocal: 'Este dispositivo',
+    downloadDestinationServerHint:
+      'Os arquivos ficam no servidor do Downtify. Você pode ouvi-los no player integrado e salvar cópias manualmente pela fila.',
+    downloadDestinationLocalHint:
+      'Quando um download terminar, o Downtify salvará uma cópia neste dispositivo automaticamente.',
+    chooseLocalFolder: 'Escolher pasta…',
+    clearLocalFolder: 'Usar downloads do navegador',
+    localFolderSelected: 'Salvando em {name}',
+    localFolderDefault:
+      'Nenhuma pasta escolhida — os arquivos vão para a pasta de downloads padrão do navegador.',
+    localFolderError: 'Não foi possível acessar a pasta escolhida.',
   },
   player: {
     title: 'Player',

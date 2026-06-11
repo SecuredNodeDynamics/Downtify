@@ -1,7 +1,10 @@
 import { ref, computed } from 'vue'
 
 import API from '/src/model/api'
+import { useDownloadDestination } from '/src/model/downloadDestination'
 import { useSettingsManager } from '/src/model/settings'
+
+const downloadDestination = useDownloadDestination()
 
 const STATUS = {
   QUEUED: 'In Queue',
@@ -89,6 +92,17 @@ export function useProgressTracker() {
 
 const progressTracker = useProgressTracker()
 
+function maybeSaveToLocalMachine(item) {
+  if (!item?.web_download_url || downloadDestination.destination.value !== 'local') {
+    return
+  }
+  downloadDestination
+    .saveToLocalMachine(item.web_download_url, item.filename)
+    .catch((err) => {
+      console.warn('Local save failed:', err.message)
+    })
+}
+
 API.ws_onmessage((event) => {
   let data = JSON.parse(event.data)
   let item = progressTracker.getBySong(data.song)
@@ -104,6 +118,7 @@ API.ws_onmessage((event) => {
       item.setFilename(data.filename)
     }
     item.setDownloaded()
+    maybeSaveToLocalMachine(item)
   } else if (data.status === 'error') {
     item.wsUpdate(data)
     item.setError()
@@ -229,6 +244,7 @@ export function useDownloadManager() {
             .setWebURL(API.downloadFileURL(filename))
           progressTracker.getBySong(song).setFilename(filename)
           progressTracker.getBySong(song).setDownloaded()
+          maybeSaveToLocalMachine(progressTracker.getBySong(song))
           return { song, filename }
         } else {
           console.log('Error:', res)
@@ -268,6 +284,7 @@ export function useDownloadManager() {
             it.setWebURL(API.downloadFileURL(filename))
             it.setFilename(filename)
             it.setDownloaded()
+            maybeSaveToLocalMachine(it)
           }
           return { song: overriddenSong, filename }
         }

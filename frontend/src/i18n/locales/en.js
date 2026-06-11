@@ -173,6 +173,19 @@ export default {
     saveError: "Couldn't save settings.",
     language: 'Language',
     languageHint: 'Choose the interface language',
+    downloadDestination: 'Download location',
+    downloadDestinationServer: 'Server',
+    downloadDestinationLocal: 'This device',
+    downloadDestinationServerHint:
+      'Files stay on the Downtify server. You can play them in the built-in player and save copies manually from the queue.',
+    downloadDestinationLocalHint:
+      'When a download finishes, Downtify saves a copy to this device automatically.',
+    chooseLocalFolder: 'Choose folder…',
+    clearLocalFolder: 'Use browser downloads',
+    localFolderSelected: 'Saving to {name}',
+    localFolderDefault:
+      'No folder chosen — files go to your browser’s default download folder.',
+    localFolderError: 'Could not access the chosen folder.',
   },
   player: {
     title: 'Player',
