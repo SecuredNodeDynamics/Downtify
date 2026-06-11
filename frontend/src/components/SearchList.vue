@@ -462,7 +462,6 @@ const demoVolumeActive = ref(false)
 const resolvedDemoAudioUrls = ref({})
 const resolvingDemoAudioKeys = ref({})
 const failedDemoAudioKeys = ref({})
-const preparedDemoAudioKey = ref('')
 const demoAudio = new Audio()
 demoAudio.volume = demoVolume.value
 
@@ -502,10 +501,7 @@ const demoTitle = computed(() => {
 })
 
 const activeDemoAudioUrl = computed(
-  () =>
-    activeDemoTrack.value?.preview_url ||
-    resolvedDemoAudioUrls.value[demoTrackKey(activeDemoTrack.value)] ||
-    ''
+  () => playableAudioUrlForTrack(activeDemoTrack.value)
 )
 
 const playButtonTitle = computed(() =>
@@ -620,7 +616,6 @@ async function openDemo(song) {
   activeDemoTrack.value = null
   demoAudioError.value = ''
   demoVolumeActive.value = false
-  preparedDemoAudioKey.value = ''
   stopDemoPlayback()
 
   try {
@@ -670,8 +665,8 @@ function selectDemoTrack(track) {
 async function toggleDemoPlay(track) {
   if (!track || isDemoPlayDisabled(track)) return
 
-  const prepared = await prepareDemoAudio(track)
-  if (!prepared) {
+  const audioUrl = await audioUrlForDemoTrack(track)
+  if (!isValidMediaUrl(audioUrl)) {
     return
   }
 
@@ -688,6 +683,10 @@ async function toggleDemoPlay(track) {
   }
 
   activeDemoTrack.value = track
+  demoAudio.pause()
+  demoAudio.src = audioUrl
+  demoAudio.currentTime = 0
+  demoProgress.value = 0
   try {
     await demoAudio.play()
     demoPlaying.value = true
@@ -700,8 +699,7 @@ async function toggleDemoPlay(track) {
 
 function stopDemoPlayback() {
   demoAudio.pause()
-  demoAudio.src = ''
-  preparedDemoAudioKey.value = ''
+  demoAudio.removeAttribute('src')
   demoPlaying.value = false
   demoProgress.value = 0
 }
@@ -733,18 +731,25 @@ function demoTrackKey(track) {
   return String(track.song_id || track.url || `${track.name || ''}:${artistsOf(track)}`)
 }
 
+function playableAudioUrlForTrack(track) {
+  if (!track) return ''
+  if (isValidMediaUrl(track.preview_url)) return track.preview_url
+  const resolvedUrl = resolvedDemoAudioUrls.value[demoTrackKey(track)]
+  return isValidMediaUrl(resolvedUrl) ? resolvedUrl : ''
+}
+
 function isDemoTrackReady(track) {
   if (!track) return false
-  return Boolean(track.preview_url || resolvedDemoAudioUrls.value[demoTrackKey(track)])
+  return Boolean(playableAudioUrlForTrack(track))
 }
 
 function isDemoTrackResolving(track) {
-  if (!track || track.preview_url) return false
+  if (!track || isValidMediaUrl(track.preview_url)) return false
   return Boolean(resolvingDemoAudioKeys.value[demoTrackKey(track)])
 }
 
 function isDemoTrackFailed(track) {
-  if (!track || track.preview_url) return false
+  if (!track || isValidMediaUrl(track.preview_url)) return false
   return Boolean(failedDemoAudioKeys.value[demoTrackKey(track)])
 }
 
@@ -752,9 +757,7 @@ function isDemoPlayDisabled(track) {
   if (!track) return true
   if (isDemoTrackFailed(track)) return true
   if (isDemoTrackResolving(track)) return true
-  if (!isDemoTrackReady(track)) return true
-  if (demoTrackKey(activeDemoTrack.value) !== demoTrackKey(track)) return false
-  return preparedDemoAudioKey.value !== demoTrackKey(track)
+  return !isDemoTrackReady(track)
 }
 
 function playIconForTrack(track) {
@@ -771,7 +774,7 @@ async function audioUrlForDemoTrack(track) {
   activeDemoTrack.value = track
   demoAudioError.value = ''
 
-  if (track.preview_url) return track.preview_url
+  if (isValidMediaUrl(track.preview_url)) return track.preview_url
 
   const key = demoTrackKey(track)
   if (resolvedDemoAudioUrls.value[key]) return resolvedDemoAudioUrls.value[key]
@@ -793,14 +796,7 @@ async function audioUrlForDemoTrack(track) {
 }
 
 function warmDemoAudio(track) {
-  if (!track) return
-
-  if (track.preview_url) {
-    if (demoTrackKey(activeDemoTrack.value) === demoTrackKey(track) && !demoPlaying.value) {
-      prepareDemoAudio(track)
-    }
-    return
-  }
+  if (!track || isValidMediaUrl(track.preview_url)) return
 
   const key = demoTrackKey(track)
   if (
@@ -812,13 +808,8 @@ function warmDemoAudio(track) {
   }
 
   resolveDemoAudio(track, key)
-    .then(() => {
-      if (demoTrackKey(activeDemoTrack.value) === key && !demoPlaying.value) {
-        prepareDemoAudio(track)
-      }
-    })
     .catch((err) => {
-    console.log('Preview warmup failed:', err.message)
+      console.log('Preview warmup failed:', err.message)
     })
 }
 
@@ -841,7 +832,9 @@ async function resolveDemoAudio(track, key = demoTrackKey(track)) {
   const request = API.audioPreview(track)
     .then((res) => {
       const audioUrl = res.data?.audio_url || ''
-      if (!audioUrl) throw new Error('No playable preview was found.')
+      if (!isValidMediaUrl(audioUrl)) {
+        throw new Error('No playable preview was found.')
+      }
       const { [key]: _failed, ...remainingFailures } = failedDemoAudioKeys.value
       failedDemoAudioKeys.value = remainingFailures
       resolvedDemoAudioUrls.value = {
@@ -874,22 +867,10 @@ async function resolveDemoAudio(track, key = demoTrackKey(track)) {
   return request
 }
 
-async function prepareDemoAudio(track) {
-  const key = demoTrackKey(track)
-  const audioUrl = await audioUrlForDemoTrack(track)
-  if (!audioUrl) return false
-
-  if (preparedDemoAudioKey.value === key && demoAudio.src) {
-    return true
-  }
-
-  demoAudio.pause()
-  demoAudio.src = audioUrl
-  demoAudio.currentTime = 0
-  demoProgress.value = 0
-  preparedDemoAudioKey.value = key
-  demoAudio.load()
-  return true
+function isValidMediaUrl(value) {
+  if (typeof value !== 'string') return false
+  const trimmed = value.trim()
+  return /^https?:\/\//.test(trimmed) || trimmed.startsWith('blob:')
 }
 
 function normalizeDemoTracks(payload) {
