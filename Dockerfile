@@ -7,6 +7,16 @@ COPY requirements.txt .
 RUN pip install --upgrade pip && \
     pip install --no-cache-dir --root-user-action ignore -r requirements.txt
 
+FROM node:22-alpine AS frontend-builder
+
+WORKDIR /build/frontend
+
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci
+
+COPY frontend ./
+RUN npm run build
+
 FROM python:3.13-alpine
 
 LABEL maintainer="Henrique Sebastião <contato@henriquesebastiao.com>"
@@ -46,7 +56,7 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 
 COPY main.py entrypoint.sh ./
 COPY downtify ./downtify
-COPY frontend/dist ./frontend/dist
+COPY --from=frontend-builder /build/frontend/dist ./frontend/dist
 
 RUN sed -i 's/\r$//g' entrypoint.sh && \
     chmod +x entrypoint.sh
