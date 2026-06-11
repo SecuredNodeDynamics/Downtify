@@ -7,6 +7,7 @@ const HANDLE_STORE = 'directory'
 
 const destination = ref(readDestination())
 const localFolderName = ref(readFolderName())
+const localFolderReady = ref(false)
 
 let dirHandle = null
 
@@ -34,31 +35,45 @@ function openHandleDb() {
   })
 }
 
-async function loadStoredHandle() {
-  if (!supportsLocalFolder()) return null
-  try {
-    const db = await openHandleDb()
-    const handle = await new Promise((resolve, reject) => {
-      const tx = db.transaction(HANDLE_STORE, 'readonly')
-      const req = tx.objectStore(HANDLE_STORE).get('downloads')
-      req.onsuccess = () => resolve(req.result || null)
-      req.onerror = () => reject(req.error)
-    })
-    if (!handle) return null
+async function readHandleFromDb() {
+  const db = await openHandleDb()
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(HANDLE_STORE, 'readonly')
+    const req = tx.objectStore(HANDLE_STORE).get('downloads')
+    req.onsuccess = () => resolve(req.result || null)
+    req.onerror = () => reject(req.error)
+  })
+}
 
-    const permission = await handle.queryPermission({ mode: 'readwrite' })
-    if (permission === 'granted') {
-      dirHandle = handle
-      return handle
-    }
-    const requested = await handle.requestPermission({ mode: 'readwrite' })
-    if (requested === 'granted') {
-      dirHandle = handle
-      return handle
-    }
+async function resolveDirHandle({ requestIfNeeded = false } = {}) {
+  if (!supportsLocalFolder()) return null
+
+  const candidates = []
+  if (dirHandle) candidates.push(dirHandle)
+  try {
+    const stored = await readHandleFromDb()
+    if (stored && stored !== dirHandle) candidates.push(stored)
   } catch (err) {
-    console.warn('Could not restore local download folder:', err)
+    console.warn('Could not read local download folder:', err)
   }
+
+  for (const handle of candidates) {
+    try {
+      let permission = await handle.queryPermission({ mode: 'readwrite' })
+      if (permission !== 'granted' && requestIfNeeded) {
+        permission = await handle.requestPermission({ mode: 'readwrite' })
+      }
+      if (permission === 'granted') {
+        dirHandle = handle
+        localFolderReady.value = true
+        return handle
+      }
+    } catch (err) {
+      console.warn('Could not access local download folder:', err)
+    }
+  }
+
+  localFolderReady.value = false
   return null
 }
 
@@ -93,13 +108,19 @@ function setDestination(value) {
   } catch {
     // ignore
   }
+  if (destination.value === 'server') {
+    localFolderReady.value = false
+  }
 }
 
 async function pickLocalFolder() {
-  if (!supportsLocalFolder()) return false
+  if (!supportsLocalFolder()) {
+    throw new Error('unsupported')
+  }
   const handle = await window.showDirectoryPicker({ mode: 'readwrite' })
   dirHandle = handle
   localFolderName.value = handle.name
+  localFolderReady.value = true
   try {
     localStorage.setItem(FOLDER_NAME_KEY, handle.name)
   } catch {
@@ -109,15 +130,26 @@ async function pickLocalFolder() {
   return true
 }
 
+async function activateLocalDestination() {
+  if (!supportsLocalFolder()) {
+    throw new Error('unsupported')
+  }
+  await pickLocalFolder()
+  setDestination('local')
+  return true
+}
+
 async function clearLocalFolder() {
   dirHandle = null
   localFolderName.value = ''
+  localFolderReady.value = false
   try {
     localStorage.removeItem(FOLDER_NAME_KEY)
   } catch {
     // ignore
   }
   await clearStoredHandle()
+  setDestination('server')
 }
 
 async function ensureDirHandle(root, parts) {
@@ -129,8 +161,10 @@ async function ensureDirHandle(root, parts) {
 }
 
 async function writeBlobToFolder(relativePath, blob) {
-  const handle = dirHandle || (await loadStoredHandle())
-  if (!handle) return false
+  const handle = await resolveDirHandle({ requestIfNeeded: true })
+  if (!handle) {
+    throw new Error('no-folder')
+  }
 
   const segments = String(relativePath || '')
     .split('/')
@@ -148,17 +182,6 @@ async function writeBlobToFolder(relativePath, blob) {
   return true
 }
 
-function triggerBrowserDownload(blob, filename) {
-  const url = URL.createObjectURL(blob)
-  const anchor = document.createElement('a')
-  anchor.href = url
-  anchor.download = String(filename || 'download').split('/').pop() || 'download'
-  document.body.appendChild(anchor)
-  anchor.click()
-  document.body.removeChild(anchor)
-  URL.revokeObjectURL(url)
-}
-
 async function saveToLocalMachine(downloadUrl, filename) {
   if (destination.value !== 'local' || !downloadUrl) return
 
@@ -168,28 +191,37 @@ async function saveToLocalMachine(downloadUrl, filename) {
   }
   const blob = await response.blob()
 
-  if (filename) {
-    try {
-      const savedToFolder = await writeBlobToFolder(filename, blob)
-      if (savedToFolder) return
-    } catch (err) {
-      console.warn('Saving to chosen folder failed, using browser download:', err)
-    }
+  if (!filename) {
+    throw new Error('no-filename')
   }
 
-  triggerBrowserDownload(blob, filename)
+  await writeBlobToFolder(filename, blob)
 }
 
-loadStoredHandle()
+async function bootstrapLocalDestination() {
+  if (destination.value !== 'local') return
+  if (!supportsLocalFolder() || !localFolderName.value) {
+    await clearLocalFolder()
+    return
+  }
+  await resolveDirHandle()
+}
+
+bootstrapLocalDestination()
 
 export function useDownloadDestination() {
   return {
     destination,
     localFolderName,
+    localFolderReady,
     supportsLocalFolder: computed(() => supportsLocalFolder()),
     isLocal: computed(() => destination.value === 'local'),
+    hasLocalFolder: computed(
+      () => destination.value === 'local' && Boolean(localFolderName.value)
+    ),
     setDestination,
     pickLocalFolder,
+    activateLocalDestination,
     clearLocalFolder,
     saveToLocalMachine,
   }

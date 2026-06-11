@@ -70,13 +70,14 @@
             </button>
             <button
               type="button"
-              class="rounded-xl border px-3 py-2 text-sm transition-colors text-left"
+              class="rounded-xl border px-3 py-2 text-sm transition-colors text-left disabled:cursor-not-allowed disabled:opacity-50"
               :class="[
                 dd.destination.value === 'local'
                   ? 'border-primary/50 bg-primary/10 text-primary'
                   : 'border-white/10 hover:border-white/20 hover:bg-white/5',
               ]"
-              @click="dd.setDestination('local')"
+              :disabled="!dd.supportsLocalFolder.value"
+              @click="selectLocalDestination"
             >
               {{ t('settings.downloadDestinationLocal') }}
             </button>
@@ -88,40 +89,52 @@
                 : t('settings.downloadDestinationServerHint')
             }}
           </p>
-          <div
-            v-if="dd.isLocal.value && dd.supportsLocalFolder.value"
-            class="mt-3 space-y-2"
+          <p
+            v-if="!dd.supportsLocalFolder.value"
+            class="text-[11px] text-base-content/40 mt-1.5"
           >
+            {{ t('settings.localFolderUnsupported') }}
+          </p>
+          <div
+            v-else-if="dd.isLocal.value"
+            class="mt-3 rounded-xl border border-white/10 bg-base-100/85 px-3 py-3 space-y-2"
+          >
+            <div class="flex items-start gap-3">
+              <Icon
+                icon="clarity:folder-open-line"
+                class="mt-0.5 h-5 w-5 shrink-0 text-primary"
+              />
+              <div class="min-w-0 flex-1">
+                <p class="text-sm font-medium">
+                  {{ t('settings.localFolderLabel') }}
+                </p>
+                <p class="truncate text-sm text-base-content/80">
+                  {{ dd.localFolderName.value }}
+                </p>
+                <p class="mt-1 text-[11px] text-base-content/40">
+                  {{ t('settings.localFolderNameHint') }}
+                </p>
+              </div>
+            </div>
             <div class="flex flex-wrap items-center gap-2">
               <button
                 type="button"
                 class="btn btn-sm h-9 rounded-full border-white/10 bg-base-100/85 hover:bg-base-100"
-                @click="pickLocalFolder"
+                @click="changeLocalFolder"
               >
-                {{ t('settings.chooseLocalFolder') }}
-              </button>
-              <button
-                v-if="dd.localFolderName.value"
-                type="button"
-                class="btn btn-sm h-9 rounded-full border-white/10 bg-base-100/85 hover:bg-base-100"
-                @click="clearLocalFolder"
-              >
-                {{ t('settings.clearLocalFolder') }}
+                {{ t('settings.changeLocalFolder') }}
               </button>
             </div>
-            <p class="text-[11px] text-base-content/40">
-              {{
-                dd.localFolderName.value
-                  ? t('settings.localFolderSelected', {
-                      name: dd.localFolderName.value,
-                    })
-                  : t('settings.localFolderDefault')
-              }}
-            </p>
-            <p v-if="folderPickerError" class="text-[11px] text-error">
-              {{ folderPickerError }}
+            <p
+              v-if="!dd.localFolderReady.value"
+              class="text-[11px] text-warning"
+            >
+              {{ t('settings.localFolderPermissionNeeded') }}
             </p>
           </div>
+          <p v-if="folderPickerError" class="text-[11px] text-error mt-2">
+            {{ folderPickerError }}
+          </p>
         </div>
 
         <!-- Audio source -->
@@ -415,17 +428,30 @@ function providerLabel(provider) {
   return provider
 }
 
-async function pickLocalFolder() {
+async function selectLocalDestination() {
+  if (dd.isLocal.value && dd.localFolderName.value) return
+
   folderPickerError.value = ''
+  if (!dd.supportsLocalFolder.value) {
+    folderPickerError.value = t('settings.localFolderUnsupported')
+    return
+  }
   try {
-    await dd.pickLocalFolder()
+    await dd.activateLocalDestination()
   } catch (err) {
-    if (err?.name === 'AbortError') return
+    if (err?.name === 'AbortError' || err?.message === 'unsupported') return
     folderPickerError.value = err?.message || t('settings.localFolderError')
   }
 }
 
-async function clearLocalFolder() {
-  await dd.clearLocalFolder()
+async function changeLocalFolder() {
+  folderPickerError.value = ''
+  try {
+    await dd.pickLocalFolder()
+    dd.setDestination('local')
+  } catch (err) {
+    if (err?.name === 'AbortError') return
+    folderPickerError.value = err?.message || t('settings.localFolderError')
+  }
 }
 </script>

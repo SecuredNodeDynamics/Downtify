@@ -181,12 +181,15 @@ export default {
     downloadDestinationServerHint:
       'Os arquivos ficam no servidor do Downtify. Você pode ouvi-los no player integrado e salvar cópias manualmente pela fila.',
     downloadDestinationLocalHint:
-      'Quando um download terminar, o Downtify salvará uma cópia neste dispositivo automaticamente.',
-    chooseLocalFolder: 'Escolher pasta…',
-    clearLocalFolder: 'Usar downloads do navegador',
-    localFolderSelected: 'Salvando em {name}',
-    localFolderDefault:
-      'Nenhuma pasta escolhida — os arquivos vão para a pasta de downloads padrão do navegador.',
+      'Quando um download terminar, o Downtify salvará uma cópia na pasta que você escolher neste dispositivo.',
+    localFolderLabel: 'Salvar downloads em',
+    localFolderNameHint:
+      'O navegador mostra apenas o nome da pasta, não o caminho completo no seu computador.',
+    changeLocalFolder: 'Alterar pasta…',
+    localFolderUnsupported:
+      'Salvar em uma pasta específica neste dispositivo requer Chrome ou Edge.',
+    localFolderPermissionNeeded:
+      'O acesso à pasta expirou. Clique em “Alterar pasta…” para permitir salvar novamente.',
     localFolderError: 'Não foi possível acessar a pasta escolhida.',
   },
   player: {

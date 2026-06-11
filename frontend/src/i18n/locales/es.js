@@ -182,12 +182,15 @@ export default {
     downloadDestinationServerHint:
       'Los archivos permanecen en el servidor de Downtify. Puedes reproducirlos en el reproductor integrado y guardar copias manualmente desde la cola.',
     downloadDestinationLocalHint:
-      'Cuando termine una descarga, Downtify guardará una copia en este dispositivo automáticamente.',
-    chooseLocalFolder: 'Elegir carpeta…',
-    clearLocalFolder: 'Usar descargas del navegador',
-    localFolderSelected: 'Guardando en {name}',
-    localFolderDefault:
-      'Sin carpeta elegida — los archivos van a la carpeta de descargas predeterminada del navegador.',
+      'Cuando termine una descarga, Downtify guardará una copia en la carpeta que elijas en este dispositivo.',
+    localFolderLabel: 'Guardar descargas en',
+    localFolderNameHint:
+      'El navegador solo muestra el nombre de la carpeta, no la ruta completa en tu equipo.',
+    changeLocalFolder: 'Cambiar carpeta…',
+    localFolderUnsupported:
+      'Guardar en una carpeta específica de este dispositivo requiere Chrome o Edge.',
+    localFolderPermissionNeeded:
+      'El acceso a la carpeta expiró. Haz clic en “Cambiar carpeta…” para permitir guardar de nuevo.',
     localFolderError: 'No se pudo acceder a la carpeta elegida.',
   },
   player: {
