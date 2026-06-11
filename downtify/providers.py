@@ -166,7 +166,19 @@ def search_songs(query: str, limit: int = 20) -> list[dict[str, Any]]:
         results = _ytm().search(query, filter='songs', limit=limit)
     except Exception:
         logger.exception('YouTube Music search failed')
-        return []
+        results = []
+    if not results:
+        try:
+            results = _ytm().search(query, limit=limit)
+        except Exception:
+            logger.exception('YouTube Music broad search failed')
+            results = []
+    if not results:
+        try:
+            results = _ytm().search(query, filter='videos', limit=limit)
+        except Exception:
+            logger.exception('YouTube Music video search failed')
+            results = []
     titles = [
         str(r.get('title') or '')[:60]
         for r in results[:8]

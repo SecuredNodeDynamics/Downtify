@@ -125,3 +125,26 @@ def test_enrich_preserves_preset_track_number(monkeypatch):
     )
     assert out['track_number'] == 7
     assert out['album_track_total'] == 11
+
+
+def test_search_songs_falls_back_to_broad_search(monkeypatch):
+    class FakeYTMusic:
+        def search(self, query, filter=None, limit=20):
+            if filter == 'songs':
+                return []
+            assert filter is None
+            return [
+                {
+                    'videoId': 'abc12345678',
+                    'title': 'Fallback Song',
+                    'artists': [{'name': 'Fallback Artist'}],
+                    'duration_seconds': 123,
+                }
+            ]
+
+    monkeypatch.setattr(providers, '_ytm', lambda: FakeYTMusic())
+
+    results = providers.search_songs('fallback song', limit=1)
+
+    assert results[0]['song_id'] == 'abc12345678'
+    assert results[0]['name'] == 'Fallback Song'
