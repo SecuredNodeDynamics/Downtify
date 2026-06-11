@@ -330,7 +330,7 @@
                     Preview will be available shortly.
                   </p>
 
-                  <div class="mt-5 flex flex-wrap items-center gap-2">
+                  <div class="mt-5 flex flex-wrap items-center gap-2 sm:flex-nowrap">
                     <button
                       v-if="demoType === 'album' && demoSourceItem"
                       class="btn btn-primary btn-sm gap-2 rounded-full"
@@ -358,7 +358,8 @@
                     </button>
                     <a
                       v-if="externalServiceUrl(activeDemoTrack)"
-                      class="btn btn-sm gap-2 rounded-full border-white/10 bg-base-100/85"
+                      class="btn btn-sm gap-2 rounded-full bg-base-100/85"
+                      :class="externalServiceButtonClass(activeDemoTrack)"
                       :href="externalServiceUrl(activeDemoTrack)"
                       target="_blank"
                       rel="noopener"
@@ -592,6 +593,12 @@ function externalServiceLabel(item) {
   return isSpotifyUrl(externalServiceUrl(item))
     ? t('search.openOnSpotify')
     : t('search.openOnYoutubeMusic')
+}
+
+function externalServiceButtonClass(item) {
+  return isSpotifyUrl(externalServiceUrl(item))
+    ? 'border-white/10'
+    : 'border-error/70 text-error hover:border-error hover:bg-error/10'
 }
 
 function downloadState(song) {
