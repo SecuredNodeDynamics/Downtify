@@ -639,9 +639,6 @@ function embedUrlFor(song) {
     }
   }
 
-  const spotifySearchUrl = spotifySearchEmbedUrlFor(song)
-  if (spotifySearchUrl) return spotifySearchUrl
-
   const youtubeId =
     song.song_id ||
     song.url?.match(/[?&]v=([A-Za-z0-9_-]{6,})/)?.[1] ||
@@ -650,22 +647,6 @@ function embedUrlFor(song) {
     return `https://www.youtube.com/embed/${youtubeId}`
   }
   return ''
-}
-
-function spotifySearchEmbedUrlFor(song) {
-  if (song.source !== 'youtube') return ''
-  const query = [
-    song.name,
-    artistsOf(song),
-    song.album_name,
-  ]
-    .filter(Boolean)
-    .join(' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-  return query
-    ? `https://open.spotify.com/embed/search/${encodeURIComponent(query)}`
-    : ''
 }
 </script>
 

@@ -99,7 +99,6 @@ class ConnectionManager:
 
 class AppState:
     version: str = '0.0.0'
-    revision: str = ''
     downloader: Optional[Downloader] = None
     connections: ConnectionManager = ConnectionManager()
     settings: dict[str, Any] = dict(DEFAULT_SETTINGS)
@@ -139,14 +138,6 @@ def _save_settings(path: Path, settings: dict[str, Any]) -> None:
 @router.get('/api/version')
 def get_version() -> str:
     return state.version
-
-
-@router.get('/api/build')
-def get_build() -> dict[str, str]:
-    return {
-        'version': state.version,
-        'revision': state.revision,
-    }
 
 
 @router.get('/api/check_update')
