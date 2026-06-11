@@ -123,12 +123,12 @@
           </button>
 
           <a
-            v-if="song.url"
+            v-if="externalServiceUrl(song)"
             class="icon-btn"
-            :href="song.url"
+            :href="externalServiceUrl(song)"
             target="_blank"
             rel="noopener"
-            :title="t('search.openOnSpotify')"
+            :title="externalServiceLabel(song)"
           >
             <Icon icon="clarity:pop-out-line" class="h-4 w-4" />
           </a>
@@ -244,14 +244,16 @@
                     <Icon icon="clarity:music-note-line" class="h-12 w-12" />
                   </div>
                   <button
-                    class="absolute inset-0 flex items-center justify-center bg-black/35 transition hover:bg-black/45 disabled:cursor-not-allowed disabled:opacity-60"
-                    :disabled="demoAudioResolving"
+                    class="absolute inset-0 flex items-center justify-center transition disabled:cursor-not-allowed"
+                    :class="activeDemoPlayButtonClass"
+                    :disabled="isDemoPlayDisabled(activeDemoTrack)"
                     @click="toggleDemoPlay(activeDemoTrack)"
                     :title="playButtonTitle"
                   >
                     <Icon
-                      :icon="demoAudioResolving ? 'clarity:refresh-line' : (demoPlaying ? 'clarity:pause-solid' : 'clarity:play-solid')"
-                      class="h-12 w-12 text-white drop-shadow"
+                      :icon="playIconForTrack(activeDemoTrack)"
+                      class="h-12 w-12 drop-shadow"
+                      :class="isDemoTrackFailed(activeDemoTrack) ? 'text-error' : 'text-white'"
                     />
                   </button>
                 </div>
@@ -308,7 +310,7 @@
                   </div>
 
                   <p
-                    v-if="demoAudioResolving"
+                    v-if="isDemoTrackResolving(activeDemoTrack)"
                     class="mt-3 text-xs italic text-base-content/40"
                   >
                     Preparing preview...
@@ -322,10 +324,10 @@
                   </p>
 
                   <p
-                    v-else-if="!activeDemoTrack?.preview_url && !activeDemoAudioUrl"
+                    v-else-if="!isDemoTrackReady(activeDemoTrack) && !isDemoTrackFailed(activeDemoTrack)"
                     class="mt-3 text-xs italic text-base-content/40"
                   >
-                    Press play to listen in this popup.
+                    Preview will be available shortly.
                   </p>
 
                   <div class="mt-5 flex flex-wrap items-center gap-2">
@@ -355,14 +357,14 @@
                       }}
                     </button>
                     <a
-                      v-if="activeDemoTrack?.url"
+                      v-if="externalServiceUrl(activeDemoTrack)"
                       class="btn btn-sm gap-2 rounded-full border-white/10 bg-base-100/85"
-                      :href="activeDemoTrack.url"
+                      :href="externalServiceUrl(activeDemoTrack)"
                       target="_blank"
                       rel="noopener"
                     >
                       <Icon icon="clarity:pop-out-line" class="h-4 w-4" />
-                      {{ t('search.openOnSpotify') }}
+                      {{ externalServiceLabel(activeDemoTrack) }}
                     </a>
                   </div>
                 </div>
@@ -403,16 +405,13 @@
                   </div>
                   <button
                     class="icon-btn shrink-0"
-                    :disabled="demoAudioResolving && activeDemoTrack?.song_id === track.song_id"
+                    :class="isDemoTrackFailed(track) ? 'text-error' : ''"
+                    :disabled="isDemoPlayDisabled(track)"
                     @click.stop="toggleDemoPlay(track)"
                     :title="playButtonTitle"
                   >
                     <Icon
-                      :icon="activeDemoTrack?.song_id === track.song_id && demoAudioResolving
-                        ? 'clarity:refresh-line'
-                        : activeDemoTrack?.song_id === track.song_id && demoPlaying
-                        ? 'clarity:pause-solid'
-                        : 'clarity:play-solid'"
+                      :icon="playIconForTrack(track)"
                       class="h-4 w-4"
                     />
                   </button>
@@ -462,6 +461,7 @@ const demoVolume = ref(1)
 const demoVolumeActive = ref(false)
 const resolvedDemoAudioUrls = ref({})
 const resolvingDemoAudioKeys = ref({})
+const failedDemoAudioKeys = ref({})
 const demoAudio = new Audio()
 demoAudio.volume = demoVolume.value
 
@@ -511,6 +511,16 @@ const playButtonTitle = computed(() =>
   demoPlaying.value ? t('player.pause') : t('player.play')
 )
 
+const activeDemoPlayButtonClass = computed(() => {
+  if (isDemoTrackFailed(activeDemoTrack.value)) {
+    return 'bg-error/20 hover:bg-error/25 opacity-100'
+  }
+  if (isDemoPlayDisabled(activeDemoTrack.value)) {
+    return 'bg-black/25 opacity-55'
+  }
+  return 'bg-black/35 hover:bg-black/45'
+})
+
 const demoVolumeIcon = computed(() => {
   if (demoVolume.value <= 0) return 'clarity:volume-mute-line'
   if (demoVolume.value < 0.5) return 'clarity:volume-down-line'
@@ -545,6 +555,46 @@ function mediaTypeClass(song) {
   return mediaType(song) === 'album'
     ? 'media-type-pill-album'
     : 'media-type-pill-track'
+}
+
+function isSpotifyUrl(url) {
+  return /open\.spotify\.com\//.test(url || '')
+}
+
+function isYoutubeMusicUrl(url) {
+  return /(?:music\.youtube\.com|youtube\.com|youtu\.be)\//.test(url || '')
+}
+
+function youtubeMusicUrlFor(item) {
+  if (!item) return ''
+  if (isYoutubeMusicUrl(item.url)) return item.url
+  if (item.browse_id) return `https://music.youtube.com/browse/${item.browse_id}`
+
+  const youtubeId =
+    item.youtube_id ||
+    (item.source === 'youtube' ? item.song_id : '') ||
+    item.url?.match(/[?&]v=([A-Za-z0-9_-]{6,})/)?.[1] ||
+    item.url?.match(/youtu\.be\/([A-Za-z0-9_-]{6,})/)?.[1]
+
+  if (youtubeId && !String(youtubeId).startsWith('album:')) {
+    return `https://music.youtube.com/watch?v=${youtubeId}`
+  }
+  return ''
+}
+
+function externalServiceUrl(item) {
+  if (!item) return ''
+  if (isSpotifyUrl(item.url)) return item.url
+  if (item.source === 'youtube' || isYoutubeMusicUrl(item.url) || item.browse_id) {
+    return youtubeMusicUrlFor(item)
+  }
+  return item.url || ''
+}
+
+function externalServiceLabel(item) {
+  return isSpotifyUrl(externalServiceUrl(item))
+    ? t('search.openOnSpotify')
+    : t('search.openOnYoutubeMusic')
 }
 
 function downloadState(song) {
@@ -588,6 +638,7 @@ async function openDemo(song) {
     demoType.value = mediaType(song)
     demoTracks.value = [song]
     activeDemoTrack.value = song
+    warmDemoAudio(activeDemoTrack.value)
     if (!song) {
       demoError.value =
         err?.response?.data?.detail || err.message || t('search.previewError')
@@ -615,7 +666,7 @@ function selectDemoTrack(track) {
 }
 
 async function toggleDemoPlay(track) {
-  if (!track || demoAudioResolving.value) return
+  if (!track || isDemoPlayDisabled(track)) return
 
   const audioUrl = await audioUrlForDemoTrack(track)
   if (!audioUrl) {
@@ -683,6 +734,37 @@ function demoTrackKey(track) {
   return String(track.song_id || track.url || `${track.name || ''}:${artistsOf(track)}`)
 }
 
+function isDemoTrackReady(track) {
+  if (!track) return false
+  return Boolean(track.preview_url || resolvedDemoAudioUrls.value[demoTrackKey(track)])
+}
+
+function isDemoTrackResolving(track) {
+  if (!track || track.preview_url) return false
+  return Boolean(resolvingDemoAudioKeys.value[demoTrackKey(track)])
+}
+
+function isDemoTrackFailed(track) {
+  if (!track || track.preview_url) return false
+  return Boolean(failedDemoAudioKeys.value[demoTrackKey(track)])
+}
+
+function isDemoPlayDisabled(track) {
+  if (!track) return true
+  if (isDemoTrackFailed(track)) return true
+  if (isDemoTrackResolving(track)) return true
+  return !isDemoTrackReady(track)
+}
+
+function playIconForTrack(track) {
+  if (isDemoTrackFailed(track)) return 'clarity:times-circle-solid'
+  if (isDemoTrackResolving(track)) return 'clarity:refresh-line'
+  if (demoTrackKey(activeDemoTrack.value) === demoTrackKey(track) && demoPlaying.value) {
+    return 'clarity:pause-solid'
+  }
+  return 'clarity:play-solid'
+}
+
 async function audioUrlForDemoTrack(track) {
   if (!track) return ''
   activeDemoTrack.value = track
@@ -692,6 +774,7 @@ async function audioUrlForDemoTrack(track) {
 
   const key = demoTrackKey(track)
   if (resolvedDemoAudioUrls.value[key]) return resolvedDemoAudioUrls.value[key]
+  if (failedDemoAudioKeys.value[key]) return ''
 
   const inflight = resolvingDemoAudioKeys.value[key]
   if (inflight) return inflight
@@ -712,7 +795,11 @@ function warmDemoAudio(track) {
   if (!track || track.preview_url) return
 
   const key = demoTrackKey(track)
-  if (resolvedDemoAudioUrls.value[key] || resolvingDemoAudioKeys.value[key]) {
+  if (
+    resolvedDemoAudioUrls.value[key] ||
+    resolvingDemoAudioKeys.value[key] ||
+    failedDemoAudioKeys.value[key]
+  ) {
     return
   }
 
@@ -741,11 +828,25 @@ async function resolveDemoAudio(track, key = demoTrackKey(track)) {
     .then((res) => {
       const audioUrl = res.data?.audio_url || ''
       if (!audioUrl) throw new Error('No playable preview was found.')
+      const { [key]: _failed, ...remainingFailures } = failedDemoAudioKeys.value
+      failedDemoAudioKeys.value = remainingFailures
       resolvedDemoAudioUrls.value = {
         ...resolvedDemoAudioUrls.value,
         [key]: audioUrl,
       }
       return audioUrl
+    })
+    .catch((err) => {
+      const message =
+        err?.response?.data?.detail || err.message || 'Preview playback failed.'
+      failedDemoAudioKeys.value = {
+        ...failedDemoAudioKeys.value,
+        [key]: message,
+      }
+      if (demoTrackKey(activeDemoTrack.value) === key) {
+        demoAudioError.value = message
+      }
+      throw err
     })
     .finally(() => {
       const { [key]: _done, ...remaining } = resolvingDemoAudioKeys.value

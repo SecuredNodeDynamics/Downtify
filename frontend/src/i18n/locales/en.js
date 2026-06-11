@@ -44,6 +44,7 @@ export default {
     empty: 'No songs found.',
     emptyHint: 'Try another query — artist + title usually works best.',
     openOnSpotify: 'Open on Spotify',
+    openOnYoutubeMusic: 'Open on YouTube Music',
     inQueue: 'In queue',
     download: 'Download',
     downloadAlbum: 'Download album',

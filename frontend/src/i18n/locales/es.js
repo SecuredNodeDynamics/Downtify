@@ -45,6 +45,7 @@ export default {
     emptyHint:
       'Prueba con otra búsqueda — artista + título suele funcionar mejor.',
     openOnSpotify: 'Abrir en Spotify',
+    openOnYoutubeMusic: 'Abrir en YouTube Music',
     inQueue: 'En la cola',
     download: 'Descargar',
     downloadAlbum: 'Descargar album',

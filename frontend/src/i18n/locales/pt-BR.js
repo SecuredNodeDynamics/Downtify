@@ -45,6 +45,7 @@ export default {
     empty: 'Nenhuma música encontrada.',
     emptyHint: 'Tente outra busca — artista + título costuma funcionar melhor.',
     openOnSpotify: 'Abrir no Spotify',
+    openOnYoutubeMusic: 'Abrir no YouTube Music',
     inQueue: 'Na fila',
     download: 'Baixar',
     downloadAlbum: 'Baixar album',
