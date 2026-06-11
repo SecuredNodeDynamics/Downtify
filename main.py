@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import base64
+import hashlib
 import logging
 import mimetypes
 import os
@@ -85,6 +86,34 @@ DATABASE_DIR = Path('/data')
 WEB_GUI_LOCATION = os.getenv('WEB_GUI_LOCATION', 'frontend/dist')
 DEFAULT_HOST = os.getenv('HOST', '0.0.0.0')
 DEFAULT_PORT = int(os.getenv('DOWNTIFY_PORT', os.getenv('PORT', '8000')))
+
+
+def _source_revision() -> str:
+    explicit = os.getenv('DOWNTIFY_BUILD_REVISION', '').strip()
+    if explicit:
+        return explicit[:12]
+
+    root = Path(__file__).resolve().parent
+    candidates = [root / 'main.py', root / 'downtify', root / 'frontend/dist']
+    digest = hashlib.sha256()
+    found = False
+    for candidate in candidates:
+        if candidate.is_file():
+            paths = [candidate]
+        elif candidate.is_dir():
+            paths = sorted(p for p in candidate.rglob('*') if p.is_file())
+        else:
+            continue
+        for path in paths:
+            if '__pycache__' in path.parts or path.suffix == '.pyc':
+                continue
+            rel = path.relative_to(root).as_posix()
+            digest.update(rel.encode('utf-8'))
+            digest.update(b'\0')
+            digest.update(path.read_bytes())
+            digest.update(b'\0')
+            found = True
+    return digest.hexdigest()[:12] if found else ''
 
 
 class SPAStaticFiles(StaticFiles):
@@ -204,6 +233,7 @@ def build_app() -> FastAPI:
     api.state.settings = api._load_settings(settings_path)
 
     api.state.version = __version__
+    api.state.revision = _source_revision()
     api.state.downloader = Downloader(
         DOWNLOAD_DIR,
         audio_format=api.state.settings['format'],
@@ -353,8 +383,9 @@ def main() -> None:
     server = Server(config)
 
     logger.info(
-        'Starting Downtify {} on http://{}:{}',
+        'Starting Downtify {} ({}) on http://{}:{}',
         __version__,
+        api.state.revision or 'unknown-revision',
         args.host,
         args.port,
     )

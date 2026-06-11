@@ -63,24 +63,38 @@ import { useI18n } from '../i18n'
 
 const { t } = useI18n()
 const backendVersion = ref('')
+const backendRevision = ref('')
 
-const versionLabel = computed(() =>
-  (backendVersion.value || __APP_VERSION__) === '0.0.0'
-    ? 'Swag Daddy Version'
-    : `v${backendVersion.value || __APP_VERSION__}`
-)
+const versionLabel = computed(() => {
+  const version = backendVersion.value || __APP_VERSION__
+  if (version === '0.0.0') return 'Swag Daddy Version'
+  return backendRevision.value
+    ? `v${version} (${backendRevision.value})`
+    : `v${version}`
+})
 
 onMounted(async () => {
   try {
-    const res = await fetch(`/api/version?t=${Date.now()}`, {
+    const res = await fetch(`/api/build?t=${Date.now()}`, {
       cache: 'no-store',
     })
-    const version = String(await res.json()).trim()
-    if (/^\d+\.\d+\.\d+$/.test(version)) {
-      backendVersion.value = version
+    const build = await res.json()
+    const version = String(build?.version || '').trim()
+    const revision = String(build?.revision || '').trim()
+    if (/^\d+\.\d+\.\d+$/.test(version)) backendVersion.value = version
+    if (/^[a-fA-F0-9]{7,12}$/.test(revision)) {
+      backendRevision.value = revision.slice(0, 7)
     }
   } catch {
-    backendVersion.value = ''
+    try {
+      const res = await fetch(`/api/version?t=${Date.now()}`, {
+        cache: 'no-store',
+      })
+      const version = String(await res.json()).trim()
+      if (/^\d+\.\d+\.\d+$/.test(version)) backendVersion.value = version
+    } catch {
+      backendVersion.value = ''
+    }
   }
 })
 </script>
