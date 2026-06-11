@@ -245,9 +245,9 @@
                   </div>
                   <button
                     class="absolute inset-0 flex items-center justify-center bg-black/35 transition hover:bg-black/45 disabled:cursor-not-allowed disabled:opacity-60"
-                    :disabled="!activeDemoTrack?.preview_url"
+                    :disabled="!activeDemoTrack?.preview_url && !activeDemoEmbedUrl"
                     @click="toggleDemoPlay(activeDemoTrack)"
-                    :title="activeDemoTrack?.preview_url ? playButtonTitle : t('search.noPreview')"
+                    :title="activeDemoTrack?.preview_url ? playButtonTitle : t('search.playInEmbed')"
                   >
                     <Icon
                       :icon="demoPlaying ? 'clarity:pause-solid' : 'clarity:play-solid'"
@@ -287,14 +287,40 @@
                     </span>
                   </div>
 
+                  <div
+                    v-if="!activeDemoTrack?.preview_url && activeDemoEmbedUrl"
+                    class="mt-5 overflow-hidden rounded-2xl border border-white/10 bg-black/20"
+                  >
+                    <iframe
+                      :key="activeDemoEmbedUrl"
+                      :src="activeDemoEmbedUrl"
+                      class="h-28 w-full"
+                      allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                      loading="lazy"
+                    />
+                  </div>
+
                   <p
-                    v-if="!activeDemoTrack?.preview_url"
+                    v-else-if="!activeDemoTrack?.preview_url"
                     class="mt-3 text-xs italic text-base-content/40"
                   >
                     {{ t('search.noPreview') }}
                   </p>
 
                   <div class="mt-5 flex flex-wrap items-center gap-2">
+                    <button
+                      v-if="demoType === 'album' && demoSourceItem"
+                      class="btn btn-primary btn-sm gap-2 rounded-full"
+                      :disabled="downloadState(demoSourceItem) === 'queued'"
+                      @click="downloadAlbumFromDemo"
+                    >
+                      <Icon icon="clarity:download-line" class="h-4 w-4" />
+                      {{
+                        downloadState(demoSourceItem) === 'queued'
+                          ? t('search.inQueue')
+                          : t('search.downloadAlbum')
+                      }}
+                    </button>
                     <button
                       class="btn btn-primary btn-sm gap-2 rounded-full"
                       :disabled="downloadState(activeDemoTrack) === 'queued'"
@@ -391,6 +417,7 @@ const demoLoading = ref(false)
 const demoError = ref('')
 const demoTracks = ref([])
 const demoType = ref('track')
+const demoSourceItem = ref(null)
 const activeDemoTrack = ref(null)
 const demoProgress = ref(0)
 const demoDuration = ref(30)
@@ -431,6 +458,8 @@ const demoTitle = computed(() => {
   if (demoType.value === 'album') return first?.album_name || first?.name || ''
   return first?.name || ''
 })
+
+const activeDemoEmbedUrl = computed(() => embedUrlFor(activeDemoTrack.value))
 
 const playButtonTitle = computed(() =>
   demoPlaying.value ? t('player.pause') : t('player.play')
@@ -484,13 +513,20 @@ async function openDemo(song) {
   demoLoading.value = true
   demoError.value = ''
   demoTracks.value = []
+  demoSourceItem.value = song
   activeDemoTrack.value = null
   stopDemoPlayback()
 
   try {
-    const res = await API.preview(song)
-    demoType.value = res.data.type || mediaType(song)
-    demoTracks.value = res.data.tracks || []
+    if (song?.media_type === 'album' && song.browse_id) {
+      const res = await API.openYoutubeAlbum(song.browse_id)
+      demoType.value = 'album'
+      demoTracks.value = res.data || []
+    } else {
+      const res = await API.preview(song)
+      demoType.value = res.data.type || mediaType(song)
+      demoTracks.value = res.data.tracks || []
+    }
     activeDemoTrack.value = demoTracks.value[0] || song
   } catch (err) {
     demoType.value = mediaType(song)
@@ -518,7 +554,10 @@ function selectDemoTrack(track) {
 }
 
 function toggleDemoPlay(track) {
-  if (!track?.preview_url) return
+  if (!track?.preview_url) {
+    activeDemoTrack.value = track
+    return
+  }
 
   if (activeDemoTrack.value?.song_id === track.song_id && demoAudio.src) {
     if (demoPlaying.value) {
@@ -557,11 +596,35 @@ function downloadFromDemo() {
   download(activeDemoTrack.value)
 }
 
+function downloadAlbumFromDemo() {
+  if (!demoSourceItem.value) return
+  download(demoSourceItem.value)
+}
+
 function formatDuration(seconds) {
   if (!seconds || isNaN(seconds)) return '0:00'
   const minutes = Math.floor(seconds / 60)
   const remaining = Math.floor(seconds % 60)
   return `${minutes}:${remaining.toString().padStart(2, '0')}`
+}
+
+function embedUrlFor(song) {
+  if (!song?.url) return ''
+  const spotifyMatch = song.url.match(
+    /open\.spotify\.com\/(?:intl-[a-z]{2}\/)?(track|album|playlist)\/([A-Za-z0-9]+)/
+  )
+  if (spotifyMatch) {
+    return `https://open.spotify.com/embed/${spotifyMatch[1]}/${spotifyMatch[2]}`
+  }
+
+  const youtubeId =
+    song.song_id ||
+    song.url.match(/[?&]v=([A-Za-z0-9_-]{6,})/)?.[1] ||
+    song.url.match(/youtu\.be\/([A-Za-z0-9_-]{6,})/)?.[1]
+  if (song.source === 'youtube' && youtubeId && !String(youtubeId).startsWith('album:')) {
+    return `https://www.youtube.com/embed/${youtubeId}`
+  }
+  return ''
 }
 </script>
 
