@@ -287,6 +287,26 @@
                     </span>
                   </div>
 
+                  <div
+                    v-if="demoVolumeActive"
+                    class="mt-3 flex items-center gap-2 text-base-content/50"
+                  >
+                    <Icon :icon="demoVolumeIcon" class="h-4 w-4 shrink-0" />
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.01"
+                      :value="demoVolume"
+                      class="h-1 w-32 cursor-pointer accent-primary sm:w-40"
+                      aria-label="Volume"
+                      @input="setDemoVolume($event.target.value)"
+                    />
+                    <span class="w-9 text-xs tabular-nums">
+                      {{ Math.round(demoVolume * 100) }}%
+                    </span>
+                  </div>
+
                   <p
                     v-if="demoAudioResolving"
                     class="mt-3 text-xs italic text-base-content/40"
@@ -438,8 +458,11 @@ const demoDuration = ref(30)
 const demoPlaying = ref(false)
 const demoAudioResolving = ref(false)
 const demoAudioError = ref('')
+const demoVolume = ref(1)
+const demoVolumeActive = ref(false)
 const resolvedDemoAudioUrls = ref({})
 const demoAudio = new Audio()
+demoAudio.volume = demoVolume.value
 
 demoAudio.addEventListener('timeupdate', () => {
   demoProgress.value = demoAudio.currentTime
@@ -486,6 +509,12 @@ const activeDemoAudioUrl = computed(
 const playButtonTitle = computed(() =>
   demoPlaying.value ? t('player.pause') : t('player.play')
 )
+
+const demoVolumeIcon = computed(() => {
+  if (demoVolume.value <= 0) return 'clarity:volume-mute-line'
+  if (demoVolume.value < 0.5) return 'clarity:volume-down-line'
+  return 'clarity:volume-up-line'
+})
 
 watch(
   () => props.data,
@@ -538,6 +567,7 @@ async function openDemo(song) {
   demoSourceItem.value = song
   activeDemoTrack.value = null
   demoAudioError.value = ''
+  demoVolumeActive.value = false
   stopDemoPlayback()
 
   try {
@@ -592,8 +622,9 @@ async function toggleDemoPlay(track) {
       demoAudio.pause()
       demoPlaying.value = false
     } else {
-      demoAudio.play()
+      await demoAudio.play()
       demoPlaying.value = true
+      demoVolumeActive.value = true
     }
     return
   }
@@ -606,6 +637,7 @@ async function toggleDemoPlay(track) {
   try {
     await demoAudio.play()
     demoPlaying.value = true
+    demoVolumeActive.value = true
   } catch (err) {
     demoAudioError.value = err.message || 'Preview playback failed.'
     demoPlaying.value = false
@@ -623,6 +655,12 @@ function seekDemo(value) {
   if (!activeDemoAudioUrl.value) return
   demoAudio.currentTime = Number(value)
   demoProgress.value = Number(value)
+}
+
+function setDemoVolume(value) {
+  const volume = Math.min(1, Math.max(0, Number(value)))
+  demoVolume.value = volume
+  demoAudio.volume = volume
 }
 
 function downloadFromDemo() {
