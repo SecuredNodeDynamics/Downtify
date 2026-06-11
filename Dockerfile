@@ -1,4 +1,4 @@
-FROM python:3.13-alpine AS builder
+FROM python:3.14-alpine AS builder
 
 WORKDIR /build
 
@@ -17,7 +17,7 @@ RUN npm ci
 COPY frontend ./
 RUN npm run build
 
-FROM python:3.13-alpine
+FROM python:3.14-alpine
 
 LABEL maintainer="Henrique Sebastião <contato@henriquesebastiao.com>"
 LABEL version="2.9.0"
