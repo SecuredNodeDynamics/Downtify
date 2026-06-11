@@ -60,23 +60,22 @@
               type="button"
               class="rounded-xl border px-3 py-2 text-sm transition-colors text-left"
               :class="[
-                dd.destination.value === 'server'
+                destination === 'server'
                   ? 'border-primary/50 bg-primary/10 text-primary'
                   : 'border-white/10 hover:border-white/20 hover:bg-white/5',
               ]"
-              @click="dd.setDestination('server')"
+              @click="setDestination('server')"
             >
               {{ t('settings.downloadDestinationServer') }}
             </button>
             <button
               type="button"
-              class="rounded-xl border px-3 py-2 text-sm transition-colors text-left disabled:cursor-not-allowed disabled:opacity-50"
+              class="rounded-xl border px-3 py-2 text-sm transition-colors text-left"
               :class="[
-                dd.destination.value === 'local'
+                destination === 'local'
                   ? 'border-primary/50 bg-primary/10 text-primary'
                   : 'border-white/10 hover:border-white/20 hover:bg-white/5',
               ]"
-              :disabled="!dd.supportsLocalFolder.value"
               @click="selectLocalDestination"
             >
               {{ t('settings.downloadDestinationLocal') }}
@@ -84,19 +83,19 @@
           </div>
           <p class="text-[11px] text-base-content/40 mt-1.5">
             {{
-              dd.destination.value === 'local'
+              destination === 'local'
                 ? t('settings.downloadDestinationLocalHint')
                 : t('settings.downloadDestinationServerHint')
             }}
           </p>
           <p
-            v-if="!dd.supportsLocalFolder.value"
+            v-if="localFolderBlockReason"
             class="text-[11px] text-base-content/40 mt-1.5"
           >
-            {{ t('settings.localFolderUnsupported') }}
+            {{ localFolderBlockMessage }}
           </p>
           <div
-            v-else-if="dd.isLocal.value"
+            v-if="isLocal"
             class="mt-3 rounded-xl border border-white/10 bg-base-100/85 px-3 py-3 space-y-2"
           >
             <div class="flex items-start gap-3">
@@ -109,7 +108,7 @@
                   {{ t('settings.localFolderLabel') }}
                 </p>
                 <p class="truncate text-sm text-base-content/80">
-                  {{ dd.localFolderName.value }}
+                  {{ localFolderName }}
                 </p>
                 <p class="mt-1 text-[11px] text-base-content/40">
                   {{ t('settings.localFolderNameHint') }}
@@ -126,7 +125,7 @@
               </button>
             </div>
             <p
-              v-if="!dd.localFolderReady.value"
+              v-if="!localFolderReady"
               class="text-[11px] text-warning"
             >
               {{ t('settings.localFolderPermissionNeeded') }}
@@ -411,16 +410,41 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useSettingsManager } from '../model/settings'
 import { useDownloadDestination } from '../model/downloadDestination'
 import { useI18n } from '../i18n'
 
 const sm = useSettingsManager()
-const dd = useDownloadDestination()
+const {
+  destination,
+  localFolderName,
+  localFolderReady,
+  localFolderBlockReason,
+  isLocal,
+  setDestination,
+  pickLocalFolder,
+  activateLocalDestination,
+} = useDownloadDestination()
 const { t, locale, setLocale, locales } = useI18n()
 const folderPickerError = ref('')
+
+const localFolderBlockMessage = computed(() => {
+  if (localFolderBlockReason.value === 'insecure') {
+    return t('settings.localFolderInsecure')
+  }
+  if (localFolderBlockReason.value === 'browser') {
+    return t('settings.localFolderUnsupported')
+  }
+  return ''
+})
+
+function localFolderErrorMessage(reason) {
+  if (reason === 'insecure') return t('settings.localFolderInsecure')
+  if (reason === 'browser') return t('settings.localFolderUnsupported')
+  return t('settings.localFolderError')
+}
 
 function providerLabel(provider) {
   if (provider === 'youtube-music') return 'YouTube Music'
@@ -429,17 +453,17 @@ function providerLabel(provider) {
 }
 
 async function selectLocalDestination() {
-  if (dd.isLocal.value && dd.localFolderName.value) return
+  if (isLocal.value && localFolderName.value) return
 
   folderPickerError.value = ''
-  if (!dd.supportsLocalFolder.value) {
-    folderPickerError.value = t('settings.localFolderUnsupported')
-    return
-  }
   try {
-    await dd.activateLocalDestination()
+    await activateLocalDestination()
   } catch (err) {
-    if (err?.name === 'AbortError' || err?.message === 'unsupported') return
+    if (err?.name === 'AbortError') return
+    if (['insecure', 'browser', 'unsupported', 'unavailable'].includes(err?.message)) {
+      folderPickerError.value = localFolderErrorMessage(err.message)
+      return
+    }
     folderPickerError.value = err?.message || t('settings.localFolderError')
   }
 }
@@ -447,10 +471,14 @@ async function selectLocalDestination() {
 async function changeLocalFolder() {
   folderPickerError.value = ''
   try {
-    await dd.pickLocalFolder()
-    dd.setDestination('local')
+    await pickLocalFolder()
+    setDestination('local')
   } catch (err) {
     if (err?.name === 'AbortError') return
+    if (['insecure', 'browser', 'unsupported', 'unavailable'].includes(err?.message)) {
+      folderPickerError.value = localFolderErrorMessage(err.message)
+      return
+    }
     folderPickerError.value = err?.message || t('settings.localFolderError')
   }
 }

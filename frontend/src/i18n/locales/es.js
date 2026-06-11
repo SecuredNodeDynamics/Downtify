@@ -189,6 +189,8 @@ export default {
     changeLocalFolder: 'Cambiar carpeta…',
     localFolderUnsupported:
       'Guardar en una carpeta específica de este dispositivo requiere Chrome o Edge.',
+    localFolderInsecure:
+      'Elegir carpeta requiere una conexión segura. Abre Downtify en http://localhost o http://127.0.0.1 en lugar de una dirección de red, o usa HTTPS.',
     localFolderPermissionNeeded:
       'El acceso a la carpeta expiró. Haz clic en “Cambiar carpeta…” para permitir guardar de nuevo.',
     localFolderError: 'No se pudo acceder a la carpeta elegida.',

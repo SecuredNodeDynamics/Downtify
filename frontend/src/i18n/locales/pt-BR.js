@@ -188,6 +188,8 @@ export default {
     changeLocalFolder: 'Alterar pasta…',
     localFolderUnsupported:
       'Salvar em uma pasta específica neste dispositivo requer Chrome ou Edge.',
+    localFolderInsecure:
+      'Escolher pasta exige uma conexão segura. Abra o Downtify em http://localhost ou http://127.0.0.1 em vez de um endereço de rede, ou use HTTPS.',
     localFolderPermissionNeeded:
       'O acesso à pasta expirou. Clique em “Alterar pasta…” para permitir salvar novamente.',
     localFolderError: 'Não foi possível acessar a pasta escolhida.',

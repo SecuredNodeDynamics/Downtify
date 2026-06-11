@@ -186,6 +186,8 @@ export default {
     changeLocalFolder: 'Change folder…',
     localFolderUnsupported:
       'Saving to a specific folder on this device requires Chrome or Edge.',
+    localFolderInsecure:
+      'Folder selection needs a secure connection. Open Downtify at http://localhost or http://127.0.0.1 instead of a network address, or use HTTPS.',
     localFolderPermissionNeeded:
       'Folder access expired. Click “Change folder…” to allow saving again.',
     localFolderError: 'Could not access the chosen folder.',

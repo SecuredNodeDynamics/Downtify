@@ -20,8 +20,21 @@ function readFolderName() {
   return localStorage.getItem(FOLDER_NAME_KEY) || ''
 }
 
+function getLocalFolderSupport() {
+  if (typeof window === 'undefined') {
+    return { supported: false, reason: 'unavailable' }
+  }
+  if (!window.isSecureContext) {
+    return { supported: false, reason: 'insecure' }
+  }
+  if (typeof window.showDirectoryPicker !== 'function') {
+    return { supported: false, reason: 'browser' }
+  }
+  return { supported: true, reason: null }
+}
+
 function supportsLocalFolder() {
-  return typeof window !== 'undefined' && 'showDirectoryPicker' in window
+  return getLocalFolderSupport().supported
 }
 
 function openHandleDb() {
@@ -114,8 +127,9 @@ function setDestination(value) {
 }
 
 async function pickLocalFolder() {
-  if (!supportsLocalFolder()) {
-    throw new Error('unsupported')
+  const support = getLocalFolderSupport()
+  if (!support.supported) {
+    throw new Error(support.reason || 'unsupported')
   }
   const handle = await window.showDirectoryPicker({ mode: 'readwrite' })
   dirHandle = handle
@@ -131,8 +145,9 @@ async function pickLocalFolder() {
 }
 
 async function activateLocalDestination() {
-  if (!supportsLocalFolder()) {
-    throw new Error('unsupported')
+  const support = getLocalFolderSupport()
+  if (!support.supported) {
+    throw new Error(support.reason || 'unsupported')
   }
   await pickLocalFolder()
   setDestination('local')
@@ -215,6 +230,7 @@ export function useDownloadDestination() {
     localFolderName,
     localFolderReady,
     supportsLocalFolder: computed(() => supportsLocalFolder()),
+    localFolderBlockReason: computed(() => getLocalFolderSupport().reason),
     isLocal: computed(() => destination.value === 'local'),
     hasLocalFolder: computed(
       () => destination.value === 'local' && Boolean(localFolderName.value)
