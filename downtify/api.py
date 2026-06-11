@@ -37,7 +37,7 @@ from fastapi import (
 from loguru import logger
 
 from . import m3u, providers, spotify
-from .downloader import Downloader
+from .downloader import Downloader, preview_audio_for_song
 from .monitor import PlaylistMonitorDB, check_playlist
 
 DEFAULT_SETTINGS: dict[str, Any] = {
@@ -199,6 +199,15 @@ def youtube_preview_endpoint(song: dict[str, Any] = Body(...)) -> dict[str, Any]
         'embed_url': f'https://www.youtube.com/embed/{video_id}',
         'track': preview,
     }
+
+
+@router.post('/api/preview/audio')
+def audio_preview_endpoint(song: dict[str, Any] = Body(...)) -> dict[str, Any]:
+    try:
+        return preview_audio_for_song(song)
+    except Exception as exc:
+        logger.exception('Failed to resolve preview audio for {}', song)
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 
 def _resolve_url(url: str):

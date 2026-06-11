@@ -245,12 +245,12 @@
                   </div>
                   <button
                     class="absolute inset-0 flex items-center justify-center bg-black/35 transition hover:bg-black/45 disabled:cursor-not-allowed disabled:opacity-60"
-                    :disabled="!activeDemoTrack?.preview_url && !activeDemoEmbedUrl && !activeDemoExternalUrl"
+                    :disabled="demoAudioResolving"
                     @click="toggleDemoPlay(activeDemoTrack)"
-                    :title="activeDemoTrack?.preview_url ? playButtonTitle : t('search.playInEmbed')"
+                    :title="playButtonTitle"
                   >
                     <Icon
-                      :icon="demoPlaying ? 'clarity:pause-solid' : 'clarity:play-solid'"
+                      :icon="demoAudioResolving ? 'clarity:refresh-line' : (demoPlaying ? 'clarity:pause-solid' : 'clarity:play-solid')"
                       class="h-12 w-12 text-white drop-shadow"
                     />
                   </button>
@@ -279,7 +279,7 @@
                       :max="demoDuration || 30"
                       :value="demoProgress"
                       class="h-1 flex-1 cursor-pointer accent-primary"
-                      :disabled="!activeDemoTrack?.preview_url"
+                      :disabled="!activeDemoAudioUrl"
                       @input="seekDemo($event.target.value)"
                     />
                     <span class="w-9 text-xs tabular-nums text-base-content/40">
@@ -287,46 +287,25 @@
                     </span>
                   </div>
 
-                  <div
-                    v-if="!activeDemoTrack?.preview_url && activeDemoEmbedUrl"
-                    class="mt-5 overflow-hidden rounded-2xl border border-white/10 bg-black/20"
-                  >
-                    <iframe
-                      :key="activeDemoEmbedUrl"
-                      :src="activeDemoEmbedUrl"
-                      class="h-28 w-full"
-                      allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-                      loading="lazy"
-                      @error="useYoutubeFallback(activeDemoTrack)"
-                    />
-                  </div>
-
-                  <div
-                    v-else-if="!activeDemoTrack?.preview_url && activeDemoExternalUrl"
-                    class="mt-5 flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-base-100/60 px-4 py-3"
-                  >
-                    <div class="min-w-0">
-                      <p class="truncate text-sm font-medium">Listen on YouTube Music</p>
-                      <p class="truncate text-xs text-base-content/50">
-                        Opens the matched track in a new tab.
-                      </p>
-                    </div>
-                    <a
-                      class="btn btn-primary btn-sm shrink-0 gap-2 rounded-full"
-                      :href="activeDemoExternalUrl"
-                      target="_blank"
-                      rel="noopener"
-                    >
-                      <Icon icon="clarity:pop-out-line" class="h-4 w-4" />
-                      Open
-                    </a>
-                  </div>
-
                   <p
-                    v-else-if="!activeDemoTrack?.preview_url"
+                    v-if="demoAudioResolving"
                     class="mt-3 text-xs italic text-base-content/40"
                   >
-                    No playable preview is available for this track.
+                    Preparing preview...
+                  </p>
+
+                  <p
+                    v-else-if="demoAudioError"
+                    class="mt-3 text-xs italic text-error"
+                  >
+                    {{ demoAudioError }}
+                  </p>
+
+                  <p
+                    v-else-if="!activeDemoTrack?.preview_url && !activeDemoAudioUrl"
+                    class="mt-3 text-xs italic text-base-content/40"
+                  >
+                    Press play to listen in this popup.
                   </p>
 
                   <div class="mt-5 flex flex-wrap items-center gap-2">
@@ -365,15 +344,6 @@
                       <Icon icon="clarity:pop-out-line" class="h-4 w-4" />
                       {{ t('search.openOnSpotify') }}
                     </a>
-                    <button
-                      v-if="canUseYoutubeFallback(activeDemoTrack)"
-                      class="btn btn-sm gap-2 rounded-full border-white/10 bg-base-100/85"
-                      :disabled="demoFallbackLoading"
-                      @click="useYoutubeFallback(activeDemoTrack)"
-                    >
-                      <Icon icon="clarity:music-note-line" class="h-4 w-4" />
-                      {{ demoFallbackLoading ? 'Loading...' : 'YouTube Music' }}
-                    </button>
                   </div>
                 </div>
               </div>
@@ -413,12 +383,14 @@
                   </div>
                   <button
                     class="icon-btn shrink-0"
-                    :disabled="!track.preview_url && !embedUrlFor(track) && !externalPlaybackUrlFor(track)"
+                    :disabled="demoAudioResolving && activeDemoTrack?.song_id === track.song_id"
                     @click.stop="toggleDemoPlay(track)"
-                    :title="track.preview_url ? playButtonTitle : t('search.playInEmbed')"
+                    :title="playButtonTitle"
                   >
                     <Icon
-                      :icon="activeDemoTrack?.song_id === track.song_id && demoPlaying
+                      :icon="activeDemoTrack?.song_id === track.song_id && demoAudioResolving
+                        ? 'clarity:refresh-line'
+                        : activeDemoTrack?.song_id === track.song_id && demoPlaying
                         ? 'clarity:pause-solid'
                         : 'clarity:play-solid'"
                       class="h-4 w-4"
@@ -464,8 +436,9 @@ const activeDemoTrack = ref(null)
 const demoProgress = ref(0)
 const demoDuration = ref(30)
 const demoPlaying = ref(false)
-const demoExternalFallbackUrl = ref('')
-const demoFallbackLoading = ref(false)
+const demoAudioResolving = ref(false)
+const demoAudioError = ref('')
+const resolvedDemoAudioUrls = ref({})
 const demoAudio = new Audio()
 
 demoAudio.addEventListener('timeupdate', () => {
@@ -503,10 +476,11 @@ const demoTitle = computed(() => {
   return first?.name || ''
 })
 
-const activeDemoEmbedUrl = computed(() => embedUrlFor(activeDemoTrack.value))
-const activeDemoExternalUrl = computed(
+const activeDemoAudioUrl = computed(
   () =>
-    demoExternalFallbackUrl.value || externalPlaybackUrlFor(activeDemoTrack.value)
+    activeDemoTrack.value?.preview_url ||
+    resolvedDemoAudioUrls.value[demoTrackKey(activeDemoTrack.value)] ||
+    ''
 )
 
 const playButtonTitle = computed(() =>
@@ -563,7 +537,7 @@ async function openDemo(song) {
   demoTracks.value = []
   demoSourceItem.value = song
   activeDemoTrack.value = null
-  demoExternalFallbackUrl.value = ''
+  demoAudioError.value = ''
   stopDemoPlayback()
 
   try {
@@ -598,20 +572,18 @@ function closeDemo() {
 function selectDemoTrack(track) {
   const wasPlaying = demoPlaying.value
   activeDemoTrack.value = track
-  demoExternalFallbackUrl.value = ''
+  demoAudioError.value = ''
   stopDemoPlayback()
-  if (wasPlaying && (track.preview_url || embedUrlFor(track) || externalPlaybackUrlFor(track))) {
+  if (wasPlaying) {
     toggleDemoPlay(track)
   }
 }
 
-function toggleDemoPlay(track) {
-  if (!track?.preview_url) {
-    activeDemoTrack.value = track
-    stopDemoPlayback()
-    if (!embedUrlFor(track) && externalPlaybackUrlFor(track)) {
-      window.open(externalPlaybackUrlFor(track), '_blank', 'noopener')
-    }
+async function toggleDemoPlay(track) {
+  if (!track || demoAudioResolving.value) return
+
+  const audioUrl = await audioUrlForDemoTrack(track)
+  if (!audioUrl) {
     return
   }
 
@@ -628,11 +600,16 @@ function toggleDemoPlay(track) {
 
   activeDemoTrack.value = track
   demoAudio.pause()
-  demoAudio.src = track.preview_url
+  demoAudio.src = audioUrl
   demoAudio.currentTime = 0
   demoProgress.value = 0
-  demoAudio.play()
-  demoPlaying.value = true
+  try {
+    await demoAudio.play()
+    demoPlaying.value = true
+  } catch (err) {
+    demoAudioError.value = err.message || 'Preview playback failed.'
+    demoPlaying.value = false
+  }
 }
 
 function stopDemoPlayback() {
@@ -643,6 +620,7 @@ function stopDemoPlayback() {
 }
 
 function seekDemo(value) {
+  if (!activeDemoAudioUrl.value) return
   demoAudio.currentTime = Number(value)
   demoProgress.value = Number(value)
 }
@@ -657,27 +635,37 @@ function downloadAlbumFromDemo() {
   download(demoSourceItem.value)
 }
 
-function canUseYoutubeFallback(song) {
-  if (!song || song.preview_url) return false
-  return isSpotifyEmbedUrl(embedUrlFor(song))
+function demoTrackKey(track) {
+  if (!track) return ''
+  return String(track.song_id || track.url || `${track.name || ''}:${artistsOf(track)}`)
 }
 
-async function useYoutubeFallback(song) {
-  if (!canUseYoutubeFallback(song) || demoFallbackLoading.value) return
-  demoFallbackLoading.value = true
+async function audioUrlForDemoTrack(track) {
+  if (!track) return ''
+  activeDemoTrack.value = track
+  demoAudioError.value = ''
+
+  if (track.preview_url) return track.preview_url
+
+  const key = demoTrackKey(track)
+  if (resolvedDemoAudioUrls.value[key]) return resolvedDemoAudioUrls.value[key]
+
+  demoAudioResolving.value = true
   try {
-    const res = await API.youtubePreview(song)
-    if (activeDemoTrack.value?.song_id === song.song_id) {
-      demoExternalFallbackUrl.value =
-        res.data?.track?.url ||
-        (res.data?.video_id
-          ? `https://music.youtube.com/watch?v=${res.data.video_id}`
-          : '')
+    const res = await API.audioPreview(track)
+    const audioUrl = res.data?.audio_url || ''
+    if (!audioUrl) throw new Error('No playable preview was found.')
+    resolvedDemoAudioUrls.value = {
+      ...resolvedDemoAudioUrls.value,
+      [key]: audioUrl,
     }
+    return audioUrl
   } catch (err) {
-    console.log('YouTube Music fallback failed:', err.message)
+    demoAudioError.value =
+      err?.response?.data?.detail || err.message || 'Preview playback failed.'
+    return ''
   } finally {
-    demoFallbackLoading.value = false
+    demoAudioResolving.value = false
   }
 }
 
@@ -694,36 +682,6 @@ function formatDuration(seconds) {
   return `${minutes}:${remaining.toString().padStart(2, '0')}`
 }
 
-function embedUrlFor(song) {
-  if (!song) return ''
-  if (song.url) {
-    const spotifyMatch = song.url.match(
-      /open\.spotify\.com\/(?:intl-[a-z]{2}\/)?(track|album|playlist)\/([A-Za-z0-9]+)/
-    )
-    if (spotifyMatch) {
-      return `https://open.spotify.com/embed/${spotifyMatch[1]}/${spotifyMatch[2]}`
-    }
-  }
-
-  return ''
-}
-
-function externalPlaybackUrlFor(song) {
-  if (!song || song.preview_url || embedUrlFor(song)) return ''
-  if (song.source === 'youtube' && song.url) return song.url
-  const youtubeId =
-    song.song_id ||
-    song.url?.match(/[?&]v=([A-Za-z0-9_-]{6,})/)?.[1] ||
-    song.url?.match(/youtu\.be\/([A-Za-z0-9_-]{6,})/)?.[1]
-  if (song.source === 'youtube' && youtubeId && !String(youtubeId).startsWith('album:')) {
-    return `https://music.youtube.com/watch?v=${youtubeId}`
-  }
-  return ''
-}
-
-function isSpotifyEmbedUrl(url) {
-  return /^https:\/\/open\.spotify\.com\/embed\//.test(url || '')
-}
 </script>
 
 <style scoped>

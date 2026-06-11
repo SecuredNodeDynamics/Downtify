@@ -90,6 +90,112 @@ def _yt_player_clients() -> list[str]:
     return clients or list(_DEFAULT_YT_PLAYER_CLIENTS)
 
 
+def _base_ytdlp_opts() -> dict[str, Any]:
+    ydl_opts: dict[str, Any] = {
+        'format': 'bestaudio/best',
+        'quiet': True,
+        'noprogress': True,
+        'logger': _YtdlpLogger(),
+        'noplaylist': True,
+        'nocheckcertificate': True,
+        'retries': 10,
+        'fragment_retries': 10,
+        'extractor_retries': 3,
+        'socket_timeout': 30,
+        'extractor_args': {
+            'youtube': {'player_client': _yt_player_clients()}
+        },
+        'sleep_interval_requests': 1,
+    }
+
+    if os.getenv('DOWNTIFY_FORCE_IPV4', '').strip() in {
+        '1',
+        'true',
+        'yes',
+    }:
+        ydl_opts['source_address'] = '0.0.0.0'
+
+    cookies_file = os.getenv('DOWNTIFY_COOKIES_FILE', '').strip()
+    if cookies_file:
+        ydl_opts['cookiefile'] = cookies_file
+
+    cookies_browser = os.getenv('DOWNTIFY_COOKIES_FROM_BROWSER', '').strip()
+    if cookies_browser:
+        parts = cookies_browser.split(':', 1)
+        ydl_opts['cookiesfrombrowser'] = (
+            (parts[0],) if len(parts) == 1 else (parts[0], parts[1])
+        )
+
+    return ydl_opts
+
+
+def _resolve_youtube_match(
+    song: dict[str, Any],
+) -> tuple[Optional[str], Optional[dict[str, Any]]]:
+    video_id = song.get('youtube_id')
+    if not video_id and (song.get('source') == 'youtube'):
+        song_id = str(song.get('song_id') or '').strip()
+        if song_id and not song_id.startswith('album:'):
+            video_id = song_id
+
+    match: Optional[dict[str, Any]] = None
+    if not video_id:
+        video_id, match = find_match(song)
+    elif not song.get('album_name') or not song.get('cover_url'):
+        try:
+            match = find_match_for_video(song, video_id)
+        except Exception:
+            logger.opt(exception=True).debug('enrichment match failed')
+            match = None
+
+    return video_id, match
+
+
+def _best_audio_url(info: dict[str, Any]) -> str:
+    requested = info.get('requested_downloads') or []
+    for item in requested:
+        if item.get('url'):
+            return item['url']
+
+    if info.get('url'):
+        return info['url']
+
+    formats = [
+        fmt
+        for fmt in (info.get('formats') or [])
+        if fmt.get('url') and fmt.get('acodec') != 'none'
+    ]
+    formats.sort(key=lambda fmt: fmt.get('abr') or fmt.get('tbr') or 0)
+    return formats[-1]['url'] if formats else ''
+
+
+def preview_audio_for_song(song: dict[str, Any]) -> dict[str, Any]:
+    video_id, match = _resolve_youtube_match(song)
+    if not video_id:
+        raise RuntimeError(
+            f'Could not find a YouTube match for {song.get("name")!r}'
+        )
+
+    ydl_opts = _base_ytdlp_opts()
+    ydl_opts['skip_download'] = True
+
+    url = f'https://music.youtube.com/watch?v={video_id}'
+    with yt_dlp.YoutubeDL(cast(Any, ydl_opts)) as ydl:
+        info = ydl.extract_info(url, download=False)
+
+    audio_url = _best_audio_url(cast(dict[str, Any], info or {}))
+    if not audio_url:
+        raise RuntimeError(
+            f'Could not resolve a playable preview for {song.get("name")!r}'
+        )
+
+    return {
+        'video_id': video_id,
+        'audio_url': audio_url,
+        'track': enrich_from_match(song, match),
+    }
+
+
 class Downloader:
     """Wraps ``yt-dlp`` plus ``mutagen`` tagging."""
 
@@ -188,19 +294,7 @@ class Downloader:
         progress_cb: Optional[ProgressCallback] = None,
         subdir: Optional[str] = None,
     ) -> str:
-        video_id = song.get('youtube_id')
-        if not video_id and (song.get('source') == 'youtube'):
-            video_id = song.get('song_id')
-
-        match: Optional[dict[str, Any]] = None
-        if not video_id:
-            video_id, match = find_match(song)
-        elif not song.get('album_name') or not song.get('cover_url'):
-            try:
-                match = find_match_for_video(song, video_id)
-            except Exception:
-                logger.opt(exception=True).debug('enrichment match failed')
-                match = None
+        video_id, match = _resolve_youtube_match(song)
 
         if not video_id:
             raise RuntimeError(
@@ -237,24 +331,11 @@ class Downloader:
             except Exception:
                 logger.opt(exception=True).debug('progress hook error')
 
-        ydl_opts: dict[str, Any] = {
-            'format': 'bestaudio/best',
+        ydl_opts = _base_ytdlp_opts()
+        ydl_opts.update({
             'outtmpl': out_template,
-            'quiet': True,
-            'noprogress': True,
-            'logger': _YtdlpLogger(),
-            'noplaylist': True,
-            'nocheckcertificate': True,
             'overwrites': True,
             'progress_hooks': [hook],
-            'retries': 10,
-            'fragment_retries': 10,
-            'extractor_retries': 3,
-            'socket_timeout': 30,
-            'extractor_args': {
-                'youtube': {'player_client': _yt_player_clients()}
-            },
-            'sleep_interval_requests': 1,
             'postprocessors': [
                 {
                     'key': 'FFmpegExtractAudio',
@@ -262,25 +343,7 @@ class Downloader:
                     'preferredquality': self.audio_bitrate,
                 }
             ],
-        }
-
-        if os.getenv('DOWNTIFY_FORCE_IPV4', '').strip() in {
-            '1',
-            'true',
-            'yes',
-        }:
-            ydl_opts['source_address'] = '0.0.0.0'
-
-        cookies_file = os.getenv('DOWNTIFY_COOKIES_FILE', '').strip()
-        if cookies_file:
-            ydl_opts['cookiefile'] = cookies_file
-
-        cookies_browser = os.getenv('DOWNTIFY_COOKIES_FROM_BROWSER', '').strip()
-        if cookies_browser:
-            parts = cookies_browser.split(':', 1)
-            ydl_opts['cookiesfrombrowser'] = (
-                (parts[0],) if len(parts) == 1 else (parts[0], parts[1])
-            )
+        })
 
         url = f'https://music.youtube.com/watch?v={video_id}'
         with yt_dlp.YoutubeDL(cast(Any, ydl_opts)) as ydl:
