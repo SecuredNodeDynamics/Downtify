@@ -461,6 +461,7 @@ const demoAudioError = ref('')
 const demoVolume = ref(1)
 const demoVolumeActive = ref(false)
 const resolvedDemoAudioUrls = ref({})
+const resolvingDemoAudioKeys = ref({})
 const demoAudio = new Audio()
 demoAudio.volume = demoVolume.value
 
@@ -581,6 +582,8 @@ async function openDemo(song) {
       demoTracks.value = normalizeDemoTracks(res.data)
     }
     activeDemoTrack.value = demoTracks.value[0] || song
+    warmDemoAudio(activeDemoTrack.value)
+    warmNextDemoTrack(activeDemoTrack.value)
   } catch (err) {
     demoType.value = mediaType(song)
     demoTracks.value = [song]
@@ -604,6 +607,8 @@ function selectDemoTrack(track) {
   activeDemoTrack.value = track
   demoAudioError.value = ''
   stopDemoPlayback()
+  warmDemoAudio(track)
+  warmNextDemoTrack(track)
   if (wasPlaying) {
     toggleDemoPlay(track)
   }
@@ -688,16 +693,12 @@ async function audioUrlForDemoTrack(track) {
   const key = demoTrackKey(track)
   if (resolvedDemoAudioUrls.value[key]) return resolvedDemoAudioUrls.value[key]
 
+  const inflight = resolvingDemoAudioKeys.value[key]
+  if (inflight) return inflight
+
   demoAudioResolving.value = true
   try {
-    const res = await API.audioPreview(track)
-    const audioUrl = res.data?.audio_url || ''
-    if (!audioUrl) throw new Error('No playable preview was found.')
-    resolvedDemoAudioUrls.value = {
-      ...resolvedDemoAudioUrls.value,
-      [key]: audioUrl,
-    }
-    return audioUrl
+    return await resolveDemoAudio(track, key)
   } catch (err) {
     demoAudioError.value =
       err?.response?.data?.detail || err.message || 'Preview playback failed.'
@@ -705,6 +706,57 @@ async function audioUrlForDemoTrack(track) {
   } finally {
     demoAudioResolving.value = false
   }
+}
+
+function warmDemoAudio(track) {
+  if (!track || track.preview_url) return
+
+  const key = demoTrackKey(track)
+  if (resolvedDemoAudioUrls.value[key] || resolvingDemoAudioKeys.value[key]) {
+    return
+  }
+
+  resolveDemoAudio(track, key).catch((err) => {
+    console.log('Preview warmup failed:', err.message)
+  })
+}
+
+function warmNextDemoTrack(track) {
+  if (demoType.value !== 'album' || !track) return
+  const currentIndex = demoTracks.value.findIndex(
+    (item) => demoTrackKey(item) === demoTrackKey(track)
+  )
+  const nextTrack = demoTracks.value[currentIndex + 1]
+  if (nextTrack) warmDemoAudio(nextTrack)
+}
+
+async function resolveDemoAudio(track, key = demoTrackKey(track)) {
+  if (!track) return ''
+  if (resolvedDemoAudioUrls.value[key]) return resolvedDemoAudioUrls.value[key]
+  if (resolvingDemoAudioKeys.value[key]) {
+    return resolvingDemoAudioKeys.value[key]
+  }
+
+  const request = API.audioPreview(track)
+    .then((res) => {
+      const audioUrl = res.data?.audio_url || ''
+      if (!audioUrl) throw new Error('No playable preview was found.')
+      resolvedDemoAudioUrls.value = {
+        ...resolvedDemoAudioUrls.value,
+        [key]: audioUrl,
+      }
+      return audioUrl
+    })
+    .finally(() => {
+      const { [key]: _done, ...remaining } = resolvingDemoAudioKeys.value
+      resolvingDemoAudioKeys.value = remaining
+    })
+
+  resolvingDemoAudioKeys.value = {
+    ...resolvingDemoAudioKeys.value,
+    [key]: request,
+  }
+  return request
 }
 
 function normalizeDemoTracks(payload) {

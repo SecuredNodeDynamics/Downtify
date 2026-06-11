@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import re
+import time
 from pathlib import Path
 from typing import Any, Callable, Optional, cast
 
@@ -39,6 +40,8 @@ from .providers import enrich_from_match, find_match, find_match_for_video
 _INVALID_FS_CHARS = re.compile(r'[\\/:*?"<>|\x00-\x1f]')
 
 ProgressCallback = Callable[[float, str], None]
+_PREVIEW_AUDIO_CACHE_TTL_SECONDS = 45 * 60
+_PREVIEW_AUDIO_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
 
 
 def _sanitize(text: str) -> str:
@@ -169,7 +172,21 @@ def _best_audio_url(info: dict[str, Any]) -> str:
     return formats[-1]['url'] if formats else ''
 
 
+def _preview_cache_key(song: dict[str, Any]) -> str:
+    return str(
+        song.get('youtube_id')
+        or song.get('song_id')
+        or song.get('url')
+        or f"{song.get('name', '')}:{','.join(song.get('artists') or [])}"
+    )
+
+
 def preview_audio_for_song(song: dict[str, Any]) -> dict[str, Any]:
+    cache_key = _preview_cache_key(song)
+    cached = _PREVIEW_AUDIO_CACHE.get(cache_key)
+    if cached and time.time() - cached[0] < _PREVIEW_AUDIO_CACHE_TTL_SECONDS:
+        return cached[1]
+
     video_id, match = _resolve_youtube_match(song)
     if not video_id:
         raise RuntimeError(
@@ -189,11 +206,13 @@ def preview_audio_for_song(song: dict[str, Any]) -> dict[str, Any]:
             f'Could not resolve a playable preview for {song.get("name")!r}'
         )
 
-    return {
+    result = {
         'video_id': video_id,
         'audio_url': audio_url,
         'track': enrich_from_match(song, match),
     }
+    _PREVIEW_AUDIO_CACHE[cache_key] = (time.time(), result)
+    return result
 
 
 class Downloader:
