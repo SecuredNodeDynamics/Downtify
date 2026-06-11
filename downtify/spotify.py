@@ -396,6 +396,17 @@ def _year_from_release_date(rd: str) -> str:
     return ''
 
 
+def _preview_url(entity: dict[str, Any]) -> str:
+    preview = entity.get('audioPreview') or {}
+    if isinstance(preview, dict) and isinstance(preview.get('url'), str):
+        return preview['url']
+    for key in ('preview_url', 'previewUrl'):
+        value = entity.get(key)
+        if isinstance(value, str):
+            return value
+    return ''
+
+
 def _track_dict(
     entity: dict[str, Any],
     *,
@@ -430,6 +441,7 @@ def _track_dict(
         'album_name': album_name or fallback_album,
         'cover_url': cover,
         'duration': int(int(duration_ms) / 1000) if duration_ms else 0,
+        'preview_url': _preview_url(entity),
         'url': f'https://open.spotify.com/track/{track_id}'
         if track_id
         else '',
@@ -594,6 +606,7 @@ def _track_dict_from_graphql_item(
         'album_name': album_name,
         'cover_url': cover_url,
         'duration': int(duration_ms / 1000) if duration_ms else 0,
+        'preview_url': _preview_url(track),
         'url': f'https://open.spotify.com/track/{track_id}',
         'explicit': label.upper() == 'EXPLICIT',
         'release_date': gql_release,

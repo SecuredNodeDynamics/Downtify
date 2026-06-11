@@ -88,6 +88,11 @@ function downloadBatch(payload) {
   return API.post('/api/download/batch', payload)
 }
 
+function preview(songURL) {
+  const url = typeof songURL === 'string' ? songURL : songURL.url
+  return API.get('/api/preview', { params: { url } })
+}
+
 function check_for_update() {
   return API.get('/api/check_update')
 }
@@ -156,6 +161,7 @@ export default {
   openYoutubeAlbum,
   download,
   downloadBatch,
+  preview,
   downloadFileURL,
   coverFileURL,
   listDownloads,

@@ -118,6 +118,18 @@ def test_track_dict_parses_iso_release_date():
     assert td['year'] == '2024'
 
 
+def test_track_dict_includes_audio_preview_url():
+    entity = {
+        'id': 'tid',
+        'uri': 'spotify:track:tid',
+        'title': 'TestSong',
+        'audioPreview': {'url': 'https://example.test/preview.mp3'},
+        'artists': [{'name': _AL1}],
+    }
+    td = _track_dict(entity, track_id='tid', fallback_album='TestAlbum')
+    assert td['preview_url'] == 'https://example.test/preview.mp3'
+
+
 def test_track_dict_year_only_release_date_object():
     """Embeds omit ``isoString`` for YEAR-precision rows; stamp year from ``year``."""
     entity = {

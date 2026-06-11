@@ -170,6 +170,17 @@ def url_endpoint(url: str = Query(...)):
     return _resolve_url(url)
 
 
+@router.get('/api/preview')
+def preview_endpoint(url: str = Query(...)) -> dict[str, Any]:
+    parsed = spotify.parse_spotify_url(url)
+    if parsed is None:
+        raise HTTPException(status_code=400, detail='Invalid Spotify URL')
+    kind, _sid = parsed
+    resolved = _resolve_url(url)
+    tracks = resolved if isinstance(resolved, list) else [resolved]
+    return {'type': kind, 'tracks': tracks}
+
+
 def _resolve_url(url: str):
     parsed = spotify.parse_spotify_url(url)
     if parsed is None:

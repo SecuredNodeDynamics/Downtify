@@ -114,6 +114,14 @@
             {{ mediaTypeLabel(song) }}
           </span>
 
+          <button
+            class="icon-btn text-primary hover:bg-primary/10"
+            @click="openDemo(song)"
+            :title="t('search.demo')"
+          >
+            <Icon icon="clarity:play-solid" class="h-4 w-4" />
+          </button>
+
           <a
             v-if="song.url"
             class="icon-btn"
@@ -180,16 +188,192 @@
         <Icon icon="clarity:angle-line" class="h-4 w-4 rotate-90" />
       </button>
     </nav>
+
+    <!-- Demo modal -->
+    <Teleport to="body">
+      <Transition name="demo-modal">
+        <div
+          v-if="demoOpen"
+          class="fixed inset-0 z-[80] flex items-end justify-center bg-black/60 p-0 backdrop-blur-sm sm:items-center sm:p-6"
+          @click.self="closeDemo"
+        >
+          <div
+            class="surface-strong w-full max-w-2xl overflow-hidden rounded-t-3xl shadow-2xl sm:rounded-3xl"
+          >
+            <div class="flex items-center justify-between border-b border-white/5 px-5 py-4">
+              <div class="min-w-0">
+                <p class="text-xs font-semibold uppercase tracking-wider text-base-content/50">
+                  {{ demoTypeLabel }}
+                </p>
+                <h2 class="truncate text-lg font-bold tracking-tight">
+                  {{ demoTitle }}
+                </h2>
+              </div>
+              <button class="icon-btn shrink-0" @click="closeDemo" :title="t('common.close')">
+                <Icon icon="clarity:close-line" class="h-5 w-5" />
+              </button>
+            </div>
+
+            <div v-if="demoLoading" class="space-y-3 p-5">
+              <div class="skeleton h-36 rounded-2xl" />
+              <div class="skeleton h-14 rounded-2xl" />
+              <div class="skeleton h-14 rounded-2xl" />
+            </div>
+
+            <div
+              v-else-if="demoError"
+              class="flex flex-col items-center gap-3 p-8 text-center text-sm text-error"
+            >
+              <Icon icon="clarity:exclamation-circle-line" class="h-10 w-10" />
+              <p>{{ demoError }}</p>
+            </div>
+
+            <template v-else>
+              <div class="grid gap-5 p-5 sm:grid-cols-[160px_1fr]">
+                <div class="relative aspect-square overflow-hidden rounded-2xl bg-base-content/10 shadow-lg">
+                  <img
+                    v-if="activeDemoTrack?.cover_url"
+                    :src="activeDemoTrack.cover_url"
+                    :alt="activeDemoTrack.name"
+                    class="h-full w-full object-cover"
+                  />
+                  <div
+                    v-else
+                    class="flex h-full w-full items-center justify-center text-base-content/30"
+                  >
+                    <Icon icon="clarity:music-note-line" class="h-12 w-12" />
+                  </div>
+                  <button
+                    class="absolute inset-0 flex items-center justify-center bg-black/35 transition hover:bg-black/45 disabled:cursor-not-allowed disabled:opacity-60"
+                    :disabled="!activeDemoTrack?.preview_url"
+                    @click="toggleDemoPlay(activeDemoTrack)"
+                    :title="activeDemoTrack?.preview_url ? playButtonTitle : t('search.noPreview')"
+                  >
+                    <Icon
+                      :icon="demoPlaying ? 'clarity:pause-solid' : 'clarity:play-solid'"
+                      class="h-12 w-12 text-white drop-shadow"
+                    />
+                  </button>
+                </div>
+
+                <div class="min-w-0">
+                  <h3 class="truncate text-xl font-bold">{{ activeDemoTrack?.name }}</h3>
+                  <p class="truncate text-sm text-base-content/60">
+                    {{ activeDemoTrack ? artistsOf(activeDemoTrack) : '' }}
+                  </p>
+                  <p
+                    v-if="activeDemoTrack?.album_name"
+                    class="mt-1 truncate text-xs text-base-content/40"
+                  >
+                    {{ activeDemoTrack.album_name }}
+                    <span v-if="activeDemoTrack.year"> · {{ activeDemoTrack.year }}</span>
+                  </p>
+
+                  <div class="mt-5 flex items-center gap-2">
+                    <span class="w-9 text-right text-xs tabular-nums text-base-content/40">
+                      {{ formatDuration(Math.floor(demoProgress)) }}
+                    </span>
+                    <input
+                      type="range"
+                      min="0"
+                      :max="demoDuration || 30"
+                      :value="demoProgress"
+                      class="h-1 flex-1 cursor-pointer accent-primary"
+                      :disabled="!activeDemoTrack?.preview_url"
+                      @input="seekDemo($event.target.value)"
+                    />
+                    <span class="w-9 text-xs tabular-nums text-base-content/40">
+                      {{ formatDuration(Math.floor(demoDuration)) }}
+                    </span>
+                  </div>
+
+                  <p
+                    v-if="!activeDemoTrack?.preview_url"
+                    class="mt-3 text-xs italic text-base-content/40"
+                  >
+                    {{ t('search.noPreview') }}
+                  </p>
+
+                  <div class="mt-5 flex flex-wrap items-center gap-2">
+                    <button
+                      class="btn btn-primary btn-sm gap-2 rounded-full"
+                      :disabled="downloadState(activeDemoTrack) === 'queued'"
+                      @click="downloadFromDemo"
+                    >
+                      <Icon icon="clarity:download-line" class="h-4 w-4" />
+                      {{
+                        downloadState(activeDemoTrack) === 'queued'
+                          ? t('search.inQueue')
+                          : t('search.download')
+                      }}
+                    </button>
+                    <a
+                      v-if="activeDemoTrack?.url"
+                      class="btn btn-sm gap-2 rounded-full border-white/10 bg-base-100/85"
+                      :href="activeDemoTrack.url"
+                      target="_blank"
+                      rel="noopener"
+                    >
+                      <Icon icon="clarity:pop-out-line" class="h-4 w-4" />
+                      {{ t('search.openOnSpotify') }}
+                    </a>
+                  </div>
+                </div>
+              </div>
+
+              <div
+                v-if="demoTracks.length > 1"
+                class="max-h-64 overflow-y-auto border-t border-white/5 p-3"
+              >
+                <button
+                  v-for="(track, index) in demoTracks"
+                  :key="track.song_id || index"
+                  class="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition-colors hover:bg-white/5"
+                  :class="{ 'bg-primary/10 text-primary': activeDemoTrack?.song_id === track.song_id }"
+                  @click="selectDemoTrack(track)"
+                >
+                  <img
+                    v-if="track.cover_url"
+                    :src="track.cover_url"
+                    :alt="track.name"
+                    class="h-10 w-10 shrink-0 rounded-lg object-cover"
+                  />
+                  <div
+                    v-else
+                    class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-base-content/10"
+                  >
+                    <Icon icon="clarity:music-note-line" class="h-4 w-4" />
+                  </div>
+                  <div class="min-w-0 flex-1">
+                    <p class="truncate text-sm font-medium">{{ track.name }}</p>
+                    <p class="truncate text-xs text-base-content/50">
+                      {{ artistsOf(track) }}
+                    </p>
+                  </div>
+                  <Icon
+                    :icon="activeDemoTrack?.song_id === track.song_id && demoPlaying
+                      ? 'clarity:pause-solid'
+                      : 'clarity:play-solid'"
+                    class="h-4 w-4 shrink-0"
+                  />
+                </button>
+              </div>
+            </template>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onBeforeUnmount } from 'vue'
 import { Icon } from '@iconify/vue'
 
 import { useSearchManager } from '../model/search'
 import { useProgressTracker, useDownloadManager } from '../model/download'
 import { useI18n } from '../i18n'
+import API from '../model/api'
 
 const PAGE_SIZE = 5
 
@@ -202,6 +386,31 @@ const dm = useDownloadManager()
 const { t } = useI18n()
 
 const currentPage = ref(1)
+const demoOpen = ref(false)
+const demoLoading = ref(false)
+const demoError = ref('')
+const demoTracks = ref([])
+const demoType = ref('track')
+const activeDemoTrack = ref(null)
+const demoProgress = ref(0)
+const demoDuration = ref(30)
+const demoPlaying = ref(false)
+const demoAudio = new Audio()
+
+demoAudio.addEventListener('timeupdate', () => {
+  demoProgress.value = demoAudio.currentTime
+})
+demoAudio.addEventListener('durationchange', () => {
+  demoDuration.value = demoAudio.duration || 30
+})
+demoAudio.addEventListener('ended', () => {
+  demoPlaying.value = false
+  demoProgress.value = 0
+})
+
+onBeforeUnmount(() => {
+  stopDemoPlayback()
+})
 
 const totalPages = computed(() =>
   Math.ceil((props.data?.length || 0) / PAGE_SIZE)
@@ -212,6 +421,20 @@ const paginatedData = computed(() => {
   const start = (currentPage.value - 1) * PAGE_SIZE
   return props.data.slice(start, start + PAGE_SIZE)
 })
+
+const demoTypeLabel = computed(() =>
+  demoType.value === 'album' ? t('search.albumType') : t('search.trackType')
+)
+
+const demoTitle = computed(() => {
+  const first = demoTracks.value[0]
+  if (demoType.value === 'album') return first?.album_name || first?.name || ''
+  return first?.name || ''
+})
+
+const playButtonTitle = computed(() =>
+  demoPlaying.value ? t('player.pause') : t('player.play')
+)
 
 watch(
   () => props.data,
@@ -244,6 +467,7 @@ function mediaTypeClass(song) {
 }
 
 function downloadState(song) {
+  if (!song) return 'idle'
   const item = pt.getBySong(song)
   if (!item) return 'idle'
   if (item.isErrored()) return 'error'
@@ -254,4 +478,111 @@ function downloadState(song) {
 function download(song) {
   emit('download', song)
 }
+
+async function openDemo(song) {
+  demoOpen.value = true
+  demoLoading.value = true
+  demoError.value = ''
+  demoTracks.value = []
+  activeDemoTrack.value = null
+  stopDemoPlayback()
+
+  try {
+    const res = await API.preview(song)
+    demoType.value = res.data.type || mediaType(song)
+    demoTracks.value = res.data.tracks || []
+    activeDemoTrack.value = demoTracks.value[0] || song
+  } catch (err) {
+    demoType.value = mediaType(song)
+    demoTracks.value = [song]
+    activeDemoTrack.value = song
+    if (!song) {
+      demoError.value =
+        err?.response?.data?.detail || err.message || t('search.previewError')
+    }
+  } finally {
+    demoLoading.value = false
+  }
+}
+
+function closeDemo() {
+  demoOpen.value = false
+  stopDemoPlayback()
+}
+
+function selectDemoTrack(track) {
+  const wasPlaying = demoPlaying.value
+  activeDemoTrack.value = track
+  stopDemoPlayback()
+  if (wasPlaying && track.preview_url) toggleDemoPlay(track)
+}
+
+function toggleDemoPlay(track) {
+  if (!track?.preview_url) return
+
+  if (activeDemoTrack.value?.song_id === track.song_id && demoAudio.src) {
+    if (demoPlaying.value) {
+      demoAudio.pause()
+      demoPlaying.value = false
+    } else {
+      demoAudio.play()
+      demoPlaying.value = true
+    }
+    return
+  }
+
+  activeDemoTrack.value = track
+  demoAudio.pause()
+  demoAudio.src = track.preview_url
+  demoAudio.currentTime = 0
+  demoProgress.value = 0
+  demoAudio.play()
+  demoPlaying.value = true
+}
+
+function stopDemoPlayback() {
+  demoAudio.pause()
+  demoAudio.src = ''
+  demoPlaying.value = false
+  demoProgress.value = 0
+}
+
+function seekDemo(value) {
+  demoAudio.currentTime = Number(value)
+  demoProgress.value = Number(value)
+}
+
+function downloadFromDemo() {
+  if (!activeDemoTrack.value) return
+  download(activeDemoTrack.value)
+}
+
+function formatDuration(seconds) {
+  if (!seconds || isNaN(seconds)) return '0:00'
+  const minutes = Math.floor(seconds / 60)
+  const remaining = Math.floor(seconds % 60)
+  return `${minutes}:${remaining.toString().padStart(2, '0')}`
+}
 </script>
+
+<style scoped>
+.demo-modal-enter-active,
+.demo-modal-leave-active {
+  transition: opacity 0.2s ease;
+}
+.demo-modal-enter-from,
+.demo-modal-leave-to {
+  opacity: 0;
+}
+.demo-modal-enter-active > div,
+.demo-modal-leave-active > div {
+  transition:
+    transform 0.2s ease,
+    opacity 0.2s ease;
+}
+.demo-modal-enter-from > div,
+.demo-modal-leave-to > div {
+  transform: translateY(16px);
+  opacity: 0;
+}
+</style>
