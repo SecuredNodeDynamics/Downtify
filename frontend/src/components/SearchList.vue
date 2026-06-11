@@ -245,7 +245,7 @@
                   </div>
                   <button
                     class="absolute inset-0 flex items-center justify-center bg-black/35 transition hover:bg-black/45 disabled:cursor-not-allowed disabled:opacity-60"
-                    :disabled="!activeDemoTrack?.preview_url && !activeDemoEmbedUrl"
+                    :disabled="!activeDemoTrack?.preview_url && !activeDemoEmbedUrl && !activeDemoExternalUrl"
                     @click="toggleDemoPlay(activeDemoTrack)"
                     :title="activeDemoTrack?.preview_url ? playButtonTitle : t('search.playInEmbed')"
                   >
@@ -299,6 +299,27 @@
                       loading="lazy"
                       @error="useYoutubeFallback(activeDemoTrack)"
                     />
+                  </div>
+
+                  <div
+                    v-else-if="!activeDemoTrack?.preview_url && activeDemoExternalUrl"
+                    class="mt-5 flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-base-100/60 px-4 py-3"
+                  >
+                    <div class="min-w-0">
+                      <p class="truncate text-sm font-medium">YouTube Music fallback</p>
+                      <p class="truncate text-xs text-base-content/50">
+                        Opens the matched track in YouTube Music.
+                      </p>
+                    </div>
+                    <a
+                      class="btn btn-primary btn-sm shrink-0 gap-2 rounded-full"
+                      :href="activeDemoExternalUrl"
+                      target="_blank"
+                      rel="noopener"
+                    >
+                      <Icon icon="clarity:pop-out-line" class="h-4 w-4" />
+                      Open
+                    </a>
                   </div>
 
                   <p
@@ -392,7 +413,7 @@
                   </div>
                   <button
                     class="icon-btn shrink-0"
-                    :disabled="!track.preview_url && !embedUrlFor(track)"
+                    :disabled="!track.preview_url && !embedUrlFor(track) && !externalPlaybackUrlFor(track)"
                     @click.stop="toggleDemoPlay(track)"
                     :title="track.preview_url ? playButtonTitle : t('search.playInEmbed')"
                   >
@@ -443,7 +464,7 @@ const activeDemoTrack = ref(null)
 const demoProgress = ref(0)
 const demoDuration = ref(30)
 const demoPlaying = ref(false)
-const demoEmbedFallbackUrl = ref('')
+const demoExternalFallbackUrl = ref('')
 const demoFallbackLoading = ref(false)
 const demoAudio = new Audio()
 
@@ -482,8 +503,10 @@ const demoTitle = computed(() => {
   return first?.name || ''
 })
 
-const activeDemoEmbedUrl = computed(
-  () => demoEmbedFallbackUrl.value || embedUrlFor(activeDemoTrack.value)
+const activeDemoEmbedUrl = computed(() => embedUrlFor(activeDemoTrack.value))
+const activeDemoExternalUrl = computed(
+  () =>
+    demoExternalFallbackUrl.value || externalPlaybackUrlFor(activeDemoTrack.value)
 )
 
 const playButtonTitle = computed(() =>
@@ -540,7 +563,7 @@ async function openDemo(song) {
   demoTracks.value = []
   demoSourceItem.value = song
   activeDemoTrack.value = null
-  demoEmbedFallbackUrl.value = ''
+  demoExternalFallbackUrl.value = ''
   stopDemoPlayback()
 
   try {
@@ -575,9 +598,9 @@ function closeDemo() {
 function selectDemoTrack(track) {
   const wasPlaying = demoPlaying.value
   activeDemoTrack.value = track
-  demoEmbedFallbackUrl.value = ''
+  demoExternalFallbackUrl.value = ''
   stopDemoPlayback()
-  if (wasPlaying && (track.preview_url || embedUrlFor(track))) {
+  if (wasPlaying && (track.preview_url || embedUrlFor(track) || externalPlaybackUrlFor(track))) {
     toggleDemoPlay(track)
   }
 }
@@ -586,6 +609,9 @@ function toggleDemoPlay(track) {
   if (!track?.preview_url) {
     activeDemoTrack.value = track
     stopDemoPlayback()
+    if (!embedUrlFor(track) && externalPlaybackUrlFor(track)) {
+      window.open(externalPlaybackUrlFor(track), '_blank', 'noopener')
+    }
     return
   }
 
@@ -641,8 +667,12 @@ async function useYoutubeFallback(song) {
   demoFallbackLoading.value = true
   try {
     const res = await API.youtubePreview(song)
-    if (res.data?.embed_url && activeDemoTrack.value?.song_id === song.song_id) {
-      demoEmbedFallbackUrl.value = res.data.embed_url
+    if (activeDemoTrack.value?.song_id === song.song_id) {
+      demoExternalFallbackUrl.value =
+        res.data?.track?.url ||
+        (res.data?.video_id
+          ? `https://music.youtube.com/watch?v=${res.data.video_id}`
+          : '')
     }
   } catch (err) {
     console.log('YouTube Music fallback failed:', err.message)
@@ -675,12 +705,18 @@ function embedUrlFor(song) {
     }
   }
 
+  return ''
+}
+
+function externalPlaybackUrlFor(song) {
+  if (!song || song.preview_url || embedUrlFor(song)) return ''
+  if (song.source === 'youtube' && song.url) return song.url
   const youtubeId =
     song.song_id ||
     song.url?.match(/[?&]v=([A-Za-z0-9_-]{6,})/)?.[1] ||
     song.url?.match(/youtu\.be\/([A-Za-z0-9_-]{6,})/)?.[1]
   if (song.source === 'youtube' && youtubeId && !String(youtubeId).startsWith('album:')) {
-    return `https://www.youtube.com/embed/${youtubeId}`
+    return `https://music.youtube.com/watch?v=${youtubeId}`
   }
   return ''
 }
