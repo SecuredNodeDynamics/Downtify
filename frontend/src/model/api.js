@@ -93,6 +93,10 @@ function preview(songURL) {
   return API.get('/api/preview', { params: { url } })
 }
 
+function youtubePreview(song) {
+  return API.post('/api/preview/youtube', song)
+}
+
 function check_for_update() {
   return API.get('/api/check_update')
 }
@@ -162,6 +166,7 @@ export default {
   download,
   downloadBatch,
   preview,
+  youtubePreview,
   downloadFileURL,
   coverFileURL,
   listDownloads,

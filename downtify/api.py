@@ -181,6 +181,26 @@ def preview_endpoint(url: str = Query(...)) -> dict[str, Any]:
     return {'type': kind, 'tracks': tracks}
 
 
+@router.post('/api/preview/youtube')
+def youtube_preview_endpoint(song: dict[str, Any] = Body(...)) -> dict[str, Any]:
+    video_id, match = providers.find_match(song)
+    if not video_id:
+        raise HTTPException(
+            status_code=404,
+            detail='No YouTube Music preview fallback found',
+        )
+    preview = providers._result_to_song(match or {'videoId': video_id}) or {
+        'song_id': video_id,
+        'source': 'youtube',
+        'url': f'https://music.youtube.com/watch?v={video_id}',
+    }
+    return {
+        'video_id': video_id,
+        'embed_url': f'https://www.youtube.com/embed/{video_id}',
+        'track': preview,
+    }
+
+
 def _resolve_url(url: str):
     parsed = spotify.parse_spotify_url(url)
     if parsed is None:
