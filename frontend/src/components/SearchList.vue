@@ -348,15 +348,19 @@
               </div>
 
               <div
-                v-if="demoTracks.length > 1"
+                v-if="demoType === 'album' && demoTracks.length"
                 class="max-h-64 overflow-y-auto border-t border-white/5 p-3"
               >
-                <button
+                <div
                   v-for="(track, index) in demoTracks"
                   :key="track.song_id || index"
-                  class="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition-colors hover:bg-white/5"
+                  class="flex w-full cursor-pointer items-center gap-3 rounded-xl px-2 py-2 text-left transition-colors hover:bg-white/5"
                   :class="{ 'bg-primary/10 text-primary': activeDemoTrack?.song_id === track.song_id }"
                   @click="selectDemoTrack(track)"
+                  role="button"
+                  tabindex="0"
+                  @keydown.enter.prevent="selectDemoTrack(track)"
+                  @keydown.space.prevent="selectDemoTrack(track)"
                 >
                   <img
                     v-if="track.cover_url"
@@ -376,13 +380,20 @@
                       {{ artistsOf(track) }}
                     </p>
                   </div>
-                  <Icon
-                    :icon="activeDemoTrack?.song_id === track.song_id && demoPlaying
-                      ? 'clarity:pause-solid'
-                      : 'clarity:play-solid'"
-                    class="h-4 w-4 shrink-0"
-                  />
-                </button>
+                  <button
+                    class="icon-btn shrink-0"
+                    :disabled="!track.preview_url && !embedUrlFor(track)"
+                    @click.stop="toggleDemoPlay(track)"
+                    :title="track.preview_url ? playButtonTitle : t('search.playInEmbed')"
+                  >
+                    <Icon
+                      :icon="activeDemoTrack?.song_id === track.song_id && demoPlaying
+                        ? 'clarity:pause-solid'
+                        : 'clarity:play-solid'"
+                      class="h-4 w-4"
+                    />
+                  </button>
+                </div>
               </div>
             </template>
           </div>
@@ -521,11 +532,11 @@ async function openDemo(song) {
     if (song?.media_type === 'album' && song.browse_id) {
       const res = await API.openYoutubeAlbum(song.browse_id)
       demoType.value = 'album'
-      demoTracks.value = res.data || []
+      demoTracks.value = normalizeDemoTracks(res.data)
     } else {
       const res = await API.preview(song)
       demoType.value = res.data.type || mediaType(song)
-      demoTracks.value = res.data.tracks || []
+      demoTracks.value = normalizeDemoTracks(res.data)
     }
     activeDemoTrack.value = demoTracks.value[0] || song
   } catch (err) {
@@ -550,12 +561,15 @@ function selectDemoTrack(track) {
   const wasPlaying = demoPlaying.value
   activeDemoTrack.value = track
   stopDemoPlayback()
-  if (wasPlaying && track.preview_url) toggleDemoPlay(track)
+  if (wasPlaying && (track.preview_url || embedUrlFor(track))) {
+    toggleDemoPlay(track)
+  }
 }
 
 function toggleDemoPlay(track) {
   if (!track?.preview_url) {
     activeDemoTrack.value = track
+    stopDemoPlayback()
     return
   }
 
@@ -599,6 +613,12 @@ function downloadFromDemo() {
 function downloadAlbumFromDemo() {
   if (!demoSourceItem.value) return
   download(demoSourceItem.value)
+}
+
+function normalizeDemoTracks(payload) {
+  if (Array.isArray(payload)) return payload
+  if (Array.isArray(payload?.tracks)) return payload.tracks
+  return []
 }
 
 function formatDuration(seconds) {
