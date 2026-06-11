@@ -306,9 +306,9 @@
                     class="mt-5 flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-base-100/60 px-4 py-3"
                   >
                     <div class="min-w-0">
-                      <p class="truncate text-sm font-medium">YouTube Music fallback</p>
+                      <p class="truncate text-sm font-medium">Listen on YouTube Music</p>
                       <p class="truncate text-xs text-base-content/50">
-                        Opens the matched track in YouTube Music.
+                        Opens the matched track in a new tab.
                       </p>
                     </div>
                     <a
