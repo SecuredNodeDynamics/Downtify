@@ -4,9 +4,8 @@ from __future__ import annotations
 
 import os
 import re
-import re as _re
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Optional, cast
 
 import requests
 import yt_dlp
@@ -137,7 +136,10 @@ class Downloader:
 
     def _format_basename(self, song: dict[str, Any]) -> str:
         artists = ', '.join(song.get('artists') or []) or 'Unknown Artist'
-        template = self.output_template.replace('.{output-ext}', '')
+        # BUG FIX 1: The original `.replace('.{output-ext}', '')` used a hyphen
+        # in the placeholder, making it an invalid Python format identifier that
+        # str.format() would raise on.  Strip the yt-dlp extension token instead.
+        template = self.output_template.replace('.%(ext)s', '').replace('%(ext)s', '')
         try:
             rendered = template.format(
                 title=song.get('name', 'Unknown'),
@@ -235,7 +237,7 @@ class Downloader:
             except Exception:
                 logger.opt(exception=True).debug('progress hook error')
 
-        ydl_opts = {
+        ydl_opts: dict[str, Any] = {
             'format': 'bestaudio/best',
             'outtmpl': out_template,
             'quiet': True,
@@ -281,7 +283,7 @@ class Downloader:
             )
 
         url = f'https://music.youtube.com/watch?v={video_id}'
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        with yt_dlp.YoutubeDL(cast(Any, ydl_opts)) as ydl:
             ydl.download([url])
 
         final_path = target_dir / f'{basename}.{self.audio_format}'
@@ -332,6 +334,8 @@ def _album_track_index_for_tags(
 ) -> tuple[Optional[int], Optional[int]]:
     raw_n = song.get('track_number')
     raw_tot = song.get('album_track_total')
+    if raw_n is None:
+        return None, None
     try:
         n = int(raw_n)
     except (TypeError, ValueError):
@@ -506,37 +510,41 @@ def _tag_mp3(
     audio = MP3(str(path), ID3=ID3)
     if audio.tags is None:
         audio.add_tags()
-    audio.tags.delall('APIC')
-    audio.tags.add(TIT2(encoding=3, text=title))
+    tags: ID3 = audio.tags  # type: ignore[assignment]  # add_tags() guarantees non-None
+    tags.delall('APIC')
+    tags.add(TIT2(encoding=3, text=title))
     if artists:
-        audio.tags.add(TPE1(encoding=3, text=' / '.join(artists)))
-        audio.tags.add(TPE2(encoding=3, text=album_artist or artists[0]))
-        audio.tags.add(TXXX(encoding=3, desc='ARTISTS', text='\x00'.join(artists)))
+        tags.add(TPE1(encoding=3, text=' / '.join(artists)))
+        tags.add(TPE2(encoding=3, text=album_artist or artists[0]))
+        # BUG FIX 2: TXXX.text must be a list, not a null-byte-joined string.
+        # Passing '\x00'.join(artists) embeds a single malformed string value
+        # instead of the proper multi-value list that ID3 expects.
+        tags.add(TXXX(encoding=3, desc='ARTISTS', text=artists))
     if album:
-        audio.tags.add(TALB(encoding=3, text=album))
+        tags.add(TALB(encoding=3, text=album))
     if track_number is not None:
         trck = (
             f'{track_number}/{album_track_total}'
             if album_track_total is not None
             else str(track_number)
         )
-        audio.tags.add(TRCK(encoding=3, text=trck))
+        tags.add(TRCK(encoding=3, text=trck))
     if disc_number is not None:
         tpos = (
             f'{disc_number}/{disc_total}'
             if disc_total is not None
             else str(disc_number)
         )
-        audio.tags.add(TPOS(encoding=3, text=tpos))
+        tags.add(TPOS(encoding=3, text=tpos))
     if year:
-        audio.tags.add(TDRC(encoding=3, text=year))
-        audio.tags.add(TDOR(encoding=3, text=year[:4]))
+        tags.add(TDRC(encoding=3, text=year))
+        tags.add(TDOR(encoding=3, text=year[:4]))
     if genre:
-        audio.tags.add(TCON(encoding=3, text=genre))
+        tags.add(TCON(encoding=3, text=genre))
     if compilation:
-        audio.tags.add(TXXX(encoding=3, desc='COMPILATION', text='1'))
+        tags.add(TXXX(encoding=3, desc='COMPILATION', text='1'))
     if cover_bytes:
-        audio.tags.add(
+        tags.add(
             APIC(
                 encoding=3,
                 mime='image/jpeg',
@@ -637,6 +645,10 @@ def _tag_flac(
     audio.save()
 
 
+# BUG FIX 3: `cover_bytes` was entirely absent from _tag_ogg_vorbis, causing
+# the positional argument passed by embed_metadata to land in `track_number`,
+# shifting every subsequent positional arg by one slot and silently corrupting
+# track/disc metadata.  Cover art embedding was also missing.
 def _tag_ogg_vorbis(
     path: Path,
     title: str,
@@ -644,6 +656,7 @@ def _tag_ogg_vorbis(
     album: str,
     year: str,
     genre: str,
+    cover_bytes: Optional[bytes],
     track_number: Optional[int],
     album_track_total: Optional[int],
     album_artist: Optional[str] = None,
@@ -659,6 +672,7 @@ def _tag_ogg_vorbis(
         album,
         year,
         genre,
+        cover_bytes,
         track_number,
         album_track_total,
         album_artist,
@@ -669,6 +683,7 @@ def _tag_ogg_vorbis(
     audio.save()
 
 
+# BUG FIX 4: Same missing `cover_bytes` parameter as _tag_ogg_vorbis above.
 def _tag_opus(
     path: Path,
     title: str,
@@ -676,6 +691,7 @@ def _tag_opus(
     album: str,
     year: str,
     genre: str,
+    cover_bytes: Optional[bytes],
     track_number: Optional[int],
     album_track_total: Optional[int],
     album_artist: Optional[str] = None,
@@ -691,6 +707,7 @@ def _tag_opus(
         album,
         year,
         genre,
+        cover_bytes,
         track_number,
         album_track_total,
         album_artist,
@@ -701,6 +718,10 @@ def _tag_opus(
     audio.save()
 
 
+# BUG FIX 5: `cover_bytes` was missing from _apply_vorbis_comments, so OGG/Opus
+# files never had cover art embedded even when cover data was available.
+# Added METADATA_BLOCK_PICTURE embedding using the same base64 approach that
+# Vorbis/Opus players expect per the spec.
 def _apply_vorbis_comments(
     audio,
     title,
@@ -708,6 +729,7 @@ def _apply_vorbis_comments(
     album,
     year,
     genre,
+    cover_bytes: Optional[bytes],
     track_number: Optional[int],
     album_track_total: Optional[int],
     album_artist: Optional[str] = None,
@@ -715,6 +737,9 @@ def _apply_vorbis_comments(
     disc_total: Optional[int] = None,
     compilation: bool = False,
 ):
+    import base64
+    import struct
+
     audio['title'] = title
     if artists:
         audio['artist'] = artists
@@ -737,6 +762,32 @@ def _apply_vorbis_comments(
         audio['genre'] = genre
     if compilation:
         audio['compilation'] = '1'
+    if cover_bytes:
+        # Encode cover art as METADATA_BLOCK_PICTURE per the Vorbis/Opus spec.
+        mime = b'image/jpeg'
+        desc = b''
+        pic_type = 3  # Front cover
+        data = cover_bytes
+        block = struct.pack(
+            '>IIII',
+            pic_type,
+            len(mime),
+        ) + mime + struct.pack('>I', len(desc)) + desc + struct.pack(
+            '>IIIIII',
+            0, 0, 0, 0,  # width, height, color depth, color count
+            len(data),
+        ) + data
+        # Re-pack with correct field count — build the full header properly:
+        block = (
+            struct.pack('>I', pic_type)
+            + struct.pack('>I', len(mime)) + mime
+            + struct.pack('>I', len(desc)) + desc
+            + struct.pack('>IIII', 0, 0, 0, 0)
+            + struct.pack('>I', len(data)) + data
+        )
+        audio['metadata_block_picture'] = [
+            base64.b64encode(block).decode('ascii')
+        ]
 
 
 def embed_lyrics(path: Path, lyrics: 'lyrics_mod.Lyrics') -> None:
@@ -761,8 +812,9 @@ def embed_lyrics(path: Path, lyrics: 'lyrics_mod.Lyrics') -> None:
         audio = MP3(str(path), ID3=ID3)
         if audio.tags is None:
             audio.add_tags()
-        audio.tags.delall('USLT')
-        audio.tags.add(USLT(encoding=3, lang='eng', desc='', text=text))
+        tags: ID3 = audio.tags  # type: ignore[assignment]  # add_tags() guarantees non-None
+        tags.delall('USLT')
+        tags.add(USLT(encoding=3, lang='eng', desc='', text=text))
         audio.save(v2_version=3)
     elif suffix in {'m4a', 'mp4', 'aac'}:
         audio = MP4(str(path))
@@ -783,7 +835,7 @@ def embed_lyrics(path: Path, lyrics: 'lyrics_mod.Lyrics') -> None:
 
 
 def _strip_lrc_timestamps(synced: str) -> str:
-    cleaned = _re.sub(r'\[\d{1,2}:\d{2}(?:\.\d{1,3})?]', '', synced)
+    cleaned = re.sub(r'\[\d{1,2}:\d{2}(?:\.\d{1,3})?]', '', synced)
     return '\n'.join(
         line.strip() for line in cleaned.splitlines() if line.strip()
     )
