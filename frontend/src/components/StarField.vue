@@ -30,11 +30,12 @@ function randomBetween(min, max) {
 }
 
 function getStarCount() {
-  return Math.min(190, Math.max(80, Math.round((width * height) / 12000)))
+  return Math.min(520, Math.max(180, Math.round((width * height) / 4200)))
 }
 
 function createStar() {
-  const size = randomBetween(0.65, 1.85)
+  const depth = Math.random()
+  const size = randomBetween(0.35, 1.05) + depth * randomBetween(0.25, 1.15)
 
   return {
     x: Math.random() * width,
@@ -43,13 +44,15 @@ function createStar() {
     baseY: 0,
     vx: 0,
     vy: 0,
+    depth,
     size,
-    alpha: randomBetween(0.18, 0.72),
-    twinkle: randomBetween(0.12, 0.5),
+    alpha: randomBetween(0.08, 0.46) + depth * randomBetween(0.12, 0.38),
+    twinkle: randomBetween(0.16, 0.62),
+    twinkleSpeed: randomBetween(0.00045, 0.00135),
     phase: randomBetween(0, Math.PI * 2),
     colorMix: Math.random(),
     driftAngle: randomBetween(0, Math.PI * 2),
-    driftSpeed: randomBetween(0.018, 0.055),
+    driftSpeed: randomBetween(0.01, 0.035) + depth * 0.03,
     wander: randomBetween(0.00012, 0.00034),
   }
 }
@@ -171,10 +174,21 @@ function draw(now) {
   updateStars(now)
 
   stars.forEach((star) => {
-    const twinkle = reduceMotion ? 0 : Math.sin(now * 0.0016 + star.phase) * star.twinkle
-    const themeAlpha = theme === 'light' ? 0.55 : 0.82
+    const fade =
+      reduceMotion
+        ? 0
+        : (Math.sin(now * star.twinkleSpeed + star.phase) + 1) * 0.5
+    const twinkle = fade * star.twinkle
+    const themeAlpha = theme === 'light' ? 0.48 : 0.9
     const alpha = Math.max(0.05, (star.alpha + twinkle) * themeAlpha)
+    const glowAlpha = alpha * (theme === 'light' ? 0.18 : 0.28) * star.depth
 
+    if (star.depth > 0.58) {
+      context.beginPath()
+      context.fillStyle = `rgba(${getStarColor(star)}, ${glowAlpha})`
+      context.arc(star.x, star.y, star.size * 2.8, 0, Math.PI * 2)
+      context.fill()
+    }
     context.beginPath()
     context.fillStyle = `rgba(${getStarColor(star)}, ${alpha})`
     context.arc(star.x, star.y, star.size, 0, Math.PI * 2)
