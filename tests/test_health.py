@@ -9,6 +9,7 @@ from downtify.api import (
     get_health,
 )
 from downtify.downloader import Downloader
+from downtify.history import DownloadHistoryDB
 
 
 def test_directory_summary_counts_audio_files(tmp_path):
@@ -197,7 +198,10 @@ def test_health_payload_contains_core_sections(tmp_path):
         api.state.settings_path.parent.mkdir()
         api.state.version = '1.2.3'
         api.state.settings = {'format': 'mp3', 'max_parallel_downloads': 3}
-        api.state.download_jobs = {'a': {'status': 'done'}}
+        api.state.download_jobs = {
+            'a': {'status': 'done'},
+            'b': {'status': 'queued'},
+        }
         api.state.history_db = None
 
         payload = get_health()
@@ -212,5 +216,39 @@ def test_health_payload_contains_core_sections(tmp_path):
     assert payload['version'] == '1.2.3'
     assert payload['downloads']['exists'] is True
     assert payload['queue']['total'] == 1
+    assert payload['queue']['all_total'] == 2
     assert 'ffmpeg' in payload['tools']
     assert 'yt_dlp' in payload['tools']
+
+
+def test_health_payload_counts_completed_last_24h(tmp_path):
+    old_downloader = api.state.downloader
+    old_settings_path = api.state.settings_path
+    old_version = api.state.version
+    old_settings = api.state.settings
+    old_jobs = api.state.download_jobs
+    old_history = api.state.history_db
+    try:
+        api.state.downloader = Downloader(tmp_path / 'downloads')
+        api.state.settings_path = tmp_path / 'data' / 'settings.json'
+        api.state.settings_path.parent.mkdir()
+        api.state.version = '1.2.3'
+        api.state.settings = {}
+        api.state.download_jobs = {}
+        api.state.history_db = DownloadHistoryDB(tmp_path / 'history.db')
+        history_id = api.state.history_db.create(
+            {'name': 'Done'},
+            status='downloading',
+        )
+        api.state.history_db.mark_done(history_id, 'Done.mp3')
+
+        payload = get_health()
+    finally:
+        api.state.downloader = old_downloader
+        api.state.settings_path = old_settings_path
+        api.state.version = old_version
+        api.state.settings = old_settings
+        api.state.download_jobs = old_jobs
+        api.state.history_db = old_history
+
+    assert payload['history']['completed_24h'] == 1

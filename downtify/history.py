@@ -158,6 +158,19 @@ class DownloadHistoryDB:
         with self._connect() as conn:
             conn.execute('DELETE FROM download_history')
 
+    def count_completed_since(self, since: datetime) -> int:
+        if since.tzinfo is None:
+            since = since.replace(tzinfo=timezone.utc)
+        with self._connect() as conn:
+            row = conn.execute(
+                """SELECT COUNT(*) AS count
+                   FROM download_history
+                   WHERE status IN ('done', 'skipped')
+                     AND completed_at >= ?""",
+                (since.isoformat(),),
+            ).fetchone()
+            return int(row['count'] if row else 0)
+
 
 def _row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
     item = dict(row)

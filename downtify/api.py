@@ -26,6 +26,7 @@ import re
 import shutil
 import subprocess
 import sys
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Optional
 
@@ -303,10 +304,22 @@ def get_health() -> dict[str, Any]:
         else Path('/data')
     )
     history = state.history_db.list(limit=5) if state.history_db else []
+    completed_24h = (
+        state.history_db.count_completed_since(
+            datetime.now(timezone.utc) - timedelta(hours=24)
+        )
+        if state.history_db
+        else 0
+    )
     queue_counts: dict[str, int] = {}
     for job in state.download_jobs.values():
         status = str(job.get('status') or 'unknown')
         queue_counts[status] = queue_counts.get(status, 0) + 1
+    active_queue_total = sum(
+        count
+        for status, count in queue_counts.items()
+        if status in {'queued', 'downloading'}
+    )
 
     failed_recent = sum(1 for item in history if item.get('status') == 'error')
 
@@ -336,12 +349,14 @@ def get_health() -> dict[str, Any]:
             'organize_by_album': state.settings.get('organize_by_album'),
         },
         'queue': {
-            'total': len(state.download_jobs),
+            'total': active_queue_total,
+            'all_total': len(state.download_jobs),
             'counts': queue_counts,
         },
         'history': {
             'recent': history,
             'recent_failures': failed_recent,
+            'completed_24h': completed_24h,
         },
     }
 

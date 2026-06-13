@@ -100,6 +100,7 @@ export default {
     statusAttention: 'Downtify needs attention',
     version: 'Version {version}',
     queueTotal: '{count} queued',
+    completed24h: '{count} completed in 24h',
     recentFailures: '{count} recent failures',
     downloads: 'Downloads',
     mediaSaveLocation: 'Media save location',

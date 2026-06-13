@@ -78,6 +78,13 @@
               <span class="pill bg-white/5 border border-white/10">
                 {{ t('health.queueTotal', { count: health.queue.total }) }}
               </span>
+              <span class="pill badge-soft">
+                {{
+                  t('health.completed24h', {
+                    count: health.history.completed_24h,
+                  })
+                }}
+              </span>
               <span
                 class="pill border"
                 :class="

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
+
 from downtify.history import DownloadHistoryDB
 
 
@@ -60,3 +62,29 @@ def test_history_can_mark_duplicate_as_skipped(tmp_path):
     assert row['filename'] == 'Artist - Song.mp3'
     assert row['error'] is None
     assert row['completed_at'] is not None
+
+
+def test_history_counts_recent_completed_rows(tmp_path):
+    db = DownloadHistoryDB(tmp_path / 'history.db')
+    done_id = db.create({'name': 'Done'}, status='downloading')
+    skipped_id = db.create({'name': 'Skipped'}, status='downloading')
+    old_id = db.create({'name': 'Old'}, status='downloading')
+    failed_id = db.create({'name': 'Failed'}, status='downloading')
+
+    db.mark_done(done_id, 'Done.mp3')
+    db.mark_skipped(skipped_id, 'Skipped.mp3')
+    db.mark_done(old_id, 'Old.mp3')
+    db.mark_error(failed_id, 'boom')
+
+    old_completed_at = (
+        datetime.now(timezone.utc) - timedelta(days=2)
+    ).isoformat()
+    with db._connect() as conn:
+        conn.execute(
+            'UPDATE download_history SET completed_at = ? WHERE id = ?',
+            (old_completed_at, old_id),
+        )
+
+    since = datetime.now(timezone.utc) - timedelta(hours=24)
+
+    assert db.count_completed_since(since) == 2

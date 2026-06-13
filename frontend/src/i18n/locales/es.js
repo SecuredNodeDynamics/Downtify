@@ -102,6 +102,7 @@ export default {
     statusAttention: 'Downtify necesita atención',
     version: 'Versión {version}',
     queueTotal: '{count} en cola',
+    completed24h: '{count} completadas en 24 h',
     recentFailures: '{count} fallos recientes',
     downloads: 'Descargas',
     mediaSaveLocation: 'Ubicación de guardado de medios',
