@@ -406,6 +406,7 @@ function historyStatusClass(item) {
 function historyStatusLabel(item) {
   if (item.status === 'error') return t('history.failed')
   if (item.status === 'done') return t('history.done')
+  if (item.status === 'skipped') return t('history.skipped')
   if (item.status === 'downloading') return t('history.downloading')
   return t('history.queued')
 }

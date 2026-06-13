@@ -79,6 +79,7 @@ export default {
     empty: 'Nenhum histórico de download ainda.',
     emptyHint: 'Downloads concluídos e com falha aparecerão aqui.',
     done: 'Concluído',
+    skipped: 'Já baixado',
     failed: 'Falhou',
     downloading: 'Baixando',
     queued: 'Na fila',

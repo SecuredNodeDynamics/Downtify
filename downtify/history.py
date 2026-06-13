@@ -140,6 +140,20 @@ class DownloadHistoryDB:
                 (error, now, now, history_id),
             )
 
+    def mark_skipped(self, history_id: int, filename: str) -> None:
+        now = _now_iso()
+        with self._connect() as conn:
+            conn.execute(
+                """UPDATE download_history
+                   SET status = 'skipped',
+                       filename = ?,
+                       error = NULL,
+                       updated_at = ?,
+                       completed_at = ?
+                   WHERE id = ?""",
+                (filename, now, now, history_id),
+            )
+
     def clear(self) -> None:
         with self._connect() as conn:
             conn.execute('DELETE FROM download_history')

@@ -78,6 +78,7 @@ export default {
     empty: 'No download history yet.',
     emptyHint: 'Completed and failed downloads will appear here.',
     done: 'Done',
+    skipped: 'Already downloaded',
     failed: 'Failed',
     downloading: 'Downloading',
     queued: 'Queued',

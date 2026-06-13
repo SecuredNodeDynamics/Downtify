@@ -38,6 +38,7 @@ from .m3u import sanitize_playlist_name
 from .providers import enrich_from_match, find_match, find_match_for_video
 
 _INVALID_FS_CHARS = re.compile(r'[\\/:*?"<>|\x00-\x1f]')
+_AUDIO_EXTENSIONS = {'mp3', 'm4a', 'mp4', 'aac', 'flac', 'ogg', 'opus', 'wav'}
 
 ProgressCallback = Callable[[float, str], None]
 _PREVIEW_AUDIO_CACHE_TTL_SECONDS = 45 * 60
@@ -47,6 +48,10 @@ _PREVIEW_AUDIO_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
 def _sanitize(text: str) -> str:
     safe = _INVALID_FS_CHARS.sub('', text or '').strip().strip('.')
     return safe or 'unknown'
+
+
+def _normalize_duplicate_key(text: str) -> str:
+    return re.sub(r'[^a-z0-9]+', '', text.lower())
 
 
 _DEFAULT_YT_PLAYER_CLIENTS = (
@@ -290,6 +295,31 @@ class Downloader:
         for candidate in target_dir.glob(f'{basename}.*'):
             if candidate.is_file():
                 return f'{prefix}{candidate.name}'
+        return None
+
+    def duplicate_filename_for(
+        self,
+        song: dict[str, Any],
+        subdir: Optional[str] = None,
+    ) -> Optional[str]:
+        exact = self.existing_filename_for(song, subdir=subdir)
+        if (
+            exact
+            and Path(exact).suffix.lower().lstrip('.') in _AUDIO_EXTENSIONS
+        ):
+            return exact
+
+        basename_key = _normalize_duplicate_key(self._format_basename(song))
+        if not basename_key:
+            return None
+
+        for candidate in self.download_dir.rglob('*'):
+            if not candidate.is_file():
+                continue
+            if candidate.suffix.lower().lstrip('.') not in _AUDIO_EXTENSIONS:
+                continue
+            if _normalize_duplicate_key(candidate.stem) == basename_key:
+                return candidate.relative_to(self.download_dir).as_posix()
         return None
 
     def _resolve_target_dir(self, subdir: Optional[str]) -> tuple[Path, str]:

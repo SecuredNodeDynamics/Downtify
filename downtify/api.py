@@ -310,6 +310,7 @@ async def _run_download(
     song_id: str,
     subdir: Optional[str] = None,
     history_id: Optional[int] = None,
+    skip_duplicates: bool = True,
 ) -> Optional[str]:
     """Run a single download to completion, updating jobs state and broadcasting WS events."""
 
@@ -328,6 +329,24 @@ async def _run_download(
         history_id = job.get('history_id')
     if history_id is not None and state.history_db is not None:
         state.history_db.mark_running(history_id)
+
+    if skip_duplicates:
+        existing = state.downloader.duplicate_filename_for(song, subdir=subdir)
+        if existing:
+            job['status'] = 'done'
+            job['filename'] = existing
+            job['progress'] = 100
+            job['message'] = 'Already downloaded'
+            if history_id is not None and state.history_db is not None:
+                state.history_db.mark_skipped(history_id, existing)
+            await state.connections.broadcast({
+                'song': song,
+                'progress': 100,
+                'message': 'Already downloaded',
+                'status': 'done',
+                'filename': existing,
+            })
+            return existing
 
     await state.connections.broadcast({
         'song': song,

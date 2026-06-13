@@ -47,3 +47,16 @@ def test_history_clear_removes_rows(tmp_path):
     db.clear()
 
     assert db.list() == []
+
+
+def test_history_can_mark_duplicate_as_skipped(tmp_path):
+    db = DownloadHistoryDB(tmp_path / 'history.db')
+    history_id = db.create({'name': 'Song'}, status='downloading')
+
+    db.mark_skipped(history_id, 'Artist - Song.mp3')
+    row = db.get(history_id)
+
+    assert row['status'] == 'skipped'
+    assert row['filename'] == 'Artist - Song.mp3'
+    assert row['error'] is None
+    assert row['completed_at'] is not None

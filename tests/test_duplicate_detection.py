@@ -1,0 +1,34 @@
+from __future__ import annotations
+
+from downtify.downloader import Downloader
+
+
+def test_duplicate_detection_finds_exact_output_target(tmp_path):
+    downloader = Downloader(tmp_path, output_template='{artists} - {title}')
+    song = {'name': 'Good Song', 'artists': ['Good Artist']}
+    existing = tmp_path / 'Good Artist - Good Song.mp3'
+    existing.write_text('audio', encoding='utf-8')
+
+    assert downloader.duplicate_filename_for(song) == existing.name
+
+
+def test_duplicate_detection_finds_normalized_audio_file_in_subfolder(tmp_path):
+    downloader = Downloader(tmp_path, output_template='{artists} - {title}')
+    song = {'name': 'Good Song!', 'artists': ['Good Artist']}
+    folder = tmp_path / 'Nested'
+    folder.mkdir()
+    existing = folder / 'good artist - good song.flac'
+    existing.write_text('audio', encoding='utf-8')
+
+    assert downloader.duplicate_filename_for(song) == 'Nested/good artist - good song.flac'
+
+
+def test_duplicate_detection_ignores_non_audio_files(tmp_path):
+    downloader = Downloader(tmp_path, output_template='{artists} - {title}')
+    song = {'name': 'Good Song', 'artists': ['Good Artist']}
+    (tmp_path / 'Good Artist - Good Song.txt').write_text(
+        'not audio',
+        encoding='utf-8',
+    )
+
+    assert downloader.duplicate_filename_for(song) is None

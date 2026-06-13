@@ -115,6 +115,7 @@ API.ws_onmessage((event) => {
   }
   if (data.status === 'done') {
     item.progress = 100
+    item.message = data.message || ''
     if (data.filename) {
       item.setWebURL(API.downloadFileURL(data.filename))
       item.setFilename(data.filename)
