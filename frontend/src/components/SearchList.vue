@@ -167,15 +167,18 @@
         <Icon icon="clarity:angle-line" class="h-4 w-4 rotate-[-90deg]" />
       </button>
       <button
-        v-for="page in visiblePages"
-        :key="page"
+        v-for="(page, index) in visiblePages"
+        :key="`${page}-${index}`"
         class="h-10 min-w-[2.5rem] rounded-full px-3 text-sm font-medium transition-colors"
         :class="
           page === currentPage
             ? 'bg-primary text-primary-content shadow-glow-sm'
+            : page === '…'
+              ? 'cursor-default text-base-content/30'
             : 'text-base-content/70 hover:text-base-content hover:bg-white/10'
         "
-        @click="currentPage = page"
+        :disabled="page === '…'"
+        @click="page !== '…' && (currentPage = page)"
       >
         {{ page }}
       </button>
@@ -514,16 +517,30 @@ const totalPages = computed(() =>
 )
 
 const visiblePages = computed(() => {
-  const maxVisiblePages = 6
   const pages = totalPages.value
-  if (pages <= maxVisiblePages) {
+  if (pages <= 9) {
     return Array.from({ length: pages }, (_, index) => index + 1)
   }
 
-  let start = currentPage.value - Math.floor(maxVisiblePages / 2)
-  start = Math.max(1, Math.min(start, pages - maxVisiblePages + 1))
+  const middle = new Set([
+    currentPage.value - 1,
+    currentPage.value,
+    currentPage.value + 1,
+  ])
+  const visible = [1]
+  let previous = 1
 
-  return Array.from({ length: maxVisiblePages }, (_, index) => start + index)
+  for (let page = 2; page < pages; page += 1) {
+    if (page <= 3 || page >= pages - 2 || middle.has(page)) {
+      if (page - previous > 1) visible.push('…')
+      visible.push(page)
+      previous = page
+    }
+  }
+
+  if (pages - previous > 1) visible.push('…')
+  visible.push(pages)
+  return visible
 })
 
 const paginatedData = computed(() => {

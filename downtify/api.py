@@ -348,7 +348,7 @@ def get_health() -> dict[str, Any]:
 
 @router.get('/api/songs/search')
 def search_endpoint(query: str = Query('')) -> list[dict[str, Any]]:
-    return providers.search_media(query, limit=20)
+    return providers.search_media(query, limit=80)
 
 
 @router.get('/api/album/youtube')

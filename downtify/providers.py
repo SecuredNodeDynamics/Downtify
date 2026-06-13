@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+from difflib import SequenceMatcher
 from threading import Lock
 from typing import Any, Optional
 
@@ -287,11 +288,70 @@ def search_albums(query: str, limit: int = 10) -> list[dict[str, Any]]:
     return albums
 
 
+def _search_tokens(value: str) -> list[str]:
+    return re.findall(r'[a-z0-9]+', value.casefold())
+
+
+def _search_text(item: dict[str, Any], fields: list[str]) -> str:
+    values: list[str] = []
+    for field in fields:
+        value = item.get(field)
+        if isinstance(value, list):
+            values.extend(str(v) for v in value if v)
+        elif value:
+            values.append(str(value))
+    return ' '.join(values)
+
+
+def _search_relevance(item: dict[str, Any], query: str) -> float:
+    q = ' '.join(_search_tokens(query))
+    if not q:
+        return 0
+
+    title = ' '.join(_search_tokens(str(item.get('name') or '')))
+    artists = ' '.join(_search_tokens(_search_text(item, ['artists', 'artist'])))
+    album = ' '.join(_search_tokens(str(item.get('album_name') or '')))
+    haystack = ' '.join(part for part in [title, artists, album] if part)
+    if not haystack:
+        return 0
+
+    score = SequenceMatcher(None, q, haystack).ratio() * 40
+    score = max(score, SequenceMatcher(None, q, title).ratio() * 55)
+    if artists:
+        score = max(score, SequenceMatcher(None, q, artists).ratio() * 45)
+    if album:
+        score = max(score, SequenceMatcher(None, q, album).ratio() * 45)
+
+    q_tokens = set(_search_tokens(query))
+    hay_tokens = set(_search_tokens(haystack))
+    if q_tokens:
+        score += (len(q_tokens & hay_tokens) / len(q_tokens)) * 35
+
+    if title == q:
+        score += 50
+    elif title.startswith(q) or q in title:
+        score += 25
+
+    if artists == q:
+        score += 35
+    elif artists.startswith(q) or q in artists:
+        score += 18
+
+    if album == q:
+        score += 35
+    elif album.startswith(q) or q in album:
+        score += 18
+
+    if item.get('media_type') == 'track':
+        score += 2
+    return score
+
+
 def search_media(query: str, limit: int = 20) -> list[dict[str, Any]]:
     if not query.strip():
         return []
     song_limit = max(1, limit)
-    album_limit = max(1, min(10, limit // 2))
+    album_limit = max(1, min(30, limit // 2))
     songs = search_songs(query, limit=song_limit)
     albums = search_albums(query, limit=album_limit)
     seen_album_ids = {a.get('browse_id') for a in albums if a.get('browse_id')}
@@ -300,7 +360,28 @@ def search_media(query: str, limit: int = 20) -> list[dict[str, Any]]:
             continue
         seen_album_ids.add(album.get('browse_id'))
         albums.append(album)
-    return [*albums[:album_limit], *songs][: limit + album_limit]
+
+    combined: list[dict[str, Any]] = []
+    seen: set[tuple[str, str]] = set()
+    for item in [*songs, *albums]:
+        item_id = str(
+            item.get('browse_id')
+            or item.get('song_id')
+            or item.get('url')
+            or ''
+        )
+        key = (str(item.get('media_type') or ''), item_id)
+        if key in seen:
+            continue
+        seen.add(key)
+        combined.append(item)
+
+    ranked = sorted(
+        enumerate(combined),
+        key=lambda pair: (_search_relevance(pair[1], query), -pair[0]),
+        reverse=True,
+    )
+    return [item for _, item in ranked[:limit]]
 
 
 def album_tracks_from_browse_id(browse_id: str) -> list[dict[str, Any]]:

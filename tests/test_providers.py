@@ -177,7 +177,60 @@ def test_search_media_derives_albums_from_song_hits(monkeypatch):
 
     results = providers.search_media('artist album', limit=5)
 
-    assert results[0]['media_type'] == 'album'
-    assert results[0]['name'] == 'Album One'
-    assert results[0]['browse_id'] == 'MPREb_album'
+    derived = [r for r in results if r.get('media_type') == 'album']
+    assert derived[0]['name'] == 'Album One'
+    assert derived[0]['browse_id'] == 'MPREb_album'
     assert [r['media_type'] for r in results].count('album') == 1
+
+
+def test_search_media_ranks_exact_track_before_unrelated_album(monkeypatch):
+    class FakeYTMusic:
+        def search(self, query, filter=None, limit=20):
+            if filter == 'songs':
+                return [
+                    {
+                        'videoId': 'perfect12345',
+                        'title': 'Perfect',
+                        'artists': [{'name': 'Ed Sheeran'}],
+                        'album': {'name': 'Divide', 'id': 'album_divide'},
+                    }
+                ]
+            if filter == 'albums':
+                return [
+                    {
+                        'browseId': 'album_ed',
+                        'title': 'Loose Album Match',
+                        'artists': [{'name': 'Different Artist'}],
+                    }
+                ]
+            return []
+
+    monkeypatch.setattr(providers, '_ytm', lambda: FakeYTMusic())
+
+    results = providers.search_media('Perfect Ed Sheeran', limit=10)
+
+    assert results[0]['media_type'] == 'track'
+    assert results[0]['name'] == 'Perfect'
+
+
+def test_search_media_can_return_more_than_old_six_pages(monkeypatch):
+    class FakeYTMusic:
+        def search(self, query, filter=None, limit=20):
+            if filter == 'songs':
+                return [
+                    {
+                        'videoId': f'video{i:08d}',
+                        'title': f'Artist Song {i}',
+                        'artists': [{'name': 'Artist'}],
+                    }
+                    for i in range(limit)
+                ]
+            if filter == 'albums':
+                return []
+            return []
+
+    monkeypatch.setattr(providers, '_ytm', lambda: FakeYTMusic())
+
+    results = providers.search_media('Artist', limit=80)
+
+    assert len(results) == 80
