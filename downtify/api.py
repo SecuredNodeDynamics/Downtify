@@ -22,9 +22,13 @@ import asyncio
 import contextlib
 import json
 import re
+import shutil
+import subprocess
+import sys
 from pathlib import Path
 from typing import Any, Optional
 
+import yt_dlp
 from fastapi import (
     APIRouter,
     Body,
@@ -53,6 +57,8 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     'organize_by_artist': False,
     'organize_by_album': False,
 }
+
+AUDIO_EXTENSIONS = {'.mp3', '.m4a', '.flac', '.ogg', '.wav', '.aac', '.opus'}
 
 
 def _effective_lyrics_providers(settings: dict[str, Any]) -> list[str]:
@@ -137,6 +143,73 @@ def _save_settings(path: Path, settings: dict[str, Any]) -> None:
         logger.warning('Could not persist settings: {}', exc)
 
 
+def _directory_summary(path: Path) -> dict[str, Any]:
+    exists = path.exists()
+    file_count = 0
+    audio_count = 0
+    total_bytes = 0
+    if exists:
+        try:
+            for item in path.rglob('*'):
+                if not item.is_file():
+                    continue
+                file_count += 1
+                try:
+                    total_bytes += item.stat().st_size
+                except OSError:
+                    pass
+                if item.suffix.lower() in AUDIO_EXTENSIONS:
+                    audio_count += 1
+        except Exception:
+            pass
+
+    try:
+        usage = shutil.disk_usage(path if exists else path.parent)
+        disk = {
+            'total_bytes': usage.total,
+            'used_bytes': usage.used,
+            'free_bytes': usage.free,
+            'percent_used': round((usage.used / usage.total) * 100, 1)
+            if usage.total
+            else 0,
+        }
+    except Exception:
+        disk = {
+            'total_bytes': 0,
+            'used_bytes': 0,
+            'free_bytes': 0,
+            'percent_used': 0,
+        }
+
+    return {
+        'path': str(path),
+        'exists': exists,
+        'file_count': file_count,
+        'audio_count': audio_count,
+        'size_bytes': total_bytes,
+        'disk': disk,
+    }
+
+
+def _command_version(command: str, args: list[str]) -> dict[str, Any]:
+    path = shutil.which(command)
+    if not path:
+        return {'available': False, 'path': None, 'version': None}
+    try:
+        result = subprocess.run(
+            [path, *args],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+        output = (result.stdout or result.stderr or '').splitlines()
+        version = output[0].strip() if output else None
+    except Exception:
+        version = None
+    return {'available': True, 'path': path, 'version': version}
+
+
 @router.get('/api/version')
 def get_version() -> str:
     return state.version
@@ -145,6 +218,62 @@ def get_version() -> str:
 @router.get('/api/check_update')
 def check_update() -> Optional[dict[str, Any]]:
     return None
+
+
+@router.get('/api/health')
+def get_health() -> dict[str, Any]:
+    download_dir = (
+        state.downloader.download_dir
+        if state.downloader is not None
+        else Path('/downloads')
+    )
+    database_dir = (
+        state.settings_path.parent
+        if state.settings_path is not None
+        else Path('/data')
+    )
+    history = state.history_db.list(limit=5) if state.history_db else []
+    queue_counts: dict[str, int] = {}
+    for job in state.download_jobs.values():
+        status = str(job.get('status') or 'unknown')
+        queue_counts[status] = queue_counts.get(status, 0) + 1
+
+    failed_recent = sum(1 for item in history if item.get('status') == 'error')
+
+    return {
+        'status': 'ok' if failed_recent == 0 else 'attention',
+        'version': state.version,
+        'python': sys.version.split()[0],
+        'tools': {
+            'ffmpeg': _command_version('ffmpeg', ['-version']),
+            'yt_dlp': {
+                'available': True,
+                'path': None,
+                'version': getattr(yt_dlp.version, '__version__', None),
+            },
+        },
+        'downloads': _directory_summary(download_dir),
+        'data': _directory_summary(database_dir),
+        'settings': {
+            'format': state.settings.get('format'),
+            'bitrate': state.settings.get('bitrate'),
+            'max_parallel_downloads': state.settings.get(
+                'max_parallel_downloads'
+            ),
+            'generate_m3u': state.settings.get('generate_m3u'),
+            'download_lyrics': state.settings.get('download_lyrics'),
+            'organize_by_artist': state.settings.get('organize_by_artist'),
+            'organize_by_album': state.settings.get('organize_by_album'),
+        },
+        'queue': {
+            'total': len(state.download_jobs),
+            'counts': queue_counts,
+        },
+        'history': {
+            'recent': history,
+            'recent_failures': failed_recent,
+        },
+    }
 
 
 @router.get('/api/songs/search')

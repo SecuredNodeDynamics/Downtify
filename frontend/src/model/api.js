@@ -101,6 +101,10 @@ function check_for_update() {
   return API.get('/api/check_update')
 }
 
+function getHealth() {
+  return API.get('/api/health')
+}
+
 function encodePath(fileName) {
   // Encode each path segment individually so '/' separators survive —
   // playlist downloads land under '<playlist>/<song>.mp3' and we need
@@ -193,6 +197,7 @@ export default {
   getSettings,
   setSettings,
   check_for_update,
+  getHealth,
   ws_onmessage,
   ws_onerror,
   getVersion,

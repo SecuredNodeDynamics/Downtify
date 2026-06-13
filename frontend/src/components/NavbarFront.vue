@@ -36,6 +36,14 @@
         </button>
 
         <button
+          class="icon-btn"
+          @click="router.push({ name: 'Health' })"
+          :title="t('nav.health')"
+        >
+          <Icon icon="clarity:info-standard-line" class="h-5 w-5" />
+        </button>
+
+        <button
           class="icon-btn relative"
           @click="router.push({ name: 'Download' })"
           :title="t('nav.queue')"

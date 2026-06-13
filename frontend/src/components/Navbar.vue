@@ -50,6 +50,15 @@
         </button>
 
         <button
+          class="icon-btn"
+          :class="{ 'icon-btn-active': route.name === 'Health' }"
+          @click="router.push({ name: 'Health' })"
+          :title="t('nav.health')"
+        >
+          <Icon icon="clarity:info-standard-line" class="h-5 w-5" />
+        </button>
+
+        <button
           class="icon-btn relative"
           :class="{ 'icon-btn-active': route.name === 'Download' }"
           @click="
