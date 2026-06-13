@@ -68,76 +68,206 @@
         </p>
       </div>
 
-      <!-- File list -->
-      <ul v-else class="space-y-2">
-        <li
-          v-for="file in paginatedFiles"
-          :key="file"
-          class="surface rounded-2xl p-3 sm:p-4 flex items-center gap-3"
-        >
-          <!-- Cover thumb -->
+      <div v-else>
+        <div class="mb-5 flex flex-wrap items-center justify-between gap-3">
           <div
-            class="relative h-11 w-11 shrink-0 rounded-xl bg-primary/10 text-primary flex items-center justify-center overflow-hidden"
+            class="inline-flex rounded-full border border-white/10 bg-base-100/75 p-1"
           >
-            <img
-              v-if="!coverFailed[file]"
-              :src="coverUrlFor(file)"
-              :alt="file"
-              class="absolute inset-0 h-full w-full object-cover"
-              loading="lazy"
-              @error="markCoverFailed(file)"
-            />
-            <Icon v-else icon="clarity:music-note-line" class="h-5 w-5" />
+            <button
+              class="rounded-full px-4 py-2 text-sm font-medium transition-colors"
+              :class="
+                viewMode === 'artists'
+                  ? 'bg-primary text-primary-content shadow-glow-sm'
+                  : 'text-base-content/60 hover:text-base-content'
+              "
+              @click="showArtists"
+            >
+              {{ t('library.artists') }}
+            </button>
+            <button
+              class="rounded-full px-4 py-2 text-sm font-medium transition-colors"
+              :class="
+                viewMode === 'tracks'
+                  ? 'bg-primary text-primary-content shadow-glow-sm'
+                  : 'text-base-content/60 hover:text-base-content'
+              "
+              @click="showTracks"
+            >
+              {{ t('library.tracks') }}
+            </button>
           </div>
+          <p class="text-xs text-base-content/45">
+            {{
+              t('library.artistCount', {
+                artists: artists.length,
+                tracks: files.length,
+              })
+            }}
+          </p>
+        </div>
 
-          <!-- Filename -->
-          <div class="flex-1 min-w-0">
-            <span class="text-sm font-medium truncate block">{{
-              displayName(file)
-            }}</span>
-            <span class="text-xs text-base-content/40">
-              <span v-if="folderOf(file)" class="mr-2 text-primary/70">
+        <!-- Artist cards -->
+        <div
+          v-if="viewMode === 'artists' && !selectedArtist"
+          class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
+        >
+          <article
+            v-for="artist in paginatedArtists"
+            :key="artist.name"
+            class="surface group cursor-pointer rounded-2xl p-4 text-left transition-transform hover:-translate-y-0.5 hover:border-primary/30"
+            role="button"
+            tabindex="0"
+            @click="openArtist(artist.name)"
+            @keydown.enter="openArtist(artist.name)"
+            @keydown.space.prevent="openArtist(artist.name)"
+          >
+            <div class="mb-4 flex -space-x-3">
+              <div
+                v-for="file in artist.previewFiles"
+                :key="file"
+                class="relative h-12 w-12 overflow-hidden rounded-xl border border-base-100 bg-primary/10 text-primary"
+              >
+                <img
+                  v-if="!coverFailed[file]"
+                  :src="coverUrlFor(file)"
+                  :alt="displayName(file)"
+                  class="absolute inset-0 h-full w-full object-cover"
+                  loading="lazy"
+                  @error="markCoverFailed(file)"
+                />
                 <Icon
-                  icon="clarity:folder-line"
-                  class="inline h-3 w-3 mr-0.5 align-text-top"
-                />{{ folderOf(file) }}
+                  v-else
+                  icon="clarity:music-note-line"
+                  class="absolute left-1/2 top-1/2 h-5 w-5 -translate-x-1/2 -translate-y-1/2"
+                />
+              </div>
+            </div>
+            <h2 class="truncate text-base font-semibold">
+              {{ artist.name }}
+            </h2>
+            <p class="mt-1 text-xs text-base-content/50">
+              {{
+                t('library.artistMeta', {
+                  tracks: artist.files.length,
+                  albums: artist.albumCount,
+                })
+              }}
+            </p>
+            <div class="mt-4 flex items-center gap-2">
+              <button
+                class="icon-btn text-primary hover:bg-primary/10"
+                @click.stop="playArtist(artist)"
+                :title="t('library.playArtist')"
+              >
+                <Icon icon="clarity:play-line" class="h-4 w-4" />
+              </button>
+              <span class="text-xs text-primary/70 group-hover:text-primary">
+                {{ t('library.openArtist') }}
               </span>
-              {{ formatExt(file) }}
-            </span>
-          </div>
+            </div>
+          </article>
+        </div>
 
-          <!-- Actions -->
-          <div class="flex items-center gap-1 shrink-0">
-            <button
-              class="icon-btn text-primary hover:bg-primary/10"
-              @click="playFile(files.indexOf(file))"
-              :title="t('library.play')"
-            >
-              <Icon icon="clarity:play-line" class="h-4 w-4" />
-            </button>
-            <a
-              class="icon-btn"
-              :href="API.downloadFileURL(file)"
-              download
-              :title="t('library.downloadToDevice')"
-            >
-              <Icon icon="clarity:download-line" class="h-4 w-4" />
-            </a>
-            <button
-              class="icon-btn text-error/70 hover:text-error hover:bg-error/10"
-              :disabled="deleting[file] === true"
-              @click="onDelete(file)"
-              :title="t('library.deleteFile')"
-            >
-              <span
-                v-if="deleting[file] === true"
-                class="loading loading-spinner loading-xs"
-              />
-              <Icon v-else icon="clarity:trash-line" class="h-4 w-4" />
-            </button>
+        <div
+          v-else-if="viewMode === 'artists' && selectedArtist"
+          class="mb-4 flex flex-wrap items-center justify-between gap-3"
+        >
+          <button
+            class="btn btn-sm h-10 rounded-full border-white/10 bg-base-100/85 hover:bg-base-100"
+            @click="closeArtist"
+          >
+            <Icon icon="clarity:angle-line" class="h-4 w-4 rotate-[-90deg]" />
+            {{ t('library.backToArtists') }}
+          </button>
+          <div class="min-w-0 text-right">
+            <h2 class="truncate text-lg font-semibold">
+              {{ selectedArtist.name }}
+            </h2>
+            <p class="text-xs text-base-content/50">
+              {{
+                t('library.artistMeta', {
+                  tracks: selectedArtist.files.length,
+                  albums: selectedArtist.albumCount,
+                })
+              }}
+            </p>
           </div>
-        </li>
-      </ul>
+        </div>
+
+        <!-- File list -->
+        <ul
+          v-if="viewMode === 'tracks' || selectedArtist"
+          class="space-y-2"
+        >
+          <li
+            v-for="file in paginatedFiles"
+            :key="file"
+            class="surface rounded-2xl p-3 sm:p-4 flex items-center gap-3"
+          >
+            <!-- Cover thumb -->
+            <div
+              class="relative h-11 w-11 shrink-0 rounded-xl bg-primary/10 text-primary flex items-center justify-center overflow-hidden"
+            >
+              <img
+                v-if="!coverFailed[file]"
+                :src="coverUrlFor(file)"
+                :alt="file"
+                class="absolute inset-0 h-full w-full object-cover"
+                loading="lazy"
+                @error="markCoverFailed(file)"
+              />
+              <Icon v-else icon="clarity:music-note-line" class="h-5 w-5" />
+            </div>
+
+            <!-- Filename -->
+            <div class="flex-1 min-w-0">
+              <span class="text-sm font-medium truncate block">{{
+                displayName(file)
+              }}</span>
+              <span class="text-xs text-base-content/40">
+                <span v-if="folderOf(file)" class="mr-2 text-primary/70">
+                  <Icon
+                    icon="clarity:folder-line"
+                    class="inline h-3 w-3 mr-0.5 align-text-top"
+                  />{{ folderOf(file) }}
+                </span>
+                {{ formatExt(file) }}
+              </span>
+            </div>
+
+            <!-- Actions -->
+            <div class="flex items-center gap-1 shrink-0">
+              <button
+                class="icon-btn text-primary hover:bg-primary/10"
+                @click="playFile(file)"
+                :title="t('library.play')"
+              >
+                <Icon icon="clarity:play-line" class="h-4 w-4" />
+              </button>
+              <a
+                class="icon-btn"
+                :href="API.downloadFileURL(file)"
+                download
+                :title="t('library.downloadToDevice')"
+              >
+                <Icon icon="clarity:download-line" class="h-4 w-4" />
+              </a>
+              <button
+                class="icon-btn text-error/70 hover:text-error hover:bg-error/10"
+                :disabled="deleting[file] === true"
+                @click="onDelete(file)"
+                :title="t('library.deleteFile')"
+              >
+                <span
+                  v-if="deleting[file] === true"
+                  class="loading loading-spinner loading-xs"
+                />
+                <Icon v-else icon="clarity:trash-line" class="h-4 w-4" />
+              </button>
+            </div>
+          </li>
+        </ul>
+      </div>
 
       <!-- Pagination -->
       <nav
@@ -204,6 +334,7 @@ import { useI18n } from '/src/i18n'
 import { usePlayer } from '/src/model/player'
 
 const PAGE_SIZE = 10
+const ARTIST_PAGE_SIZE = 24
 
 const { t } = useI18n()
 const player = usePlayer()
@@ -215,8 +346,57 @@ const error = ref('')
 const deleting = ref({})
 const coverFailed = ref({})
 const currentPage = ref(1)
+const viewMode = ref('artists')
+const selectedArtistName = ref('')
 
-const totalPages = computed(() => Math.ceil(files.value.length / PAGE_SIZE))
+const artists = computed(() => {
+  const grouped = new Map()
+
+  for (const file of files.value) {
+    const artistName = artistOf(file)
+    const albumName = albumOf(file)
+    if (!grouped.has(artistName)) {
+      grouped.set(artistName, {
+        name: artistName,
+        files: [],
+        albums: new Set(),
+      })
+    }
+
+    const artist = grouped.get(artistName)
+    artist.files.push(file)
+    if (albumName) artist.albums.add(albumName)
+  }
+
+  return Array.from(grouped.values())
+    .map((artist) => ({
+      name: artist.name,
+      files: artist.files,
+      albumCount: artist.albums.size,
+      previewFiles: artist.files.slice(0, 3),
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name))
+})
+
+const selectedArtist = computed(() =>
+  artists.value.find((artist) => artist.name === selectedArtistName.value)
+)
+
+const visibleFiles = computed(() =>
+  selectedArtist.value ? selectedArtist.value.files : files.value
+)
+
+const totalPages = computed(() => {
+  const count =
+    viewMode.value === 'artists' && !selectedArtist.value
+      ? artists.value.length
+      : visibleFiles.value.length
+  const pageSize =
+    viewMode.value === 'artists' && !selectedArtist.value
+      ? ARTIST_PAGE_SIZE
+      : PAGE_SIZE
+  return Math.ceil(count / pageSize)
+})
 
 const visiblePages = computed(() => {
   const pages = totalPages.value
@@ -247,11 +427,32 @@ const visiblePages = computed(() => {
 
 const paginatedFiles = computed(() => {
   const start = (currentPage.value - 1) * PAGE_SIZE
-  return files.value.slice(start, start + PAGE_SIZE)
+  return visibleFiles.value.slice(start, start + PAGE_SIZE)
+})
+
+const paginatedArtists = computed(() => {
+  const start = (currentPage.value - 1) * ARTIST_PAGE_SIZE
+  return artists.value.slice(start, start + ARTIST_PAGE_SIZE)
 })
 
 watch(files, () => {
   currentPage.value = 1
+})
+
+watch([viewMode, selectedArtistName], () => {
+  currentPage.value = 1
+})
+
+watch(totalPages, (pages) => {
+  if (pages > 0 && currentPage.value > pages) {
+    currentPage.value = pages
+  }
+})
+
+watch(selectedArtist, (artist) => {
+  if (selectedArtistName.value && !artist) {
+    selectedArtistName.value = ''
+  }
 })
 
 function coverUrlFor(file) {
@@ -303,8 +504,56 @@ function folderOf(file) {
   return slash >= 0 ? file.slice(0, slash) : ''
 }
 
-function playFile(index) {
-  player.setPlaylist(files.value, { startIndex: index })
+function pathParts(file) {
+  return String(file || '')
+    .split('/')
+    .map((part) => part.trim())
+    .filter(Boolean)
+}
+
+function artistOf(file) {
+  const parts = pathParts(file)
+  if (parts.length > 1) return parts[0]
+
+  const name = displayName(file).replace(/\.[^/.]+$/, '')
+  const separator = name.indexOf(' - ')
+  if (separator > 0) return name.slice(0, separator).trim()
+
+  return t('common.unknownArtist')
+}
+
+function albumOf(file) {
+  const parts = pathParts(file)
+  if (parts.length > 2) return parts[1]
+  return ''
+}
+
+function showArtists() {
+  viewMode.value = 'artists'
+  selectedArtistName.value = ''
+}
+
+function showTracks() {
+  viewMode.value = 'tracks'
+  selectedArtistName.value = ''
+}
+
+function openArtist(name) {
+  selectedArtistName.value = name
+}
+
+function closeArtist() {
+  selectedArtistName.value = ''
+}
+
+function playFile(file) {
+  const playlist = visibleFiles.value
+  player.setPlaylist(playlist, { startIndex: playlist.indexOf(file) })
+  router.push({ name: 'Player' })
+}
+
+function playArtist(artist) {
+  player.setPlaylist(artist.files, { startIndex: 0 })
   router.push({ name: 'Player' })
 }
 

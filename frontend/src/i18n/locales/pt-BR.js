@@ -137,6 +137,13 @@ export default {
     downloadToDevice: 'Baixar para o dispositivo',
     deleteFile: 'Excluir arquivo',
     play: 'Reproduzir',
+    artists: 'Artistas',
+    tracks: 'Faixas',
+    artistCount: '{artists} artistas - {tracks} faixas',
+    artistMeta: '{tracks} faixas - {albums} albuns',
+    openArtist: 'Abrir artista',
+    playArtist: 'Reproduzir artista',
+    backToArtists: 'Artistas',
   },
   monitor: {
     title: 'Monitor de playlists',

@@ -135,6 +135,13 @@ export default {
     downloadToDevice: 'Download to device',
     deleteFile: 'Delete file',
     play: 'Play',
+    artists: 'Artists',
+    tracks: 'Tracks',
+    artistCount: '{artists} artists - {tracks} tracks',
+    artistMeta: '{tracks} tracks - {albums} albums',
+    openArtist: 'Open artist',
+    playArtist: 'Play artist',
+    backToArtists: 'Artists',
   },
   monitor: {
     title: 'Playlist Monitor',

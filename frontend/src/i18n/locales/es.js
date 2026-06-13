@@ -138,6 +138,13 @@ export default {
     downloadToDevice: 'Descargar al dispositivo',
     deleteFile: 'Eliminar archivo',
     play: 'Reproducir',
+    artists: 'Artistas',
+    tracks: 'Pistas',
+    artistCount: '{artists} artistas - {tracks} pistas',
+    artistMeta: '{tracks} pistas - {albums} albumes',
+    openArtist: 'Abrir artista',
+    playArtist: 'Reproducir artista',
+    backToArtists: 'Artistas',
   },
   monitor: {
     title: 'Monitor de listas',
