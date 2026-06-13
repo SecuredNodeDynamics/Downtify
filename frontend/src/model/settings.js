@@ -12,6 +12,7 @@ const settings = ref({
   generate_m3u: true,
   organize_by_artist: false,
   organize_by_album: false,
+  server_media_location: '',
   max_parallel_downloads: 3,
 })
 

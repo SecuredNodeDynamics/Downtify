@@ -23,6 +23,7 @@ def test_default_settings_has_required_keys():
         'generate_m3u',
         'organize_by_artist',
         'organize_by_album',
+        'server_media_location',
     }
     assert required <= set(DEFAULT_SETTINGS)
 

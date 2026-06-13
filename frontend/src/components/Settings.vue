@@ -88,6 +88,20 @@
                 : t('settings.downloadDestinationServerHint')
             }}
           </p>
+          <div v-if="destination === 'server'" class="mt-3">
+            <label class="block text-xs text-base-content/50 mb-1.5">
+              {{ t('settings.serverMediaLocation') }}
+            </label>
+            <input
+              v-model="sm.settings.value.server_media_location"
+              type="text"
+              class="input-modern h-10 w-full text-sm"
+              :placeholder="t('settings.serverMediaLocationPlaceholder')"
+            />
+            <p class="text-[11px] text-base-content/40 mt-1.5">
+              {{ t('settings.serverMediaLocationHint') }}
+            </p>
+          </div>
           <p
             v-if="localFolderBlockReason"
             class="text-[11px] text-base-content/40 mt-1.5"

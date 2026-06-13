@@ -230,6 +230,10 @@ export default {
     downloadDestinationLocal: 'Este dispositivo',
     downloadDestinationServerHint:
       'Os arquivos ficam no servidor do Downtify. Você pode ouvi-los no player integrado e salvar cópias manualmente pela fila.',
+    serverMediaLocation: 'Local de mídia do servidor',
+    serverMediaLocationPlaceholder: '/mnt/media/Music',
+    serverMediaLocationHint:
+      'Mostrado na Saúde como o local de download do servidor.',
     downloadDestinationLocalHint:
       'Quando um download terminar, o Downtify salvará uma cópia na pasta que você escolher neste dispositivo.',
     downloadDestinationBrowserHint:

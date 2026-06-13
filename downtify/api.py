@@ -57,6 +57,7 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     'max_parallel_downloads': 3,
     'organize_by_artist': False,
     'organize_by_album': False,
+    'server_media_location': '',
 }
 
 AUDIO_EXTENSIONS = {'.mp3', '.m4a', '.flac', '.ogg', '.wav', '.aac', '.opus'}
@@ -234,6 +235,9 @@ def _mount_source_for(
 
 
 def _external_download_path(download_dir: Path) -> Optional[str]:
+    saved = str(state.settings.get('server_media_location') or '').strip()
+    if saved:
+        return saved
     configured = os.getenv('DOWNTIFY_MEDIA_SAVE_LOCATION', '').strip()
     if configured:
         return configured
