@@ -196,6 +196,50 @@ def _directory_summary(
     }
 
 
+def _decode_mountinfo_path(value: str) -> str:
+    return (
+        value.replace('\\040', ' ')
+        .replace('\\011', '\t')
+        .replace('\\012', '\n')
+        .replace('\\134', '\\')
+    )
+
+
+def _mount_source_for(
+    path: Path,
+    mountinfo_path: Path = Path('/proc/self/mountinfo'),
+) -> Optional[str]:
+    target = str(path.resolve())
+    try:
+        lines = mountinfo_path.read_text(encoding='utf-8').splitlines()
+    except Exception:
+        return None
+
+    best: Optional[str] = None
+    best_len = -1
+    for line in lines:
+        fields = line.split()
+        if len(fields) < 5:
+            continue
+        mount_point = _decode_mountinfo_path(fields[4])
+        if mount_point != target:
+            continue
+        root = _decode_mountinfo_path(fields[3])
+        if root in {'/', target}:
+            continue
+        if len(mount_point) > best_len:
+            best = root
+            best_len = len(mount_point)
+    return best
+
+
+def _external_download_path(download_dir: Path) -> Optional[str]:
+    configured = os.getenv('DOWNTIFY_MEDIA_SAVE_LOCATION', '').strip()
+    if configured:
+        return configured
+    return _mount_source_for(download_dir)
+
+
 def _command_version(command: str, args: list[str]) -> dict[str, Any]:
     path = shutil.which(command)
     if not path:
@@ -259,11 +303,7 @@ def get_health() -> dict[str, Any]:
         },
         'downloads': _directory_summary(
             download_dir,
-            external_path=os.getenv(
-                'DOWNTIFY_MEDIA_SAVE_LOCATION',
-                '',
-            ).strip()
-            or None,
+            external_path=_external_download_path(download_dir),
         ),
         'data': _directory_summary(database_dir),
         'settings': {

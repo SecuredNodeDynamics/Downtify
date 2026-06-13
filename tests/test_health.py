@@ -1,7 +1,12 @@
 from __future__ import annotations
 
 from downtify import api
-from downtify.api import _command_version, _directory_summary, get_health
+from downtify.api import (
+    _command_version,
+    _directory_summary,
+    _mount_source_for,
+    get_health,
+)
 from downtify.downloader import Downloader
 
 
@@ -28,6 +33,31 @@ def test_directory_summary_includes_external_media_location(
     )
 
     assert summary['external_path'] == '/mnt/media/Music'
+
+
+def test_mount_source_detects_download_bind_source(tmp_path):
+    downloads = tmp_path / 'downloads'
+    downloads.mkdir()
+    escaped_downloads = str(downloads).replace(' ', '\\040')
+    mountinfo = tmp_path / 'mountinfo'
+    mountinfo.write_text(
+        f'1 2 8:1 /mnt/media/Music {escaped_downloads} rw,relatime - ext4 /dev/sda1 rw\n',
+        encoding='utf-8',
+    )
+
+    assert _mount_source_for(downloads, mountinfo) == '/mnt/media/Music'
+
+
+def test_mount_source_ignores_root_mounts(tmp_path):
+    downloads = tmp_path / 'downloads'
+    downloads.mkdir()
+    mountinfo = tmp_path / 'mountinfo'
+    mountinfo.write_text(
+        f'1 2 8:1 / {downloads} rw,relatime - ext4 /dev/sda1 rw\n',
+        encoding='utf-8',
+    )
+
+    assert _mount_source_for(downloads, mountinfo) is None
 
 
 def test_health_payload_includes_configured_media_location(
