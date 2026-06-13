@@ -84,7 +84,7 @@
           <p class="text-[11px] text-base-content/40 mt-1.5">
             {{
               destination === 'local'
-                ? t('settings.downloadDestinationLocalHint')
+                ? localDestinationHint
                 : t('settings.downloadDestinationServerHint')
             }}
           </p>
@@ -111,12 +111,17 @@
                   {{ localFolderName }}
                 </p>
                 <p class="mt-1 text-[11px] text-base-content/40">
-                  {{ t('settings.localFolderNameHint') }}
+                  {{
+                    usesBrowserDownloads
+                      ? t('settings.browserDownloadsHint')
+                      : t('settings.localFolderNameHint')
+                  }}
                 </p>
               </div>
             </div>
             <div class="flex flex-wrap items-center gap-2">
               <button
+                v-if="!usesBrowserDownloads"
                 type="button"
                 class="btn btn-sm h-9 rounded-full border-white/10 bg-base-100/85 hover:bg-base-100"
                 @click="changeLocalFolder"
@@ -422,6 +427,7 @@ const {
   localFolderName,
   localFolderReady,
   localFolderBlockReason,
+  usesBrowserDownloads,
   isLocal,
   setDestination,
   pickLocalFolder,
@@ -439,6 +445,12 @@ const localFolderBlockMessage = computed(() => {
   }
   return ''
 })
+
+const localDestinationHint = computed(() =>
+  usesBrowserDownloads.value
+    ? t('settings.downloadDestinationBrowserHint')
+    : t('settings.downloadDestinationLocalHint')
+)
 
 function localFolderErrorMessage(reason) {
   if (reason === 'insecure') return t('settings.localFolderInsecure')

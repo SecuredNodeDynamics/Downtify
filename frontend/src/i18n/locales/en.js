@@ -180,12 +180,16 @@ export default {
       'Files stay on the Downtify server. You can play them in the built-in player and save copies manually from the queue.',
     downloadDestinationLocalHint:
       'When a download finishes, Downtify saves a copy to the folder you choose on this device.',
+    downloadDestinationBrowserHint:
+      'When a download finishes, Downtify saves a copy using your browser downloads folder.',
     localFolderLabel: 'Save downloads to',
     localFolderNameHint:
       'Browsers only show the folder name, not the full path on your computer.',
     changeLocalFolder: 'Change folder…',
+    browserDownloadsHint:
+      'Firefox and browsers without folder access use their normal downloads folder and download prompts.',
     localFolderUnsupported:
-      'Saving to a specific folder on this device requires Chrome or Edge.',
+      'Saving to a specific folder on this device requires Chrome, Edge, or Brave. Other browsers use their downloads folder.',
     localFolderInsecure:
       'Folder selection needs a secure connection. Open Downtify at http://localhost or http://127.0.0.1 instead of a network address, or use HTTPS.',
     localFolderPermissionNeeded:

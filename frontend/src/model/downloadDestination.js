@@ -2,12 +2,14 @@ import { ref, computed } from 'vue'
 
 const DESTINATION_KEY = 'downtify-download-destination'
 const FOLDER_NAME_KEY = 'downtify-local-folder-name'
+const LOCAL_MODE_KEY = 'downtify-local-save-mode'
 const HANDLE_DB = 'downtify-fs'
 const HANDLE_STORE = 'directory'
 
 const destination = ref(readDestination())
 const localFolderName = ref(readFolderName())
 const localFolderReady = ref(false)
+const localSaveMode = ref(readLocalSaveMode())
 
 let dirHandle = null
 
@@ -18,6 +20,11 @@ function readDestination() {
 
 function readFolderName() {
   return localStorage.getItem(FOLDER_NAME_KEY) || ''
+}
+
+function readLocalSaveMode() {
+  const value = localStorage.getItem(LOCAL_MODE_KEY)
+  return value === 'browser-downloads' ? value : 'folder'
 }
 
 function getLocalFolderSupport() {
@@ -31,6 +38,21 @@ function getLocalFolderSupport() {
     return { supported: false, reason: 'browser' }
   }
   return { supported: true, reason: null }
+}
+
+function supportsBrowserDownloads() {
+  return typeof window !== 'undefined' && typeof document !== 'undefined'
+}
+
+function getLocalSaveSupport() {
+  const folderSupport = getLocalFolderSupport()
+  if (folderSupport.supported) {
+    return { supported: true, mode: 'folder', reason: null }
+  }
+  if (supportsBrowserDownloads()) {
+    return { supported: true, mode: 'browser-downloads', reason: null }
+  }
+  return { supported: false, mode: null, reason: folderSupport.reason }
 }
 
 function supportsLocalFolder() {
@@ -126,6 +148,15 @@ function setDestination(value) {
   }
 }
 
+function setLocalMode(mode) {
+  localSaveMode.value = mode === 'browser-downloads' ? mode : 'folder'
+  try {
+    localStorage.setItem(LOCAL_MODE_KEY, localSaveMode.value)
+  } catch {
+    // ignore
+  }
+}
+
 async function pickLocalFolder() {
   const support = getLocalFolderSupport()
   if (!support.supported) {
@@ -135,6 +166,7 @@ async function pickLocalFolder() {
   dirHandle = handle
   localFolderName.value = handle.name
   localFolderReady.value = true
+  setLocalMode('folder')
   try {
     localStorage.setItem(FOLDER_NAME_KEY, handle.name)
   } catch {
@@ -145,11 +177,23 @@ async function pickLocalFolder() {
 }
 
 async function activateLocalDestination() {
-  const support = getLocalFolderSupport()
+  const support = getLocalSaveSupport()
   if (!support.supported) {
     throw new Error(support.reason || 'unsupported')
   }
-  await pickLocalFolder()
+  if (support.mode === 'folder') {
+    await pickLocalFolder()
+  } else {
+    dirHandle = null
+    localFolderName.value = 'Browser downloads folder'
+    localFolderReady.value = true
+    setLocalMode('browser-downloads')
+    try {
+      localStorage.setItem(FOLDER_NAME_KEY, localFolderName.value)
+    } catch {
+      // ignore
+    }
+  }
   setDestination('local')
   return true
 }
@@ -160,11 +204,27 @@ async function clearLocalFolder() {
   localFolderReady.value = false
   try {
     localStorage.removeItem(FOLDER_NAME_KEY)
+    localStorage.removeItem(LOCAL_MODE_KEY)
   } catch {
     // ignore
   }
   await clearStoredHandle()
   setDestination('server')
+}
+
+function downloadBlobWithBrowser(blob, filename) {
+  const link = document.createElement('a')
+  const url = URL.createObjectURL(blob)
+  const segments = String(filename || 'download')
+    .split('/')
+    .filter(Boolean)
+  link.href = url
+  link.download = segments.pop() || 'download'
+  link.style.display = 'none'
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
 
 async function ensureDirHandle(root, parts) {
@@ -210,15 +270,41 @@ async function saveToLocalMachine(downloadUrl, filename) {
     throw new Error('no-filename')
   }
 
-  await writeBlobToFolder(filename, blob)
+  if (localSaveMode.value === 'folder' && supportsLocalFolder()) {
+    await writeBlobToFolder(filename, blob)
+    return
+  }
+
+  downloadBlobWithBrowser(blob, filename)
 }
 
 async function bootstrapLocalDestination() {
   if (destination.value !== 'local') return
+
+  if (localSaveMode.value === 'browser-downloads') {
+    if (!supportsBrowserDownloads()) {
+      await clearLocalFolder()
+      return
+    }
+    localFolderReady.value = true
+    if (!localFolderName.value) {
+      localFolderName.value = 'Browser downloads folder'
+    }
+    return
+  }
+
   if (!supportsLocalFolder() || !localFolderName.value) {
+    const support = getLocalSaveSupport()
+    if (support.supported && support.mode === 'browser-downloads') {
+      localFolderName.value = 'Browser downloads folder'
+      localFolderReady.value = true
+      setLocalMode('browser-downloads')
+      return
+    }
     await clearLocalFolder()
     return
   }
+
   await resolveDirHandle()
 }
 
@@ -229,8 +315,15 @@ export function useDownloadDestination() {
     destination,
     localFolderName,
     localFolderReady,
+    localSaveMode,
     supportsLocalFolder: computed(() => supportsLocalFolder()),
-    localFolderBlockReason: computed(() => getLocalFolderSupport().reason),
+    localFolderBlockReason: computed(() => {
+      const support = getLocalSaveSupport()
+      return support.supported ? null : support.reason
+    }),
+    usesBrowserDownloads: computed(
+      () => localSaveMode.value === 'browser-downloads'
+    ),
     isLocal: computed(() => destination.value === 'local'),
     hasLocalFolder: computed(
       () => destination.value === 'local' && Boolean(localFolderName.value)
