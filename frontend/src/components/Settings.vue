@@ -340,7 +340,7 @@
           >
             {{ t('settings.parallelDownloads') }}
           </label>
-          <div class="grid grid-cols-5 gap-1.5">
+          <div class="grid grid-cols-3 gap-1.5 sm:grid-cols-6">
             <button
               v-for="n in sm.settingsOptions.max_parallel_downloads"
               :key="n"

@@ -20,7 +20,7 @@ const settingsOptions = {
   lyrics_providers: ['lrclib', 'genius', 'musixmatch', 'azlyrics'],
   format: ['mp3', 'flac', 'ogg', 'opus', 'm4a'],
   bitrate: ['128', '192', '256', '320'],
-  max_parallel_downloads: [1, 2, 3, 5, 8],
+  max_parallel_downloads: [1, 2, 3, 5, 8, 12],
   output: '{artists} - {title}.{output-ext}',
 }
 
