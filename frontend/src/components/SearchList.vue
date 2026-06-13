@@ -253,7 +253,7 @@
                     <Icon
                       :icon="playIconForTrack(activeDemoTrack)"
                       class="h-12 w-12 drop-shadow"
-                      :class="isDemoTrackFailed(activeDemoTrack) ? 'text-error' : 'text-white'"
+                      :class="demoPlayIconClass(activeDemoTrack, 'text-white')"
                     />
                   </button>
                 </div>
@@ -427,6 +427,7 @@
                     <Icon
                       :icon="playIconForTrack(track)"
                       class="h-4 w-4"
+                      :class="demoPlayIconClass(track)"
                     />
                   </button>
                 </div>
@@ -835,6 +836,14 @@ function playIconForTrack(track) {
     return 'clarity:pause-solid'
   }
   return 'clarity:play-solid'
+}
+
+function demoPlayIconClass(track, defaultClass = '') {
+  if (isDemoTrackFailed(track)) return 'text-error'
+  return [
+    defaultClass,
+    isDemoTrackResolving(track) ? 'animate-spin text-primary' : '',
+  ]
 }
 
 async function audioUrlForDemoTrack(track) {
