@@ -232,14 +232,26 @@ async function apply(item) {
   error.value = ''
   try {
     const res = await API.applyMetadata(item.file)
-    fixed.value = { ...fixed.value, [item.file]: true }
+    const remainingChanges = res.data?.changes || []
+    if (remainingChanges.length === 0) {
+      fixed.value = { ...fixed.value, [item.file]: true }
+    } else {
+      error.value = t('metadata.failedVerify')
+    }
     items.value = items.value.map((existing) =>
       existing.file === item.file
-        ? { ...existing, current: res.data.current || existing.current }
+        ? {
+            ...existing,
+            current: res.data.current || existing.current,
+            changes: remainingChanges,
+          }
         : existing
     )
-  } catch {
-    error.value = t('metadata.failedApply')
+  } catch (err) {
+    const detail = err?.response?.data?.detail
+    error.value = detail
+      ? `${t('metadata.failedApply')} ${detail}`
+      : t('metadata.failedApply')
   } finally {
     applying.value = { ...applying.value, [item.file]: false }
   }

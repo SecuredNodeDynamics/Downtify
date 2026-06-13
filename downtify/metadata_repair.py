@@ -157,6 +157,8 @@ def apply_text_tags(path: Path, metadata: dict[str, Any]) -> None:
     audio = MutagenFile(str(path), easy=True)
     if audio is None:
         raise ValueError('Unsupported audio file')
+    if audio.tags is None and hasattr(audio, 'add_tags'):
+        audio.add_tags()
 
     def set_key(key: str, value: Any, optional: bool = False) -> None:
         if value:
@@ -194,4 +196,15 @@ def repair_file(root: Path, relative_file: str) -> dict[str, Any]:
     if not candidate.get('musicbrainz_recording_id'):
         return _scan_item(root.resolve(), path)
     apply_text_tags(path, candidate)
-    return _scan_item(root.resolve(), path)
+    updated = _song_from_file(path)
+    remaining = _changes(updated, candidate)
+    if remaining:
+        fields = ', '.join(change['label'] for change in remaining)
+        raise ValueError(f'Metadata write did not persist for: {fields}')
+    return {
+        'file': path.relative_to(root.resolve()).as_posix(),
+        'current': _public_song(updated),
+        'candidate': _public_song(candidate),
+        'matched': True,
+        'changes': [],
+    }

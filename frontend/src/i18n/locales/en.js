@@ -171,6 +171,8 @@ export default {
     idsOnly: 'MusicBrainz IDs can be added; visible tags already match.',
     failedScan: 'Failed to scan metadata.',
     failedApply: 'Failed to apply metadata fix.',
+    failedVerify:
+      'The metadata write finished, but the file still has remaining changes.',
   },
   monitor: {
     title: 'Playlist Monitor',

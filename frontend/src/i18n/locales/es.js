@@ -175,6 +175,8 @@ export default {
       'Se pueden agregar IDs de MusicBrainz; las etiquetas visibles ya coinciden.',
     failedScan: 'No se pudo escanear los metadatos.',
     failedApply: 'No se pudo aplicar la correccion de metadatos.',
+    failedVerify:
+      'La escritura termino, pero el archivo todavia tiene cambios pendientes.',
   },
   monitor: {
     title: 'Monitor de listas',

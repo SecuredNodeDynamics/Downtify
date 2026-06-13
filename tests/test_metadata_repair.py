@@ -115,17 +115,24 @@ def test_repair_file_applies_high_confidence_metadata(tmp_path, monkeypatch):
     track.write_bytes(b'not really audio')
     applied = {}
 
-    monkeypatch.setattr(
-        metadata_repair,
-        '_song_from_file',
-        lambda _path: {'name': 'Song', 'artists': ['Artist']},
-    )
+    reads = iter([
+        {'name': 'Song', 'artists': ['Artist']},
+        {
+            'name': 'Fixed Song',
+            'artists': ['Artist'],
+            'year': '2020',
+            'release_date': '2020-01-01',
+        },
+    ])
+    monkeypatch.setattr(metadata_repair, '_song_from_file', lambda _path: next(reads))
     monkeypatch.setattr(
         metadata_repair,
         'enrich_song_metadata',
         lambda song: {
             **song,
             'name': 'Fixed Song',
+            'year': '2020',
+            'release_date': '2020-01-01',
             'musicbrainz_recording_id': 'mbid-recording',
         },
     )
@@ -141,3 +148,31 @@ def test_repair_file_applies_high_confidence_metadata(tmp_path, monkeypatch):
     assert applied['path'] == track.resolve()
     assert applied['metadata']['name'] == 'Fixed Song'
     assert result['matched'] is True
+    assert result['changes'] == []
+
+
+def test_repair_file_fails_when_metadata_does_not_persist(
+    tmp_path,
+    monkeypatch,
+):
+    track = tmp_path / 'song.mp3'
+    track.write_bytes(b'not really audio')
+
+    monkeypatch.setattr(
+        metadata_repair,
+        '_song_from_file',
+        lambda _path: {'name': 'Song', 'artists': ['Artist']},
+    )
+    monkeypatch.setattr(
+        metadata_repair,
+        'enrich_song_metadata',
+        lambda song: {
+            **song,
+            'name': 'Fixed Song',
+            'musicbrainz_recording_id': 'mbid-recording',
+        },
+    )
+    monkeypatch.setattr(metadata_repair, 'apply_text_tags', lambda *_args: None)
+
+    with pytest.raises(ValueError, match='Metadata write did not persist'):
+        metadata_repair.repair_file(tmp_path, 'song.mp3')

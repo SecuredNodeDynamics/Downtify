@@ -174,6 +174,8 @@ export default {
       'IDs do MusicBrainz podem ser adicionados; as tags visiveis ja coincidem.',
     failedScan: 'Falha ao escanear metadados.',
     failedApply: 'Falha ao aplicar correcao de metadados.',
+    failedVerify:
+      'A escrita terminou, mas o arquivo ainda tem alteracoes pendentes.',
   },
   monitor: {
     title: 'Monitor de playlists',
