@@ -25,7 +25,23 @@ def _first(tags: Any, keys: list[str]) -> str:
 
 
 def _artists(tags: Any) -> list[str]:
-    value = _first(tags, ['artist', 'artists', '\xa9ART', 'TPE1'])
+    if tags:
+        for key in ['artist', 'artists', '\xa9ART', 'TPE1']:
+            value = tags.get(key)
+            if isinstance(value, list) and value:
+                artists = [
+                    str(item).strip()
+                    for item in value
+                    if str(item).strip()
+                ]
+                if artists:
+                    return artists
+            if value:
+                break
+        else:
+            value = ''
+    else:
+        value = ''
     if not value:
         return []
     for separator in (' / ', ';', ','):

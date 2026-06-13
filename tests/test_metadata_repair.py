@@ -5,6 +5,18 @@ import pytest
 from downtify import metadata_repair
 
 
+def test_artists_reads_multi_value_tags():
+    artists = metadata_repair._artists({
+        'artist': ['Alexandre Desplat', 'Lang Lang', 'Prague Symphony Orchestra']
+    })
+
+    assert artists == [
+        'Alexandre Desplat',
+        'Lang Lang',
+        'Prague Symphony Orchestra',
+    ]
+
+
 def test_safe_library_path_rejects_traversal(tmp_path):
     with pytest.raises(ValueError, match='Invalid library path'):
         metadata_repair.safe_library_path(tmp_path, '../outside.mp3')
