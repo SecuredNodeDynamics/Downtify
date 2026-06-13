@@ -44,11 +44,13 @@ def _song_from_file(path: Path) -> dict[str, Any]:
         return {'name': stem, 'artists': []}
 
     tags = audio.tags or {}
+    release_date = _first(tags, ['date', '\xa9day', 'TDRC'])
     song = {
         'name': _first(tags, ['title', '\xa9nam', 'TIT2']) or path.stem,
         'artists': _artists(tags),
         'album_name': _first(tags, ['album', '\xa9alb', 'TALB']),
-        'release_date': _first(tags, ['date', '\xa9day', 'TDRC']),
+        'release_date': release_date,
+        'year': release_date[:4] if len(release_date) >= 4 else '',
         'track_number': _first(tags, ['tracknumber', 'trkn', 'TRCK']),
         'disc_number': _first(tags, ['discnumber', 'disk', 'TPOS']),
     }
@@ -59,12 +61,14 @@ def _song_from_file(path: Path) -> dict[str, Any]:
 
 
 def _public_song(song: dict[str, Any]) -> dict[str, Any]:
+    release_date = str(song.get('release_date') or '')
+    year = str(song.get('year') or '')
     return {
         'name': song.get('name') or '',
         'artists': song.get('artists') or [],
         'album_name': song.get('album_name') or '',
-        'release_date': song.get('release_date') or '',
-        'year': song.get('year') or '',
+        'release_date': release_date,
+        'year': year or (release_date[:4] if len(release_date) >= 4 else ''),
         'track_number': song.get('track_number') or '',
         'disc_number': song.get('disc_number') or '',
         'musicbrainz_recording_id': song.get('musicbrainz_recording_id') or '',
@@ -154,12 +158,13 @@ def apply_text_tags(path: Path, metadata: dict[str, Any]) -> None:
     if audio is None:
         raise ValueError('Unsupported audio file')
 
-    def set_key(key: str, value: Any) -> None:
+    def set_key(key: str, value: Any, optional: bool = False) -> None:
         if value:
             try:
                 audio[key] = value if isinstance(value, list) else [str(value)]
             except Exception:
-                pass
+                if not optional:
+                    raise
 
     set_key('title', metadata.get('name'))
     set_key('artist', metadata.get('artists') or metadata.get('artist'))
@@ -167,8 +172,16 @@ def apply_text_tags(path: Path, metadata: dict[str, Any]) -> None:
     set_key('date', metadata.get('release_date') or metadata.get('year'))
     set_key('tracknumber', metadata.get('track_number'))
     set_key('discnumber', metadata.get('disc_number'))
-    set_key('musicbrainz_trackid', metadata.get('musicbrainz_recording_id'))
-    set_key('musicbrainz_albumid', metadata.get('musicbrainz_release_id'))
+    set_key(
+        'musicbrainz_trackid',
+        metadata.get('musicbrainz_recording_id'),
+        optional=True,
+    )
+    set_key(
+        'musicbrainz_albumid',
+        metadata.get('musicbrainz_release_id'),
+        optional=True,
+    )
     audio.save()
 
 

@@ -75,6 +75,41 @@ def test_scan_library_hides_matches_without_changes(tmp_path, monkeypatch):
     assert result['items'] == []
 
 
+def test_scan_library_treats_year_derived_from_release_date_as_fixed(
+    tmp_path,
+    monkeypatch,
+):
+    track = tmp_path / 'Artist - Song.mp3'
+    track.write_bytes(b'not really audio')
+
+    monkeypatch.setattr(
+        metadata_repair,
+        '_song_from_file',
+        lambda _path: {
+            'name': 'Song',
+            'artists': ['Artist'],
+            'album_name': 'Album',
+            'release_date': '2020-01-01',
+            'year': '2020',
+        },
+    )
+    monkeypatch.setattr(
+        metadata_repair,
+        'enrich_song_metadata',
+        lambda value: {
+            **value,
+            'release_date': '2020-01-01',
+            'year': '2020',
+            'musicbrainz_recording_id': 'mbid-recording',
+        },
+    )
+
+    result = metadata_repair.scan_library(tmp_path)
+
+    assert result['matched'] == 0
+    assert result['items'] == []
+
+
 def test_repair_file_applies_high_confidence_metadata(tmp_path, monkeypatch):
     track = tmp_path / 'song.mp3'
     track.write_bytes(b'not really audio')
