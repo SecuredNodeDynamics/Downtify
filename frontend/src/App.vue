@@ -1,4 +1,5 @@
 <template>
+  <StarField />
   <div class="app-shell min-h-dvh flex flex-col text-base-content">
     <router-view v-slot="{ Component, route }">
       <transition name="page" mode="out-in">
@@ -14,6 +15,7 @@
 import { onBeforeMount } from 'vue'
 import Footer from './components/Footer.vue'
 import Settings from './components/Settings.vue'
+import StarField from './components/StarField.vue'
 import { useBinaryThemeManager } from './model/theme'
 
 const themeMgr = useBinaryThemeManager()

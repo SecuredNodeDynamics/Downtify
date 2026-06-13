@@ -33,44 +33,6 @@
     min-height: 100dvh;
   }
 
-  body::before,
-  body::after {
-    content: '';
-    position: fixed;
-    inset: 0;
-    z-index: 0;
-    pointer-events: none;
-    background-repeat: repeat;
-    animation: twinkle 7s ease-in-out infinite;
-  }
-
-  body::before {
-    background-image:
-      radial-gradient(circle, rgba(255, 255, 255, 0.75) 0 1px, transparent 1.5px),
-      radial-gradient(circle, rgba(255, 255, 255, 0.42) 0 1px, transparent 1.4px);
-    background-position:
-      12px 24px,
-      72px 92px;
-    background-size:
-      118px 118px,
-      176px 176px;
-    opacity: 0.34;
-  }
-
-  body::after {
-    background-image:
-      radial-gradient(circle, rgba(26, 208, 92, 0.48) 0 1px, transparent 1.5px),
-      radial-gradient(circle, rgba(255, 255, 255, 0.32) 0 1px, transparent 1.4px);
-    background-position:
-      42px 62px,
-      116px 18px;
-    background-size:
-      152px 152px,
-      232px 232px;
-    opacity: 0.26;
-    animation-delay: -3.5s;
-  }
-
   [data-theme='downtify-light'] body {
     background-image:
       radial-gradient(
@@ -90,24 +52,17 @@
       );
   }
 
-  [data-theme='downtify-light'] body::before {
-    background-image:
-      radial-gradient(circle, rgba(15, 23, 42, 0.28) 0 1px, transparent 1.5px),
-      radial-gradient(circle, rgba(26, 208, 92, 0.32) 0 1px, transparent 1.4px);
-    opacity: 0.28;
-  }
-
-  [data-theme='downtify-light'] body::after {
-    background-image:
-      radial-gradient(circle, rgba(15, 23, 42, 0.2) 0 1px, transparent 1.5px),
-      radial-gradient(circle, rgba(26, 208, 92, 0.24) 0 1px, transparent 1.4px);
-    opacity: 0.2;
-  }
-
   #app,
   .app-shell {
     position: relative;
     z-index: 1;
+  }
+
+  .star-field {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
   }
 
   ::selection {
@@ -134,12 +89,6 @@
     background: rgba(0, 0, 0, 0.12);
   }
 
-  @media (prefers-reduced-motion: reduce) {
-    body::before,
-    body::after {
-      animation: none;
-    }
-  }
 }
 
 @layer components {
@@ -258,20 +207,5 @@
   .grid-fluid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  }
-}
-
-@keyframes twinkle {
-  0%,
-  100% {
-    opacity: 0.18;
-    transform: translate3d(0, 0, 0);
-  }
-  45% {
-    opacity: 0.48;
-  }
-  70% {
-    opacity: 0.3;
-    transform: translate3d(0, -8px, 0);
   }
 }
