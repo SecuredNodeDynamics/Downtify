@@ -15,6 +15,11 @@ const STATUS = {
 
 const downloadQueue = ref([])
 const historyRevision = ref(0)
+const activeDownloadCount = computed(() =>
+  downloadQueue.value.filter(
+    (item) => !item.isDownloaded() && !item.isErrored()
+  ).length
+)
 
 class DownloadItem {
   constructor(song) {
@@ -88,6 +93,7 @@ export function useProgressTracker() {
     removeSong,
     getBySong,
     downloadQueue,
+    activeDownloadCount,
     historyRevision,
   }
 }
