@@ -160,13 +160,16 @@ export default {
     scanLimit: 'Archivos a escanear',
     scanned: 'Escaneados',
     matches: 'Coincidencias',
+    needsFix: 'Necesita correccion',
     total: 'Archivos totales',
     serverOnly:
       'Esto escanea archivos en la ubicacion de descarga del servidor Downtify. Las carpetas locales del navegador aun no estan disponibles para el backend.',
-    empty: 'Ejecuta un escaneo para revisar archivos existentes.',
+    empty: 'No se encontraron correcciones de metadatos en este escaneo.',
     matchFound: 'Coincidencia encontrada',
     noMatch: 'Sin coincidencia',
     apply: 'Aplicar correccion',
+    fixing: 'Corrigiendo...',
+    fixed: 'Corregido',
     blank: 'Vacio',
     idsOnly:
       'Se pueden agregar IDs de MusicBrainz; las etiquetas visibles ya coinciden.',

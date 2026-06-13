@@ -49,6 +49,32 @@ def test_scan_library_reports_musicbrainz_match(tmp_path, monkeypatch):
     assert result['items'][0]['matched'] is True
 
 
+def test_scan_library_hides_matches_without_changes(tmp_path, monkeypatch):
+    track = tmp_path / 'Artist - Song.mp3'
+    track.write_bytes(b'not really audio')
+    song = {
+        'name': 'Song',
+        'artists': ['Artist'],
+        'album_name': 'Album',
+    }
+
+    monkeypatch.setattr(metadata_repair, '_song_from_file', lambda _path: song)
+    monkeypatch.setattr(
+        metadata_repair,
+        'enrich_song_metadata',
+        lambda value: {
+            **value,
+            'musicbrainz_recording_id': 'mbid-recording',
+        },
+    )
+
+    result = metadata_repair.scan_library(tmp_path)
+
+    assert result['scanned'] == 1
+    assert result['matched'] == 0
+    assert result['items'] == []
+
+
 def test_repair_file_applies_high_confidence_metadata(tmp_path, monkeypatch):
     track = tmp_path / 'song.mp3'
     track.write_bytes(b'not really audio')

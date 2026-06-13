@@ -56,7 +56,7 @@
         </div>
         <div class="surface rounded-2xl p-4">
           <p class="text-xs uppercase text-base-content/40">
-            {{ t('metadata.matches') }}
+            {{ t('metadata.needsFix') }}
           </p>
           <p class="mt-1 text-2xl font-semibold text-primary">
             {{ summary.matched }}
@@ -95,7 +95,12 @@
         <li
           v-for="item in items"
           :key="item.file"
-          class="surface rounded-2xl p-4"
+          class="surface rounded-2xl p-4 transition-all duration-300"
+          :class="
+            applying[item.file]
+              ? 'scale-[1.01] border-primary/40 shadow-glow-sm'
+              : ''
+          "
         >
           <div class="flex flex-wrap items-start justify-between gap-3">
             <div class="min-w-0">
@@ -106,18 +111,17 @@
             </div>
             <span
               class="pill shrink-0"
-              :class="item.matched ? 'badge-soft' : 'bg-white/5 text-base-content/50'"
+              :class="fixed[item.file] ? 'badge-soft' : 'bg-warning/10 text-warning'"
             >
               {{
-                item.matched
-                  ? t('metadata.matchFound')
-                  : t('metadata.noMatch')
+                fixed[item.file]
+                  ? t('metadata.fixed')
+                  : t('metadata.needsFix')
               }}
             </span>
           </div>
 
           <div
-            v-if="item.matched"
             class="mt-4 rounded-xl border border-white/10 bg-base-100/70 p-3"
           >
             <p class="text-xs font-semibold text-primary">
@@ -151,15 +155,26 @@
           <div class="mt-4 flex justify-end">
             <button
               class="btn btn-sm h-10 rounded-full border-white/10 bg-base-100/85 hover:bg-base-100"
-              :disabled="!item.matched || applying[item.file]"
+              :class="fixed[item.file] ? 'text-primary' : ''"
+              :disabled="applying[item.file] || fixed[item.file]"
               @click="apply(item)"
             >
               <span
                 v-if="applying[item.file]"
                 class="loading loading-spinner loading-xs mr-2"
               />
-              <Icon v-else icon="clarity:check-line" class="h-4 w-4 mr-2" />
-              {{ t('metadata.apply') }}
+              <Icon
+                v-else
+                icon="clarity:check-line"
+                class="h-4 w-4 mr-2"
+              />
+              {{
+                applying[item.file]
+                  ? t('metadata.fixing')
+                  : fixed[item.file]
+                    ? t('metadata.fixed')
+                    : t('metadata.apply')
+              }}
             </button>
           </div>
         </li>
@@ -182,6 +197,7 @@ const loading = ref(false)
 const error = ref('')
 const items = ref([])
 const applying = ref({})
+const fixed = ref({})
 const scanLimit = ref(25)
 const summary = ref({ scanned: 0, matched: 0, total: 0 })
 
@@ -203,6 +219,7 @@ async function scan() {
       total: res.data.total || 0,
     }
     items.value = res.data.items || []
+    fixed.value = {}
   } catch {
     error.value = t('metadata.failedScan')
   } finally {
@@ -215,8 +232,11 @@ async function apply(item) {
   error.value = ''
   try {
     const res = await API.applyMetadata(item.file)
+    fixed.value = { ...fixed.value, [item.file]: true }
     items.value = items.value.map((existing) =>
-      existing.file === item.file ? res.data : existing
+      existing.file === item.file
+        ? { ...existing, current: res.data.current || existing.current }
+        : existing
     )
   } catch {
     error.value = t('metadata.failedApply')

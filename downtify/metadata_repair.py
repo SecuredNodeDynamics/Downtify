@@ -124,12 +124,17 @@ def scan_library(root: Path, limit: int = 100) -> dict[str, Any]:
     ]
     files.sort(key=lambda path: path.relative_to(root).as_posix().casefold())
     selected = files[: max(1, limit)]
-    items = [_scan_item(root, path) for path in selected]
+    scanned_items = [_scan_item(root, path) for path in selected]
+    items = [
+        item
+        for item in scanned_items
+        if item['matched'] and item['changes']
+    ]
     return {
         'root': str(root),
-        'scanned': len(items),
+        'scanned': len(scanned_items),
         'total': len(files),
-        'matched': sum(1 for item in items if item['matched']),
+        'matched': len(items),
         'items': items,
     }
 
