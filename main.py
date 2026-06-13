@@ -35,6 +35,7 @@ from uvicorn import Config, Server
 from downtify import __version__, api
 from downtify.downloader import Downloader
 from downtify.monitor import PlaylistMonitorDB, monitor_loop
+from downtify.versioning import read_runtime_version, runtime_version_path
 
 load_dotenv()
 
@@ -85,6 +86,7 @@ DATABASE_DIR = Path('/data')
 WEB_GUI_LOCATION = os.getenv('WEB_GUI_LOCATION', 'frontend/dist')
 DEFAULT_HOST = os.getenv('HOST', '0.0.0.0')
 DEFAULT_PORT = int(os.getenv('DOWNTIFY_PORT', os.getenv('PORT', '8000')))
+VERSION_FILE = runtime_version_path(DATABASE_DIR / 'app-version')
 
 
 class SPAStaticFiles(StaticFiles):
@@ -182,6 +184,7 @@ def _extract_cover(path: Path) -> tuple[bytes | None, str | None]:
 def build_app() -> FastAPI:
     DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
     DATABASE_DIR.mkdir(parents=True, exist_ok=True)
+    runtime_version = read_runtime_version(__version__, VERSION_FILE)
 
     app = FastAPI(
         title='Downtify',
@@ -189,7 +192,7 @@ def build_app() -> FastAPI:
             'Download your Spotify playlists and songs along with album '
             'art and metadata in a self-hosted way via Docker.'
         ),
-        version=__version__,
+        version=runtime_version,
     )
     app.add_middleware(
         CORSMiddleware,
@@ -203,7 +206,7 @@ def build_app() -> FastAPI:
     api.state.settings_path = settings_path
     api.state.settings = api._load_settings(settings_path)
 
-    api.state.version = __version__
+    api.state.version = runtime_version
     api.state.downloader = Downloader(
         DOWNLOAD_DIR,
         audio_format=api.state.settings['format'],
@@ -354,7 +357,7 @@ def main() -> None:
 
     logger.info(
         'Starting Downtify {} on http://{}:{}',
-        __version__,
+        api.state.version,
         args.host,
         args.port,
     )
