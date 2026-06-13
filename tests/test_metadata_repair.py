@@ -87,6 +87,35 @@ def test_scan_library_hides_matches_without_changes(tmp_path, monkeypatch):
     assert result['items'] == []
 
 
+def test_scan_library_scans_all_files_but_limits_visible_results(
+    tmp_path,
+    monkeypatch,
+):
+    for index in range(3):
+        (tmp_path / f'{index}.mp3').write_bytes(b'not really audio')
+
+    monkeypatch.setattr(
+        metadata_repair,
+        '_song_from_file',
+        lambda path: {'name': path.stem, 'artists': ['Artist']},
+    )
+    monkeypatch.setattr(
+        metadata_repair,
+        'enrich_song_metadata',
+        lambda song: {
+            **song,
+            'name': f"{song['name']} fixed",
+            'musicbrainz_recording_id': f"mbid-{song['name']}",
+        },
+    )
+
+    result = metadata_repair.scan_library(tmp_path, limit=2)
+
+    assert result['scanned'] == 3
+    assert result['matched'] == 3
+    assert len(result['items']) == 2
+
+
 def test_scan_library_treats_year_derived_from_release_date_as_fixed(
     tmp_path,
     monkeypatch,

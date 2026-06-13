@@ -155,6 +155,7 @@ export default {
       'Scan existing server library files and repair tags with MusicBrainz matches.',
     scan: 'Scan library',
     scanLimit: 'Files to scan',
+    resultLimit: 'Fixes to show',
     scanned: 'Scanned',
     matches: 'Matches',
     needsFix: 'Needs fix',

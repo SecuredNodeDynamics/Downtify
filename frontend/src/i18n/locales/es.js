@@ -158,6 +158,7 @@ export default {
       'Escanea archivos existentes en el servidor y repara etiquetas con coincidencias de MusicBrainz.',
     scan: 'Escanear biblioteca',
     scanLimit: 'Archivos a escanear',
+    resultLimit: 'Correcciones a mostrar',
     scanned: 'Escaneados',
     matches: 'Coincidencias',
     needsFix: 'Necesita correccion',

@@ -143,19 +143,19 @@ def scan_library(root: Path, limit: int = 100) -> dict[str, Any]:
         if path.is_file() and path.suffix.lower() in AUDIO_EXTENSIONS
     ]
     files.sort(key=lambda path: path.relative_to(root).as_posix().casefold())
-    selected = files[: max(1, limit)]
-    scanned_items = [_scan_item(root, path) for path in selected]
+    scanned_items = [_scan_item(root, path) for path in files]
     items = [
         item
         for item in scanned_items
         if item['matched'] and item['changes']
     ]
+    visible_items = items[: max(1, limit)]
     return {
         'root': str(root),
         'scanned': len(scanned_items),
         'total': len(files),
         'matched': len(items),
-        'items': items,
+        'items': visible_items,
     }
 
 

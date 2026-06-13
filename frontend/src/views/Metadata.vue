@@ -18,7 +18,7 @@
             v-model.number="scanLimit"
             class="select h-11 rounded-full border-white/10 bg-base-100/85 text-sm"
             :disabled="loading"
-            :title="t('metadata.scanLimit')"
+            :title="t('metadata.resultLimit')"
           >
             <option :value="25">25</option>
             <option :value="50">50</option>
