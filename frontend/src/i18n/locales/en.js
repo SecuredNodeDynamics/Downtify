@@ -103,6 +103,8 @@ export default {
     recentFailures: '{count} recent failures',
     downloads: 'Downloads',
     mediaSaveLocation: 'Media save location',
+    containerDownloadLocation: 'Container downloads path',
+    localDownloadLocation: 'This device download location',
     data: 'Data',
     audioFiles: 'Audio files',
     librarySize: 'Library size',

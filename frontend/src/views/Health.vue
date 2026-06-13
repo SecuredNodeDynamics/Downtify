@@ -104,17 +104,17 @@
               </h2>
               <Icon icon="clarity:download-line" class="h-5 w-5 text-primary" />
             </div>
+            <p class="text-xs text-base-content/40">
+              {{ downloadLocationLabel }}
+            </p>
             <p class="truncate text-sm font-medium">
-              {{ health.downloads.path }}
+              {{ displayedDownloadPath }}
             </p>
             <p
-              v-if="health.downloads.external_path"
+              v-if="secondaryDownloadPath"
               class="mt-1 truncate text-xs text-base-content/50"
             >
-              {{ t('health.mediaSaveLocation') }}:
-              <span class="text-base-content/70">
-                {{ health.downloads.external_path }}
-              </span>
+              {{ secondaryDownloadPath }}
             </p>
             <div class="mt-4 h-2 overflow-hidden rounded-full bg-white/10">
               <div
@@ -267,9 +267,11 @@ import { Icon } from '@iconify/vue'
 import API from '../model/api'
 import Navbar from '../components/Navbar.vue'
 import Settings from '../components/Settings.vue'
+import { useDownloadDestination } from '../model/downloadDestination'
 import { useI18n } from '../i18n'
 
 const { t } = useI18n()
+const downloadDestination = useDownloadDestination()
 const health = ref(null)
 const loading = ref(false)
 const error = ref('')
@@ -306,6 +308,43 @@ const settingRows = computed(() => {
       value: yesNo(settings.organize_by_album),
     },
   ]
+})
+
+const downloadLocationLabel = computed(() => {
+  if (downloadDestination.isLocal.value) {
+    return t('health.localDownloadLocation')
+  }
+  if (health.value?.downloads?.external_path) {
+    return t('health.mediaSaveLocation')
+  }
+  return t('health.containerDownloadLocation')
+})
+
+const displayedDownloadPath = computed(() => {
+  if (downloadDestination.isLocal.value) {
+    return (
+      downloadDestination.localFolderName.value ||
+      t('settings.downloadDestinationLocal')
+    )
+  }
+  return health.value?.downloads?.external_path || health.value?.downloads?.path
+})
+
+const secondaryDownloadPath = computed(() => {
+  if (!health.value) return ''
+  const containerPath = health.value.downloads.path
+  const externalPath = health.value.downloads.external_path
+
+  if (!downloadDestination.isLocal.value && externalPath) {
+    return `${t('health.containerDownloadLocation')}: ${containerPath}`
+  }
+
+  if (downloadDestination.isLocal.value) {
+    const serverPath = externalPath || containerPath
+    return `${t('settings.downloadDestinationServer')}: ${serverPath}`
+  }
+
+  return ''
 })
 
 onMounted(loadHealth)
