@@ -244,6 +244,23 @@ def _external_download_path(download_dir: Path) -> Optional[str]:
     return _mount_source_for(download_dir)
 
 
+def _download_directory_summary(download_dir: Path) -> dict[str, Any]:
+    external_path = _external_download_path(download_dir)
+    storage_dir = download_dir
+    if external_path:
+        external_dir = Path(external_path)
+        if external_dir.exists():
+            storage_dir = external_dir
+
+    summary = _directory_summary(storage_dir, external_path=external_path)
+    summary['container_path'] = str(download_dir)
+    summary['storage_path'] = str(storage_dir)
+    summary['storage_path_matches_display'] = (
+        external_path is None or str(storage_dir) == external_path
+    )
+    return summary
+
+
 def _command_version(command: str, args: list[str]) -> dict[str, Any]:
     path = shutil.which(command)
     if not path:
@@ -305,10 +322,7 @@ def get_health() -> dict[str, Any]:
                 'version': getattr(yt_dlp.version, '__version__', None),
             },
         },
-        'downloads': _directory_summary(
-            download_dir,
-            external_path=_external_download_path(download_dir),
-        ),
+        'downloads': _download_directory_summary(download_dir),
         'data': _directory_summary(database_dir),
         'settings': {
             'format': state.settings.get('format'),

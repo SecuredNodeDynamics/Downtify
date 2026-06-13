@@ -107,6 +107,7 @@ export default {
     mediaSaveLocation: 'Ubicación de guardado de medios',
     containerDownloadLocation: 'Ruta de descargas del contenedor',
     localDownloadLocation: 'Ubicación de descarga de este dispositivo',
+    storageMeasuredFrom: 'Almacenamiento medido desde',
     data: 'Datos',
     audioFiles: 'Archivos de audio',
     librarySize: 'Tamaño de biblioteca',

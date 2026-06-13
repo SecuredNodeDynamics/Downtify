@@ -4,6 +4,7 @@ from downtify import api
 from downtify.api import (
     _command_version,
     _directory_summary,
+    _download_directory_summary,
     _mount_source_for,
     get_health,
 )
@@ -129,6 +130,49 @@ def test_health_payload_prefers_saved_server_media_location(
         api.state.history_db = old_history
 
     assert payload['downloads']['external_path'] == '/mnt/media/Music'
+
+
+def test_download_summary_measures_existing_external_path(tmp_path):
+    downloads = tmp_path / 'downloads'
+    downloads.mkdir()
+    media = tmp_path / 'media'
+    media.mkdir()
+    (media / 'song.flac').write_text('audio', encoding='utf-8')
+
+    old_settings = api.state.settings
+    try:
+        api.state.settings = {'server_media_location': str(media)}
+
+        summary = _download_directory_summary(downloads)
+    finally:
+        api.state.settings = old_settings
+
+    assert summary['external_path'] == str(media)
+    assert summary['container_path'] == str(downloads)
+    assert summary['storage_path'] == str(media)
+    assert summary['storage_path_matches_display'] is True
+    assert summary['audio_count'] == 1
+
+
+def test_download_summary_marks_unmounted_external_path(tmp_path):
+    downloads = tmp_path / 'downloads'
+    downloads.mkdir()
+    (downloads / 'song.mp3').write_text('audio', encoding='utf-8')
+    missing_media = tmp_path / 'missing-media'
+
+    old_settings = api.state.settings
+    try:
+        api.state.settings = {'server_media_location': str(missing_media)}
+
+        summary = _download_directory_summary(downloads)
+    finally:
+        api.state.settings = old_settings
+
+    assert summary['external_path'] == str(missing_media)
+    assert summary['container_path'] == str(downloads)
+    assert summary['storage_path'] == str(downloads)
+    assert summary['storage_path_matches_display'] is False
+    assert summary['audio_count'] == 1
 
 
 def test_command_version_reports_missing_command():
