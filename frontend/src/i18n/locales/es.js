@@ -73,6 +73,22 @@ export default {
     applyOverride: 'Aplicar',
     invalidYouTubeURL: 'URL de YouTube no válida',
   },
+  history: {
+    title: 'Historial de descargas',
+    subtitle: 'Intentos recientes de descarga, guardados entre reinicios.',
+    empty: 'Aún no hay historial de descargas.',
+    emptyHint: 'Las descargas completadas y fallidas aparecerán aquí.',
+    done: 'Completada',
+    failed: 'Fallida',
+    downloading: 'Descargando',
+    queued: 'En cola',
+    retry: 'Reintentar descarga',
+    clear: 'Limpiar historial',
+    clearPrompt: '¿Limpiar todo el historial de descargas?',
+    downloadFile: 'Descargar archivo',
+    failedLoad: 'No se pudo cargar el historial de descargas.',
+    failedRetry: 'No se pudo reintentar esta descarga.',
+  },
   library: {
     title: 'Biblioteca',
     subtitle:

@@ -143,6 +143,18 @@ function clearQueue() {
   return API.delete('/api/queue')
 }
 
+function getHistory() {
+  return API.get('/api/history')
+}
+
+function retryHistoryItem(historyId) {
+  return API.post(`/api/history/${historyId}/retry`)
+}
+
+function clearHistory() {
+  return API.delete('/api/history')
+}
+
 function getSettings() {
   return API.get('/api/settings', { params: { client_id: sessionID } })
 }
@@ -175,6 +187,9 @@ export default {
   getQueue,
   removeQueueItem,
   clearQueue,
+  getHistory,
+  retryHistoryItem,
+  clearHistory,
   getSettings,
   setSettings,
   check_for_update,

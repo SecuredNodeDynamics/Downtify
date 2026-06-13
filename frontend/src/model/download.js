@@ -14,6 +14,7 @@ const STATUS = {
 }
 
 const downloadQueue = ref([])
+const historyRevision = ref(0)
 
 class DownloadItem {
   constructor(song) {
@@ -87,6 +88,7 @@ export function useProgressTracker() {
     removeSong,
     getBySong,
     downloadQueue,
+    historyRevision,
   }
 }
 
@@ -118,10 +120,12 @@ API.ws_onmessage((event) => {
       item.setFilename(data.filename)
     }
     item.setDownloaded()
+    historyRevision.value += 1
     maybeSaveToLocalMachine(item)
   } else if (data.status === 'error') {
     item.wsUpdate(data)
     item.setError()
+    historyRevision.value += 1
   } else if (data.status === 'queued') {
     item.message = data.message || ''
   } else {

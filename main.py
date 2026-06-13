@@ -34,6 +34,7 @@ from uvicorn import Config, Server
 
 from downtify import __version__, api
 from downtify.downloader import Downloader
+from downtify.history import DownloadHistoryDB
 from downtify.monitor import PlaylistMonitorDB, monitor_loop
 from downtify.versioning import read_runtime_version, runtime_version_path
 
@@ -205,6 +206,9 @@ def build_app() -> FastAPI:
     settings_path = DATABASE_DIR / 'settings.json'
     api.state.settings_path = settings_path
     api.state.settings = api._load_settings(settings_path)
+    api.state.history_db = DownloadHistoryDB(
+        DATABASE_DIR / 'download_history.db'
+    )
 
     api.state.version = runtime_version
     api.state.downloader = Downloader(

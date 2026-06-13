@@ -38,6 +38,7 @@ from loguru import logger
 
 from . import m3u, providers, spotify
 from .downloader import Downloader, preview_audio_for_song
+from .history import DownloadHistoryDB
 from .monitor import PlaylistMonitorDB, check_playlist
 
 DEFAULT_SETTINGS: dict[str, Any] = {
@@ -105,6 +106,7 @@ class AppState:
     settings_path: Optional[Path] = None
     loop: Optional[asyncio.AbstractEventLoop] = None
     monitor_db: Optional[PlaylistMonitorDB] = None
+    history_db: Optional[DownloadHistoryDB] = None
     download_jobs: dict[str, dict[str, Any]] = {}
     download_semaphore: Optional[asyncio.Semaphore] = None
 
@@ -286,7 +288,11 @@ def _song_for_download(url: str) -> dict[str, Any]:
     raise HTTPException(status_code=400, detail='Unsupported URL')
 
 
-def _register_job(song: dict[str, Any], status: str = 'queued') -> str:
+def _register_job(
+    song: dict[str, Any],
+    status: str = 'queued',
+    history_id: Optional[int] = None,
+) -> str:
     song_id = str(song.get('song_id') or song.get('url') or id(song))
     state.download_jobs[song_id] = {
         'song': song,
@@ -294,6 +300,7 @@ def _register_job(song: dict[str, Any], status: str = 'queued') -> str:
         'progress': 0,
         'message': '',
         'filename': None,
+        'history_id': history_id,
     }
     return song_id
 
@@ -302,6 +309,7 @@ async def _run_download(
     song: dict[str, Any],
     song_id: str,
     subdir: Optional[str] = None,
+    history_id: Optional[int] = None,
 ) -> Optional[str]:
     """Run a single download to completion, updating jobs state and broadcasting WS events."""
 
@@ -315,6 +323,11 @@ async def _run_download(
         job = state.download_jobs[song_id]
     else:
         job['status'] = 'downloading'
+
+    if history_id is None:
+        history_id = job.get('history_id')
+    if history_id is not None and state.history_db is not None:
+        state.history_db.mark_running(history_id)
 
     await state.connections.broadcast({
         'song': song,
@@ -351,6 +364,8 @@ async def _run_download(
         logger.exception('Download failed for {}', song_id)
         job['status'] = 'error'
         job['message'] = f'Error: {exc}'
+        if history_id is not None and state.history_db is not None:
+            state.history_db.mark_error(history_id, str(exc))
         await state.connections.broadcast({
             'song': song,
             'progress': 0,
@@ -362,6 +377,8 @@ async def _run_download(
     job['status'] = 'done'
     job['filename'] = filename
     job['progress'] = 100
+    if history_id is not None and state.history_db is not None:
+        state.history_db.mark_done(history_id, filename)
     await state.connections.broadcast({
         'song': song,
         'progress': 100,
@@ -397,9 +414,16 @@ async def download_endpoint(
         song.get('release_date'),
     )
     song_id = _register_job(song, status='downloading')
+    history_id = (
+        state.history_db.create(song, status='downloading', source_url=url)
+        if state.history_db is not None
+        else None
+    )
+    if history_id is not None:
+        state.download_jobs[song_id]['history_id'] = history_id
 
     try:
-        filename = await _run_download(song, song_id)
+        filename = await _run_download(song, song_id, history_id=history_id)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
     return filename
@@ -408,6 +432,7 @@ async def download_endpoint(
 async def _process_batch(
     songs: list[dict[str, Any]],
     job_ids: list[str],
+    history_ids: list[Optional[int]],
     playlist_url: str,
     generate_m3u: bool,
 ) -> None:
@@ -428,17 +453,27 @@ async def _process_batch(
                 'Failed to resolve playlist name for {}', playlist_url
             )
 
-    async def _bounded(song: dict[str, Any], song_id: str) -> dict[str, Any]:
+    async def _bounded(
+        song: dict[str, Any],
+        song_id: str,
+        history_id: Optional[int],
+    ) -> dict[str, Any]:
         try:
             filename = await _run_download(
-                song, song_id, subdir=playlist_subdir
+                song,
+                song_id,
+                subdir=playlist_subdir,
+                history_id=history_id,
             )
         except Exception:
             filename = None
         return {'song': song, 'filename': filename}
 
     results = await asyncio.gather(
-        *[_bounded(s, sid) for s, sid in zip(songs, job_ids)],
+        *[
+            _bounded(s, sid, hid)
+            for s, sid, hid in zip(songs, job_ids, history_ids)
+        ],
         return_exceptions=False,
     )
 
@@ -495,12 +530,19 @@ async def download_batch_endpoint(request: Request) -> dict[str, Any]:
 
     valid_songs: list[dict[str, Any]] = []
     job_ids: list[str] = []
+    history_ids: list[Optional[int]] = []
     for song in songs:
         if not isinstance(song, dict):
             continue
-        song_id = _register_job(song, status='queued')
+        history_id = (
+            state.history_db.create(song, status='queued')
+            if state.history_db is not None
+            else None
+        )
+        song_id = _register_job(song, status='queued', history_id=history_id)
         valid_songs.append(song)
         job_ids.append(song_id)
+        history_ids.append(history_id)
         await state.connections.broadcast({
             'song': song,
             'progress': 0,
@@ -512,7 +554,9 @@ async def download_batch_endpoint(request: Request) -> dict[str, Any]:
         raise HTTPException(status_code=400, detail='No valid songs in batch')
 
     task = asyncio.create_task(
-        _process_batch(valid_songs, job_ids, playlist_url, generate_m3u)
+        _process_batch(
+            valid_songs, job_ids, history_ids, playlist_url, generate_m3u
+        )
     )
 
     def _log_batch_failure(t: asyncio.Task) -> None:
@@ -543,6 +587,62 @@ def remove_queue_item(song_id: str = Query(...)) -> dict:
         del state.download_jobs[song_id]
         return {'removed': True}
     return {'removed': False}
+
+
+@router.get('/api/history')
+def list_history(limit: int = Query(100)) -> list[dict[str, Any]]:
+    if state.history_db is None:
+        return []
+    return state.history_db.list(limit=limit)
+
+
+@router.delete('/api/history')
+def clear_history() -> dict:
+    if state.history_db is not None:
+        state.history_db.clear()
+    return {'cleared': True}
+
+
+@router.post('/api/history/{history_id}/retry')
+async def retry_history_item(history_id: int) -> dict[str, Any]:
+    if state.downloader is None:
+        raise HTTPException(status_code=500, detail='Downloader not ready')
+    if state.history_db is None:
+        raise HTTPException(status_code=500, detail='History not ready')
+
+    item = state.history_db.get(history_id)
+    if item is None:
+        raise HTTPException(status_code=404, detail='History item not found')
+
+    song = item.get('song')
+    if not isinstance(song, dict) or not song:
+        raise HTTPException(status_code=400, detail='History item has no song')
+
+    song_id = _register_job(song, status='queued', history_id=history_id)
+    await state.connections.broadcast({
+        'song': song,
+        'progress': 0,
+        'message': 'Queued',
+        'status': 'queued',
+    })
+
+    async def _retry() -> None:
+        try:
+            await _run_download(song, song_id, history_id=history_id)
+        except Exception:
+            pass
+
+    task = asyncio.create_task(_retry())
+
+    def _log_retry_failure(t: asyncio.Task) -> None:
+        if t.cancelled():
+            return
+        exc = t.exception()
+        if exc is not None:
+            logger.opt(exception=exc).error('History retry crashed')
+
+    task.add_done_callback(_log_retry_failure)
+    return {'job_id': song_id, 'history_id': history_id}
 
 
 @router.post('/api/playlist/m3u')
