@@ -184,13 +184,13 @@ export default {
     downloadDestinationLocalHint:
       'Cuando termine una descarga, Downtify guardará una copia en la carpeta que elijas en este dispositivo.',
     downloadDestinationBrowserHint:
-      'Cuando termine una descarga, Downtify guardara una copia usando la carpeta de descargas del navegador.',
+      'Cuando termine una descarga, Downtify guardara una copia en la ubicacion de descarga seleccionada en tu navegador.',
     localFolderLabel: 'Guardar descargas en',
     localFolderNameHint:
       'El navegador solo muestra el nombre de la carpeta, no la ruta completa en tu equipo.',
     changeLocalFolder: 'Cambiar carpeta…',
     browserDownloadsHint:
-      'Firefox y los navegadores sin acceso a carpetas usan su carpeta normal de descargas y sus avisos de descarga.',
+      'Firefox y los navegadores sin acceso a carpetas usan la ubicacion de descarga seleccionada en la configuracion del navegador.',
     localFolderUnsupported:
       'Guardar en una carpeta especifica de este dispositivo requiere Chrome, Edge o Brave. Otros navegadores usan su carpeta de descargas.',
     localFolderInsecure:

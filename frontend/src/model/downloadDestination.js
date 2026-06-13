@@ -185,7 +185,7 @@ async function activateLocalDestination() {
     await pickLocalFolder()
   } else {
     dirHandle = null
-    localFolderName.value = 'Browser downloads folder'
+    localFolderName.value = 'Selected browser download location'
     localFolderReady.value = true
     setLocalMode('browser-downloads')
     try {
@@ -288,7 +288,7 @@ async function bootstrapLocalDestination() {
     }
     localFolderReady.value = true
     if (!localFolderName.value) {
-      localFolderName.value = 'Browser downloads folder'
+      localFolderName.value = 'Selected browser download location'
     }
     return
   }
@@ -296,7 +296,7 @@ async function bootstrapLocalDestination() {
   if (!supportsLocalFolder() || !localFolderName.value) {
     const support = getLocalSaveSupport()
     if (support.supported && support.mode === 'browser-downloads') {
-      localFolderName.value = 'Browser downloads folder'
+      localFolderName.value = 'Selected browser download location'
       localFolderReady.value = true
       setLocalMode('browser-downloads')
       return

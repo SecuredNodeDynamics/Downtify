@@ -183,13 +183,13 @@ export default {
     downloadDestinationLocalHint:
       'Quando um download terminar, o Downtify salvará uma cópia na pasta que você escolher neste dispositivo.',
     downloadDestinationBrowserHint:
-      'Quando um download terminar, o Downtify salvara uma copia usando a pasta de downloads do navegador.',
+      'Quando um download terminar, o Downtify salvara uma copia no local de download selecionado no navegador.',
     localFolderLabel: 'Salvar downloads em',
     localFolderNameHint:
       'O navegador mostra apenas o nome da pasta, não o caminho completo no seu computador.',
     changeLocalFolder: 'Alterar pasta…',
     browserDownloadsHint:
-      'Firefox e navegadores sem acesso a pastas usam sua pasta normal de downloads e seus avisos de download.',
+      'Firefox e navegadores sem acesso a pastas usam o local de download selecionado nas configuracoes do navegador.',
     localFolderUnsupported:
       'Salvar em uma pasta especifica neste dispositivo requer Chrome, Edge ou Brave. Outros navegadores usam sua pasta de downloads.',
     localFolderInsecure:

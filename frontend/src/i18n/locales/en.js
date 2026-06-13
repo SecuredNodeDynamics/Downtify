@@ -181,13 +181,13 @@ export default {
     downloadDestinationLocalHint:
       'When a download finishes, Downtify saves a copy to the folder you choose on this device.',
     downloadDestinationBrowserHint:
-      'When a download finishes, Downtify saves a copy using your browser downloads folder.',
+      'When a download finishes, Downtify saves a copy to your selected browser download location.',
     localFolderLabel: 'Save downloads to',
     localFolderNameHint:
       'Browsers only show the folder name, not the full path on your computer.',
     changeLocalFolder: 'Change folder…',
     browserDownloadsHint:
-      'Firefox and browsers without folder access use their normal downloads folder and download prompts.',
+      'Firefox and browsers without folder access use the download location selected in your browser settings.',
     localFolderUnsupported:
       'Saving to a specific folder on this device requires Chrome, Edge, or Brave. Other browsers use their downloads folder.',
     localFolderInsecure:
