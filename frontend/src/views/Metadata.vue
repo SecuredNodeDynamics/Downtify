@@ -87,7 +87,7 @@
           class="mx-auto mb-3 h-10 w-10 text-base-content/20"
         />
         <p class="text-sm text-base-content/50">
-          {{ t('metadata.empty') }}
+          {{ loading ? t('metadata.scanning') : t('metadata.empty') }}
         </p>
       </div>
 
@@ -184,7 +184,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { Icon } from '@iconify/vue'
 
 import Navbar from '/src/components/Navbar.vue'
@@ -200,6 +200,7 @@ const applying = ref({})
 const fixed = ref({})
 const scanLimit = ref(25)
 const summary = ref({ scanned: 0, matched: 0, total: 0 })
+let pollTimer = null
 
 function displaySong(song) {
   const artists = (song?.artists || []).join(', ')
@@ -208,24 +209,75 @@ function displaySong(song) {
   return `${artists || t('common.unknownArtist')} - ${title}${album}`
 }
 
+function applyScanStatus(data) {
+  loading.value = data.status === 'scanning'
+  scanLimit.value = data.limit || scanLimit.value
+  summary.value = {
+    scanned: data.scanned || 0,
+    matched: data.matched || 0,
+    total: data.total || 0,
+  }
+  items.value = data.items || []
+  if (data.status === 'error') {
+    error.value = data.error || t('metadata.failedScan')
+  }
+}
+
+function stopPolling() {
+  if (pollTimer !== null) {
+    clearInterval(pollTimer)
+    pollTimer = null
+  }
+}
+
+function startPolling() {
+  stopPolling()
+  pollTimer = setInterval(refreshScanStatus, 2000)
+}
+
+async function refreshScanStatus() {
+  try {
+    const res = await API.getMetadataScanStatus()
+    applyScanStatus(res.data)
+    if (res.data.status !== 'scanning') {
+      stopPolling()
+    }
+  } catch {
+    stopPolling()
+    loading.value = false
+    error.value = t('metadata.failedScan')
+  }
+}
+
 async function scan() {
   loading.value = true
   error.value = ''
+  fixed.value = {}
   try {
-    const res = await API.scanMetadata(scanLimit.value)
-    summary.value = {
-      scanned: res.data.scanned || 0,
-      matched: res.data.matched || 0,
-      total: res.data.total || 0,
+    const res = await API.startMetadataScan(scanLimit.value)
+    applyScanStatus(res.data)
+    if (res.data.status === 'scanning') {
+      startPolling()
     }
-    items.value = res.data.items || []
-    fixed.value = {}
   } catch {
     error.value = t('metadata.failedScan')
-  } finally {
     loading.value = false
   }
 }
+
+onMounted(async () => {
+  try {
+    const res = await API.getMetadataScanStatus()
+    applyScanStatus(res.data)
+    if (res.data.status === 'scanning') {
+      startPolling()
+    }
+  } catch {
+    // The page can still start a fresh scan if status lookup fails.
+  }
+})
+
+onBeforeUnmount(stopPolling)
 
 async function apply(item) {
   applying.value = { ...applying.value, [item.file]: true }
@@ -235,6 +287,10 @@ async function apply(item) {
     const remainingChanges = res.data?.changes || []
     if (remainingChanges.length === 0) {
       fixed.value = { ...fixed.value, [item.file]: true }
+      summary.value = {
+        ...summary.value,
+        matched: Math.max(0, summary.value.matched - 1),
+      }
     } else {
       error.value = t('metadata.failedVerify')
     }

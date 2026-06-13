@@ -156,6 +156,7 @@ export default {
     subtitle:
       'Escaneie arquivos existentes no servidor e repare tags com correspondencias do MusicBrainz.',
     scan: 'Escanear biblioteca',
+    scanning: 'Escaneando biblioteca...',
     scanLimit: 'Arquivos para escanear',
     resultLimit: 'Correcoes para mostrar',
     scanned: 'Escaneados',

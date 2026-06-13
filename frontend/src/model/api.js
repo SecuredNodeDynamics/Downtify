@@ -105,8 +105,12 @@ function getHealth() {
   return API.get('/api/health')
 }
 
-function scanMetadata(limit = 100) {
-  return API.get('/api/metadata/scan', { params: { limit } })
+function startMetadataScan(limit = 100) {
+  return API.post('/api/metadata/scan', { limit })
+}
+
+function getMetadataScanStatus() {
+  return API.get('/api/metadata/scan/status')
 }
 
 function applyMetadata(file) {
@@ -206,7 +210,8 @@ export default {
   setSettings,
   check_for_update,
   getHealth,
-  scanMetadata,
+  startMetadataScan,
+  getMetadataScanStatus,
   applyMetadata,
   ws_onmessage,
   ws_onerror,

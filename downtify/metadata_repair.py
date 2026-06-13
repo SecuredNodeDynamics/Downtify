@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from mutagen import File as MutagenFile
 
@@ -135,7 +135,14 @@ def _scan_item(root: Path, path: Path) -> dict[str, Any]:
     }
 
 
-def scan_library(root: Path, limit: int = 100) -> dict[str, Any]:
+ProgressCallback = Callable[[dict[str, Any]], None]
+
+
+def scan_library(
+    root: Path,
+    limit: int = 100,
+    progress_cb: ProgressCallback | None = None,
+) -> dict[str, Any]:
     root = root.resolve()
     files = [
         path
@@ -143,16 +150,23 @@ def scan_library(root: Path, limit: int = 100) -> dict[str, Any]:
         if path.is_file() and path.suffix.lower() in AUDIO_EXTENSIONS
     ]
     files.sort(key=lambda path: path.relative_to(root).as_posix().casefold())
-    scanned_items = [_scan_item(root, path) for path in files]
-    items = [
-        item
-        for item in scanned_items
-        if item['matched'] and item['changes']
-    ]
+    items: list[dict[str, Any]] = []
+    scanned = 0
+    for path in files:
+        scanned += 1
+        item = _scan_item(root, path)
+        if item['matched'] and item['changes']:
+            items.append(item)
+        if progress_cb is not None:
+            progress_cb({
+                'scanned': scanned,
+                'total': len(files),
+                'matched': len(items),
+            })
     visible_items = items[: max(1, limit)]
     return {
         'root': str(root),
-        'scanned': len(scanned_items),
+        'scanned': scanned,
         'total': len(files),
         'matched': len(items),
         'items': visible_items,

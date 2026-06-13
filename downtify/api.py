@@ -119,6 +119,16 @@ class AppState:
     history_db: Optional[DownloadHistoryDB] = None
     download_jobs: dict[str, dict[str, Any]] = {}
     download_semaphore: Optional[asyncio.Semaphore] = None
+    metadata_scan: dict[str, Any] = {
+        'status': 'idle',
+        'limit': 100,
+        'scanned': 0,
+        'total': 0,
+        'matched': 0,
+        'items': [],
+        'error': '',
+    }
+    metadata_scan_task: Optional[asyncio.Task] = None
 
 
 state = AppState()
@@ -368,18 +378,84 @@ def search_endpoint(query: str = Query('')) -> list[dict[str, Any]]:
     return providers.search_media(query, limit=80)
 
 
-@router.get('/api/metadata/scan')
-def scan_metadata(limit: int = Query(100, ge=1, le=500)) -> dict[str, Any]:
+def _metadata_scan_status() -> dict[str, Any]:
+    return dict(state.metadata_scan)
+
+
+async def _run_metadata_scan(limit: int) -> None:
+    if state.downloader is None:
+        state.metadata_scan = {
+            **state.metadata_scan,
+            'status': 'error',
+            'error': 'Downloader not ready',
+        }
+        return
+
+    def progress(update: dict[str, Any]) -> None:
+        state.metadata_scan = {
+            **state.metadata_scan,
+            **update,
+            'status': 'scanning',
+        }
+
+    try:
+        result = await asyncio.to_thread(
+            metadata_repair.scan_library,
+            state.downloader.download_dir,
+            limit,
+            progress,
+        )
+        state.metadata_scan = {
+            **result,
+            'limit': limit,
+            'status': 'done',
+            'error': '',
+            'finished_at': datetime.now(timezone.utc).isoformat(),
+        }
+    except Exception as exc:
+        logger.exception('Metadata scan failed')
+        state.metadata_scan = {
+            **state.metadata_scan,
+            'status': 'error',
+            'error': str(exc),
+            'finished_at': datetime.now(timezone.utc).isoformat(),
+        }
+
+
+@router.post('/api/metadata/scan')
+async def start_metadata_scan(request: Request) -> dict[str, Any]:
     if state.downloader is None:
         raise HTTPException(status_code=500, detail='Downloader not ready')
     try:
-        return metadata_repair.scan_library(
-            state.downloader.download_dir,
-            limit=limit,
-        )
-    except Exception as exc:
-        logger.exception('Metadata scan failed')
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        payload = await request.json()
+    except Exception:
+        payload = {}
+    try:
+        limit = max(1, min(500, int(payload.get('limit', 100))))
+    except (TypeError, ValueError):
+        limit = 100
+
+    task = state.metadata_scan_task
+    if task is not None and not task.done():
+        return _metadata_scan_status()
+
+    state.metadata_scan = {
+        'status': 'scanning',
+        'limit': limit,
+        'scanned': 0,
+        'total': 0,
+        'matched': 0,
+        'items': [],
+        'error': '',
+        'started_at': datetime.now(timezone.utc).isoformat(),
+    }
+    state.metadata_scan_task = asyncio.create_task(_run_metadata_scan(limit))
+    return _metadata_scan_status()
+
+
+@router.get('/api/metadata/scan/status')
+def metadata_scan_status() -> dict[str, Any]:
+    return _metadata_scan_status()
 
 
 @router.post('/api/metadata/apply')
