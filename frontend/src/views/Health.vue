@@ -301,6 +301,10 @@ const settingRows = computed(() => {
       value: yesNo(settings.download_lyrics),
     },
     {
+      label: t('settings.enhanceMetadata'),
+      value: yesNo(settings.enhance_metadata),
+    },
+    {
       label: t('settings.organizeByArtist'),
       value: yesNo(settings.organize_by_artist),
     },

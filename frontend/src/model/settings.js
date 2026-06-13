@@ -10,6 +10,7 @@ const settings = ref({
   bitrate: '320',
   output: '',
   generate_m3u: true,
+  enhance_metadata: true,
   organize_by_artist: false,
   organize_by_album: false,
   server_media_location: '',

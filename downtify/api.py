@@ -58,6 +58,7 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     'max_parallel_downloads': 3,
     'organize_by_artist': False,
     'organize_by_album': False,
+    'enhance_metadata': True,
     'server_media_location': '',
 }
 
@@ -347,6 +348,7 @@ def get_health() -> dict[str, Any]:
             'download_lyrics': state.settings.get('download_lyrics'),
             'organize_by_artist': state.settings.get('organize_by_artist'),
             'organize_by_album': state.settings.get('organize_by_album'),
+            'enhance_metadata': state.settings.get('enhance_metadata'),
         },
         'queue': {
             'total': active_queue_total,
@@ -974,6 +976,10 @@ async def update_settings_endpoint(
             if 'organize_by_album' in payload:
                 state.downloader.organize_by_album = bool(
                     payload['organize_by_album']
+                )
+            if 'enhance_metadata' in payload:
+                state.downloader.enhance_metadata = bool(
+                    payload['enhance_metadata']
                 )
         if 'max_parallel_downloads' in payload:
             try:

@@ -21,6 +21,7 @@ def test_default_settings_has_required_keys():
         'bitrate',
         'output',
         'generate_m3u',
+        'enhance_metadata',
         'organize_by_artist',
         'organize_by_album',
         'server_media_location',
@@ -42,6 +43,10 @@ def test_default_generate_m3u_is_true():
 
 def test_default_download_lyrics_is_true():
     assert DEFAULT_SETTINGS['download_lyrics'] is True
+
+
+def test_default_enhance_metadata_is_true():
+    assert DEFAULT_SETTINGS['enhance_metadata'] is True
 
 
 def test_default_format_is_mp3():

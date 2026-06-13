@@ -225,6 +225,9 @@ def build_app() -> FastAPI:
         organize_by_album=bool(
             api.state.settings.get('organize_by_album', False)
         ),
+        enhance_metadata=bool(
+            api.state.settings.get('enhance_metadata', True)
+        ),
     )
     app.include_router(api.router)
 

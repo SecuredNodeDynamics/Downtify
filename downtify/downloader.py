@@ -35,6 +35,7 @@ from mutagen.oggvorbis import OggVorbis
 from . import lyrics as lyrics_mod
 from .jellyfin_meta import format_for_jellyfin
 from .m3u import sanitize_playlist_name
+from .musicbrainz import enrich_song_metadata
 from .providers import enrich_from_match, find_match, find_match_for_video
 
 _INVALID_FS_CHARS = re.compile(r'[\\/:*?"<>|\x00-\x1f]')
@@ -232,6 +233,7 @@ class Downloader:
         lyrics_providers: Optional[list[str]] = None,
         organize_by_artist: bool = False,
         organize_by_album: bool = False,
+        enhance_metadata: bool = True,
     ):
         self.download_dir = Path(download_dir)
         self.download_dir.mkdir(parents=True, exist_ok=True)
@@ -241,6 +243,7 @@ class Downloader:
         self.lyrics_providers = list(lyrics_providers or [])
         self.organize_by_artist = organize_by_artist
         self.organize_by_album = organize_by_album
+        self.enhance_metadata = enhance_metadata
 
     @staticmethod
     def _artist_subdir(song: dict[str, Any]) -> str:
@@ -351,6 +354,8 @@ class Downloader:
             )
 
         song = enrich_from_match(song, match)
+        if self.enhance_metadata:
+            song = enrich_song_metadata(song)
 
         basename = self._format_basename(song)
         effective_subdir = self._content_subdir(song, subdir)

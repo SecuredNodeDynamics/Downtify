@@ -221,6 +221,10 @@ export default {
     format: 'Formato',
     quality: 'Calidad',
     qualityIgnored: 'ignorada (sin pérdidas)',
+    metadataSection: 'Metadatos',
+    enhanceMetadata: 'Mejorar etiquetas con MusicBrainz',
+    enhanceMetadataHint:
+      'Despues de resolver una pista, Downtify usa coincidencias confiables de MusicBrainz para mejorar titulo, artista, album y fecha de lanzamiento.',
     playlistsSection: 'Listas',
     generateM3u: 'Generar archivo M3U para las listas',
     generateM3uHint:
