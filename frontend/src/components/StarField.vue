@@ -48,6 +48,9 @@ function createStar() {
     twinkle: randomBetween(0.12, 0.5),
     phase: randomBetween(0, Math.PI * 2),
     colorMix: Math.random(),
+    driftAngle: randomBetween(0, Math.PI * 2),
+    driftSpeed: randomBetween(0.018, 0.055),
+    wander: randomBetween(0.00012, 0.00034),
   }
 }
 
@@ -136,13 +139,28 @@ function updateStars(now) {
       }
     }
 
-    const drift = reduceMotion ? 0 : 0.005
-    star.vx += (star.baseX - star.x) * 0.012 + Math.cos(now * 0.0004 + star.phase) * drift
-    star.vy += (star.baseY - star.y) * 0.012 + Math.sin(now * 0.00035 + star.phase) * drift
+    if (!reduceMotion) {
+      star.driftAngle += Math.sin(now * star.wander + star.phase) * 0.0025
+    }
+
+    const driftSpeed = reduceMotion ? 0 : star.driftSpeed
+    star.vx +=
+      (star.baseX - star.x) * 0.006 +
+      Math.cos(star.driftAngle) * driftSpeed +
+      Math.cos(now * 0.0004 + star.phase) * 0.003
+    star.vy +=
+      (star.baseY - star.y) * 0.006 +
+      Math.sin(star.driftAngle) * driftSpeed +
+      Math.sin(now * 0.00035 + star.phase) * 0.003
     star.vx *= 0.88
     star.vy *= 0.88
     star.x += star.vx
     star.y += star.vy
+
+    if (star.x < -12) star.x = width + 12
+    if (star.x > width + 12) star.x = -12
+    if (star.y < -12) star.y = height + 12
+    if (star.y > height + 12) star.y = -12
   })
 }
 
