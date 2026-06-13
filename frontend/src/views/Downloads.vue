@@ -95,11 +95,23 @@
             >
               {{ t('library.tracks') }}
             </button>
+            <button
+              class="rounded-full px-4 py-2 text-sm font-medium transition-colors"
+              :class="
+                viewMode === 'albums'
+                  ? 'bg-primary text-primary-content shadow-glow-sm'
+                  : 'text-base-content/60 hover:text-base-content'
+              "
+              @click="showAlbums"
+            >
+              {{ t('library.albums') }}
+            </button>
           </div>
           <p class="text-xs text-base-content/45">
             {{
               t('library.artistCount', {
                 artists: artists.length,
+                albums: albums.length,
                 tracks: files.length,
               })
             }}
@@ -153,6 +165,12 @@
                 })
               }}
             </p>
+            <p
+              v-if="artist.albumNames.length"
+              class="mt-3 max-h-10 overflow-hidden text-xs leading-5 text-base-content/45"
+            >
+              {{ artist.albumNames.slice(0, 3).join(' - ') }}
+            </p>
             <div class="mt-4 flex items-center gap-2">
               <button
                 class="icon-btn text-primary hover:bg-primary/10"
@@ -169,7 +187,7 @@
         </div>
 
         <div
-          v-else-if="viewMode === 'artists' && selectedArtist"
+          v-else-if="viewMode === 'artists' && selectedArtist && !selectedAlbum"
           class="mb-4 flex flex-wrap items-center justify-between gap-3"
         >
           <button
@@ -194,9 +212,99 @@
           </div>
         </div>
 
+        <div
+          v-if="selectedAlbum"
+          class="mb-4 flex flex-wrap items-center justify-between gap-3"
+        >
+          <button
+            class="btn btn-sm h-10 rounded-full border-white/10 bg-base-100/85 hover:bg-base-100"
+            @click="closeAlbum"
+          >
+            <Icon icon="clarity:angle-line" class="h-4 w-4 rotate-[-90deg]" />
+            {{
+              selectedArtist
+                ? t('library.backToAlbums')
+                : t('library.albums')
+            }}
+          </button>
+          <div class="min-w-0 text-right">
+            <h2 class="truncate text-lg font-semibold">
+              {{ selectedAlbum.name }}
+            </h2>
+            <p class="truncate text-xs text-base-content/50">
+              {{ selectedAlbum.artist }} -
+              {{ t('library.albumMeta', { tracks: selectedAlbum.files.length }) }}
+            </p>
+          </div>
+        </div>
+
+        <!-- Album cards -->
+        <div
+          v-if="
+            (viewMode === 'albums' || (viewMode === 'artists' && selectedArtist)) &&
+            !selectedAlbum
+          "
+          class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
+          :class="selectedArtist ? 'mb-5' : ''"
+        >
+          <article
+            v-for="album in paginatedAlbums"
+            :key="album.key"
+            class="surface group cursor-pointer rounded-2xl p-4 text-left transition-transform hover:-translate-y-0.5 hover:border-primary/30"
+            role="button"
+            tabindex="0"
+            @click="openAlbum(album)"
+            @keydown.enter="openAlbum(album)"
+            @keydown.space.prevent="openAlbum(album)"
+          >
+            <div
+              class="relative mb-4 aspect-square overflow-hidden rounded-xl bg-primary/10 text-primary"
+            >
+              <img
+                v-if="!coverFailed[album.coverFile]"
+                :src="coverUrlFor(album.coverFile)"
+                :alt="album.name"
+                class="absolute inset-0 h-full w-full object-cover"
+                loading="lazy"
+                @error="markCoverFailed(album.coverFile)"
+              />
+              <Icon
+                v-else
+                icon="clarity:album-line"
+                class="absolute left-1/2 top-1/2 h-8 w-8 -translate-x-1/2 -translate-y-1/2"
+              />
+            </div>
+            <h2 class="truncate text-base font-semibold">
+              {{ album.name }}
+            </h2>
+            <p class="mt-1 truncate text-xs text-primary/70">
+              {{ album.artist }}
+            </p>
+            <p class="mt-1 text-xs text-base-content/50">
+              {{ t('library.albumMeta', { tracks: album.files.length }) }}
+            </p>
+            <div class="mt-4 flex items-center gap-2">
+              <button
+                class="icon-btn text-primary hover:bg-primary/10"
+                @click.stop="playAlbum(album)"
+                :title="t('library.playAlbum')"
+              >
+                <Icon icon="clarity:play-line" class="h-4 w-4" />
+              </button>
+              <span class="text-xs text-primary/70 group-hover:text-primary">
+                {{ t('library.openAlbum') }}
+              </span>
+            </div>
+          </article>
+        </div>
+
         <!-- File list -->
         <ul
-          v-if="viewMode === 'tracks' || selectedArtist"
+          v-if="
+            viewMode === 'tracks' ||
+            selectedAlbum ||
+            (selectedArtist && selectedArtistAlbums.length === 0)
+          "
           class="space-y-2"
         >
           <li
@@ -348,6 +456,39 @@ const coverFailed = ref({})
 const currentPage = ref(1)
 const viewMode = ref('artists')
 const selectedArtistName = ref('')
+const selectedAlbumKey = ref('')
+
+const albums = computed(() => {
+  const grouped = new Map()
+
+  for (const file of files.value) {
+    const artistName = artistOf(file)
+    const albumName = albumOf(file)
+    if (!albumName) continue
+
+    const key = albumKey(artistName, albumName)
+    if (!grouped.has(key)) {
+      grouped.set(key, {
+        key,
+        name: albumName,
+        artist: artistName,
+        files: [],
+      })
+    }
+
+    grouped.get(key).files.push(file)
+  }
+
+  return Array.from(grouped.values())
+    .map((album) => ({
+      ...album,
+      coverFile: album.files[0],
+    }))
+    .sort(
+      (a, b) =>
+        a.artist.localeCompare(b.artist) || a.name.localeCompare(b.name)
+    )
+})
 
 const artists = computed(() => {
   const grouped = new Map()
@@ -373,6 +514,9 @@ const artists = computed(() => {
       name: artist.name,
       files: artist.files,
       albumCount: artist.albums.size,
+      albumNames: Array.from(artist.albums).sort((a, b) =>
+        a.localeCompare(b)
+      ),
       previewFiles: artist.files.slice(0, 3),
     }))
     .sort((a, b) => a.name.localeCompare(b.name))
@@ -382,17 +526,44 @@ const selectedArtist = computed(() =>
   artists.value.find((artist) => artist.name === selectedArtistName.value)
 )
 
+const selectedArtistAlbums = computed(() => {
+  if (!selectedArtist.value) return []
+  return albums.value.filter(
+    (album) => album.artist === selectedArtist.value.name
+  )
+})
+
+const visibleAlbums = computed(() =>
+  selectedArtist.value ? selectedArtistAlbums.value : albums.value
+)
+
+const selectedAlbum = computed(() =>
+  visibleAlbums.value.find((album) => album.key === selectedAlbumKey.value)
+)
+
 const visibleFiles = computed(() =>
-  selectedArtist.value ? selectedArtist.value.files : files.value
+  selectedAlbum.value
+    ? selectedAlbum.value.files
+    : selectedArtist.value
+      ? selectedArtist.value.files
+    : files.value
 )
 
 const totalPages = computed(() => {
-  const count =
-    viewMode.value === 'artists' && !selectedArtist.value
-      ? artists.value.length
-      : visibleFiles.value.length
+  const browsingArtistAlbums =
+    viewMode.value === 'artists' &&
+    selectedArtist.value &&
+    !selectedAlbum.value &&
+    selectedArtistAlbums.value.length > 0
+  const browsingAlbums = viewMode.value === 'albums' && !selectedAlbum.value
+  const browsingArtists = viewMode.value === 'artists' && !selectedArtist.value
+  const count = browsingArtists
+    ? artists.value.length
+    : browsingAlbums || browsingArtistAlbums
+      ? visibleAlbums.value.length
+    : visibleFiles.value.length
   const pageSize =
-    viewMode.value === 'artists' && !selectedArtist.value
+    browsingArtists || browsingAlbums || browsingArtistAlbums
       ? ARTIST_PAGE_SIZE
       : PAGE_SIZE
   return Math.ceil(count / pageSize)
@@ -435,11 +606,16 @@ const paginatedArtists = computed(() => {
   return artists.value.slice(start, start + ARTIST_PAGE_SIZE)
 })
 
+const paginatedAlbums = computed(() => {
+  const start = (currentPage.value - 1) * ARTIST_PAGE_SIZE
+  return visibleAlbums.value.slice(start, start + ARTIST_PAGE_SIZE)
+})
+
 watch(files, () => {
   currentPage.value = 1
 })
 
-watch([viewMode, selectedArtistName], () => {
+watch([viewMode, selectedArtistName, selectedAlbumKey], () => {
   currentPage.value = 1
 })
 
@@ -452,6 +628,12 @@ watch(totalPages, (pages) => {
 watch(selectedArtist, (artist) => {
   if (selectedArtistName.value && !artist) {
     selectedArtistName.value = ''
+  }
+})
+
+watch(selectedAlbum, (album) => {
+  if (selectedAlbumKey.value && !album) {
+    selectedAlbumKey.value = ''
   }
 })
 
@@ -528,22 +710,44 @@ function albumOf(file) {
   return ''
 }
 
+function albumKey(artist, album) {
+  return `${artist}\u0000${album}`
+}
+
 function showArtists() {
   viewMode.value = 'artists'
   selectedArtistName.value = ''
+  selectedAlbumKey.value = ''
+}
+
+function showAlbums() {
+  viewMode.value = 'albums'
+  selectedArtistName.value = ''
+  selectedAlbumKey.value = ''
 }
 
 function showTracks() {
   viewMode.value = 'tracks'
   selectedArtistName.value = ''
+  selectedAlbumKey.value = ''
 }
 
 function openArtist(name) {
   selectedArtistName.value = name
+  selectedAlbumKey.value = ''
 }
 
 function closeArtist() {
   selectedArtistName.value = ''
+  selectedAlbumKey.value = ''
+}
+
+function openAlbum(album) {
+  selectedAlbumKey.value = album.key
+}
+
+function closeAlbum() {
+  selectedAlbumKey.value = ''
 }
 
 function playFile(file) {
@@ -554,6 +758,11 @@ function playFile(file) {
 
 function playArtist(artist) {
   player.setPlaylist(artist.files, { startIndex: 0 })
+  router.push({ name: 'Player' })
+}
+
+function playAlbum(album) {
+  player.setPlaylist(album.files, { startIndex: 0 })
   router.push({ name: 'Player' })
 }
 
