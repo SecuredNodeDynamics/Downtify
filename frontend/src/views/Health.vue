@@ -110,12 +110,6 @@
             <p class="truncate text-sm font-medium">
               {{ displayedDownloadPath }}
             </p>
-            <p
-              v-if="secondaryDownloadPath"
-              class="mt-1 truncate text-xs text-base-content/50"
-            >
-              {{ secondaryDownloadPath }}
-            </p>
             <div class="mt-4 h-2 overflow-hidden rounded-full bg-white/10">
               <div
                 class="h-full bg-primary"
@@ -328,24 +322,6 @@ const displayedDownloadPath = computed(() => {
     )
   }
   return health.value?.downloads?.external_path || health.value?.downloads?.path
-})
-
-const secondaryDownloadPath = computed(() => {
-  if (!health.value) return ''
-  const containerPath =
-    health.value.downloads.container_path || health.value.downloads.path
-  const externalPath = health.value.downloads.external_path
-
-  if (!downloadDestination.isLocal.value && externalPath) {
-    return `${t('health.containerDownloadLocation')}: ${containerPath}`
-  }
-
-  if (downloadDestination.isLocal.value) {
-    const serverPath = externalPath || containerPath
-    return `${t('settings.downloadDestinationServer')}: ${serverPath}`
-  }
-
-  return ''
 })
 
 onMounted(loadHealth)
