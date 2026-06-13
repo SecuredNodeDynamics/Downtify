@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-dvh flex flex-col text-base-content">
+  <div class="app-shell min-h-dvh flex flex-col text-base-content">
     <router-view v-slot="{ Component, route }">
       <transition name="page" mode="out-in">
         <component :is="Component" :key="route.fullPath" />
