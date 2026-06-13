@@ -21,6 +21,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -143,7 +144,10 @@ def _save_settings(path: Path, settings: dict[str, Any]) -> None:
         logger.warning('Could not persist settings: {}', exc)
 
 
-def _directory_summary(path: Path) -> dict[str, Any]:
+def _directory_summary(
+    path: Path,
+    external_path: Optional[str] = None,
+) -> dict[str, Any]:
     exists = path.exists()
     file_count = 0
     audio_count = 0
@@ -183,6 +187,7 @@ def _directory_summary(path: Path) -> dict[str, Any]:
 
     return {
         'path': str(path),
+        'external_path': external_path,
         'exists': exists,
         'file_count': file_count,
         'audio_count': audio_count,
@@ -252,7 +257,14 @@ def get_health() -> dict[str, Any]:
                 'version': getattr(yt_dlp.version, '__version__', None),
             },
         },
-        'downloads': _directory_summary(download_dir),
+        'downloads': _directory_summary(
+            download_dir,
+            external_path=os.getenv(
+                'DOWNTIFY_MEDIA_SAVE_LOCATION',
+                '',
+            ).strip()
+            or None,
+        ),
         'data': _directory_summary(database_dir),
         'settings': {
             'format': state.settings.get('format'),

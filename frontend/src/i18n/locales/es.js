@@ -104,6 +104,7 @@ export default {
     queueTotal: '{count} en cola',
     recentFailures: '{count} fallos recientes',
     downloads: 'Descargas',
+    mediaSaveLocation: 'Ubicación de guardado de medios',
     data: 'Datos',
     audioFiles: 'Archivos de audio',
     librarySize: 'Tamaño de biblioteca',

@@ -7,10 +7,11 @@ services:
     ports:
       - '8000:30321'
     volumes:
-      - ./docker/downloads:/downloads
+      - ${DOWNTIFY_MEDIA_SAVE_LOCATION:-./docker/downloads}:/downloads
       - ./docker/data:/data
     environment:
       - DOWNTIFY_PORT=30321
+      - DOWNTIFY_MEDIA_SAVE_LOCATION=${DOWNTIFY_MEDIA_SAVE_LOCATION:-}
     dns:
       - 1.1.1.1
       - 1.0.0.1

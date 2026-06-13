@@ -104,7 +104,18 @@
               </h2>
               <Icon icon="clarity:download-line" class="h-5 w-5 text-primary" />
             </div>
-            <p class="truncate text-sm font-medium">{{ health.downloads.path }}</p>
+            <p class="truncate text-sm font-medium">
+              {{ health.downloads.path }}
+            </p>
+            <p
+              v-if="health.downloads.external_path"
+              class="mt-1 truncate text-xs text-base-content/50"
+            >
+              {{ t('health.mediaSaveLocation') }}:
+              <span class="text-base-content/70">
+                {{ health.downloads.external_path }}
+              </span>
+            </p>
             <div class="mt-4 h-2 overflow-hidden rounded-full bg-white/10">
               <div
                 class="h-full bg-primary"

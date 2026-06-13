@@ -102,6 +102,7 @@ export default {
     queueTotal: '{count} queued',
     recentFailures: '{count} recent failures',
     downloads: 'Downloads',
+    mediaSaveLocation: 'Media save location',
     data: 'Data',
     audioFiles: 'Audio files',
     librarySize: 'Library size',
