@@ -6,6 +6,7 @@ import List from '/src/views/Downloads.vue'
 import Monitor from '/src/views/Monitor.vue'
 import Player from '/src/views/Player.vue'
 import Health from '/src/views/Health.vue'
+import Metadata from '/src/views/Metadata.vue'
 import config from '/src/config'
 
 const routes = [
@@ -43,6 +44,11 @@ const routes = [
     path: '/health',
     name: 'Health',
     component: Health,
+  },
+  {
+    path: '/metadata',
+    name: 'Metadata',
+    component: Metadata,
   },
 ]
 

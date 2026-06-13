@@ -21,6 +21,7 @@ export default {
     library: 'Biblioteca',
     monitor: 'Monitor de playlists',
     health: 'Saúde',
+    metadata: 'Metadados',
     queue: 'Fila',
     player: 'Player',
     settings: 'Configurações',
@@ -149,6 +150,27 @@ export default {
     playAlbum: 'Reproduzir album',
     backToArtists: 'Artistas',
     backToAlbums: 'Albuns',
+  },
+  metadata: {
+    title: 'Metadados',
+    subtitle:
+      'Escaneie arquivos existentes no servidor e repare tags com correspondencias do MusicBrainz.',
+    scan: 'Escanear biblioteca',
+    scanLimit: 'Arquivos para escanear',
+    scanned: 'Escaneados',
+    matches: 'Correspondencias',
+    total: 'Arquivos totais',
+    serverOnly:
+      'Isto escaneia arquivos no local de download do servidor Downtify. Pastas locais do navegador ainda nao estao disponiveis para o backend.',
+    empty: 'Execute um escaneamento para verificar arquivos existentes.',
+    matchFound: 'Correspondencia encontrada',
+    noMatch: 'Sem correspondencia',
+    apply: 'Aplicar correcao',
+    blank: 'Vazio',
+    idsOnly:
+      'IDs do MusicBrainz podem ser adicionados; as tags visiveis ja coincidem.',
+    failedScan: 'Falha ao escanear metadados.',
+    failedApply: 'Falha ao aplicar correcao de metadados.',
   },
   monitor: {
     title: 'Monitor de playlists',

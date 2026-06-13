@@ -17,6 +17,7 @@ class _Response:
 
 def test_musicbrainz_enriches_high_confidence_match(monkeypatch):
     musicbrainz._CACHE.clear()
+    musicbrainz._LAST_REQUEST_AT = 0
 
     def fake_get(*_args, **_kwargs):
         return _Response({
@@ -57,6 +58,7 @@ def test_musicbrainz_enriches_high_confidence_match(monkeypatch):
 
 def test_musicbrainz_rejects_weak_match(monkeypatch):
     musicbrainz._CACHE.clear()
+    musicbrainz._LAST_REQUEST_AT = 0
     song = {
         'name': 'Original Song',
         'artists': ['Right Artist'],

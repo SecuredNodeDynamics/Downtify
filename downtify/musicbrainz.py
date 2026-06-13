@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from difflib import SequenceMatcher
 from typing import Any, Optional
 
@@ -12,6 +13,7 @@ MUSICBRAINZ_RECORDING_URL = 'https://musicbrainz.org/ws/2/recording/'
 USER_AGENT = 'Downtify/1.0 (https://github.com/JanzenMediaGroup/Downtify)'
 
 _CACHE: dict[str, Optional[dict[str, Any]]] = {}
+_LAST_REQUEST_AT = 0.0
 
 
 def _norm(value: Any) -> str:
@@ -106,6 +108,8 @@ def _candidate_score(
 
 
 def _query(song: dict[str, Any]) -> Optional[dict[str, Any]]:
+    global _LAST_REQUEST_AT
+
     title = str(song.get('name') or '').strip()
     artists = _artists(song)
     if not title or not artists:
@@ -121,12 +125,16 @@ def _query(song: dict[str, Any]) -> Optional[dict[str, Any]]:
         query += f' AND release:"{album}"'
 
     try:
+        elapsed = time.monotonic() - _LAST_REQUEST_AT
+        if elapsed < 1.0:
+            time.sleep(1.0 - elapsed)
         response = requests.get(
             MUSICBRAINZ_RECORDING_URL,
             params={'query': query, 'fmt': 'json', 'limit': 8},
             headers={'User-Agent': USER_AGENT},
             timeout=8,
         )
+        _LAST_REQUEST_AT = time.monotonic()
         response.raise_for_status()
         payload = response.json()
     except Exception:

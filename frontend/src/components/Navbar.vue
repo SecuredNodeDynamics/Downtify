@@ -59,6 +59,15 @@
         </button>
 
         <button
+          class="icon-btn"
+          :class="{ 'icon-btn-active': route.name === 'Metadata' }"
+          @click="router.push({ name: 'Metadata' })"
+          :title="t('nav.metadata')"
+        >
+          <Icon icon="clarity:tag-line" class="h-5 w-5" />
+        </button>
+
+        <button
           class="icon-btn relative"
           :class="{ 'icon-btn-active': route.name === 'Download' }"
           @click="

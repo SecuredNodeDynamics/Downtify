@@ -42,7 +42,7 @@ from fastapi import (
 )
 from loguru import logger
 
-from . import m3u, providers, spotify
+from . import m3u, metadata_repair, providers, spotify
 from .downloader import Downloader, preview_audio_for_song
 from .history import DownloadHistoryDB
 from .monitor import PlaylistMonitorDB, check_playlist
@@ -366,6 +366,42 @@ def get_health() -> dict[str, Any]:
 @router.get('/api/songs/search')
 def search_endpoint(query: str = Query('')) -> list[dict[str, Any]]:
     return providers.search_media(query, limit=80)
+
+
+@router.get('/api/metadata/scan')
+def scan_metadata(limit: int = Query(100, ge=1, le=500)) -> dict[str, Any]:
+    if state.downloader is None:
+        raise HTTPException(status_code=500, detail='Downloader not ready')
+    try:
+        return metadata_repair.scan_library(
+            state.downloader.download_dir,
+            limit=limit,
+        )
+    except Exception as exc:
+        logger.exception('Metadata scan failed')
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@router.post('/api/metadata/apply')
+async def apply_metadata(request: Request) -> dict[str, Any]:
+    if state.downloader is None:
+        raise HTTPException(status_code=500, detail='Downloader not ready')
+    try:
+        payload = await request.json()
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail='Invalid JSON') from exc
+    file = str(payload.get('file') or '').strip()
+    if not file:
+        raise HTTPException(status_code=400, detail='file is required')
+    try:
+        return metadata_repair.repair_file(state.downloader.download_dir, file)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail='File not found') from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception('Metadata repair failed for {}', file)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 @router.get('/api/album/youtube')

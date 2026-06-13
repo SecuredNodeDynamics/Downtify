@@ -105,6 +105,14 @@ function getHealth() {
   return API.get('/api/health')
 }
 
+function scanMetadata(limit = 100) {
+  return API.get('/api/metadata/scan', { params: { limit } })
+}
+
+function applyMetadata(file) {
+  return API.post('/api/metadata/apply', { file })
+}
+
 function encodePath(fileName) {
   // Encode each path segment individually so '/' separators survive —
   // playlist downloads land under '<playlist>/<song>.mp3' and we need
@@ -198,6 +206,8 @@ export default {
   setSettings,
   check_for_update,
   getHealth,
+  scanMetadata,
+  applyMetadata,
   ws_onmessage,
   ws_onerror,
   getVersion,

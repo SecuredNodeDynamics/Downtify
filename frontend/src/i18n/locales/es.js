@@ -21,6 +21,7 @@ export default {
     library: 'Biblioteca',
     monitor: 'Monitor de listas',
     health: 'Salud',
+    metadata: 'Metadatos',
     queue: 'Cola',
     player: 'Reproductor',
     settings: 'Ajustes',
@@ -150,6 +151,27 @@ export default {
     playAlbum: 'Reproducir album',
     backToArtists: 'Artistas',
     backToAlbums: 'Albumes',
+  },
+  metadata: {
+    title: 'Metadatos',
+    subtitle:
+      'Escanea archivos existentes en el servidor y repara etiquetas con coincidencias de MusicBrainz.',
+    scan: 'Escanear biblioteca',
+    scanLimit: 'Archivos a escanear',
+    scanned: 'Escaneados',
+    matches: 'Coincidencias',
+    total: 'Archivos totales',
+    serverOnly:
+      'Esto escanea archivos en la ubicacion de descarga del servidor Downtify. Las carpetas locales del navegador aun no estan disponibles para el backend.',
+    empty: 'Ejecuta un escaneo para revisar archivos existentes.',
+    matchFound: 'Coincidencia encontrada',
+    noMatch: 'Sin coincidencia',
+    apply: 'Aplicar correccion',
+    blank: 'Vacio',
+    idsOnly:
+      'Se pueden agregar IDs de MusicBrainz; las etiquetas visibles ya coinciden.',
+    failedScan: 'No se pudo escanear los metadatos.',
+    failedApply: 'No se pudo aplicar la correccion de metadatos.',
   },
   monitor: {
     title: 'Monitor de listas',
