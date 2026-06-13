@@ -105,7 +105,6 @@ export default {
     mediaSaveLocation: 'Media save location',
     containerDownloadLocation: 'Container downloads path',
     localDownloadLocation: 'This device download location',
-    storageMeasuredFrom: 'Storage measured from',
     data: 'Data',
     audioFiles: 'Audio files',
     librarySize: 'Library size',

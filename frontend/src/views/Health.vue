@@ -116,12 +116,6 @@
             >
               {{ secondaryDownloadPath }}
             </p>
-            <p
-              v-if="storagePathNotice"
-              class="mt-1 truncate text-xs text-warning"
-            >
-              {{ storagePathNotice }}
-            </p>
             <div class="mt-4 h-2 overflow-hidden rounded-full bg-white/10">
               <div
                 class="h-full bg-primary"
@@ -352,12 +346,6 @@ const secondaryDownloadPath = computed(() => {
   }
 
   return ''
-})
-
-const storagePathNotice = computed(() => {
-  if (!health.value?.downloads) return ''
-  if (health.value.downloads.storage_path_matches_display) return ''
-  return `${t('health.storageMeasuredFrom')}: ${health.value.downloads.storage_path}`
 })
 
 onMounted(loadHealth)
