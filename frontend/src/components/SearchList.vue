@@ -167,7 +167,7 @@
         <Icon icon="clarity:angle-line" class="h-4 w-4 rotate-[-90deg]" />
       </button>
       <button
-        v-for="page in totalPages"
+        v-for="page in visiblePages"
         :key="page"
         class="h-10 min-w-[2.5rem] rounded-full px-3 text-sm font-medium transition-colors"
         :class="
@@ -512,6 +512,19 @@ const totalPages = computed(() =>
   Math.ceil((props.data?.length || 0) / PAGE_SIZE)
 )
 
+const visiblePages = computed(() => {
+  const maxVisiblePages = 6
+  const pages = totalPages.value
+  if (pages <= maxVisiblePages) {
+    return Array.from({ length: pages }, (_, index) => index + 1)
+  }
+
+  let start = currentPage.value - Math.floor(maxVisiblePages / 2)
+  start = Math.max(1, Math.min(start, pages - maxVisiblePages + 1))
+
+  return Array.from({ length: maxVisiblePages }, (_, index) => start + index)
+})
+
 const paginatedData = computed(() => {
   if (!props.data) return []
   const start = (currentPage.value - 1) * PAGE_SIZE
@@ -558,6 +571,12 @@ watch(
     currentPage.value = 1
   }
 )
+
+watch(totalPages, (pages) => {
+  if (pages > 0 && currentPage.value > pages) {
+    currentPage.value = pages
+  }
+})
 
 function artistsOf(song) {
   if (Array.isArray(song.artists) && song.artists.length) {
