@@ -170,8 +170,10 @@ export default {
     matchFound: 'Coincidencia encontrada',
     noMatch: 'Sin coincidencia',
     apply: 'Aplicar correccion',
+    repairAll: 'Corregir todo',
     fixing: 'Corrigiendo...',
     fixed: 'Corregido',
+    completed: 'Completado',
     blank: 'Vacio',
     idsOnly:
       'Se pueden agregar IDs de MusicBrainz; las etiquetas visibles ya coinciden.',

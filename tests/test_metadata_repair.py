@@ -87,7 +87,7 @@ def test_scan_library_hides_matches_without_changes(tmp_path, monkeypatch):
     assert result['items'] == []
 
 
-def test_scan_library_scans_all_files_but_limits_visible_results(
+def test_scan_library_scans_batch_and_returns_only_fixable_items(
     tmp_path,
     monkeypatch,
 ):
@@ -111,9 +111,39 @@ def test_scan_library_scans_all_files_but_limits_visible_results(
 
     result = metadata_repair.scan_library(tmp_path, limit=2)
 
-    assert result['scanned'] == 3
-    assert result['matched'] == 3
+    assert result['scanned'] == 2
+    assert result['batch_scanned'] == 2
+    assert result['matched'] == 2
     assert len(result['items']) == 2
+    assert result['next_offset'] == 2
+    assert result['complete'] is False
+
+
+def test_scan_library_uses_start_offset_for_next_batch(tmp_path, monkeypatch):
+    for index in range(4):
+        (tmp_path / f'{index}.mp3').write_bytes(b'not really audio')
+
+    monkeypatch.setattr(
+        metadata_repair,
+        '_song_from_file',
+        lambda path: {'name': path.stem, 'artists': ['Artist']},
+    )
+    monkeypatch.setattr(
+        metadata_repair,
+        'enrich_song_metadata',
+        lambda song: {
+            **song,
+            'name': f"{song['name']} fixed",
+            'musicbrainz_recording_id': f"mbid-{song['name']}",
+        },
+    )
+
+    result = metadata_repair.scan_library(tmp_path, limit=2, start=2)
+
+    assert result['scanned'] == 4
+    assert result['batch_scanned'] == 2
+    assert [item['file'] for item in result['items']] == ['2.mp3', '3.mp3']
+    assert result['complete'] is True
 
 
 def test_scan_library_reports_progress(tmp_path, monkeypatch):
@@ -138,9 +168,9 @@ def test_scan_library_reports_progress(tmp_path, monkeypatch):
 
     metadata_repair.scan_library(tmp_path, limit=2, progress_cb=updates.append)
 
-    assert [update['scanned'] for update in updates] == [1, 2, 3]
+    assert [update['scanned'] for update in updates] == [1, 2]
     assert updates[-1]['total'] == 3
-    assert updates[-1]['matched'] == 3
+    assert updates[-1]['matched'] == 2
 
 
 def test_scan_library_treats_year_derived_from_release_date_as_fixed(

@@ -169,8 +169,10 @@ export default {
     matchFound: 'Correspondencia encontrada',
     noMatch: 'Sem correspondencia',
     apply: 'Aplicar correcao',
+    repairAll: 'Corrigir tudo',
     fixing: 'Corrigindo...',
     fixed: 'Corrigido',
+    completed: 'Concluido',
     blank: 'Vazio',
     idsOnly:
       'IDs do MusicBrainz podem ser adicionados; as tags visiveis ja coincidem.',

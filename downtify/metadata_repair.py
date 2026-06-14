@@ -141,6 +141,7 @@ ProgressCallback = Callable[[dict[str, Any]], None]
 def scan_library(
     root: Path,
     limit: int = 100,
+    start: int = 0,
     progress_cb: ProgressCallback | None = None,
 ) -> dict[str, Any]:
     root = root.resolve()
@@ -150,26 +151,46 @@ def scan_library(
         if path.is_file() and path.suffix.lower() in AUDIO_EXTENSIONS
     ]
     files.sort(key=lambda path: path.relative_to(root).as_posix().casefold())
+    total = len(files)
+    start = max(0, min(start, total))
+    selected = files[start : start + max(1, limit)]
     items: list[dict[str, Any]] = []
-    scanned = 0
-    for path in files:
-        scanned += 1
-        item = _scan_item(root, path)
-        if item['matched'] and item['changes']:
+    errors: list[dict[str, str]] = []
+    batch_scanned = 0
+    for path in selected:
+        batch_scanned += 1
+        current_offset = start + batch_scanned
+        try:
+            item = _scan_item(root, path)
+        except Exception as exc:
+            errors.append({
+                'file': path.relative_to(root).as_posix(),
+                'error': str(exc),
+            })
+            item = None
+        if item is not None and item['matched'] and item['changes']:
             items.append(item)
         if progress_cb is not None:
             progress_cb({
-                'scanned': scanned,
-                'total': len(files),
+                'scanned': current_offset,
+                'batch_scanned': batch_scanned,
+                'total': total,
                 'matched': len(items),
+                'start': start,
+                'next_offset': current_offset,
             })
-    visible_items = items[: max(1, limit)]
+    next_offset = start + batch_scanned
     return {
         'root': str(root),
-        'scanned': scanned,
-        'total': len(files),
+        'scanned': next_offset,
+        'batch_scanned': batch_scanned,
+        'total': total,
         'matched': len(items),
-        'items': visible_items,
+        'items': items,
+        'errors': errors,
+        'start': start,
+        'next_offset': next_offset,
+        'complete': next_offset >= total,
     }
 
 

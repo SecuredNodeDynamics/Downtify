@@ -123,10 +123,15 @@ class AppState:
         'status': 'idle',
         'limit': 100,
         'scanned': 0,
+        'batch_scanned': 0,
         'total': 0,
         'matched': 0,
         'items': [],
+        'completed': [],
         'error': '',
+        'errors': [],
+        'next_offset': 0,
+        'complete': False,
     }
     metadata_scan_task: Optional[asyncio.Task] = None
 
@@ -382,7 +387,7 @@ def _metadata_scan_status() -> dict[str, Any]:
     return dict(state.metadata_scan)
 
 
-async def _run_metadata_scan(limit: int) -> None:
+async def _run_metadata_scan(limit: int, start: int) -> None:
     if state.downloader is None:
         state.metadata_scan = {
             **state.metadata_scan,
@@ -396,6 +401,7 @@ async def _run_metadata_scan(limit: int) -> None:
             **state.metadata_scan,
             **update,
             'status': 'scanning',
+            'limit': limit,
         }
 
     try:
@@ -403,9 +409,11 @@ async def _run_metadata_scan(limit: int) -> None:
             metadata_repair.scan_library,
             state.downloader.download_dir,
             limit,
+            start,
             progress,
         )
         state.metadata_scan = {
+            **state.metadata_scan,
             **result,
             'limit': limit,
             'status': 'done',
@@ -434,22 +442,36 @@ async def start_metadata_scan(request: Request) -> dict[str, Any]:
         limit = max(1, min(500, int(payload.get('limit', 100))))
     except (TypeError, ValueError):
         limit = 100
+    reset = bool(payload.get('reset', False))
 
     task = state.metadata_scan_task
     if task is not None and not task.done():
         return _metadata_scan_status()
 
+    previous = state.metadata_scan
+    total = int(previous.get('total') or 0)
+    start = 0 if reset else int(previous.get('next_offset') or 0)
+    if total > 0 and start >= total:
+        start = 0
+
     state.metadata_scan = {
         'status': 'scanning',
         'limit': limit,
         'scanned': 0,
+        'batch_scanned': 0,
         'total': 0,
         'matched': 0,
         'items': [],
+        'completed': previous.get('completed') or [],
         'error': '',
+        'errors': [],
+        'next_offset': start,
+        'complete': False,
         'started_at': datetime.now(timezone.utc).isoformat(),
     }
-    state.metadata_scan_task = asyncio.create_task(_run_metadata_scan(limit))
+    state.metadata_scan_task = asyncio.create_task(
+        _run_metadata_scan(limit, start)
+    )
     return _metadata_scan_status()
 
 
@@ -470,7 +492,16 @@ async def apply_metadata(request: Request) -> dict[str, Any]:
     if not file:
         raise HTTPException(status_code=400, detail='file is required')
     try:
-        return metadata_repair.repair_file(state.downloader.download_dir, file)
+        result = metadata_repair.repair_file(
+            state.downloader.download_dir, file
+        )
+        completed = list(state.metadata_scan.get('completed') or [])
+        completed.append(result)
+        state.metadata_scan = {
+            **state.metadata_scan,
+            'completed': completed,
+        }
+        return result
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail='File not found') from exc
     except ValueError as exc:

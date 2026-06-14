@@ -36,6 +36,23 @@
             <Icon v-else icon="clarity:refresh-line" class="h-4 w-4 mr-2" />
             {{ t('metadata.scan') }}
           </button>
+          <button
+            class="btn btn-sm h-11 rounded-full border-white/10 bg-base-100/85 hover:bg-base-100"
+            :disabled="
+              loading ||
+              activeTab !== 'needs' ||
+              items.length === 0 ||
+              repairingAll
+            "
+            @click="repairAll"
+          >
+            <span
+              v-if="repairingAll"
+              class="loading loading-spinner loading-xs mr-2"
+            />
+            <Icon v-else icon="clarity:check-circle-line" class="h-4 w-4 mr-2" />
+            {{ t('metadata.repairAll') }}
+          </button>
         </div>
       </div>
 
@@ -74,12 +91,37 @@
         {{ t('metadata.serverOnly') }}
       </p>
 
+      <div class="mb-5 inline-flex rounded-full border border-white/10 bg-base-100/75 p-1">
+        <button
+          class="rounded-full px-4 py-2 text-sm font-medium transition-colors"
+          :class="
+            activeTab === 'needs'
+              ? 'bg-primary text-primary-content shadow-glow-sm'
+              : 'text-base-content/60 hover:text-base-content'
+          "
+          @click="activeTab = 'needs'"
+        >
+          {{ t('metadata.needsFix') }}
+        </button>
+        <button
+          class="rounded-full px-4 py-2 text-sm font-medium transition-colors"
+          :class="
+            activeTab === 'completed'
+              ? 'bg-primary text-primary-content shadow-glow-sm'
+              : 'text-base-content/60 hover:text-base-content'
+          "
+          @click="activeTab = 'completed'"
+        >
+          {{ t('metadata.completed') }}
+        </button>
+      </div>
+
       <div v-if="loading && items.length === 0" class="space-y-3">
         <div v-for="n in 5" :key="n" class="skeleton h-24 rounded-2xl" />
       </div>
 
       <div
-        v-else-if="items.length === 0"
+        v-else-if="visibleItems.length === 0"
         class="surface rounded-2xl p-10 text-center"
       >
         <Icon
@@ -93,7 +135,7 @@
 
       <ul v-else class="space-y-3">
         <li
-          v-for="item in items"
+          v-for="item in visibleItems"
           :key="item.file"
           class="surface rounded-2xl p-4 transition-all duration-300"
           :class="
@@ -111,10 +153,14 @@
             </div>
             <span
               class="pill shrink-0"
-              :class="fixed[item.file] ? 'badge-soft' : 'bg-warning/10 text-warning'"
+              :class="
+                activeTab === 'completed'
+                  ? 'badge-soft'
+                  : 'bg-warning/10 text-warning'
+              "
             >
               {{
-                fixed[item.file]
+                activeTab === 'completed'
                   ? t('metadata.fixed')
                   : t('metadata.needsFix')
               }}
@@ -152,7 +198,7 @@
             </p>
           </div>
 
-          <div class="mt-4 flex justify-end">
+          <div v-if="activeTab === 'needs'" class="mt-4 flex justify-end">
             <button
               class="btn btn-sm h-10 rounded-full border-white/10 bg-base-100/85 hover:bg-base-100"
               :class="fixed[item.file] ? 'text-primary' : ''"
@@ -184,7 +230,7 @@
 </template>
 
 <script setup>
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { Icon } from '@iconify/vue'
 
 import Navbar from '/src/components/Navbar.vue'
@@ -198,9 +244,16 @@ const error = ref('')
 const items = ref([])
 const applying = ref({})
 const fixed = ref({})
+const completedItems = ref([])
+const activeTab = ref('needs')
+const repairingAll = ref(false)
 const scanLimit = ref(25)
 const summary = ref({ scanned: 0, matched: 0, total: 0 })
 let pollTimer = null
+
+const visibleItems = computed(() =>
+  activeTab.value === 'completed' ? completedItems.value : items.value
+)
 
 function displaySong(song) {
   const artists = (song?.artists || []).join(', ')
@@ -218,6 +271,7 @@ function applyScanStatus(data) {
     total: data.total || 0,
   }
   items.value = data.items || []
+  completedItems.value = data.completed || completedItems.value
   if (data.status === 'error') {
     error.value = data.error || t('metadata.failedScan')
   }
@@ -287,6 +341,8 @@ async function apply(item) {
     const remainingChanges = res.data?.changes || []
     if (remainingChanges.length === 0) {
       fixed.value = { ...fixed.value, [item.file]: true }
+      completedItems.value = [res.data, ...completedItems.value]
+      items.value = items.value.filter((existing) => existing.file !== item.file)
       summary.value = {
         ...summary.value,
         matched: Math.max(0, summary.value.matched - 1),
@@ -294,15 +350,17 @@ async function apply(item) {
     } else {
       error.value = t('metadata.failedVerify')
     }
-    items.value = items.value.map((existing) =>
-      existing.file === item.file
-        ? {
-            ...existing,
-            current: res.data.current || existing.current,
-            changes: remainingChanges,
-          }
-        : existing
-    )
+    if (remainingChanges.length > 0) {
+      items.value = items.value.map((existing) =>
+        existing.file === item.file
+          ? {
+              ...existing,
+              current: res.data.current || existing.current,
+              changes: remainingChanges,
+            }
+          : existing
+      )
+    }
   } catch (err) {
     const detail = err?.response?.data?.detail
     error.value = detail
@@ -311,5 +369,14 @@ async function apply(item) {
   } finally {
     applying.value = { ...applying.value, [item.file]: false }
   }
+}
+
+async function repairAll() {
+  repairingAll.value = true
+  for (const item of [...items.value]) {
+    // eslint-disable-next-line no-await-in-loop
+    await apply(item)
+  }
+  repairingAll.value = false
 }
 </script>

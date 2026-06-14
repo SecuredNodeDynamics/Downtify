@@ -105,8 +105,8 @@ function getHealth() {
   return API.get('/api/health')
 }
 
-function startMetadataScan(limit = 100) {
-  return API.post('/api/metadata/scan', { limit })
+function startMetadataScan(limit = 100, reset = false) {
+  return API.post('/api/metadata/scan', { limit, reset })
 }
 
 function getMetadataScanStatus() {
