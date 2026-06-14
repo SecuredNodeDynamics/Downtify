@@ -5,8 +5,10 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Callable
 
+from loguru import logger
 from mutagen import File as MutagenFile
 
+from .artist_art import save_missing_artist_images
 from .musicbrainz import enrich_song_metadata
 
 AUDIO_EXTENSIONS = {'.mp3', '.m4a', '.mp4', '.aac', '.flac', '.ogg', '.opus'}
@@ -89,6 +91,7 @@ def _public_song(song: dict[str, Any]) -> dict[str, Any]:
         'disc_number': song.get('disc_number') or '',
         'musicbrainz_recording_id': song.get('musicbrainz_recording_id') or '',
         'musicbrainz_release_id': song.get('musicbrainz_release_id') or '',
+        'musicbrainz_artist_ids': song.get('musicbrainz_artist_ids') or [],
     }
 
 
@@ -253,6 +256,17 @@ def repair_file(root: Path, relative_file: str) -> dict[str, Any]:
     if not candidate.get('musicbrainz_recording_id'):
         return _scan_item(root.resolve(), path)
     apply_text_tags(path, candidate)
+    try:
+        save_missing_artist_images(
+            root.resolve(),
+            path,
+            candidate.get('musicbrainz_artist_ids') or [],
+        )
+    except Exception:
+        logger.opt(exception=True).warning(
+            'Failed to save artist image for {}',
+            path,
+        )
     updated = _song_from_file(path)
     remaining = _changes(updated, candidate)
     if remaining:

@@ -243,6 +243,11 @@ def test_repair_file_applies_high_confidence_metadata(tmp_path, monkeypatch):
         applied['metadata'] = metadata
 
     monkeypatch.setattr(metadata_repair, 'apply_text_tags', fake_apply)
+    monkeypatch.setattr(
+        metadata_repair,
+        'save_missing_artist_images',
+        lambda *_args: [],
+    )
 
     result = metadata_repair.repair_file(tmp_path, 'song.mp3')
 
@@ -250,6 +255,55 @@ def test_repair_file_applies_high_confidence_metadata(tmp_path, monkeypatch):
     assert applied['metadata']['name'] == 'Fixed Song'
     assert result['matched'] is True
     assert result['changes'] == []
+
+
+def test_repair_file_saves_missing_artist_images(tmp_path, monkeypatch):
+    artist = tmp_path / 'Artist'
+    album = artist / 'Album'
+    album.mkdir(parents=True)
+    track = album / 'song.mp3'
+    track.write_bytes(b'not really audio')
+
+    reads = iter([
+        {'name': 'Song', 'artists': ['Artist']},
+        {
+            'name': 'Fixed Song',
+            'artists': ['Artist'],
+            'musicbrainz_artist_ids': [
+                {'id': 'artist-mbid', 'name': 'Artist'},
+            ],
+        },
+    ])
+    monkeypatch.setattr(metadata_repair, '_song_from_file', lambda _path: next(reads))
+    monkeypatch.setattr(
+        metadata_repair,
+        'enrich_song_metadata',
+        lambda song: {
+            **song,
+            'name': 'Fixed Song',
+            'musicbrainz_recording_id': 'mbid-recording',
+            'musicbrainz_artist_ids': [
+                {'id': 'artist-mbid', 'name': 'Artist'},
+            ],
+        },
+    )
+    monkeypatch.setattr(metadata_repair, 'apply_text_tags', lambda *_args: None)
+
+    saved = {}
+
+    def fake_save(root, path, artists):
+        saved['root'] = root
+        saved['path'] = path
+        saved['artists'] = artists
+        return ['Artist/folder.jpg']
+
+    monkeypatch.setattr(metadata_repair, 'save_missing_artist_images', fake_save)
+
+    metadata_repair.repair_file(tmp_path, 'Artist/Album/song.mp3')
+
+    assert saved['root'] == tmp_path.resolve()
+    assert saved['path'] == track.resolve()
+    assert saved['artists'] == [{'id': 'artist-mbid', 'name': 'Artist'}]
 
 
 def test_repair_file_fails_when_metadata_does_not_persist(

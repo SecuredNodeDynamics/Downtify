@@ -27,9 +27,6 @@ dev = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
-[tool.uv]
-upgrade = true
-
 [tool.ruff]
 line-length = 79
 

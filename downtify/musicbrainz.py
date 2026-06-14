@@ -46,6 +46,29 @@ def _artist_credit_names(recording: dict[str, Any]) -> list[str]:
     return names
 
 
+def _artist_credit_ids(recording: dict[str, Any]) -> list[dict[str, str]]:
+    artists: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for credit in recording.get('artist-credit') or []:
+        if not isinstance(credit, dict):
+            continue
+        artist = credit.get('artist')
+        if not isinstance(artist, dict):
+            continue
+        artist_id = str(artist.get('id') or '').strip()
+        name = str(credit.get('name') or artist.get('name') or '').strip()
+        if not artist_id or artist_id in seen:
+            continue
+        artists.append({'id': artist_id, 'name': name})
+        seen.add(artist_id)
+    return artists
+
+
+def _artist_credit_text(recording: dict[str, Any]) -> str:
+    names = _artist_credit_names(recording)
+    return ' '.join(names)
+
+
 def _release_date(release: dict[str, Any]) -> str:
     return str(release.get('date') or '').strip()
 
@@ -80,10 +103,22 @@ def _candidate_score(
 
     target_artists = _artists(song)
     recording_artists = _artist_credit_names(recording)
-    artist_score = 0.0
+    artist_scores: list[float] = []
     for target in target_artists:
+        best = 0.0
         for candidate in recording_artists:
-            artist_score = max(artist_score, _ratio(candidate, target) * 35)
+            best = max(best, _ratio(candidate, target))
+        artist_scores.append(best)
+    artist_score = (
+        sum(artist_scores) / len(artist_scores) * 35
+        if artist_scores
+        else 0.0
+    )
+    if len(target_artists) > 1:
+        artist_score += _ratio(
+            _artist_credit_text(recording),
+            ' '.join(target_artists),
+        ) * 10
 
     album_score = 0.0
     album = str(song.get('album_name') or '').strip()
@@ -104,7 +139,31 @@ def _candidate_score(
         elif diff <= 8000:
             duration_score = 2
 
-    return title_score + artist_score + album_score + duration_score
+    return title_score + min(45, artist_score) + album_score + duration_score
+
+
+def _musicbrainz_queries(
+    title: str,
+    artists: list[str],
+    album: str,
+) -> list[str]:
+    artist_queries: list[str] = []
+    if len(artists) > 1:
+        joined = ' '.join(artists)
+        artist_queries.append(f'artist:"{joined}"')
+        artist_queries.append(
+            ' AND '.join(f'artist:"{artist}"' for artist in artists)
+        )
+    artist_queries.extend(f'artist:"{artist}"' for artist in artists)
+
+    queries: list[str] = []
+    for artist_query in artist_queries:
+        query = f'recording:"{title}" AND {artist_query}'
+        if album:
+            query += f' AND release:"{album}"'
+        if query not in queries:
+            queries.append(query)
+    return queries
 
 
 def _query(song: dict[str, Any]) -> Optional[dict[str, Any]]:
@@ -115,42 +174,52 @@ def _query(song: dict[str, Any]) -> Optional[dict[str, Any]]:
     if not title or not artists:
         return None
 
-    cache_key = f'{_norm(title)}|{_norm(artists[0])}|{_norm(song.get("album_name"))}'
+    album = str(song.get('album_name') or '').strip()
+    cache_key = (
+        f'{_norm(title)}|{_norm(" ".join(artists))}|{_norm(album)}'
+    )
     if cache_key in _CACHE:
         return _CACHE[cache_key]
 
-    query = f'recording:"{title}" AND artist:"{artists[0]}"'
-    album = str(song.get('album_name') or '').strip()
-    if album:
-        query += f' AND release:"{album}"'
+    queries = _musicbrainz_queries(title, artists, album)
+    recordings: list[dict[str, Any]] = []
 
     try:
-        elapsed = time.monotonic() - _LAST_REQUEST_AT
-        if elapsed < 1.0:
-            time.sleep(1.0 - elapsed)
-        response = requests.get(
-            MUSICBRAINZ_RECORDING_URL,
-            params={'query': query, 'fmt': 'json', 'limit': 8},
-            headers={'User-Agent': USER_AGENT},
-            timeout=8,
-        )
-        _LAST_REQUEST_AT = time.monotonic()
-        response.raise_for_status()
-        payload = response.json()
+        seen_ids: set[str] = set()
+        multi_query_count = 2 if len(artists) > 1 else 0
+        for index, query in enumerate(queries):
+            if recordings and index >= multi_query_count:
+                break
+            elapsed = time.monotonic() - _LAST_REQUEST_AT
+            if elapsed < 1.0:
+                time.sleep(1.0 - elapsed)
+            response = requests.get(
+                MUSICBRAINZ_RECORDING_URL,
+                params={'query': query, 'fmt': 'json', 'limit': 8},
+                headers={'User-Agent': USER_AGENT},
+                timeout=8,
+            )
+            _LAST_REQUEST_AT = time.monotonic()
+            response.raise_for_status()
+            payload = response.json()
+            for item in payload.get('recordings') or []:
+                if not isinstance(item, dict):
+                    continue
+                recording_id = str(item.get('id') or '')
+                if recording_id and recording_id in seen_ids:
+                    continue
+                if recording_id:
+                    seen_ids.add(recording_id)
+                recordings.append(item)
     except Exception:
         logger.opt(exception=True).warning(
             'MusicBrainz lookup failed for {!r} by {!r}',
             title,
-            artists[0],
+            ', '.join(artists),
         )
         _CACHE[cache_key] = None
         return None
 
-    recordings = [
-        item
-        for item in payload.get('recordings') or []
-        if isinstance(item, dict)
-    ]
     if not recordings:
         _CACHE[cache_key] = None
         return None
@@ -198,6 +267,9 @@ def enrich_song_metadata(song: dict[str, Any]) -> dict[str, Any]:
             enriched['year'] = date[:4]
 
     enriched['musicbrainz_recording_id'] = recording.get('id')
+    artist_ids = _artist_credit_ids(recording)
+    if artist_ids:
+        enriched['musicbrainz_artist_ids'] = artist_ids
     if release and release.get('id'):
         enriched['musicbrainz_release_id'] = release.get('id')
 

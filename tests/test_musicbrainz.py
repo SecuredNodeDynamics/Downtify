@@ -26,7 +26,15 @@ def test_musicbrainz_enriches_high_confidence_match(monkeypatch):
                     'id': 'recording-1',
                     'title': 'The Correct Title',
                     'length': 180500,
-                    'artist-credit': [{'name': 'The Artist'}],
+                    'artist-credit': [
+                        {
+                            'name': 'The Artist',
+                            'artist': {
+                                'id': 'artist-1',
+                                'name': 'The Artist',
+                            },
+                        }
+                    ],
                     'releases': [
                         {
                             'id': 'release-1',
@@ -54,6 +62,9 @@ def test_musicbrainz_enriches_high_confidence_match(monkeypatch):
     assert result['year'] == '2020'
     assert result['musicbrainz_recording_id'] == 'recording-1'
     assert result['musicbrainz_release_id'] == 'release-1'
+    assert result['musicbrainz_artist_ids'] == [
+        {'id': 'artist-1', 'name': 'The Artist'}
+    ]
 
 
 def test_musicbrainz_rejects_weak_match(monkeypatch):
@@ -80,3 +91,48 @@ def test_musicbrainz_rejects_weak_match(monkeypatch):
     monkeypatch.setattr(musicbrainz.requests, 'get', fake_get)
 
     assert musicbrainz.enrich_song_metadata(song) is song
+
+
+def test_musicbrainz_queries_include_multi_artist_credit():
+    queries = musicbrainz._musicbrainz_queries(
+        'River Waltz',
+        ['Lang Lang', 'Alexandre Desplat'],
+        'Soundtrack Masters',
+    )
+
+    assert (
+        'recording:"River Waltz" AND '
+        'artist:"Lang Lang Alexandre Desplat" AND '
+        'release:"Soundtrack Masters"'
+    ) in queries
+    assert (
+        'recording:"River Waltz" AND '
+        'artist:"Lang Lang" AND artist:"Alexandre Desplat" AND '
+        'release:"Soundtrack Masters"'
+    ) in queries
+
+
+def test_musicbrainz_scores_multi_artist_coverage_higher():
+    song = {
+        'name': 'River Waltz',
+        'artists': ['Lang Lang', 'Alexandre Desplat'],
+        'album_name': 'Soundtrack Masters',
+    }
+    full_match = {
+        'title': 'River Waltz',
+        'artist-credit': [
+            {'name': 'Lang Lang'},
+            {'name': 'Alexandre Desplat'},
+        ],
+        'releases': [{'title': 'Soundtrack Masters'}],
+    }
+    partial_match = {
+        'title': 'River Waltz',
+        'artist-credit': [{'name': 'Lang Lang'}],
+        'releases': [{'title': 'Soundtrack Masters'}],
+    }
+
+    assert (
+        musicbrainz._candidate_score(full_match, song)
+        > musicbrainz._candidate_score(partial_match, song)
+    )
