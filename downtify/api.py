@@ -114,6 +114,15 @@ def _dedupe_jellyfin_libraries(candidates: list[dict[str, Any]]) -> list[dict[st
     return libraries
 
 
+def _prefer_music_libraries(candidates: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    music = [
+        library
+        for library in candidates
+        if str(library.get('collection_type') or '').casefold() == 'music'
+    ]
+    return music or candidates
+
+
 def _libraries_from_virtual_folders(data: Any) -> list[dict[str, Any]]:
     items = data if isinstance(data, list) else data.get('Items', [])
     candidates = []
@@ -135,7 +144,7 @@ def _libraries_from_virtual_folders(data: Any) -> list[dict[str, Any]]:
                 'collection_type': collection_type,
             }
         )
-    return _dedupe_jellyfin_libraries(candidates)
+    return _dedupe_jellyfin_libraries(_prefer_music_libraries(candidates))
 
 
 def _libraries_from_items(data: dict[str, Any]) -> list[dict[str, Any]]:
@@ -162,7 +171,7 @@ def _libraries_from_items(data: dict[str, Any]) -> list[dict[str, Any]]:
                 }
             )
 
-    return _dedupe_jellyfin_libraries(candidates)
+    return _dedupe_jellyfin_libraries(_prefer_music_libraries(candidates))
 
 
 class ConnectionManager:

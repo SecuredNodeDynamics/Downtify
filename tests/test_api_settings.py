@@ -182,6 +182,7 @@ def test_jellyfin_libraries_dedupes_by_name(monkeypatch):
                 {'ItemId': 'music-view', 'Name': 'Music', 'CollectionType': 'music'},
                 {'ItemId': 'music-copy', 'Name': '\ufeff Music\u200b ', 'CollectionType': 'music'},
                 {'ItemId': 'tv-view', 'Name': 'TV', 'CollectionType': 'tvshows'},
+                {'ItemId': 'movie-view', 'Name': 'Movies', 'CollectionType': 'movies'},
             ]
 
     def fake_get(url, headers=None, params=None, timeout=None):
@@ -207,12 +208,6 @@ def test_jellyfin_libraries_dedupes_by_name(monkeypatch):
                 'name': 'Music',
                 'type': 'VirtualFolder',
                 'collection_type': 'music',
-            },
-            {
-                'id': 'tv-view',
-                'name': 'TV',
-                'type': 'VirtualFolder',
-                'collection_type': 'tvshows',
             },
         ],
     }
@@ -242,12 +237,21 @@ def test_jellyfin_libraries_falls_back_to_items(monkeypatch):
                         'Name': 'Music',
                         'Type': 'Folder',
                         'IsFolder': True,
+                        'CollectionType': 'music',
                     },
                     {
                         'Id': 'music-folder',
                         'Name': 'Music',
                         'Type': 'Folder',
                         'IsFolder': True,
+                        'CollectionType': 'music',
+                    },
+                    {
+                        'Id': 'tv-view',
+                        'Name': 'TV',
+                        'Type': 'Folder',
+                        'IsFolder': True,
+                        'CollectionType': 'tvshows',
                     },
                 ]
             }
@@ -279,6 +283,44 @@ def test_jellyfin_libraries_falls_back_to_items(monkeypatch):
                 'id': 'music-view',
                 'name': 'Music',
                 'type': 'Folder',
+                'collection_type': 'music',
+            },
+        ],
+    }
+
+
+def test_jellyfin_libraries_keeps_untyped_virtual_folders(monkeypatch):
+    class FakeVirtualFoldersResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return [
+                {'ItemId': 'music-view', 'Name': 'Music'},
+                {'ItemId': 'tv-view', 'Name': 'TV'},
+            ]
+
+    monkeypatch.setattr(
+        'downtify.api.requests.get',
+        lambda *args, **kwargs: FakeVirtualFoldersResponse(),
+    )
+
+    result = jellyfin_libraries_endpoint('jellyfin.test', 'secret')
+
+    assert result == {
+        'success': True,
+        'source': 'virtual_folders',
+        'libraries': [
+            {
+                'id': 'music-view',
+                'name': 'Music',
+                'type': 'VirtualFolder',
+                'collection_type': '',
+            },
+            {
+                'id': 'tv-view',
+                'name': 'TV',
+                'type': 'VirtualFolder',
                 'collection_type': '',
             },
         ],
