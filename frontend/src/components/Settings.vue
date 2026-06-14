@@ -731,6 +731,9 @@ async function onJellyfinConfigChange() {
     if (response.status === 200 && response.data.success) {
       jellyfinLibraries.value = response.data.libraries || []
       console.log('Successfully loaded libraries:', jellyfinLibraries.value)
+      console.log('Libraries count:', jellyfinLibraries.value.length)
+      console.log('Library names:', jellyfinLibraries.value.map(lib => `${lib.name} (id: ${lib.id})`))
+      console.log('Duplicate check:', jellyfinLibraries.value.map(lib => lib.name).filter((v, i, a) => a.indexOf(v) !== i))
       
       if (jellyfinLibraries.value.length === 0) {
         jellyfinLibraryError.value = t('settings.jellyfinNoLibraries')
