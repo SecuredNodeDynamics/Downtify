@@ -181,6 +181,7 @@ def test_jellyfin_libraries_dedupes_by_name(monkeypatch):
             return [
                 {'ItemId': 'music-view', 'Name': 'Music', 'CollectionType': 'music'},
                 {'ItemId': 'music-copy', 'Name': '\ufeff Music\u200b ', 'CollectionType': 'music'},
+                {'ItemId': 'misic-copy', 'Name': 'Misic', 'CollectionType': 'music'},
                 {'ItemId': 'tv-view', 'Name': 'TV', 'CollectionType': 'tvshows'},
                 {'ItemId': 'movie-view', 'Name': 'Movies', 'CollectionType': 'movies'},
             ]
