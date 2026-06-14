@@ -29,6 +29,7 @@ import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Optional
+from urllib.parse import quote
 
 import yt_dlp
 from fastapi import (
@@ -37,12 +38,13 @@ from fastapi import (
     HTTPException,
     Query,
     Request,
+    Response,
     WebSocket,
     WebSocketDisconnect,
 )
 from loguru import logger
 
-from . import m3u, metadata_repair, providers, spotify
+from . import artist_art, m3u, metadata_repair, providers, spotify
 from .downloader import Downloader, preview_audio_for_song
 from .history import DownloadHistoryDB
 from .monitor import PlaylistMonitorDB, check_playlist
@@ -503,6 +505,11 @@ async def _run_artist_image_scan(limit: int) -> None:
         return
 
     def progress(update: dict[str, Any]) -> None:
+        if 'items' in update:
+            update = {
+                **update,
+                'items': _with_artist_image_preview(update['items']),
+            }
         state.artist_image_scan = {
             **state.artist_image_scan,
             **update,
@@ -520,6 +527,7 @@ async def _run_artist_image_scan(limit: int) -> None:
         state.artist_image_scan = {
             **state.artist_image_scan,
             **result,
+            'items': _with_artist_image_preview(result.get('items') or []),
             'limit': limit,
             'status': 'done',
             'error': '',
@@ -570,6 +578,59 @@ async def scan_artist_images(request: Request) -> dict[str, Any]:
 @router.get('/api/metadata/artist-images/status')
 def artist_image_scan_status() -> dict[str, Any]:
     return dict(state.artist_image_scan)
+
+
+def _artist_image_preview_url(item: dict[str, Any]) -> str:
+    file = str(item.get('file') or '')
+    artist_id = str(item.get('artist_id') or '')
+    artist = str(item.get('artist') or '')
+    return (
+        '/api/metadata/artist-images/preview?'
+        f'file={quote(file)}&artist_id={quote(artist_id)}&artist={quote(artist)}'
+    )
+
+
+def _with_artist_image_preview(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [
+        {
+            **item,
+            'preview_url': item.get('preview_url') or _artist_image_preview_url(item),
+        }
+        for item in items
+    ]
+
+
+@router.get('/api/metadata/artist-images/preview')
+def artist_image_preview(
+    file: str = Query(...),
+    artist_id: str = Query(...),
+    artist: str = Query(...),
+) -> Response:
+    if state.downloader is None:
+        raise HTTPException(status_code=500, detail='Downloader not ready')
+    try:
+        path = metadata_repair.safe_library_path(
+            state.downloader.download_dir,
+            file,
+        )
+        data, _source = artist_art.artist_or_fallback_image(
+            artist_id,
+            path,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail='File not found') from exc
+    except Exception as exc:
+        logger.exception('Artist image preview failed for {}', file)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    if not data:
+        raise HTTPException(status_code=404, detail='Preview not available')
+    return Response(
+        content=data,
+        media_type=artist_art.media_type_for_image(data),
+        headers={'Cache-Control': 'no-store'},
+    )
 
 
 @router.post('/api/metadata/artist-images/apply')

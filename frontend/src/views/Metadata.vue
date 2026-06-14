@@ -377,7 +377,7 @@
                   : ''
               "
             >
-              <div class="flex flex-wrap items-start justify-between gap-3">
+              <div class="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto_auto] md:items-center">
                 <div class="min-w-0">
                   <p class="truncate text-sm font-semibold">
                     {{ item.artist }}
@@ -388,6 +388,46 @@
                   <p class="mt-1 text-xs text-primary">
                     {{ item.source }}
                   </p>
+                </div>
+                <div class="grid grid-cols-[5rem_5rem] items-center gap-3 justify-self-center">
+                  <div>
+                    <p class="mb-1 text-center text-[0.65rem] uppercase text-base-content/40">
+                      {{ t('metadata.before') }}
+                    </p>
+                    <div
+                      class="flex aspect-square w-20 items-center justify-center rounded-xl border border-white/10 bg-base-100/80"
+                    >
+                      <Icon
+                        icon="clarity:user-line"
+                        class="h-9 w-9 text-base-content/35"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <p class="mb-1 text-center text-[0.65rem] uppercase text-base-content/40">
+                      {{ t('metadata.after') }}
+                    </p>
+                    <div
+                      class="aspect-square w-20 overflow-hidden rounded-xl border border-primary/30 bg-base-100/80"
+                    >
+                      <img
+                        v-if="item.preview_url"
+                        :src="item.preview_url"
+                        :alt="item.artist"
+                        class="h-full w-full object-cover"
+                        loading="lazy"
+                      />
+                      <div
+                        v-else
+                        class="flex h-full w-full items-center justify-center"
+                      >
+                        <Icon
+                          icon="clarity:image-gallery-line"
+                          class="h-9 w-9 text-base-content/35"
+                        />
+                      </div>
+                    </div>
+                  </div>
                 </div>
                 <button
                   class="btn btn-sm h-10 rounded-full border-white/10 bg-base-100/85 hover:bg-base-100"

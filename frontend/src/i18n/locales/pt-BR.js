@@ -182,6 +182,8 @@ export default {
     missingImages: 'Imagens ausentes',
     emptyArtistImages:
       'Nenhuma imagem de artista ausente com arte disponivel foi encontrada.',
+    before: 'Antes',
+    after: 'Depois',
     blank: 'Vazio',
     idsOnly:
       'IDs do MusicBrainz podem ser adicionados; as tags visiveis ja coincidem.',

@@ -179,6 +179,8 @@ export default {
     scanArtistImages: 'Scan artist images',
     missingImages: 'Missing images',
     emptyArtistImages: 'No missing artist images found with available artwork.',
+    before: 'Before',
+    after: 'After',
     blank: 'Blank',
     idsOnly: 'MusicBrainz IDs can be added; visible tags already match.',
     failedScan: 'Failed to scan metadata.',

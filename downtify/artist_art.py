@@ -265,6 +265,15 @@ def _extension_for_image(data: bytes) -> str:
     return '.jpg'
 
 
+def media_type_for_image(data: bytes) -> str:
+    extension = _extension_for_image(data)
+    if extension == '.png':
+        return 'image/png'
+    if extension == '.webp':
+        return 'image/webp'
+    return 'image/jpeg'
+
+
 def save_missing_artist_images(
     root: Path,
     path: Path,
