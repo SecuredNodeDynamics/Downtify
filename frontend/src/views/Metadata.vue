@@ -114,6 +114,17 @@
         >
           {{ t('metadata.completed') }}
         </button>
+        <button
+          class="rounded-full px-4 py-2 text-sm font-medium transition-colors"
+          :class="
+            activeTab === 'clean'
+              ? 'bg-primary text-primary-content shadow-glow-sm'
+              : 'text-base-content/60 hover:text-base-content'
+          "
+          @click="activeTab = 'clean'"
+        >
+          {{ t('metadata.clean') }}
+        </button>
       </div>
 
       <div v-if="loading && items.length === 0" class="space-y-3">
@@ -156,12 +167,16 @@
               :class="
                 activeTab === 'completed'
                   ? 'badge-soft'
+                  : activeTab === 'clean'
+                    ? 'bg-white/5 text-base-content/50'
                   : 'bg-warning/10 text-warning'
               "
             >
               {{
                 activeTab === 'completed'
                   ? t('metadata.fixed')
+                  : activeTab === 'clean'
+                    ? t('metadata.clean')
                   : t('metadata.needsFix')
               }}
             </span>
@@ -242,6 +257,7 @@ const { t } = useI18n()
 const loading = ref(false)
 const error = ref('')
 const items = ref([])
+const cleanItems = ref([])
 const applying = ref({})
 const fixed = ref({})
 const completedItems = ref([])
@@ -252,7 +268,11 @@ const summary = ref({ scanned: 0, matched: 0, total: 0 })
 let pollTimer = null
 
 const visibleItems = computed(() =>
-  activeTab.value === 'completed' ? completedItems.value : items.value
+  activeTab.value === 'completed'
+    ? completedItems.value
+    : activeTab.value === 'clean'
+      ? cleanItems.value
+      : items.value
 )
 
 function displaySong(song) {
@@ -271,6 +291,7 @@ function applyScanStatus(data) {
     total: data.total || 0,
   }
   items.value = data.items || []
+  cleanItems.value = data.clean || cleanItems.value
   completedItems.value = data.completed || completedItems.value
   if (data.status === 'error') {
     error.value = data.error || t('metadata.failedScan')

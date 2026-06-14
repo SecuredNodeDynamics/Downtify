@@ -85,6 +85,7 @@ def test_scan_library_hides_matches_without_changes(tmp_path, monkeypatch):
     assert result['scanned'] == 1
     assert result['matched'] == 0
     assert result['items'] == []
+    assert len(result['clean']) == 1
 
 
 def test_scan_library_scans_batch_and_returns_only_fixable_items(

@@ -174,6 +174,7 @@ export default {
     fixing: 'Corrigiendo...',
     fixed: 'Corregido',
     completed: 'Completado',
+    clean: 'No necesita correccion',
     blank: 'Vacio',
     idsOnly:
       'Se pueden agregar IDs de MusicBrainz; las etiquetas visibles ya coinciden.',

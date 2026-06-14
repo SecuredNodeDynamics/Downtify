@@ -155,6 +155,7 @@ def scan_library(
     start = max(0, min(start, total))
     selected = files[start : start + max(1, limit)]
     items: list[dict[str, Any]] = []
+    clean_items: list[dict[str, Any]] = []
     errors: list[dict[str, str]] = []
     batch_scanned = 0
     for path in selected:
@@ -170,6 +171,8 @@ def scan_library(
             item = None
         if item is not None and item['matched'] and item['changes']:
             items.append(item)
+        elif item is not None:
+            clean_items.append(item)
         if progress_cb is not None:
             progress_cb({
                 'scanned': current_offset,
@@ -187,6 +190,7 @@ def scan_library(
         'total': total,
         'matched': len(items),
         'items': items,
+        'clean': clean_items,
         'errors': errors,
         'start': start,
         'next_offset': next_offset,

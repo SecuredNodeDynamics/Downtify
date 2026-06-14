@@ -171,6 +171,7 @@ export default {
     fixing: 'Fixing...',
     fixed: 'Fixed',
     completed: 'Completed',
+    clean: 'No Repair Needed',
     blank: 'Blank',
     idsOnly: 'MusicBrainz IDs can be added; visible tags already match.',
     failedScan: 'Failed to scan metadata.',
