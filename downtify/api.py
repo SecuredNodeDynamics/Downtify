@@ -31,6 +31,7 @@ from pathlib import Path
 from typing import Any, Optional
 from urllib.parse import quote
 
+import requests
 import yt_dlp
 from fastapi import (
     APIRouter,
@@ -1345,7 +1346,7 @@ async def update_settings_endpoint(
 
 
 @router.get('/api/jellyfin/libraries')
-async def jellyfin_libraries_endpoint(
+def jellyfin_libraries_endpoint(
     jellyfin_url: str = Query(''),
     jellyfin_api_key: str = Query(''),
 ) -> dict[str, Any]:
@@ -1355,8 +1356,6 @@ async def jellyfin_libraries_endpoint(
             status_code=400,
             detail='Jellyfin URL and API key are required',
         )
-
-    import requests
 
     try:
         # Normalize URL (remove trailing slash)

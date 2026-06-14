@@ -508,30 +508,49 @@
                 </div>
               </div>
               <div v-else-if="jellyfinLibraryError" class="space-y-1.5">
-                <select
-                  v-model="sm.settings.value.jellyfin_music_library"
-                  class="input-modern h-10 w-full text-sm opacity-50"
-                  disabled
-                >
-                  <option value="">{{ t('settings.jellyfinMusicLibraryPlaceholder') }}</option>
-                </select>
+                <div class="flex gap-2">
+                  <select
+                    v-model="sm.settings.value.jellyfin_music_library"
+                    class="input-modern h-10 flex-1 text-sm opacity-50"
+                    disabled
+                  >
+                    <option value="">{{ t('settings.jellyfinMusicLibraryPlaceholder') }}</option>
+                  </select>
+                  <button
+                    type="button"
+                    class="btn btn-sm h-10 px-3 rounded-lg border-white/10 bg-base-100/85 hover:bg-base-100"
+                    @click="onJellyfinConfigChange"
+                    :disabled="jellyfinLibraryLoading"
+                  >
+                    {{ t('common.refresh') }}
+                  </button>
+                </div>
                 <p class="text-[11px] text-error">{{ jellyfinLibraryError }}</p>
               </div>
-              <select
-                v-else
-                v-model="sm.settings.value.jellyfin_music_library"
-                class="input-modern h-10 w-full text-sm"
-                :disabled="jellyfinLibraries.length === 0"
-              >
-                <option value="">{{ t('settings.jellyfinMusicLibraryPlaceholder') }}</option>
-                <option
-                  v-for="lib in jellyfinLibraries"
-                  :key="lib.id"
-                  :value="lib.name"
+              <div v-else class="flex gap-2">
+                <select
+                  v-model="sm.settings.value.jellyfin_music_library"
+                  class="input-modern h-10 flex-1 text-sm"
+                  :disabled="jellyfinLibraries.length === 0"
                 >
-                  {{ lib.name }}
-                </option>
-              </select>
+                  <option value="">{{ t('settings.jellyfinMusicLibraryPlaceholder') }}</option>
+                  <option
+                    v-for="lib in jellyfinLibraries"
+                    :key="lib.id"
+                    :value="lib.name"
+                  >
+                    {{ lib.name }}
+                  </option>
+                </select>
+                <button
+                  type="button"
+                  class="btn btn-sm h-10 px-3 rounded-lg border-white/10 bg-base-100/85 hover:bg-base-100"
+                  @click="onJellyfinConfigChange"
+                  :disabled="jellyfinLibraryLoading"
+                >
+                  {{ t('common.refresh') }}
+                </button>
+              </div>
               <p class="text-[11px] text-base-content/40 mt-1.5">
                 {{ t('settings.jellyfinMusicLibraryHint') }}
               </p>
@@ -592,7 +611,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useSettingsManager } from '../model/settings'
 import { useDownloadDestination } from '../model/downloadDestination'
@@ -617,6 +636,18 @@ const activeTab = ref('general')
 const jellyfinLibraries = ref([])
 const jellyfinLibraryLoading = ref(false)
 const jellyfinLibraryError = ref('')
+
+// Watch for tab changes to fetch Jellyfin libraries when API tab is opened
+watch(activeTab, (newTab) => {
+  if (newTab === 'api') {
+    // Fetch libraries if we have URL and API key, but libraries haven't been fetched yet
+    const hasUrl = sm.settings.value.jellyfin_url?.trim()
+    const hasApiKey = sm.settings.value.jellyfin_api_key?.trim()
+    if (hasUrl && hasApiKey && jellyfinLibraries.value.length === 0 && !jellyfinLibraryError.value) {
+      onJellyfinConfigChange()
+    }
+  }
+})
 
 const localFolderBlockMessage = computed(() => {
   if (localFolderBlockReason.value === 'insecure') {
@@ -681,26 +712,36 @@ async function onJellyfinConfigChange() {
   const url = sm.settings.value.jellyfin_url?.trim()
   const apiKey = sm.settings.value.jellyfin_api_key?.trim()
 
+  console.log('Jellyfin config changed:', { url: url ? '***' : '', hasApiKey: !!apiKey })
+
   jellyfinLibraryError.value = ''
   jellyfinLibraries.value = []
 
   if (!url || !apiKey) {
+    console.log('Missing Jellyfin URL or API key')
     return
   }
 
   jellyfinLibraryLoading.value = true
   try {
+    console.log('Fetching Jellyfin libraries from:', url)
     const response = await API.getJellyfinLibraries(url, apiKey)
+    console.log('Jellyfin libraries response:', response)
+    
     if (response.status === 200 && response.data.success) {
       jellyfinLibraries.value = response.data.libraries || []
+      console.log('Successfully loaded libraries:', jellyfinLibraries.value)
+      
       if (jellyfinLibraries.value.length === 0) {
         jellyfinLibraryError.value = t('settings.jellyfinNoLibraries')
       }
+    } else {
+      jellyfinLibraryError.value = t('settings.jellyfinLibraryError') + ': Invalid response'
     }
   } catch (err) {
+    console.error('Failed to fetch Jellyfin libraries:', err)
     const errorDetail = err.response?.data?.detail || err.message || 'Unknown error'
     jellyfinLibraryError.value = `${t('settings.jellyfinLibraryError')}: ${errorDetail}`
-    console.error('Failed to fetch Jellyfin libraries:', err)
   } finally {
     jellyfinLibraryLoading.value = false
   }
