@@ -116,6 +116,33 @@ def test_scan_library_scans_all_files_but_limits_visible_results(
     assert len(result['items']) == 2
 
 
+def test_scan_library_reports_progress(tmp_path, monkeypatch):
+    for index in range(3):
+        (tmp_path / f'{index}.mp3').write_bytes(b'not really audio')
+
+    monkeypatch.setattr(
+        metadata_repair,
+        '_song_from_file',
+        lambda path: {'name': path.stem, 'artists': ['Artist']},
+    )
+    monkeypatch.setattr(
+        metadata_repair,
+        'enrich_song_metadata',
+        lambda song: {
+            **song,
+            'name': f"{song['name']} fixed",
+            'musicbrainz_recording_id': f"mbid-{song['name']}",
+        },
+    )
+    updates = []
+
+    metadata_repair.scan_library(tmp_path, limit=2, progress_cb=updates.append)
+
+    assert [update['scanned'] for update in updates] == [1, 2, 3]
+    assert updates[-1]['total'] == 3
+    assert updates[-1]['matched'] == 3
+
+
 def test_scan_library_treats_year_derived_from_release_date_as_fixed(
     tmp_path,
     monkeypatch,
