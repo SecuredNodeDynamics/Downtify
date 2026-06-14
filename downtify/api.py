@@ -90,15 +90,6 @@ def _normalized_jellyfin_library_name(value: Any) -> str:
     return re.sub(r'\s+', ' ', normalized).strip().casefold()
 
 
-def _jellyfin_library_dedupe_key(library: dict[str, Any]) -> str:
-    key = _normalized_jellyfin_library_name(library.get('name'))
-    if str(library.get('collection_type') or '').casefold() == 'music':
-        compact = re.sub(r'[^a-z0-9]+', '', key)
-        if compact in {'music', 'misic'}:
-            return 'music'
-    return key
-
-
 def _jellyfin_auth_headers(api_key: str) -> dict[str, str]:
     return {
         'X-Emby-Token': api_key,
@@ -110,7 +101,7 @@ def _dedupe_jellyfin_libraries(candidates: list[dict[str, Any]]) -> list[dict[st
     libraries = []
     seen_names = set()
     for library in candidates:
-        name_key = _jellyfin_library_dedupe_key(library)
+        name_key = _normalized_jellyfin_library_name(library.get('name'))
         if not name_key or name_key in seen_names:
             if name_key:
                 logger.info(
@@ -129,7 +120,9 @@ def _prefer_music_libraries(candidates: list[dict[str, Any]]) -> list[dict[str, 
         for library in candidates
         if str(library.get('collection_type') or '').casefold() == 'music'
     ]
-    return music or candidates
+    if not music:
+        return candidates
+    return [music[0]]
 
 
 def _libraries_from_virtual_folders(data: Any) -> list[dict[str, Any]]:
