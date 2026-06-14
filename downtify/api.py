@@ -1432,9 +1432,8 @@ def jellyfin_libraries_endpoint(
 
         logger.info(f'Jellyfin response items count: {len(data.get("Items", []))}')
 
-        libraries = []
-        seen_ids = set()  # Track IDs to avoid duplicates
-        seen_names = set()  # Jellyfin can return duplicate views with different IDs
+        candidates = []
+        seen_ids = set()  # Track IDs to avoid exact duplicates
 
         if 'Items' in data:
             for item in data['Items']:
@@ -1447,28 +1446,30 @@ def jellyfin_libraries_endpoint(
                 logger.info(f'Item: {name} - Type: {item_type}, IsFolder: {is_folder}')
 
                 # Include folders that might contain music (including "Music" library)
-                # Skip duplicate IDs and duplicate names because settings store names.
-                name_key = _normalized_jellyfin_library_name(name)
                 is_library_folder = is_folder and item_type in {'Folder', 'CollectionFolder'}
-                if (
-                    is_library_folder
-                    and item_id not in seen_ids
-                    and name_key not in seen_names
-                ):
+                if is_library_folder and item_id not in seen_ids:
                     seen_ids.add(item_id)
-                    seen_names.add(name_key)
-                    libraries.append(
+                    candidates.append(
                         {
                             'id': item_id,
                             'name': name,
                             'type': item_type,
                         }
                     )
-                elif is_library_folder:
+
+        libraries = []
+        seen_names = set()  # Jellyfin can return duplicate views with different IDs
+        for library in candidates:
+            name_key = _normalized_jellyfin_library_name(library.get('name'))
+            if not name_key or name_key in seen_names:
+                if name_key:
                     logger.info(
-                        f'Skipping duplicate Jellyfin library candidate: {name} '
-                        f'(id: {item_id})'
+                        'Skipping duplicate Jellyfin library candidate: '
+                        f'{library.get("name")} (id: {library.get("id")})'
                     )
+                continue
+            seen_names.add(name_key)
+            libraries.append(library)
 
         return {'success': True, 'libraries': libraries}
     except requests.exceptions.Timeout:

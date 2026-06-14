@@ -646,14 +646,18 @@ function normalizedJellyfinLibraryName(value) {
 }
 
 const uniqueJellyfinLibraries = computed(() => {
+  return uniqueLibrariesByName(jellyfinLibraries.value)
+})
+
+function uniqueLibrariesByName(libraries) {
   const seen = new Set()
-  return jellyfinLibraries.value.filter((lib) => {
+  return (libraries || []).filter((lib) => {
     const key = normalizedJellyfinLibraryName(lib?.name)
     if (!key || seen.has(key)) return false
     seen.add(key)
     return true
   })
-})
+}
 
 // Watch for tab changes to fetch Jellyfin libraries when API tab is opened
 watch(activeTab, (newTab) => {
@@ -747,11 +751,21 @@ async function onJellyfinConfigChange() {
     console.log('Jellyfin libraries response:', response)
     
     if (response.status === 200 && response.data.success) {
-      jellyfinLibraries.value = response.data.libraries || []
+      jellyfinLibraries.value = uniqueLibrariesByName(response.data.libraries)
       console.log('Successfully loaded libraries:', jellyfinLibraries.value)
       console.log('Libraries count:', jellyfinLibraries.value.length)
-      console.log('Library names:', jellyfinLibraries.value.map(lib => `${lib.name} (id: ${lib.id})`))
-      console.log('Duplicate check:', jellyfinLibraries.value.map(lib => lib.name).filter((v, i, a) => a.indexOf(v) !== i))
+      console.log(
+        'Library names:',
+        jellyfinLibraries.value.map((lib) => `${lib.name} (id: ${lib.id})`)
+      )
+      console.log(
+        'Library normalized keys:',
+        jellyfinLibraries.value.map((lib) => normalizedJellyfinLibraryName(lib.name))
+      )
+      console.log(
+        'Displayed library names:',
+        uniqueJellyfinLibraries.value.map((lib) => `${lib.name} (id: ${lib.id})`)
+      )
       
       if (jellyfinLibraries.value.length === 0) {
         jellyfinLibraryError.value = t('settings.jellyfinNoLibraries')
