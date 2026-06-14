@@ -253,6 +253,169 @@
           </li>
         </ul>
       </div>
+
+      <section class="mt-10 border-t border-white/10 pt-8">
+        <div class="mb-5 flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h2 class="text-xl font-bold tracking-tight">
+              {{ t('metadata.artistImages') }}
+            </h2>
+            <p class="mt-1 text-sm text-base-content/60">
+              {{ t('metadata.artistImagesSubtitle') }}
+            </p>
+          </div>
+          <div class="flex items-center gap-2">
+            <select
+              v-model.number="artistImageLimit"
+              class="select h-11 rounded-full border-white/10 bg-base-100/85 text-sm"
+              :disabled="artistImageLoading"
+              :title="t('metadata.artistImageLimit')"
+            >
+              <option :value="25">25</option>
+              <option :value="50">50</option>
+              <option :value="100">100</option>
+            </select>
+            <button
+              class="btn btn-primary btn-sm h-11 rounded-full px-5"
+              :disabled="artistImageLoading"
+              @click="scanArtistImages"
+            >
+              <span
+                v-if="artistImageLoading"
+                class="loading loading-spinner loading-xs mr-2"
+              />
+              <Icon v-else icon="clarity:image-gallery-line" class="h-4 w-4 mr-2" />
+              {{ t('metadata.scanArtistImages') }}
+            </button>
+            <button
+              class="btn btn-sm h-11 rounded-full border-white/10 bg-base-100/85 hover:bg-base-100"
+              :disabled="
+                artistImageLoading ||
+                artistImageItems.length === 0 ||
+                repairingAllImages
+              "
+              @click="repairAllArtistImages"
+            >
+              <span
+                v-if="repairingAllImages"
+                class="loading loading-spinner loading-xs mr-2"
+              />
+              <Icon v-else icon="clarity:check-circle-line" class="h-4 w-4 mr-2" />
+              {{ t('metadata.repairAll') }}
+            </button>
+          </div>
+        </div>
+
+        <div
+          v-if="artistImageError"
+          class="surface mb-4 flex items-center gap-3 rounded-2xl p-4 text-sm text-error"
+        >
+          <Icon icon="clarity:exclamation-circle-line" class="h-5 w-5" />
+          <span>{{ artistImageError }}</span>
+        </div>
+
+        <section class="mb-5 grid gap-3 sm:grid-cols-3">
+          <div class="surface rounded-2xl p-4">
+            <p class="text-xs uppercase text-base-content/40">
+              {{ t('metadata.scanned') }}
+            </p>
+            <p class="mt-1 text-2xl font-semibold">
+              {{ artistImageSummary.scanned }}
+            </p>
+          </div>
+          <div class="surface rounded-2xl p-4">
+            <p class="text-xs uppercase text-base-content/40">
+              {{ t('metadata.missingImages') }}
+            </p>
+            <p class="mt-1 text-2xl font-semibold text-primary">
+              {{ artistImageItems.length }}
+            </p>
+          </div>
+          <div class="surface rounded-2xl p-4">
+            <p class="text-xs uppercase text-base-content/40">
+              {{ t('metadata.completed') }}
+            </p>
+            <p class="mt-1 text-2xl font-semibold">
+              {{ completedArtistImages.length }}
+            </p>
+          </div>
+        </section>
+
+        <div class="max-h-[34rem] overflow-y-auto pr-2">
+          <div
+            v-if="artistImageLoading && artistImageItems.length === 0"
+            class="space-y-3"
+          >
+            <div v-for="n in 4" :key="n" class="skeleton h-20 rounded-2xl" />
+          </div>
+
+          <div
+            v-else-if="artistImageItems.length === 0"
+            class="surface rounded-2xl p-10 text-center"
+          >
+            <Icon
+              icon="clarity:image-gallery-line"
+              class="mx-auto mb-3 h-10 w-10 text-base-content/20"
+            />
+            <p class="text-sm text-base-content/50">
+              {{
+                artistImageLoading
+                  ? t('metadata.scanning')
+                  : t('metadata.emptyArtistImages')
+              }}
+            </p>
+          </div>
+
+          <ul v-else class="space-y-3">
+            <li
+              v-for="item in artistImageItems"
+              :key="`${item.artist_id}-${item.folder}`"
+              class="surface rounded-2xl p-4"
+              :class="
+                applyingArtistImages[itemKey(item)]
+                  ? 'scale-[1.01] border-primary/40 shadow-glow-sm'
+                  : ''
+              "
+            >
+              <div class="flex flex-wrap items-start justify-between gap-3">
+                <div class="min-w-0">
+                  <p class="truncate text-sm font-semibold">
+                    {{ item.artist }}
+                  </p>
+                  <p class="mt-1 text-xs text-base-content/45">
+                    {{ item.folder }}
+                  </p>
+                  <p class="mt-1 text-xs text-primary">
+                    {{ item.source }}
+                  </p>
+                </div>
+                <button
+                  class="btn btn-sm h-10 rounded-full border-white/10 bg-base-100/85 hover:bg-base-100"
+                  :class="fixedArtistImages[itemKey(item)] ? 'text-primary' : ''"
+                  :disabled="
+                    applyingArtistImages[itemKey(item)] ||
+                    fixedArtistImages[itemKey(item)]
+                  "
+                  @click="applyArtistImage(item)"
+                >
+                  <span
+                    v-if="applyingArtistImages[itemKey(item)]"
+                    class="loading loading-spinner loading-xs mr-2"
+                  />
+                  <Icon v-else icon="clarity:check-line" class="h-4 w-4 mr-2" />
+                  {{
+                    applyingArtistImages[itemKey(item)]
+                      ? t('metadata.fixing')
+                      : fixedArtistImages[itemKey(item)]
+                        ? t('metadata.fixed')
+                        : t('metadata.apply')
+                  }}
+                </button>
+              </div>
+            </li>
+          </ul>
+        </div>
+      </section>
     </main>
   </div>
 </template>
@@ -278,6 +441,15 @@ const activeTab = ref('needs')
 const repairingAll = ref(false)
 const scanLimit = ref(25)
 const summary = ref({ scanned: 0, matched: 0, total: 0 })
+const artistImageLoading = ref(false)
+const artistImageError = ref('')
+const artistImageLimit = ref(50)
+const artistImageItems = ref([])
+const completedArtistImages = ref([])
+const applyingArtistImages = ref({})
+const fixedArtistImages = ref({})
+const repairingAllImages = ref(false)
+const artistImageSummary = ref({ scanned: 0, matched: 0, total: 0 })
 let pollTimer = null
 
 const visibleItems = computed(() =>
@@ -295,6 +467,10 @@ function displaySong(song) {
   return `${artists || t('common.unknownArtist')} - ${title}${album}`
 }
 
+function itemKey(item) {
+  return `${item.artist_id}-${item.folder}`
+}
+
 function applyScanStatus(data) {
   loading.value = data.status === 'scanning'
   scanLimit.value = data.limit || scanLimit.value
@@ -308,6 +484,22 @@ function applyScanStatus(data) {
   completedItems.value = data.completed || completedItems.value
   if (data.status === 'error') {
     error.value = data.error || t('metadata.failedScan')
+  }
+}
+
+function applyArtistImageStatus(data) {
+  artistImageLoading.value = data.status === 'scanning'
+  artistImageLimit.value = data.limit || artistImageLimit.value
+  artistImageSummary.value = {
+    scanned: data.scanned || 0,
+    matched: data.matched || 0,
+    total: data.total || 0,
+  }
+  artistImageItems.value = data.items || []
+  completedArtistImages.value =
+    data.completed || completedArtistImages.value
+  if (data.status === 'error') {
+    artistImageError.value = data.error || t('metadata.failedArtistImageScan')
   }
 }
 
@@ -363,6 +555,12 @@ onMounted(async () => {
   } catch {
     // The page can still start a fresh scan if status lookup fails.
   }
+  try {
+    const res = await API.getArtistImageScanStatus()
+    applyArtistImageStatus(res.data)
+  } catch {
+    // The page can still start a fresh artist image scan.
+  }
 })
 
 onBeforeUnmount(stopPolling)
@@ -412,5 +610,59 @@ async function repairAll() {
     await apply(item)
   }
   repairingAll.value = false
+}
+
+async function scanArtistImages() {
+  artistImageLoading.value = true
+  artistImageError.value = ''
+  fixedArtistImages.value = {}
+  try {
+    const res = await API.scanArtistImages(artistImageLimit.value)
+    applyArtistImageStatus(res.data)
+  } catch {
+    artistImageError.value = t('metadata.failedArtistImageScan')
+  } finally {
+    artistImageLoading.value = false
+  }
+}
+
+async function applyArtistImage(item) {
+  const key = itemKey(item)
+  applyingArtistImages.value = {
+    ...applyingArtistImages.value,
+    [key]: true,
+  }
+  artistImageError.value = ''
+  try {
+    const res = await API.applyArtistImage(item)
+    if ((res.data?.saved || []).length === 0) {
+      artistImageError.value = t('metadata.failedArtistImageApply')
+      return
+    }
+    fixedArtistImages.value = { ...fixedArtistImages.value, [key]: true }
+    completedArtistImages.value = [res.data, ...completedArtistImages.value]
+    artistImageItems.value = artistImageItems.value.filter(
+      (existing) => itemKey(existing) !== key
+    )
+  } catch (err) {
+    const detail = err?.response?.data?.detail
+    artistImageError.value = detail
+      ? `${t('metadata.failedArtistImageApply')} ${detail}`
+      : t('metadata.failedArtistImageApply')
+  } finally {
+    applyingArtistImages.value = {
+      ...applyingArtistImages.value,
+      [key]: false,
+    }
+  }
+}
+
+async function repairAllArtistImages() {
+  repairingAllImages.value = true
+  for (const item of [...artistImageItems.value]) {
+    // eslint-disable-next-line no-await-in-loop
+    await applyArtistImage(item)
+  }
+  repairingAllImages.value = false
 }
 </script>

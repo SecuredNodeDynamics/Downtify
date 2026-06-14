@@ -135,6 +135,16 @@ class AppState:
         'complete': False,
     }
     metadata_scan_task: Optional[asyncio.Task] = None
+    artist_image_scan: dict[str, Any] = {
+        'status': 'idle',
+        'limit': 50,
+        'scanned': 0,
+        'total': 0,
+        'matched': 0,
+        'items': [],
+        'completed': [],
+        'error': '',
+    }
 
 
 state = AppState()
@@ -480,6 +490,99 @@ async def start_metadata_scan(request: Request) -> dict[str, Any]:
 @router.get('/api/metadata/scan/status')
 def metadata_scan_status() -> dict[str, Any]:
     return _metadata_scan_status()
+
+
+@router.post('/api/metadata/artist-images/scan')
+async def scan_artist_images(request: Request) -> dict[str, Any]:
+    if state.downloader is None:
+        raise HTTPException(status_code=500, detail='Downloader not ready')
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+    try:
+        limit = max(1, min(200, int(payload.get('limit', 50))))
+    except (TypeError, ValueError):
+        limit = 50
+    state.artist_image_scan = {
+        **state.artist_image_scan,
+        'status': 'scanning',
+        'limit': limit,
+        'scanned': 0,
+        'total': 0,
+        'matched': 0,
+        'items': [],
+        'error': '',
+    }
+    try:
+        result = await asyncio.to_thread(
+            metadata_repair.scan_artist_images,
+            state.downloader.download_dir,
+            limit,
+        )
+        state.artist_image_scan = {
+            **state.artist_image_scan,
+            **result,
+            'limit': limit,
+            'status': 'done',
+            'error': '',
+            'finished_at': datetime.now(timezone.utc).isoformat(),
+        }
+        return state.artist_image_scan
+    except Exception as exc:
+        logger.exception('Artist image scan failed')
+        state.artist_image_scan = {
+            **state.artist_image_scan,
+            'status': 'error',
+            'error': str(exc),
+            'finished_at': datetime.now(timezone.utc).isoformat(),
+        }
+        return state.artist_image_scan
+
+
+@router.get('/api/metadata/artist-images/status')
+def artist_image_scan_status() -> dict[str, Any]:
+    return dict(state.artist_image_scan)
+
+
+@router.post('/api/metadata/artist-images/apply')
+async def apply_artist_image(request: Request) -> dict[str, Any]:
+    if state.downloader is None:
+        raise HTTPException(status_code=500, detail='Downloader not ready')
+    try:
+        payload = await request.json()
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail='Invalid JSON') from exc
+    file = str(payload.get('file') or '').strip()
+    artist = {
+        'id': str(payload.get('artist_id') or '').strip(),
+        'name': str(payload.get('artist') or '').strip(),
+    }
+    if not file or not artist['id'] or not artist['name']:
+        raise HTTPException(
+            status_code=400,
+            detail='file, artist_id and artist are required',
+        )
+    try:
+        result = metadata_repair.repair_artist_image(
+            state.downloader.download_dir,
+            file,
+            artist,
+        )
+        completed = list(state.artist_image_scan.get('completed') or [])
+        completed.append(result)
+        state.artist_image_scan = {
+            **state.artist_image_scan,
+            'completed': completed,
+        }
+        return result
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail='File not found') from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception('Artist image repair failed for {}', file)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 @router.post('/api/metadata/apply')

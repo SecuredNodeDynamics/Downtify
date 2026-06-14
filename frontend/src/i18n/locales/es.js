@@ -175,11 +175,21 @@ export default {
     fixed: 'Corregido',
     completed: 'Completado',
     clean: 'No necesita correccion',
+    artistImages: 'Imagenes de artistas',
+    artistImagesSubtitle:
+      'Busca imagenes faltantes para Jellyfin usando MusicBrainz, Wikimedia y caratulas locales como alternativa.',
+    artistImageLimit: 'Imagenes de artistas para mostrar',
+    scanArtistImages: 'Escanear imagenes',
+    missingImages: 'Imagenes faltantes',
+    emptyArtistImages:
+      'No se encontraron imagenes de artistas faltantes con arte disponible.',
     blank: 'Vacio',
     idsOnly:
       'Se pueden agregar IDs de MusicBrainz; las etiquetas visibles ya coinciden.',
     failedScan: 'No se pudo escanear los metadatos.',
     failedApply: 'No se pudo aplicar la correccion de metadatos.',
+    failedArtistImageScan: 'No se pudo escanear imagenes de artistas.',
+    failedArtistImageApply: 'No se pudo reparar la imagen del artista.',
     failedVerify:
       'La escritura termino, pero el archivo todavia tiene cambios pendientes.',
   },

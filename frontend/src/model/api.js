@@ -117,6 +117,22 @@ function applyMetadata(file) {
   return API.post('/api/metadata/apply', { file })
 }
 
+function scanArtistImages(limit = 50) {
+  return API.post('/api/metadata/artist-images/scan', { limit })
+}
+
+function getArtistImageScanStatus() {
+  return API.get('/api/metadata/artist-images/status')
+}
+
+function applyArtistImage(item) {
+  return API.post('/api/metadata/artist-images/apply', {
+    file: item.file,
+    artist: item.artist,
+    artist_id: item.artist_id,
+  })
+}
+
 function encodePath(fileName) {
   // Encode each path segment individually so '/' separators survive —
   // playlist downloads land under '<playlist>/<song>.mp3' and we need
@@ -213,6 +229,9 @@ export default {
   startMetadataScan,
   getMetadataScanStatus,
   applyMetadata,
+  scanArtistImages,
+  getArtistImageScanStatus,
+  applyArtistImage,
   ws_onmessage,
   ws_onerror,
   getVersion,

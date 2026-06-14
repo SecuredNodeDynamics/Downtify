@@ -2,18 +2,19 @@
 
 from __future__ import annotations
 
-import os
+import base64
 import re
+import struct
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote, unquote, urlparse
 
 import requests
 from loguru import logger
+from mutagen import File as MutagenFile
 
 from .musicbrainz import USER_AGENT
 
-FANART_API_URL = 'https://webservice.fanart.tv/v3/music/{mbid}'
 MUSICBRAINZ_ARTIST_URL = 'https://musicbrainz.org/ws/2/artist/{mbid}'
 WIKIDATA_API_URL = 'https://www.wikidata.org/w/api.php'
 WIKIDATA_IMAGE_PROPERTY = 'P18'
@@ -88,40 +89,6 @@ def artist_folders_for_file(
 
 def has_artist_image(folder: Path) -> bool:
     return any((folder / name).exists() for name in IMAGE_NAMES)
-
-
-def _best_fanart_url(payload: dict[str, Any]) -> str:
-    for key in ('artistthumb', 'artistbackground', 'hdmusiclogo'):
-        images = payload.get(key)
-        if not isinstance(images, list):
-            continue
-        ranked = sorted(
-            (
-                image
-                for image in images
-                if isinstance(image, dict) and image.get('url')
-            ),
-            key=lambda image: int(str(image.get('likes') or '0')),
-            reverse=True,
-        )
-        if ranked:
-            return str(ranked[0]['url'])
-    return ''
-
-
-def _fanart_artist_image_url(mbid: str) -> str:
-    api_key = os.environ.get('DOWNTIFY_FANART_API_KEY', '').strip()
-    if not api_key:
-        return ''
-    response = requests.get(
-        FANART_API_URL.format(mbid=mbid),
-        params={'api_key': api_key},
-        timeout=12,
-    )
-    if response.status_code == 404:
-        return ''
-    response.raise_for_status()
-    return _best_fanart_url(response.json())
 
 
 def _wikidata_id_from_url(url: str) -> str:
@@ -212,24 +179,82 @@ def artist_image_bytes(mbid: str) -> bytes | None:
     if mbid in _IMAGE_CACHE:
         return _IMAGE_CACHE[mbid]
 
-    for source in (_fanart_artist_image_url, _wikimedia_artist_image_url):
-        try:
-            url = source(mbid)
-            if not url:
-                continue
-            data = _download_image(url)
-        except Exception:
-            logger.opt(exception=True).warning(
-                'Failed to fetch artist image for MusicBrainz artist {}',
-                mbid,
-            )
-            continue
-        if data:
-            _IMAGE_CACHE[mbid] = data
-            return data
+    try:
+        url = _wikimedia_artist_image_url(mbid)
+        data = _download_image(url) if url else None
+    except Exception:
+        logger.opt(exception=True).warning(
+            'Failed to fetch artist image for MusicBrainz artist {}',
+            mbid,
+        )
+        data = None
+    if data:
+        _IMAGE_CACHE[mbid] = data
+        return data
 
     _IMAGE_CACHE[mbid] = None
     return None
+
+
+def _picture_from_vorbis_block(value: str) -> bytes | None:
+    try:
+        block = base64.b64decode(value)
+        offset = 0
+        _pic_type = struct.unpack_from('>I', block, offset)[0]
+        offset += 4
+        mime_len = struct.unpack_from('>I', block, offset)[0]
+        offset += 4 + mime_len
+        desc_len = struct.unpack_from('>I', block, offset)[0]
+        offset += 4 + desc_len
+        offset += 16
+        data_len = struct.unpack_from('>I', block, offset)[0]
+        offset += 4
+        return block[offset : offset + data_len]
+    except Exception:
+        return None
+
+
+def embedded_cover_bytes(path: Path) -> bytes | None:
+    audio = MutagenFile(str(path))
+    if audio is None:
+        return None
+
+    pictures = getattr(audio, 'pictures', None)
+    if pictures:
+        return pictures[0].data
+
+    tags = audio.tags or {}
+    getall = getattr(tags, 'getall', None)
+    if callable(getall):
+        apic = getall('APIC')
+        if apic:
+            return apic[0].data
+
+    covr = tags.get('covr') if hasattr(tags, 'get') else None
+    if covr:
+        return bytes(covr[0])
+
+    blocks = tags.get('metadata_block_picture') if hasattr(tags, 'get') else None
+    if isinstance(blocks, list):
+        for block in blocks:
+            data = _picture_from_vorbis_block(str(block))
+            if data:
+                return data
+    return None
+
+
+def artist_or_fallback_image(
+    mbid: str,
+    fallback_path: Path | None = None,
+) -> tuple[bytes | None, str]:
+    image = artist_image_bytes(mbid)
+    if image:
+        return image, 'Wikimedia Commons'
+    if fallback_path is not None:
+        image = embedded_cover_bytes(fallback_path)
+        if image:
+            return image, 'Album cover fallback'
+    return None, ''
 
 
 def _extension_for_image(data: bytes) -> str:
@@ -253,7 +278,7 @@ def save_missing_artist_images(
         folders = [folder for folder in folders if not has_artist_image(folder)]
         if not folders:
             continue
-        image = artist_image_bytes(artist.get('id', ''))
+        image, _source = artist_or_fallback_image(artist.get('id', ''), path)
         if not image:
             continue
         extension = _extension_for_image(image)
@@ -264,3 +289,31 @@ def save_missing_artist_images(
             target.write_bytes(image)
             saved.append(unquote(target.relative_to(root.resolve()).as_posix()))
     return saved
+
+
+def missing_artist_image_items(
+    root: Path,
+    path: Path,
+    artists: list[dict[str, str]],
+) -> list[dict[str, Any]]:
+    items: list[dict[str, Any]] = []
+    for artist in artists:
+        folders = [
+            folder
+            for folder in artist_folders_for_file(root, path, [artist])
+            if not has_artist_image(folder)
+        ]
+        if not folders:
+            continue
+        image, source = artist_or_fallback_image(artist.get('id', ''), path)
+        if not image:
+            continue
+        for folder in folders:
+            items.append({
+                'artist': artist.get('name', ''),
+                'artist_id': artist.get('id', ''),
+                'file': path.relative_to(root.resolve()).as_posix(),
+                'folder': folder.relative_to(root.resolve()).as_posix(),
+                'source': source,
+            })
+    return items

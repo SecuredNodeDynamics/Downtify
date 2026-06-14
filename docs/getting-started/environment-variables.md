@@ -13,7 +13,6 @@ All environment variables are optional. Downtify works out of the box without an
 | `DOWNTIFY_PORT` | `8000` | Port the server listens on inside the container. Change the left side of the port mapping to expose a different host port. |
 | `DOWNLOAD_DIR` | `/downloads` | Directory where audio files are saved. Override if you mount your library at a custom path. |
 | `DOWNTIFY_MEDIA_SAVE_LOCATION` | _(unset)_ | Optional host/external media path shown on the Health page. In the included Compose file, setting this also changes the host folder mounted to `/downloads`, e.g. `/mnt/media/Music`. |
-| `DOWNTIFY_FANART_API_KEY` | _(unset)_ | Optional fanart.tv API key. When set, metadata repair can pull artist images from fanart.tv before falling back to Wikimedia images linked from MusicBrainz/Wikidata. |
 | `HOST` | `0.0.0.0` | Bind address for the web server. |
 
 ## Anti-bot / YouTube

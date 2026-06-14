@@ -8,7 +8,7 @@ from typing import Any, Callable
 from loguru import logger
 from mutagen import File as MutagenFile
 
-from .artist_art import save_missing_artist_images
+from .artist_art import missing_artist_image_items, save_missing_artist_images
 from .musicbrainz import enrich_song_metadata
 
 AUDIO_EXTENSIONS = {'.mp3', '.m4a', '.mp4', '.aac', '.flac', '.ogg', '.opus'}
@@ -71,11 +71,35 @@ def _song_from_file(path: Path) -> dict[str, Any]:
         'year': release_date[:4] if len(release_date) >= 4 else '',
         'track_number': _first(tags, ['tracknumber', 'trkn', 'TRCK']),
         'disc_number': _first(tags, ['discnumber', 'disk', 'TPOS']),
+        'musicbrainz_artist_ids': [
+            {'id': artist_id, 'name': ''}
+            for artist_id in _artists_from_ids(tags)
+        ],
     }
     length = getattr(getattr(audio, 'info', None), 'length', None)
     if length:
         song['duration_ms'] = int(float(length) * 1000)
     return song
+
+
+def _artists_from_ids(tags: Any) -> list[str]:
+    if not tags:
+        return []
+    for key in ['musicbrainz_artistid', 'MusicBrainz Artist Id', 'TXXX:MusicBrainz Artist Id']:
+        value = tags.get(key)
+        if isinstance(value, list) and value:
+            return [str(item).strip() for item in value if str(item).strip()]
+        if value:
+            text = str(value)
+            for separator in (' / ', ';', ','):
+                if separator in text:
+                    return [
+                        part.strip()
+                        for part in text.split(separator)
+                        if part.strip()
+                    ]
+            return [text.strip()]
+    return []
 
 
 def _public_song(song: dict[str, Any]) -> dict[str, Any]:
@@ -203,6 +227,46 @@ def scan_library(
     }
 
 
+def scan_artist_images(root: Path, limit: int = 100) -> dict[str, Any]:
+    root = root.resolve()
+    files = [
+        path
+        for path in root.rglob('*')
+        if path.is_file() and path.suffix.lower() in AUDIO_EXTENSIONS
+    ]
+    files.sort(key=lambda path: path.relative_to(root).as_posix().casefold())
+    items: list[dict[str, Any]] = []
+    seen: set[tuple[str, str]] = set()
+    scanned = 0
+    max_items = max(1, limit)
+    for path in files:
+        scanned += 1
+        current = _song_from_file(path)
+        candidate = enrich_song_metadata(current)
+        artists = candidate.get('musicbrainz_artist_ids') or []
+        for item in missing_artist_image_items(root, path, artists):
+            key = (item['artist_id'], item['folder'])
+            if key in seen:
+                continue
+            seen.add(key)
+            items.append(item)
+            if len(items) >= max_items:
+                return {
+                    'root': str(root),
+                    'scanned': scanned,
+                    'total': len(files),
+                    'items': items,
+                    'matched': len(items),
+                }
+    return {
+        'root': str(root),
+        'scanned': scanned,
+        'total': len(files),
+        'items': items,
+        'matched': len(items),
+    }
+
+
 def safe_library_path(root: Path, relative_file: str) -> Path:
     root = root.resolve()
     target = (root / relative_file).resolve()
@@ -244,7 +308,26 @@ def apply_text_tags(path: Path, metadata: dict[str, Any]) -> None:
         metadata.get('musicbrainz_release_id'),
         optional=True,
     )
+    artist_ids = [
+        artist.get('id')
+        for artist in metadata.get('musicbrainz_artist_ids') or []
+        if isinstance(artist, dict) and artist.get('id')
+    ]
+    set_key('musicbrainz_artistid', artist_ids, optional=True)
     audio.save()
+
+
+def repair_artist_image(root: Path, relative_file: str, artist: dict[str, str]):
+    path = safe_library_path(root, relative_file)
+    if not path.exists() or not path.is_file():
+        raise FileNotFoundError(relative_file)
+    saved = save_missing_artist_images(root.resolve(), path, [artist])
+    return {
+        'artist': artist.get('name', ''),
+        'artist_id': artist.get('id', ''),
+        'file': path.relative_to(root.resolve()).as_posix(),
+        'saved': saved,
+    }
 
 
 def repair_file(root: Path, relative_file: str) -> dict[str, Any]:

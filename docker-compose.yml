@@ -12,7 +12,6 @@ services:
     environment:
       - DOWNTIFY_PORT=30321
       - DOWNTIFY_MEDIA_SAVE_LOCATION=${DOWNTIFY_MEDIA_SAVE_LOCATION:-}
-      - DOWNTIFY_FANART_API_KEY=${DOWNTIFY_FANART_API_KEY:-}
     dns:
       - 1.1.1.1
       - 1.0.0.1

@@ -306,6 +306,79 @@ def test_repair_file_saves_missing_artist_images(tmp_path, monkeypatch):
     assert saved['artists'] == [{'id': 'artist-mbid', 'name': 'Artist'}]
 
 
+def test_scan_artist_images_lists_available_missing_art(tmp_path, monkeypatch):
+    album = tmp_path / 'Artist' / 'Album'
+    album.mkdir(parents=True)
+    track = album / 'song.mp3'
+    track.write_bytes(b'not really audio')
+
+    monkeypatch.setattr(
+        metadata_repair,
+        '_song_from_file',
+        lambda _path: {'name': 'Song', 'artists': ['Artist']},
+    )
+    monkeypatch.setattr(
+        metadata_repair,
+        'enrich_song_metadata',
+        lambda song: {
+            **song,
+            'musicbrainz_artist_ids': [
+                {'id': 'artist-mbid', 'name': 'Artist'},
+            ],
+        },
+    )
+    monkeypatch.setattr(
+        metadata_repair,
+        'missing_artist_image_items',
+        lambda root, path, artists: [
+            {
+                'artist': artists[0]['name'],
+                'artist_id': artists[0]['id'],
+                'file': path.relative_to(root).as_posix(),
+                'folder': 'Artist',
+                'source': 'Wikimedia Commons',
+            }
+        ],
+    )
+
+    result = metadata_repair.scan_artist_images(tmp_path, limit=10)
+
+    assert result['matched'] == 1
+    assert result['items'][0]['artist'] == 'Artist'
+    assert result['items'][0]['source'] == 'Wikimedia Commons'
+
+
+def test_repair_artist_image_writes_for_requested_artist(
+    tmp_path,
+    monkeypatch,
+):
+    album = tmp_path / 'Artist' / 'Album'
+    album.mkdir(parents=True)
+    track = album / 'song.mp3'
+    track.write_bytes(b'not really audio')
+
+    saved = {}
+
+    def fake_save(root, path, artists):
+        saved['root'] = root
+        saved['path'] = path
+        saved['artists'] = artists
+        return ['Artist/folder.jpg']
+
+    monkeypatch.setattr(metadata_repair, 'save_missing_artist_images', fake_save)
+
+    result = metadata_repair.repair_artist_image(
+        tmp_path,
+        'Artist/Album/song.mp3',
+        {'id': 'artist-mbid', 'name': 'Artist'},
+    )
+
+    assert saved['root'] == tmp_path.resolve()
+    assert saved['path'] == track.resolve()
+    assert saved['artists'] == [{'id': 'artist-mbid', 'name': 'Artist'}]
+    assert result['saved'] == ['Artist/folder.jpg']
+
+
 def test_repair_file_fails_when_metadata_does_not_persist(
     tmp_path,
     monkeypatch,
