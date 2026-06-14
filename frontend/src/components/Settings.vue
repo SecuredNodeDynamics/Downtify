@@ -636,10 +636,19 @@ const activeTab = ref('general')
 const jellyfinLibraries = ref([])
 const jellyfinLibraryLoading = ref(false)
 const jellyfinLibraryError = ref('')
+function normalizedJellyfinLibraryName(value) {
+  return String(value || '')
+    .normalize('NFKC')
+    .replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2060-\u206f\ufeff]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase()
+}
+
 const uniqueJellyfinLibraries = computed(() => {
   const seen = new Set()
   return jellyfinLibraries.value.filter((lib) => {
-    const key = String(lib?.name || '').trim().toLowerCase()
+    const key = normalizedJellyfinLibraryName(lib?.name)
     if (!key || seen.has(key)) return false
     seen.add(key)
     return true

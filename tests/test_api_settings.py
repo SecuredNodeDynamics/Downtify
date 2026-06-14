@@ -9,6 +9,7 @@ from downtify.api import (
     DEFAULT_SETTINGS,
     _effective_lyrics_providers,
     _load_settings,
+    _normalized_jellyfin_library_name,
     jellyfin_libraries_endpoint,
 )
 
@@ -185,7 +186,7 @@ def test_jellyfin_libraries_dedupes_by_name(monkeypatch):
                     },
                     {
                         'Id': 'music-folder',
-                        'Name': ' Music ',
+                        'Name': '\ufeff Music\u200b ',
                         'Type': 'Folder',
                         'IsFolder': True,
                     },
@@ -201,7 +202,7 @@ def test_jellyfin_libraries_dedupes_by_name(monkeypatch):
     def fake_get(url, headers=None, params=None, timeout=None):
         assert url == 'http://jellyfin.test/Items'
         assert headers == {'X-MediaBrowser-Token': 'secret'}
-        assert params == {'Recursive': False}
+        assert params == {'Recursive': False, 'IncludeItemTypes': 'CollectionFolder'}
         assert timeout == 10
         return FakeResponse()
 
@@ -216,3 +217,7 @@ def test_jellyfin_libraries_dedupes_by_name(monkeypatch):
             {'id': 'tv-view', 'name': 'TV', 'type': 'Folder'},
         ],
     }
+
+
+def test_normalized_jellyfin_library_name_removes_hidden_characters():
+    assert _normalized_jellyfin_library_name('\ufeff Music\u200b ') == 'music'

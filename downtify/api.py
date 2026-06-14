@@ -26,6 +26,7 @@ import re
 import shutil
 import subprocess
 import sys
+import unicodedata
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Optional
@@ -79,6 +80,14 @@ def _effective_lyrics_providers(settings: dict[str, Any]) -> list[str]:
         for p in (settings.get('lyrics_providers') or [])
         if isinstance(p, str) and p
     ]
+
+
+def _normalized_jellyfin_library_name(value: Any) -> str:
+    normalized = unicodedata.normalize('NFKC', str(value or ''))
+    normalized = ''.join(
+        char for char in normalized if unicodedata.category(char) not in {'Cc', 'Cf'}
+    )
+    return re.sub(r'\s+', ' ', normalized).strip().casefold()
 
 
 class ConnectionManager:
@@ -1415,7 +1424,7 @@ def jellyfin_libraries_endpoint(
         response = requests.get(
             f'{url}/Items',
             headers=headers,
-            params={'Recursive': False},
+            params={'Recursive': False, 'IncludeItemTypes': 'CollectionFolder'},
             timeout=10,
         )
         response.raise_for_status()
@@ -1439,10 +1448,10 @@ def jellyfin_libraries_endpoint(
 
                 # Include folders that might contain music (including "Music" library)
                 # Skip duplicate IDs and duplicate names because settings store names.
-                name_key = name.strip().casefold()
+                name_key = _normalized_jellyfin_library_name(name)
+                is_library_folder = is_folder and item_type in {'Folder', 'CollectionFolder'}
                 if (
-                    is_folder
-                    and item_type == 'Folder'
+                    is_library_folder
                     and item_id not in seen_ids
                     and name_key not in seen_names
                 ):
@@ -1454,6 +1463,11 @@ def jellyfin_libraries_endpoint(
                             'name': name,
                             'type': item_type,
                         }
+                    )
+                elif is_library_folder:
+                    logger.info(
+                        f'Skipping duplicate Jellyfin library candidate: {name} '
+                        f'(id: {item_id})'
                     )
 
         return {'success': True, 'libraries': libraries}
