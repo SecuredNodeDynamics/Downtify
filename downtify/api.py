@@ -120,9 +120,7 @@ def _prefer_music_libraries(candidates: list[dict[str, Any]]) -> list[dict[str, 
         for library in candidates
         if str(library.get('collection_type') or '').casefold() == 'music'
     ]
-    if not music:
-        return candidates
-    return [music[0]]
+    return music or candidates
 
 
 def _libraries_from_virtual_folders(data: Any) -> list[dict[str, Any]]:

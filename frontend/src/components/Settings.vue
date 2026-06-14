@@ -539,7 +539,7 @@
                     :key="lib.id"
                     :value="lib.name"
                   >
-                    {{ lib.name }}
+                    {{ lib.display_name || lib.name }}
                   </option>
                 </select>
                 <button

@@ -172,7 +172,7 @@ def test_effective_providers_empty_list_when_no_providers():
 # ── Jellyfin libraries ────────────────────────────────────────────────────────
 
 
-def test_jellyfin_libraries_returns_one_canonical_music_library(monkeypatch):
+def test_jellyfin_libraries_returns_music_libraries_only(monkeypatch):
     class FakeVirtualFoldersResponse:
         def raise_for_status(self):
             return None
@@ -181,6 +181,11 @@ def test_jellyfin_libraries_returns_one_canonical_music_library(monkeypatch):
             return [
                 {'ItemId': 'music-view', 'Name': 'Music', 'CollectionType': 'music'},
                 {'ItemId': 'music-copy', 'Name': '\ufeff Music\u200b ', 'CollectionType': 'music'},
+                {
+                    'ItemId': 'music-playlists-view',
+                    'Name': 'Music Playlists',
+                    'CollectionType': 'music',
+                },
                 {'ItemId': 'tv-view', 'Name': 'TV', 'CollectionType': 'tvshows'},
                 {'ItemId': 'movie-view', 'Name': 'Movies', 'CollectionType': 'movies'},
             ]
@@ -206,6 +211,12 @@ def test_jellyfin_libraries_returns_one_canonical_music_library(monkeypatch):
             {
                 'id': 'music-view',
                 'name': 'Music',
+                'type': 'VirtualFolder',
+                'collection_type': 'music',
+            },
+            {
+                'id': 'music-playlists-view',
+                'name': 'Music Playlists',
                 'type': 'VirtualFolder',
                 'collection_type': 'music',
             },
