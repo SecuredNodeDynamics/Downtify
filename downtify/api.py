@@ -145,6 +145,7 @@ class AppState:
         'completed': [],
         'error': '',
     }
+    artist_image_scan_task: Optional[asyncio.Task] = None
 
 
 state = AppState()
@@ -492,6 +493,48 @@ def metadata_scan_status() -> dict[str, Any]:
     return _metadata_scan_status()
 
 
+async def _run_artist_image_scan(limit: int) -> None:
+    if state.downloader is None:
+        state.artist_image_scan = {
+            **state.artist_image_scan,
+            'status': 'error',
+            'error': 'Downloader not ready',
+        }
+        return
+
+    def progress(update: dict[str, Any]) -> None:
+        state.artist_image_scan = {
+            **state.artist_image_scan,
+            **update,
+            'status': 'scanning',
+            'limit': limit,
+        }
+
+    try:
+        result = await asyncio.to_thread(
+            metadata_repair.scan_artist_images,
+            state.downloader.download_dir,
+            limit,
+            progress,
+        )
+        state.artist_image_scan = {
+            **state.artist_image_scan,
+            **result,
+            'limit': limit,
+            'status': 'done',
+            'error': '',
+            'finished_at': datetime.now(timezone.utc).isoformat(),
+        }
+    except Exception as exc:
+        logger.exception('Artist image scan failed')
+        state.artist_image_scan = {
+            **state.artist_image_scan,
+            'status': 'error',
+            'error': str(exc),
+            'finished_at': datetime.now(timezone.utc).isoformat(),
+        }
+
+
 @router.post('/api/metadata/artist-images/scan')
 async def scan_artist_images(request: Request) -> dict[str, Any]:
     if state.downloader is None:
@@ -504,6 +547,9 @@ async def scan_artist_images(request: Request) -> dict[str, Any]:
         limit = max(1, min(200, int(payload.get('limit', 50))))
     except (TypeError, ValueError):
         limit = 50
+    task = state.artist_image_scan_task
+    if task is not None and not task.done():
+        return dict(state.artist_image_scan)
     state.artist_image_scan = {
         **state.artist_image_scan,
         'status': 'scanning',
@@ -513,31 +559,12 @@ async def scan_artist_images(request: Request) -> dict[str, Any]:
         'matched': 0,
         'items': [],
         'error': '',
+        'started_at': datetime.now(timezone.utc).isoformat(),
     }
-    try:
-        result = await asyncio.to_thread(
-            metadata_repair.scan_artist_images,
-            state.downloader.download_dir,
-            limit,
-        )
-        state.artist_image_scan = {
-            **state.artist_image_scan,
-            **result,
-            'limit': limit,
-            'status': 'done',
-            'error': '',
-            'finished_at': datetime.now(timezone.utc).isoformat(),
-        }
-        return state.artist_image_scan
-    except Exception as exc:
-        logger.exception('Artist image scan failed')
-        state.artist_image_scan = {
-            **state.artist_image_scan,
-            'status': 'error',
-            'error': str(exc),
-            'finished_at': datetime.now(timezone.utc).isoformat(),
-        }
-        return state.artist_image_scan
+    state.artist_image_scan_task = asyncio.create_task(
+        _run_artist_image_scan(limit)
+    )
+    return dict(state.artist_image_scan)
 
 
 @router.get('/api/metadata/artist-images/status')

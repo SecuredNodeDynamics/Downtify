@@ -63,17 +63,22 @@ def _song_from_file(path: Path) -> dict[str, Any]:
 
     tags = audio.tags or {}
     release_date = _first(tags, ['date', '\xa9day', 'TDRC'])
+    artists = _artists(tags)
+    artist_ids = _artists_from_ids(tags)
     song = {
         'name': _first(tags, ['title', '\xa9nam', 'TIT2']) or path.stem,
-        'artists': _artists(tags),
+        'artists': artists,
         'album_name': _first(tags, ['album', '\xa9alb', 'TALB']),
         'release_date': release_date,
         'year': release_date[:4] if len(release_date) >= 4 else '',
         'track_number': _first(tags, ['tracknumber', 'trkn', 'TRCK']),
         'disc_number': _first(tags, ['discnumber', 'disk', 'TPOS']),
         'musicbrainz_artist_ids': [
-            {'id': artist_id, 'name': ''}
-            for artist_id in _artists_from_ids(tags)
+            {
+                'id': artist_id,
+                'name': artists[index] if index < len(artists) else '',
+            }
+            for index, artist_id in enumerate(artist_ids)
         ],
     }
     length = getattr(getattr(audio, 'info', None), 'length', None)
@@ -227,7 +232,42 @@ def scan_library(
     }
 
 
-def scan_artist_images(root: Path, limit: int = 100) -> dict[str, Any]:
+def _artist_image_scan_candidates(
+    root: Path,
+    path: Path,
+    current: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
+    current = current or _song_from_file(path)
+    artists = current.get('musicbrainz_artist_ids') or []
+    if not artists:
+        candidate = enrich_song_metadata(current)
+        artists = candidate.get('musicbrainz_artist_ids') or []
+    return missing_artist_image_items(root, path, artists)
+
+
+def _artist_attempt_key(root: Path, path: Path, song: dict[str, Any]) -> str:
+    artist_ids = [
+        str(artist.get('id') or '').strip()
+        for artist in song.get('musicbrainz_artist_ids') or []
+        if isinstance(artist, dict) and artist.get('id')
+    ]
+    if artist_ids:
+        return 'mbid:' + '|'.join(artist_ids)
+    artists = [str(artist).strip() for artist in song.get('artists') or []]
+    if artists:
+        return 'artist:' + '|'.join(artists).casefold()
+    try:
+        relative = path.resolve().relative_to(root)
+    except ValueError:
+        return path.stem.casefold()
+    return f'folder:{relative.parts[0].casefold()}' if relative.parts else ''
+
+
+def scan_artist_images(
+    root: Path,
+    limit: int = 100,
+    progress_cb: ProgressCallback | None = None,
+) -> dict[str, Any]:
     root = root.resolve()
     files = [
         path
@@ -237,33 +277,62 @@ def scan_artist_images(root: Path, limit: int = 100) -> dict[str, Any]:
     files.sort(key=lambda path: path.relative_to(root).as_posix().casefold())
     items: list[dict[str, Any]] = []
     seen: set[tuple[str, str]] = set()
+    attempted: set[str] = set()
     scanned = 0
     max_items = max(1, limit)
     for path in files:
         scanned += 1
-        current = _song_from_file(path)
-        candidate = enrich_song_metadata(current)
-        artists = candidate.get('musicbrainz_artist_ids') or []
-        for item in missing_artist_image_items(root, path, artists):
+        try:
+            current = _song_from_file(path)
+            attempt_key = _artist_attempt_key(root, path, current)
+            if attempt_key in attempted:
+                candidates = []
+            else:
+                attempted.add(attempt_key)
+                candidates = _artist_image_scan_candidates(root, path, current)
+        except Exception:
+            logger.opt(exception=True).warning(
+                'Failed to scan artist image candidate {}',
+                path,
+            )
+            candidates = []
+        for item in candidates:
             key = (item['artist_id'], item['folder'])
             if key in seen:
                 continue
             seen.add(key)
             items.append(item)
-            if len(items) >= max_items:
-                return {
-                    'root': str(root),
+        if progress_cb is not None:
+            progress_cb({
+                'scanned': scanned,
+                'total': len(files),
+                'items': list(items),
+                'matched': len(items),
+            })
+        if len(items) >= max_items:
+            items = items[:max_items]
+            if progress_cb is not None:
+                progress_cb({
                     'scanned': scanned,
                     'total': len(files),
-                    'items': items,
+                    'items': list(items),
                     'matched': len(items),
-                }
+                })
+            return {
+                'root': str(root),
+                'scanned': scanned,
+                'total': len(files),
+                'items': items,
+                'matched': len(items),
+                'complete': False,
+            }
     return {
         'root': str(root),
         'scanned': scanned,
         'total': len(files),
         'items': items,
         'matched': len(items),
+        'complete': True,
     }
 
 

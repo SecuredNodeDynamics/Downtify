@@ -348,6 +348,43 @@ def test_scan_artist_images_lists_available_missing_art(tmp_path, monkeypatch):
     assert result['items'][0]['source'] == 'Wikimedia Commons'
 
 
+def test_scan_artist_images_reports_progress(tmp_path, monkeypatch):
+    album = tmp_path / 'Artist' / 'Album'
+    album.mkdir(parents=True)
+    for index in range(2):
+        (album / f'song-{index}.mp3').write_bytes(b'not really audio')
+
+    monkeypatch.setattr(
+        metadata_repair,
+        '_song_from_file',
+        lambda _path: {'name': 'Song', 'artists': ['Artist']},
+    )
+    monkeypatch.setattr(
+        metadata_repair,
+        '_artist_image_scan_candidates',
+        lambda root, path, _current=None: [
+            {
+                'artist': 'Artist',
+                'artist_id': 'artist-mbid',
+                'file': path.relative_to(root).as_posix(),
+                'folder': 'Artist',
+                'source': 'Album cover fallback',
+            }
+        ],
+    )
+    updates = []
+
+    metadata_repair.scan_artist_images(
+        tmp_path,
+        limit=10,
+        progress_cb=updates.append,
+    )
+
+    assert updates
+    assert updates[-1]['scanned'] == 2
+    assert updates[-1]['matched'] == 1
+
+
 def test_repair_artist_image_writes_for_requested_artist(
     tmp_path,
     monkeypatch,

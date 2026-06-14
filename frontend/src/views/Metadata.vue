@@ -451,6 +451,7 @@ const fixedArtistImages = ref({})
 const repairingAllImages = ref(false)
 const artistImageSummary = ref({ scanned: 0, matched: 0, total: 0 })
 let pollTimer = null
+let artistImagePollTimer = null
 
 const visibleItems = computed(() =>
   activeTab.value === 'completed'
@@ -510,9 +511,21 @@ function stopPolling() {
   }
 }
 
+function stopArtistImagePolling() {
+  if (artistImagePollTimer !== null) {
+    clearInterval(artistImagePollTimer)
+    artistImagePollTimer = null
+  }
+}
+
 function startPolling() {
   stopPolling()
   pollTimer = setInterval(refreshScanStatus, 2000)
+}
+
+function startArtistImagePolling() {
+  stopArtistImagePolling()
+  artistImagePollTimer = setInterval(refreshArtistImageStatus, 1500)
 }
 
 async function refreshScanStatus() {
@@ -526,6 +539,20 @@ async function refreshScanStatus() {
     stopPolling()
     loading.value = false
     error.value = t('metadata.failedScan')
+  }
+}
+
+async function refreshArtistImageStatus() {
+  try {
+    const res = await API.getArtistImageScanStatus()
+    applyArtistImageStatus(res.data)
+    if (res.data.status !== 'scanning') {
+      stopArtistImagePolling()
+    }
+  } catch {
+    stopArtistImagePolling()
+    artistImageLoading.value = false
+    artistImageError.value = t('metadata.failedArtistImageScan')
   }
 }
 
@@ -558,12 +585,18 @@ onMounted(async () => {
   try {
     const res = await API.getArtistImageScanStatus()
     applyArtistImageStatus(res.data)
+    if (res.data.status === 'scanning') {
+      startArtistImagePolling()
+    }
   } catch {
     // The page can still start a fresh artist image scan.
   }
 })
 
-onBeforeUnmount(stopPolling)
+onBeforeUnmount(() => {
+  stopPolling()
+  stopArtistImagePolling()
+})
 
 async function apply(item) {
   applying.value = { ...applying.value, [item.file]: true }
@@ -619,9 +652,11 @@ async function scanArtistImages() {
   try {
     const res = await API.scanArtistImages(artistImageLimit.value)
     applyArtistImageStatus(res.data)
+    if (res.data.status === 'scanning') {
+      startArtistImagePolling()
+    }
   } catch {
     artistImageError.value = t('metadata.failedArtistImageScan')
-  } finally {
     artistImageLoading.value = false
   }
 }
