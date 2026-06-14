@@ -14,6 +14,9 @@ const settings = ref({
   organize_by_artist: false,
   organize_by_album: false,
   server_media_location: '',
+  jellyfin_url: '',
+  jellyfin_api_key: '',
+  jellyfin_music_library: '',
   max_parallel_downloads: 3,
 })
 

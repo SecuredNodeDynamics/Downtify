@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from downtify import metadata_repair
+from downtify import artist_art, metadata_repair
 
 
 def test_artists_reads_multi_value_tags():
@@ -25,6 +25,45 @@ def test_safe_library_path_rejects_traversal(tmp_path):
 def test_safe_library_path_rejects_non_audio(tmp_path):
     with pytest.raises(ValueError, match='Unsupported audio file'):
         metadata_repair.safe_library_path(tmp_path, 'notes.txt')
+
+
+def test_has_artist_image_accepts_common_local_image_names(tmp_path):
+    artist = tmp_path / 'Aaron Copland'
+    artist.mkdir()
+    (artist / 'thumb.jpg').write_bytes(b'image')
+
+    assert artist_art.has_artist_image(artist) is True
+
+
+def test_artist_image_target_uses_artist_name(tmp_path):
+    target = artist_art.artist_image_target_path(
+        tmp_path,
+        'AC/DC: Live',
+        b'\x89PNG\r\n\x1a\nimage',
+    )
+
+    assert target.name == 'AC DC Live.png'
+
+
+def test_missing_artist_image_items_include_named_target(tmp_path, monkeypatch):
+    album = tmp_path / 'Artist' / 'Album'
+    album.mkdir(parents=True)
+    track = album / 'song.mp3'
+    track.write_bytes(b'not really audio')
+
+    monkeypatch.setattr(
+        artist_art,
+        'artist_or_fallback_image',
+        lambda *_args: (b'image', 'Album cover fallback'),
+    )
+
+    items = artist_art.missing_artist_image_items(
+        tmp_path,
+        track,
+        [{'id': 'artist-mbid', 'name': 'Artist'}],
+    )
+
+    assert items[0]['target'] == 'Artist/Artist.jpg'
 
 
 def test_scan_library_reports_musicbrainz_match(tmp_path, monkeypatch):
@@ -295,7 +334,7 @@ def test_repair_file_saves_missing_artist_images(tmp_path, monkeypatch):
         saved['root'] = root
         saved['path'] = path
         saved['artists'] = artists
-        return ['Artist/folder.jpg']
+        return ['Artist/Artist.jpg']
 
     monkeypatch.setattr(metadata_repair, 'save_missing_artist_images', fake_save)
 
@@ -440,7 +479,7 @@ def test_repair_artist_image_writes_for_requested_artist(
         saved['root'] = root
         saved['path'] = path
         saved['artists'] = artists
-        return ['Artist/folder.jpg']
+        return ['Artist/Artist.jpg']
 
     monkeypatch.setattr(metadata_repair, 'save_missing_artist_images', fake_save)
 
@@ -453,7 +492,7 @@ def test_repair_artist_image_writes_for_requested_artist(
     assert saved['root'] == tmp_path.resolve()
     assert saved['path'] == track.resolve()
     assert saved['artists'] == [{'id': 'artist-mbid', 'name': 'Artist'}]
-    assert result['saved'] == ['Artist/folder.jpg']
+    assert result['saved'] == ['Artist/Artist.jpg']
 
 
 def test_repair_file_fails_when_metadata_does_not_persist(

@@ -383,7 +383,7 @@
                     {{ item.artist }}
                   </p>
                   <p class="mt-1 text-xs text-base-content/45">
-                    {{ item.folder }}
+                    {{ item.target || item.folder }}
                   </p>
                   <p class="mt-1 text-xs text-primary">
                     {{ item.source }}

@@ -172,13 +172,14 @@ export default {
     fixed: 'Fixed',
     completed: 'Completed',
     clean: 'No Repair Needed',
-    artistImages: 'Artist Images',
+    artistImages: 'Local Artist Images',
     artistImagesSubtitle:
-      'Find missing Jellyfin artist images using MusicBrainz, Wikimedia and local album art fallback.',
+      'Find artist folders missing local image files and save new artwork as Artist Name.jpg/png/webp. Jellyfin may still show cached or provider artwork that is not stored in your music folder.',
     artistImageLimit: 'Artist images to show',
     scanArtistImages: 'Scan artist images',
-    missingImages: 'Missing images',
-    emptyArtistImages: 'No missing artist images found with available artwork.',
+    missingImages: 'Missing local images',
+    emptyArtistImages:
+      'No missing local artist images found with available artwork.',
     before: 'Before',
     after: 'After',
     blank: 'Blank',
@@ -249,6 +250,8 @@ export default {
   settings: {
     title: 'Settings',
     subtitle: 'Tweak how Downtify fetches and tags your music.',
+    generalTab: 'General',
+    apiTab: 'API',
     audioSource: 'Audio source',
     lyricsSource: 'Lyrics source',
     lyricsHint: 'only lrclib is active',
@@ -263,6 +266,19 @@ export default {
     enhanceMetadata: 'Enhance tags with MusicBrainz',
     enhanceMetadataHint:
       'After Downtify resolves a track, use high-confidence MusicBrainz matches to improve title, artist, album and release date tags.',
+    jellyfinSection: 'Jellyfin API',
+    jellyfinUrl: 'Jellyfin URL',
+    jellyfinUrlPlaceholder: 'http://10.128.1.30:8096',
+    jellyfinUrlHint:
+      'Base URL for your Jellyfin server. Do not include /web at the end.',
+    jellyfinApiKey: 'Jellyfin API key',
+    jellyfinApiKeyPlaceholder: 'Paste API key',
+    jellyfinApiKeyHint:
+      'Used later for Jellyfin library sync and direct artist image updates.',
+    jellyfinMusicLibrary: 'Music library or folder',
+    jellyfinMusicLibraryPlaceholder: 'Music',
+    jellyfinMusicLibraryHint:
+      'Name or path of the Jellyfin music library Downtify should scan/sync.',
     playlistsSection: 'Playlists',
     generateM3u: 'Generate M3U file for playlists',
     generateM3uHint:

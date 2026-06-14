@@ -62,6 +62,9 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     'organize_by_album': False,
     'enhance_metadata': True,
     'server_media_location': '',
+    'jellyfin_url': '',
+    'jellyfin_api_key': '',
+    'jellyfin_music_library': '',
 }
 
 AUDIO_EXTENSIONS = {'.mp3', '.m4a', '.flac', '.ogg', '.wav', '.aac', '.opus'}

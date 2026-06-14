@@ -23,6 +23,12 @@ IMAGE_NAMES = (
     'folder.jpg',
     'folder.png',
     'folder.webp',
+    'artist.jpg',
+    'artist.png',
+    'artist.webp',
+    'thumb.jpg',
+    'thumb.png',
+    'thumb.webp',
     'poster.jpg',
     'poster.png',
     'poster.webp',
@@ -33,6 +39,7 @@ IMAGE_NAMES = (
     'default.png',
     'default.webp',
 )
+IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.webp'}
 
 _IMAGE_CACHE: dict[str, bytes | None] = {}
 _WIKIDATA_CACHE: dict[str, str | None] = {}
@@ -40,6 +47,12 @@ _WIKIDATA_CACHE: dict[str, str | None] = {}
 
 def _norm(value: str) -> str:
     return ' '.join(value.casefold().split())
+
+
+def _safe_image_stem(value: str) -> str:
+    stem = re.sub(r'[\\/:*?"<>|\x00-\x1f]+', ' ', value).strip()
+    stem = re.sub(r'\s+', ' ', stem).strip(' .')
+    return stem or 'artist'
 
 
 def _safe_artist_folder(root: Path, name: str) -> Path | None:
@@ -88,7 +101,12 @@ def artist_folders_for_file(
 
 
 def has_artist_image(folder: Path) -> bool:
-    return any((folder / name).exists() for name in IMAGE_NAMES)
+    if any((folder / name).exists() for name in IMAGE_NAMES):
+        return True
+    return any(
+        path.is_file() and path.suffix.casefold() in IMAGE_EXTENSIONS
+        for path in folder.iterdir()
+    )
 
 
 def _wikidata_id_from_url(url: str) -> str:
@@ -265,6 +283,14 @@ def _extension_for_image(data: bytes) -> str:
     return '.jpg'
 
 
+def artist_image_target_path(
+    folder: Path,
+    artist_name: str,
+    image_data: bytes,
+) -> Path:
+    return folder / f'{_safe_image_stem(artist_name)}{_extension_for_image(image_data)}'
+
+
 def media_type_for_image(data: bytes) -> str:
     extension = _extension_for_image(data)
     if extension == '.png':
@@ -290,9 +316,12 @@ def save_missing_artist_images(
         image, _source = artist_or_fallback_image(artist.get('id', ''), path)
         if not image:
             continue
-        extension = _extension_for_image(image)
         for folder in folders:
-            target = folder / f'folder{extension}'
+            target = artist_image_target_path(
+                folder,
+                artist.get('name', ''),
+                image,
+            )
             if target.exists():
                 continue
             target.write_bytes(image)
@@ -318,11 +347,17 @@ def missing_artist_image_items(
         if not image:
             continue
         for folder in folders:
+            target = artist_image_target_path(
+                folder,
+                artist.get('name', ''),
+                image,
+            )
             items.append({
                 'artist': artist.get('name', ''),
                 'artist_id': artist.get('id', ''),
                 'file': path.relative_to(root.resolve()).as_posix(),
                 'folder': folder.relative_to(root.resolve()).as_posix(),
+                'target': target.relative_to(root.resolve()).as_posix(),
                 'source': source,
             })
     return items

@@ -175,14 +175,14 @@ export default {
     fixed: 'Corregido',
     completed: 'Completado',
     clean: 'No necesita correccion',
-    artistImages: 'Imagenes de artistas',
+    artistImages: 'Imagenes locales de artistas',
     artistImagesSubtitle:
-      'Busca imagenes faltantes para Jellyfin usando MusicBrainz, Wikimedia y caratulas locales como alternativa.',
+      'Busca carpetas de artistas sin imagen local y guarda arte nuevo como Nombre del artista.jpg/png/webp. Jellyfin puede mostrar arte en cache o de proveedores que no esta guardado en tu carpeta de musica.',
     artistImageLimit: 'Imagenes de artistas para mostrar',
     scanArtistImages: 'Escanear imagenes',
-    missingImages: 'Imagenes faltantes',
+    missingImages: 'Imagenes locales faltantes',
     emptyArtistImages:
-      'No se encontraron imagenes de artistas faltantes con arte disponible.',
+      'No se encontraron imagenes locales de artistas faltantes con arte disponible.',
     before: 'Antes',
     after: 'Despues',
     blank: 'Vacio',
@@ -255,6 +255,8 @@ export default {
   settings: {
     title: 'Ajustes',
     subtitle: 'Ajusta cómo Downtify descarga y etiqueta tu música.',
+    generalTab: 'General',
+    apiTab: 'API',
     audioSource: 'Fuente de audio',
     lyricsSource: 'Fuente de letras',
     lyricsHint: 'solo lrclib está activo',
@@ -269,6 +271,19 @@ export default {
     enhanceMetadata: 'Mejorar etiquetas con MusicBrainz',
     enhanceMetadataHint:
       'Despues de resolver una pista, Downtify usa coincidencias confiables de MusicBrainz para mejorar titulo, artista, album y fecha de lanzamiento.',
+    jellyfinSection: 'API de Jellyfin',
+    jellyfinUrl: 'URL de Jellyfin',
+    jellyfinUrlPlaceholder: 'http://10.128.1.30:8096',
+    jellyfinUrlHint:
+      'URL base de tu servidor Jellyfin. No incluyas /web al final.',
+    jellyfinApiKey: 'Clave API de Jellyfin',
+    jellyfinApiKeyPlaceholder: 'Pega la clave API',
+    jellyfinApiKeyHint:
+      'Se usara luego para sincronizar la biblioteca Jellyfin y actualizar imagenes de artistas.',
+    jellyfinMusicLibrary: 'Biblioteca o carpeta de musica',
+    jellyfinMusicLibraryPlaceholder: 'Music',
+    jellyfinMusicLibraryHint:
+      'Nombre o ruta de la biblioteca de musica de Jellyfin que Downtify debe escanear/sincronizar.',
     playlistsSection: 'Listas',
     generateM3u: 'Generar archivo M3U para las listas',
     generateM3uHint:

@@ -26,7 +26,38 @@
       </div>
 
       <!-- Body -->
-      <div class="px-6 py-5 space-y-6">
+      <div class="px-6 pt-5">
+        <div
+          class="mb-5 grid grid-cols-2 rounded-full border border-white/10 bg-base-100/75 p-1"
+        >
+          <button
+            type="button"
+            class="rounded-full px-4 py-2 text-sm font-medium transition-colors"
+            :class="
+              activeTab === 'general'
+                ? 'bg-primary text-primary-content shadow-glow-sm'
+                : 'text-base-content/60 hover:text-base-content'
+            "
+            @click="activeTab = 'general'"
+          >
+            {{ t('settings.generalTab') }}
+          </button>
+          <button
+            type="button"
+            class="rounded-full px-4 py-2 text-sm font-medium transition-colors"
+            :class="
+              activeTab === 'api'
+                ? 'bg-primary text-primary-content shadow-glow-sm'
+                : 'text-base-content/60 hover:text-base-content'
+            "
+            @click="activeTab = 'api'"
+          >
+            {{ t('settings.apiTab') }}
+          </button>
+        </div>
+      </div>
+
+      <div v-if="activeTab === 'general'" class="px-6 pb-5 space-y-6">
         <!-- Language -->
         <div>
           <label
@@ -428,6 +459,88 @@
         </transition>
       </div>
 
+      <div v-else class="px-6 pb-5 space-y-5">
+        <div>
+          <label
+            class="block text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2"
+          >
+            {{ t('settings.jellyfinSection') }}
+          </label>
+          <div class="space-y-3">
+            <div>
+              <label class="block text-xs text-base-content/50 mb-1.5">
+                {{ t('settings.jellyfinUrl') }}
+              </label>
+              <input
+                v-model="sm.settings.value.jellyfin_url"
+                type="url"
+                class="input-modern h-10 w-full text-sm"
+                :placeholder="t('settings.jellyfinUrlPlaceholder')"
+              />
+              <p class="text-[11px] text-base-content/40 mt-1.5">
+                {{ t('settings.jellyfinUrlHint') }}
+              </p>
+            </div>
+            <div>
+              <label class="block text-xs text-base-content/50 mb-1.5">
+                {{ t('settings.jellyfinApiKey') }}
+              </label>
+              <input
+                v-model="sm.settings.value.jellyfin_api_key"
+                type="password"
+                autocomplete="off"
+                class="input-modern h-10 w-full text-sm"
+                :placeholder="t('settings.jellyfinApiKeyPlaceholder')"
+              />
+              <p class="text-[11px] text-base-content/40 mt-1.5">
+                {{ t('settings.jellyfinApiKeyHint') }}
+              </p>
+            </div>
+            <div>
+              <label class="block text-xs text-base-content/50 mb-1.5">
+                {{ t('settings.jellyfinMusicLibrary') }}
+              </label>
+              <input
+                v-model="sm.settings.value.jellyfin_music_library"
+                type="text"
+                class="input-modern h-10 w-full text-sm"
+                :placeholder="t('settings.jellyfinMusicLibraryPlaceholder')"
+              />
+              <p class="text-[11px] text-base-content/40 mt-1.5">
+                {{ t('settings.jellyfinMusicLibraryHint') }}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <transition
+          enter-active-class="transition duration-200"
+          enter-from-class="opacity-0 -translate-y-1"
+          enter-to-class="opacity-100 translate-y-0"
+          leave-active-class="transition duration-200"
+          leave-from-class="opacity-100"
+          leave-to-class="opacity-0"
+        >
+          <div
+            v-if="sm.isSaved.value === true"
+            class="surface rounded-xl p-3 flex items-center gap-2 text-sm text-primary"
+          >
+            <Icon icon="clarity:check-line" class="h-4 w-4 shrink-0" />
+            {{ t('settings.saved') }}
+          </div>
+          <div
+            v-else-if="sm.isSaved.value === false"
+            class="surface rounded-xl p-3 flex items-center gap-2 text-sm text-error"
+          >
+            <Icon
+              icon="clarity:exclamation-circle-line"
+              class="h-4 w-4 shrink-0"
+            />
+            {{ t('settings.saveError') }}
+          </div>
+        </transition>
+      </div>
+
       <!-- Footer -->
       <div
         class="flex items-center justify-end gap-2 px-6 py-4 border-t border-white/5"
@@ -473,6 +586,7 @@ const {
 } = useDownloadDestination()
 const { t, locale, setLocale, locales } = useI18n()
 const folderPickerError = ref('')
+const activeTab = ref('general')
 
 const localFolderBlockMessage = computed(() => {
   if (localFolderBlockReason.value === 'insecure') {

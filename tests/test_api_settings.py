@@ -25,6 +25,9 @@ def test_default_settings_has_required_keys():
         'organize_by_artist',
         'organize_by_album',
         'server_media_location',
+        'jellyfin_url',
+        'jellyfin_api_key',
+        'jellyfin_music_library',
     }
     assert required <= set(DEFAULT_SETTINGS)
 
