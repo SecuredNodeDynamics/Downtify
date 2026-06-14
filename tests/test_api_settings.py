@@ -202,7 +202,7 @@ def test_jellyfin_libraries_dedupes_by_name(monkeypatch):
     def fake_get(url, headers=None, params=None, timeout=None):
         assert url == 'http://jellyfin.test/Items'
         assert headers == {'X-MediaBrowser-Token': 'secret'}
-        assert params == {'Recursive': False, 'IncludeItemTypes': 'CollectionFolder'}
+        assert params == {'Recursive': False}
         assert timeout == 10
         return FakeResponse()
 

@@ -1374,7 +1374,7 @@ def jellyfin_debug(
         response = requests.get(
             f'{url}/Items',
             headers=headers,
-            params={'Recursive': False, 'IncludeItemTypes': 'CollectionFolder'},
+            params={'Recursive': False},
             timeout=10,
         )
         response.raise_for_status()
@@ -1420,11 +1420,11 @@ def jellyfin_libraries_endpoint(
         # Fetch all top-level items (libraries/folders)
         headers = {'X-MediaBrowser-Token': jellyfin_api_key}
         logger.info(f'Fetching Jellyfin libraries from {url}/Items')
-        
+
         response = requests.get(
             f'{url}/Items',
             headers=headers,
-            params={'Recursive': False, 'IncludeItemTypes': 'CollectionFolder'},
+            params={'Recursive': False},
             timeout=10,
         )
         response.raise_for_status()
