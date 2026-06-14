@@ -90,6 +90,81 @@ def _normalized_jellyfin_library_name(value: Any) -> str:
     return re.sub(r'\s+', ' ', normalized).strip().casefold()
 
 
+def _jellyfin_auth_headers(api_key: str) -> dict[str, str]:
+    return {
+        'X-Emby-Token': api_key,
+        'X-MediaBrowser-Token': api_key,
+    }
+
+
+def _dedupe_jellyfin_libraries(candidates: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    libraries = []
+    seen_names = set()
+    for library in candidates:
+        name_key = _normalized_jellyfin_library_name(library.get('name'))
+        if not name_key or name_key in seen_names:
+            if name_key:
+                logger.info(
+                    'Skipping duplicate Jellyfin library candidate: '
+                    f'{library.get("name")} (id: {library.get("id")})'
+                )
+            continue
+        seen_names.add(name_key)
+        libraries.append(library)
+    return libraries
+
+
+def _libraries_from_virtual_folders(data: Any) -> list[dict[str, Any]]:
+    items = data if isinstance(data, list) else data.get('Items', [])
+    candidates = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        name = str(item.get('Name') or '')
+        item_id = item.get('ItemId') or item.get('Id') or name
+        collection_type = item.get('CollectionType') or item.get('collectionType') or ''
+        logger.info(
+            f'Virtual folder: {name} - CollectionType: {collection_type} '
+            f'- ItemId: {item_id}'
+        )
+        candidates.append(
+            {
+                'id': item_id,
+                'name': name,
+                'type': 'VirtualFolder',
+                'collection_type': collection_type,
+            }
+        )
+    return _dedupe_jellyfin_libraries(candidates)
+
+
+def _libraries_from_items(data: dict[str, Any]) -> list[dict[str, Any]]:
+    candidates = []
+    seen_ids = set()
+
+    for item in data.get('Items', []):
+        name = str(item.get('Name') or '')
+        item_id = item.get('Id')
+        item_type = item.get('Type', '')
+        is_folder = item.get('IsFolder', False)
+
+        logger.info(f'Item: {name} - Type: {item_type}, IsFolder: {is_folder}')
+
+        is_library_folder = is_folder and item_type in {'Folder', 'CollectionFolder'}
+        if is_library_folder and item_id not in seen_ids:
+            seen_ids.add(item_id)
+            candidates.append(
+                {
+                    'id': item_id,
+                    'name': name,
+                    'type': item_type,
+                    'collection_type': item.get('CollectionType', ''),
+                }
+            )
+
+    return _dedupe_jellyfin_libraries(candidates)
+
+
 class ConnectionManager:
     """Tracks the active WebSocket clients keyed by ``client_id``."""
 
@@ -1368,21 +1443,33 @@ def jellyfin_debug(
 
     try:
         url = jellyfin_url.rstrip('/')
-        headers = {'X-MediaBrowser-Token': jellyfin_api_key}
-        
-        # Try fetching CollectionFolders
-        response = requests.get(
+        headers = _jellyfin_auth_headers(jellyfin_api_key)
+
+        virtual_response = requests.get(
+            f'{url}/Library/VirtualFolders',
+            headers=headers,
+            timeout=10,
+        )
+        virtual_response.raise_for_status()
+        virtual_data = virtual_response.json()
+
+        items_response = requests.get(
             f'{url}/Items',
             headers=headers,
             params={'Recursive': False},
             timeout=10,
         )
-        response.raise_for_status()
-        data = response.json()
+        items_response.raise_for_status()
+        items_data = items_response.json()
         
         return {
-            'raw_response': data,
-            'items_count': len(data.get('Items', [])),
+            'virtual_folders_raw_response': virtual_data,
+            'virtual_folders_count': len(virtual_data)
+            if isinstance(virtual_data, list)
+            else len(virtual_data.get('Items', [])),
+            'virtual_folders': _libraries_from_virtual_folders(virtual_data),
+            'items_raw_response': items_data,
+            'items_count': len(items_data.get('Items', [])),
             'items': [
                 {
                     'name': item.get('Name'),
@@ -1390,8 +1477,8 @@ def jellyfin_debug(
                     'collectionType': item.get('CollectionType'),
                     'type': item.get('Type'),
                 }
-                for item in data.get('Items', [])
-            ]
+                for item in items_data.get('Items', [])
+            ],
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -1417,10 +1504,32 @@ def jellyfin_libraries_endpoint(
         if not url.startswith(('http://', 'https://')):
             url = 'http://' + url
 
-        # Fetch all top-level items (libraries/folders)
-        headers = {'X-MediaBrowser-Token': jellyfin_api_key}
-        logger.info(f'Fetching Jellyfin libraries from {url}/Items')
+        headers = _jellyfin_auth_headers(jellyfin_api_key)
+        logger.info(f'Fetching Jellyfin virtual folders from {url}/Library/VirtualFolders')
 
+        try:
+            response = requests.get(
+                f'{url}/Library/VirtualFolders',
+                headers=headers,
+                timeout=10,
+            )
+            response.raise_for_status()
+            data = response.json()
+            libraries = _libraries_from_virtual_folders(data)
+            logger.info(f'Jellyfin virtual folder count: {len(libraries)}')
+            return {
+                'success': True,
+                'source': 'virtual_folders',
+                'libraries': libraries,
+            }
+        except requests.exceptions.HTTPError as e:
+            status_code = getattr(e.response, 'status_code', 'unknown')
+            logger.warning(
+                f'Jellyfin virtual folders request failed with '
+                f'{status_code}; falling back to /Items'
+            )
+
+        logger.info(f'Fetching Jellyfin libraries from {url}/Items')
         response = requests.get(
             f'{url}/Items',
             headers=headers,
@@ -1429,49 +1538,13 @@ def jellyfin_libraries_endpoint(
         )
         response.raise_for_status()
         data = response.json()
-
         logger.info(f'Jellyfin response items count: {len(data.get("Items", []))}')
 
-        candidates = []
-        seen_ids = set()  # Track IDs to avoid exact duplicates
-
-        if 'Items' in data:
-            for item in data['Items']:
-                # Get all folders as potential libraries
-                name = str(item.get('Name') or '')
-                item_id = item.get('Id')
-                item_type = item.get('Type', '')
-                is_folder = item.get('IsFolder', False)
-
-                logger.info(f'Item: {name} - Type: {item_type}, IsFolder: {is_folder}')
-
-                # Include folders that might contain music (including "Music" library)
-                is_library_folder = is_folder and item_type in {'Folder', 'CollectionFolder'}
-                if is_library_folder and item_id not in seen_ids:
-                    seen_ids.add(item_id)
-                    candidates.append(
-                        {
-                            'id': item_id,
-                            'name': name,
-                            'type': item_type,
-                        }
-                    )
-
-        libraries = []
-        seen_names = set()  # Jellyfin can return duplicate views with different IDs
-        for library in candidates:
-            name_key = _normalized_jellyfin_library_name(library.get('name'))
-            if not name_key or name_key in seen_names:
-                if name_key:
-                    logger.info(
-                        'Skipping duplicate Jellyfin library candidate: '
-                        f'{library.get("name")} (id: {library.get("id")})'
-                    )
-                continue
-            seen_names.add(name_key)
-            libraries.append(library)
-
-        return {'success': True, 'libraries': libraries}
+        return {
+            'success': True,
+            'source': 'items',
+            'libraries': _libraries_from_items(data),
+        }
     except requests.exceptions.Timeout:
         raise HTTPException(
             status_code=504, detail='Jellyfin server timeout - server took too long to respond'

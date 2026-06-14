@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import json
 
+import requests
+
 from downtify.api import (
     DEFAULT_SETTINGS,
     _effective_lyrics_providers,
@@ -171,7 +173,64 @@ def test_effective_providers_empty_list_when_no_providers():
 
 
 def test_jellyfin_libraries_dedupes_by_name(monkeypatch):
-    class FakeResponse:
+    class FakeVirtualFoldersResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return [
+                {'ItemId': 'music-view', 'Name': 'Music', 'CollectionType': 'music'},
+                {'ItemId': 'music-copy', 'Name': '\ufeff Music\u200b ', 'CollectionType': 'music'},
+                {'ItemId': 'tv-view', 'Name': 'TV', 'CollectionType': 'tvshows'},
+            ]
+
+    def fake_get(url, headers=None, params=None, timeout=None):
+        assert url == 'http://jellyfin.test/Library/VirtualFolders'
+        assert headers == {
+            'X-Emby-Token': 'secret',
+            'X-MediaBrowser-Token': 'secret',
+        }
+        assert params is None
+        assert timeout == 10
+        return FakeVirtualFoldersResponse()
+
+    monkeypatch.setattr('downtify.api.requests.get', fake_get)
+
+    result = jellyfin_libraries_endpoint('jellyfin.test', 'secret')
+
+    assert result == {
+        'success': True,
+        'source': 'virtual_folders',
+        'libraries': [
+            {
+                'id': 'music-view',
+                'name': 'Music',
+                'type': 'VirtualFolder',
+                'collection_type': 'music',
+            },
+            {
+                'id': 'tv-view',
+                'name': 'TV',
+                'type': 'VirtualFolder',
+                'collection_type': 'tvshows',
+            },
+        ],
+    }
+
+
+def test_jellyfin_libraries_falls_back_to_items(monkeypatch):
+    class FakeVirtualFoldersResponse:
+        status_code = 403
+
+        def raise_for_status(self):
+            error = requests.exceptions.HTTPError('forbidden')
+            error.response = self
+            raise error
+
+        def json(self):
+            return {}
+
+    class FakeItemsResponse:
         def raise_for_status(self):
             return None
 
@@ -186,35 +245,42 @@ def test_jellyfin_libraries_dedupes_by_name(monkeypatch):
                     },
                     {
                         'Id': 'music-folder',
-                        'Name': '\ufeff Music\u200b ',
-                        'Type': 'Folder',
-                        'IsFolder': True,
-                    },
-                    {
-                        'Id': 'tv-view',
-                        'Name': 'TV',
+                        'Name': 'Music',
                         'Type': 'Folder',
                         'IsFolder': True,
                     },
                 ]
             }
 
+    urls = []
+
     def fake_get(url, headers=None, params=None, timeout=None):
+        urls.append(url)
+        if url.endswith('/Library/VirtualFolders'):
+            assert params is None
+            return FakeVirtualFoldersResponse()
         assert url == 'http://jellyfin.test/Items'
-        assert headers == {'X-MediaBrowser-Token': 'secret'}
         assert params == {'Recursive': False}
-        assert timeout == 10
-        return FakeResponse()
+        return FakeItemsResponse()
 
     monkeypatch.setattr('downtify.api.requests.get', fake_get)
 
     result = jellyfin_libraries_endpoint('jellyfin.test', 'secret')
 
+    assert urls == [
+        'http://jellyfin.test/Library/VirtualFolders',
+        'http://jellyfin.test/Items',
+    ]
     assert result == {
         'success': True,
+        'source': 'items',
         'libraries': [
-            {'id': 'music-view', 'name': 'Music', 'type': 'Folder'},
-            {'id': 'tv-view', 'name': 'TV', 'type': 'Folder'},
+            {
+                'id': 'music-view',
+                'name': 'Music',
+                'type': 'Folder',
+                'collection_type': '',
+            },
         ],
     }
 
