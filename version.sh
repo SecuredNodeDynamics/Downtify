@@ -43,7 +43,7 @@ bump_version() {
   echo "${major}.${minor}.${patch}"
 }
 
-[[ $# -le 1 ]] || usage
+[[ $# -eq 1 ]] || usage
 
 if [[ "${1:-}" == "--current" ]]; then
   echo "$(current_version)"
@@ -52,9 +52,7 @@ fi
 
 OLD_VERSION="$(current_version)"
 
-if [[ $# -eq 0 ]]; then
-  NEW_VERSION="$(bump_version "$OLD_VERSION" patch)"
-elif [[ "$1" == patch || "$1" == minor || "$1" == major ]]; then
+if [[ "$1" == patch || "$1" == minor || "$1" == major ]]; then
   NEW_VERSION="$(bump_version "$OLD_VERSION" "$1")"
 else
   NEW_VERSION="$1"
