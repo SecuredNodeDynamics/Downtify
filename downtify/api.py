@@ -1344,6 +1344,75 @@ async def update_settings_endpoint(
     return state.settings
 
 
+@router.get('/api/jellyfin/libraries')
+async def jellyfin_libraries_endpoint(
+    jellyfin_url: str = Query(''),
+    jellyfin_api_key: str = Query(''),
+) -> dict[str, Any]:
+    """Fetch available music libraries from Jellyfin server."""
+    if not jellyfin_url or not jellyfin_api_key:
+        raise HTTPException(
+            status_code=400,
+            detail='Jellyfin URL and API key are required',
+        )
+
+    import requests
+
+    try:
+        # Normalize URL (remove trailing slash)
+        url = jellyfin_url.rstrip('/')
+
+        # Fetch items with library type filtering
+        headers = {'X-MediaBrowser-Token': jellyfin_api_key}
+        response = requests.get(
+            f'{url}/Items',
+            headers=headers,
+            params={'Recursive': False, 'IncludeItemTypes': 'CollectionFolder'},
+            timeout=10,
+        )
+        response.raise_for_status()
+        data = response.json()
+
+        libraries = []
+        if 'Items' in data:
+            for item in data['Items']:
+                # Filter for music libraries
+                collection_type = item.get('CollectionType', '')
+                if collection_type == 'music':
+                    libraries.append(
+                        {
+                            'id': item.get('Id'),
+                            'name': item.get('Name'),
+                            'collectionType': collection_type,
+                        }
+                    )
+
+        return {'success': True, 'libraries': libraries}
+    except requests.exceptions.Timeout:
+        raise HTTPException(
+            status_code=504, detail='Jellyfin server timeout'
+        )
+    except requests.exceptions.ConnectionError:
+        raise HTTPException(
+            status_code=503,
+            detail='Cannot connect to Jellyfin server',
+        )
+    except requests.exceptions.HTTPError as e:
+        if e.response.status_code == 401:
+            raise HTTPException(
+                status_code=401, detail='Jellyfin API key is invalid'
+            )
+        raise HTTPException(
+            status_code=e.response.status_code,
+            detail=f'Jellyfin error: {e.response.reason}',
+        )
+    except Exception as e:
+        logger.error(f'Error fetching Jellyfin libraries: {e}')
+        raise HTTPException(
+            status_code=500, detail='Failed to fetch Jellyfin libraries'
+        )
+
+
 @router.websocket('/api/ws')
 async def websocket_endpoint(
     ws: WebSocket, client_id: str = Query(...)

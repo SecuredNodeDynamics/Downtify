@@ -196,6 +196,12 @@ function setSettings(settings) {
   })
 }
 
+function getJellyfinLibraries(jellyfinUrl, jellyfinApiKey) {
+  return API.get('/api/jellyfin/libraries', {
+    params: { jellyfin_url: jellyfinUrl, jellyfin_api_key: jellyfinApiKey },
+  })
+}
+
 function ws_onmessage(fn) {
   return (wsConnection.onmessage = fn)
 }
@@ -224,6 +230,7 @@ export default {
   clearHistory,
   getSettings,
   setSettings,
+  getJellyfinLibraries,
   check_for_update,
   getHealth,
   startMetadataScan,

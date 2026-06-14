@@ -284,6 +284,9 @@ export default {
     jellyfinMusicLibraryPlaceholder: 'Music',
     jellyfinMusicLibraryHint:
       'Nombre o ruta de la biblioteca de musica de Jellyfin que Downtify debe escanear/sincronizar.',
+    jellyfinLibraryLoading: 'Cargando bibliotecas...',
+    jellyfinNoLibraries: 'No se encontraron bibliotecas de musica. Verifica tu URL de Jellyfin y clave API.',
+    jellyfinLibraryError: 'Error al cargar las bibliotecas',
     playlistsSection: 'Listas',
     generateM3u: 'Generar archivo M3U para las listas',
     generateM3uHint:
