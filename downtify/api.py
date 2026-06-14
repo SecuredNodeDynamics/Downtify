@@ -141,11 +141,14 @@ class AppState:
         'status': 'idle',
         'limit': 50,
         'scanned': 0,
+        'batch_scanned': 0,
         'total': 0,
         'matched': 0,
         'items': [],
         'completed': [],
         'error': '',
+        'next_offset': 0,
+        'complete': False,
     }
     artist_image_scan_task: Optional[asyncio.Task] = None
 
@@ -495,7 +498,7 @@ def metadata_scan_status() -> dict[str, Any]:
     return _metadata_scan_status()
 
 
-async def _run_artist_image_scan(limit: int) -> None:
+async def _run_artist_image_scan(limit: int, start: int) -> None:
     if state.downloader is None:
         state.artist_image_scan = {
             **state.artist_image_scan,
@@ -522,6 +525,7 @@ async def _run_artist_image_scan(limit: int) -> None:
             metadata_repair.scan_artist_images,
             state.downloader.download_dir,
             limit,
+            start,
             progress,
         )
         state.artist_image_scan = {
@@ -555,22 +559,31 @@ async def scan_artist_images(request: Request) -> dict[str, Any]:
         limit = max(1, min(200, int(payload.get('limit', 50))))
     except (TypeError, ValueError):
         limit = 50
+    reset = bool(payload.get('reset', False))
     task = state.artist_image_scan_task
     if task is not None and not task.done():
         return dict(state.artist_image_scan)
+    previous = state.artist_image_scan
+    total = int(previous.get('total') or 0)
+    start = 0 if reset else int(previous.get('next_offset') or 0)
+    if total > 0 and start >= total:
+        start = 0
     state.artist_image_scan = {
-        **state.artist_image_scan,
         'status': 'scanning',
         'limit': limit,
         'scanned': 0,
+        'batch_scanned': 0,
         'total': 0,
         'matched': 0,
         'items': [],
+        'completed': previous.get('completed') or [],
         'error': '',
+        'next_offset': start,
+        'complete': False,
         'started_at': datetime.now(timezone.utc).isoformat(),
     }
     state.artist_image_scan_task = asyncio.create_task(
-        _run_artist_image_scan(limit)
+        _run_artist_image_scan(limit, start)
     )
     return dict(state.artist_image_scan)
 

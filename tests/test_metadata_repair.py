@@ -385,6 +385,46 @@ def test_scan_artist_images_reports_progress(tmp_path, monkeypatch):
     assert updates[-1]['matched'] == 1
 
 
+def test_scan_artist_images_scans_selected_batch(tmp_path, monkeypatch):
+    album = tmp_path / 'Artist' / 'Album'
+    album.mkdir(parents=True)
+    for index in range(5):
+        (album / f'song-{index}.mp3').write_bytes(b'not really audio')
+
+    monkeypatch.setattr(
+        metadata_repair,
+        '_song_from_file',
+        lambda path: {'name': path.stem, 'artists': [path.stem]},
+    )
+    monkeypatch.setattr(
+        metadata_repair,
+        '_artist_image_scan_candidates',
+        lambda root, path, _current=None: [
+            {
+                'artist': path.stem,
+                'artist_id': path.stem,
+                'file': path.relative_to(root).as_posix(),
+                'folder': 'Artist',
+                'source': 'Album cover fallback',
+            }
+        ],
+    )
+
+    first = metadata_repair.scan_artist_images(tmp_path, limit=2)
+    second = metadata_repair.scan_artist_images(
+        tmp_path,
+        limit=2,
+        start=first['next_offset'],
+    )
+
+    assert first['batch_scanned'] == 2
+    assert first['next_offset'] == 2
+    assert first['complete'] is False
+    assert [item['artist'] for item in first['items']] == ['song-0', 'song-1']
+    assert second['start'] == 2
+    assert [item['artist'] for item in second['items']] == ['song-2', 'song-3']
+
+
 def test_repair_artist_image_writes_for_requested_artist(
     tmp_path,
     monkeypatch,
