@@ -1422,24 +1422,32 @@ def jellyfin_libraries_endpoint(
         data = response.json()
 
         logger.info(f'Jellyfin response items count: {len(data.get("Items", []))}')
-        
+
         libraries = []
         seen_ids = set()  # Track IDs to avoid duplicates
-        
+        seen_names = set()  # Jellyfin can return duplicate views with different IDs
+
         if 'Items' in data:
             for item in data['Items']:
                 # Get all folders as potential libraries
-                name = item.get('Name', '')
+                name = str(item.get('Name') or '')
                 item_id = item.get('Id')
                 item_type = item.get('Type', '')
                 is_folder = item.get('IsFolder', False)
-                
+
                 logger.info(f'Item: {name} - Type: {item_type}, IsFolder: {is_folder}')
-                
+
                 # Include folders that might contain music (including "Music" library)
-                # Skip duplicates based on ID
-                if is_folder and item_type == 'Folder' and item_id not in seen_ids:
+                # Skip duplicate IDs and duplicate names because settings store names.
+                name_key = name.strip().casefold()
+                if (
+                    is_folder
+                    and item_type == 'Folder'
+                    and item_id not in seen_ids
+                    and name_key not in seen_names
+                ):
                     seen_ids.add(item_id)
+                    seen_names.add(name_key)
                     libraries.append(
                         {
                             'id': item_id,

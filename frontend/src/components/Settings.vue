@@ -531,11 +531,11 @@
                 <select
                   v-model="sm.settings.value.jellyfin_music_library"
                   class="input-modern h-10 flex-1 text-sm"
-                  :disabled="jellyfinLibraries.length === 0"
+                  :disabled="uniqueJellyfinLibraries.length === 0"
                 >
                   <option value="">{{ t('settings.jellyfinMusicLibraryPlaceholder') }}</option>
                   <option
-                    v-for="lib in jellyfinLibraries"
+                    v-for="lib in uniqueJellyfinLibraries"
                     :key="lib.id"
                     :value="lib.name"
                   >
@@ -636,6 +636,15 @@ const activeTab = ref('general')
 const jellyfinLibraries = ref([])
 const jellyfinLibraryLoading = ref(false)
 const jellyfinLibraryError = ref('')
+const uniqueJellyfinLibraries = computed(() => {
+  const seen = new Set()
+  return jellyfinLibraries.value.filter((lib) => {
+    const key = String(lib?.name || '').trim().toLowerCase()
+    if (!key || seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+})
 
 // Watch for tab changes to fetch Jellyfin libraries when API tab is opened
 watch(activeTab, (newTab) => {

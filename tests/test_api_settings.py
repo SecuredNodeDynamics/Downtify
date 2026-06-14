@@ -9,6 +9,7 @@ from downtify.api import (
     DEFAULT_SETTINGS,
     _effective_lyrics_providers,
     _load_settings,
+    jellyfin_libraries_endpoint,
 )
 
 
@@ -163,3 +164,55 @@ def test_effective_providers_defaults_to_enabled_when_key_missing():
 def test_effective_providers_empty_list_when_no_providers():
     settings = {'download_lyrics': True, 'lyrics_providers': []}
     assert _effective_lyrics_providers(settings) == []
+
+
+# ── Jellyfin libraries ────────────────────────────────────────────────────────
+
+
+def test_jellyfin_libraries_dedupes_by_name(monkeypatch):
+    class FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {
+                'Items': [
+                    {
+                        'Id': 'music-view',
+                        'Name': 'Music',
+                        'Type': 'Folder',
+                        'IsFolder': True,
+                    },
+                    {
+                        'Id': 'music-folder',
+                        'Name': ' Music ',
+                        'Type': 'Folder',
+                        'IsFolder': True,
+                    },
+                    {
+                        'Id': 'tv-view',
+                        'Name': 'TV',
+                        'Type': 'Folder',
+                        'IsFolder': True,
+                    },
+                ]
+            }
+
+    def fake_get(url, headers=None, params=None, timeout=None):
+        assert url == 'http://jellyfin.test/Items'
+        assert headers == {'X-MediaBrowser-Token': 'secret'}
+        assert params == {'Recursive': False}
+        assert timeout == 10
+        return FakeResponse()
+
+    monkeypatch.setattr('downtify.api.requests.get', fake_get)
+
+    result = jellyfin_libraries_endpoint('jellyfin.test', 'secret')
+
+    assert result == {
+        'success': True,
+        'libraries': [
+            {'id': 'music-view', 'name': 'Music', 'type': 'Folder'},
+            {'id': 'tv-view', 'name': 'TV', 'type': 'Folder'},
+        ],
+    }
