@@ -104,7 +104,9 @@
           @click="activeTab = 'needs'"
         >
           {{ t('metadata.needsFix') }}
-          <span class="ml-1 text-xs opacity-70">{{ items.length }}</span>
+          <span class="ml-2 rounded-full bg-current/10 px-2 py-0.5 text-sm font-bold">
+            {{ items.length }}
+          </span>
         </button>
         <button
           class="rounded-full px-4 py-2 text-sm font-medium transition-colors"
@@ -116,9 +118,9 @@
           @click="activeTab = 'completed'"
         >
           {{ t('metadata.completed') }}
-          <span class="ml-1 text-xs opacity-70">{{
-            completedItems.length
-          }}</span>
+          <span class="ml-2 rounded-full bg-current/10 px-2 py-0.5 text-sm font-bold">
+            {{ completedItems.length }}
+          </span>
         </button>
         <button
           class="rounded-full px-4 py-2 text-sm font-medium transition-colors"
@@ -130,123 +132,127 @@
           @click="activeTab = 'clean'"
         >
           {{ t('metadata.clean') }}
-          <span class="ml-1 text-xs opacity-70">{{ cleanItems.length }}</span>
+          <span class="ml-2 rounded-full bg-current/10 px-2 py-0.5 text-sm font-bold">
+            {{ cleanItems.length }}
+          </span>
         </button>
       </div>
 
-      <div v-if="loading && visibleItems.length === 0" class="space-y-3">
-        <div v-for="n in 5" :key="n" class="skeleton h-24 rounded-2xl" />
-      </div>
+      <div class="max-h-[45rem] overflow-y-auto pr-2">
+        <div v-if="loading && visibleItems.length === 0" class="space-y-3">
+          <div v-for="n in 5" :key="n" class="skeleton h-24 rounded-2xl" />
+        </div>
 
-      <div
-        v-else-if="visibleItems.length === 0"
-        class="surface rounded-2xl p-10 text-center"
-      >
-        <Icon
-          icon="clarity:tag-line"
-          class="mx-auto mb-3 h-10 w-10 text-base-content/20"
-        />
-        <p class="text-sm text-base-content/50">
-          {{ loading ? t('metadata.scanning') : t('metadata.empty') }}
-        </p>
-      </div>
-
-      <ul v-else class="space-y-3">
-        <li
-          v-for="item in visibleItems"
-          :key="item.file"
-          class="surface rounded-2xl p-4 transition-all duration-300"
-          :class="
-            applying[item.file]
-              ? 'scale-[1.01] border-primary/40 shadow-glow-sm'
-              : ''
-          "
+        <div
+          v-else-if="visibleItems.length === 0"
+          class="surface rounded-2xl p-10 text-center"
         >
-          <div class="flex flex-wrap items-start justify-between gap-3">
-            <div class="min-w-0">
-              <p class="truncate text-sm font-semibold">{{ item.file }}</p>
-              <p class="mt-1 text-xs text-base-content/45">
-                {{ displaySong(item.current) }}
-              </p>
-            </div>
-            <span
-              class="pill shrink-0"
-              :class="
-                activeTab === 'completed'
-                  ? 'badge-soft'
-                  : activeTab === 'clean'
-                    ? 'bg-white/5 text-base-content/50'
-                  : 'bg-warning/10 text-warning'
-              "
-            >
-              {{
-                activeTab === 'completed'
-                  ? t('metadata.fixed')
-                  : activeTab === 'clean'
-                    ? t('metadata.clean')
-                  : t('metadata.needsFix')
-              }}
-            </span>
-          </div>
+          <Icon
+            icon="clarity:tag-line"
+            class="mx-auto mb-3 h-10 w-10 text-base-content/20"
+          />
+          <p class="text-sm text-base-content/50">
+            {{ loading ? t('metadata.scanning') : t('metadata.empty') }}
+          </p>
+        </div>
 
-          <div
-            class="mt-4 rounded-xl border border-white/10 bg-base-100/70 p-3"
+        <ul v-else class="space-y-3">
+          <li
+            v-for="item in visibleItems"
+            :key="item.file"
+            class="surface rounded-2xl p-4 transition-all duration-300"
+            :class="
+              applying[item.file]
+                ? 'scale-[1.01] border-primary/40 shadow-glow-sm'
+                : ''
+            "
           >
-            <p class="text-xs font-semibold text-primary">
-              {{ displaySong(item.candidate) }}
-            </p>
-            <div
-              v-if="item.changes.length"
-              class="mt-3 grid gap-2 text-xs sm:grid-cols-2"
-            >
-              <div
-                v-for="change in item.changes"
-                :key="`${item.file}-${change.field}`"
-                class="rounded-lg bg-white/5 p-2"
-              >
-                <p class="font-semibold text-base-content/70">
-                  {{ change.label }}
-                </p>
-                <p class="truncate text-base-content/40">
-                  {{ change.before || t('metadata.blank') }}
-                </p>
-                <p class="truncate text-primary">
-                  {{ change.after || t('metadata.blank') }}
+            <div class="flex flex-wrap items-start justify-between gap-3">
+              <div class="min-w-0">
+                <p class="truncate text-sm font-semibold">{{ item.file }}</p>
+                <p class="mt-1 text-xs text-base-content/45">
+                  {{ displaySong(item.current) }}
                 </p>
               </div>
-            </div>
-            <p v-else class="mt-2 text-xs text-base-content/45">
-              {{ t('metadata.idsOnly') }}
-            </p>
-          </div>
-
-          <div v-if="activeTab === 'needs'" class="mt-4 flex justify-end">
-            <button
-              class="btn btn-sm h-10 rounded-full border-white/10 bg-base-100/85 hover:bg-base-100"
-              :class="fixed[item.file] ? 'text-primary' : ''"
-              :disabled="applying[item.file] || fixed[item.file]"
-              @click="apply(item)"
-            >
               <span
-                v-if="applying[item.file]"
-                class="loading loading-spinner loading-xs mr-2"
-              />
-              <Icon
-                v-else
-                icon="clarity:check-line"
-                class="h-4 w-4 mr-2"
-              />
-              {{
-                applying[item.file]
-                  ? t('metadata.fixing')
-                  : fixed[item.file]
+                class="pill shrink-0"
+                :class="
+                  activeTab === 'completed'
+                    ? 'badge-soft'
+                    : activeTab === 'clean'
+                      ? 'bg-white/5 text-base-content/50'
+                    : 'bg-warning/10 text-warning'
+                "
+              >
+                {{
+                  activeTab === 'completed'
                     ? t('metadata.fixed')
-                    : t('metadata.apply')
-              }}
-            </button>
-          </div>
-        </li>
-      </ul>
+                    : activeTab === 'clean'
+                      ? t('metadata.clean')
+                    : t('metadata.needsFix')
+                }}
+              </span>
+            </div>
+
+            <div
+              class="mt-4 rounded-xl border border-white/10 bg-base-100/70 p-3"
+            >
+              <p class="text-xs font-semibold text-primary">
+                {{ displaySong(item.candidate) }}
+              </p>
+              <div
+                v-if="item.changes.length"
+                class="mt-3 grid gap-2 text-xs sm:grid-cols-2"
+              >
+                <div
+                  v-for="change in item.changes"
+                  :key="`${item.file}-${change.field}`"
+                  class="rounded-lg bg-white/5 p-2"
+                >
+                  <p class="font-semibold text-base-content/70">
+                    {{ change.label }}
+                  </p>
+                  <p class="truncate text-base-content/40">
+                    {{ change.before || t('metadata.blank') }}
+                  </p>
+                  <p class="truncate text-primary">
+                    {{ change.after || t('metadata.blank') }}
+                  </p>
+                </div>
+              </div>
+              <p v-else class="mt-2 text-xs text-base-content/45">
+                {{ t('metadata.idsOnly') }}
+              </p>
+            </div>
+
+            <div v-if="activeTab === 'needs'" class="mt-4 flex justify-end">
+              <button
+                class="btn btn-sm h-10 rounded-full border-white/10 bg-base-100/85 hover:bg-base-100"
+                :class="fixed[item.file] ? 'text-primary' : ''"
+                :disabled="applying[item.file] || fixed[item.file]"
+                @click="apply(item)"
+              >
+                <span
+                  v-if="applying[item.file]"
+                  class="loading loading-spinner loading-xs mr-2"
+                />
+                <Icon
+                  v-else
+                  icon="clarity:check-line"
+                  class="h-4 w-4 mr-2"
+                />
+                {{
+                  applying[item.file]
+                    ? t('metadata.fixing')
+                    : fixed[item.file]
+                      ? t('metadata.fixed')
+                      : t('metadata.apply')
+                }}
+              </button>
+            </div>
+          </li>
+        </ul>
+      </div>
     </main>
   </div>
 </template>
