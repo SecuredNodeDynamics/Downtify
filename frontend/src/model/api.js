@@ -202,6 +202,12 @@ function getJellyfinLibraries(jellyfinUrl, jellyfinApiKey) {
   })
 }
 
+function getJellyfinDebug(jellyfinUrl, jellyfinApiKey) {
+  return API.get('/api/jellyfin/debug', {
+    params: { jellyfin_url: jellyfinUrl, jellyfin_api_key: jellyfinApiKey },
+  })
+}
+
 function ws_onmessage(fn) {
   return (wsConnection.onmessage = fn)
 }
@@ -231,6 +237,7 @@ export default {
   getSettings,
   setSettings,
   getJellyfinLibraries,
+  getJellyfinDebug,
   check_for_update,
   getHealth,
   startMetadataScan,

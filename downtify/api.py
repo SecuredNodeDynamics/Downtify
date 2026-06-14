@@ -1345,6 +1345,49 @@ async def update_settings_endpoint(
     return state.settings
 
 
+@router.get('/api/jellyfin/debug')
+def jellyfin_debug(
+    jellyfin_url: str = Query(''),
+    jellyfin_api_key: str = Query(''),
+) -> dict[str, Any]:
+    """Debug endpoint to see raw Jellyfin response."""
+    if not jellyfin_url or not jellyfin_api_key:
+        raise HTTPException(
+            status_code=400,
+            detail='Jellyfin URL and API key are required',
+        )
+
+    try:
+        url = jellyfin_url.rstrip('/')
+        headers = {'X-MediaBrowser-Token': jellyfin_api_key}
+        
+        # Try fetching CollectionFolders
+        response = requests.get(
+            f'{url}/Items',
+            headers=headers,
+            params={'Recursive': False, 'IncludeItemTypes': 'CollectionFolder'},
+            timeout=10,
+        )
+        response.raise_for_status()
+        data = response.json()
+        
+        return {
+            'raw_response': data,
+            'items_count': len(data.get('Items', [])),
+            'items': [
+                {
+                    'name': item.get('Name'),
+                    'id': item.get('Id'),
+                    'collectionType': item.get('CollectionType'),
+                    'type': item.get('Type'),
+                }
+                for item in data.get('Items', [])
+            ]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get('/api/jellyfin/libraries')
 def jellyfin_libraries_endpoint(
     jellyfin_url: str = Query(''),
@@ -1358,48 +1401,64 @@ def jellyfin_libraries_endpoint(
         )
 
     try:
-        # Normalize URL (remove trailing slash)
+        # Normalize URL (remove trailing slash and handle http/https)
         url = jellyfin_url.rstrip('/')
+        
+        # Ensure we have a valid URL
+        if not url.startswith(('http://', 'https://')):
+            url = 'http://' + url
 
-        # Fetch items with library type filtering
+        # Fetch all top-level items (libraries/folders)
         headers = {'X-MediaBrowser-Token': jellyfin_api_key}
+        logger.info(f'Fetching Jellyfin libraries from {url}/Items')
+        
         response = requests.get(
             f'{url}/Items',
             headers=headers,
-            params={'Recursive': False, 'IncludeItemTypes': 'CollectionFolder'},
+            params={'Recursive': False},
             timeout=10,
         )
         response.raise_for_status()
         data = response.json()
 
+        logger.info(f'Jellyfin response items count: {len(data.get("Items", []))}')
+        
         libraries = []
         if 'Items' in data:
             for item in data['Items']:
-                # Filter for music libraries
-                collection_type = item.get('CollectionType', '')
-                if collection_type == 'music':
+                # Get all folders as potential libraries
+                name = item.get('Name', '')
+                item_id = item.get('Id')
+                item_type = item.get('Type', '')
+                is_folder = item.get('IsFolder', False)
+                
+                logger.info(f'Item: {name} - Type: {item_type}, IsFolder: {is_folder}')
+                
+                # Include folders that might contain music (including "Music" library)
+                if is_folder and item_type == 'Folder':
                     libraries.append(
                         {
-                            'id': item.get('Id'),
-                            'name': item.get('Name'),
-                            'collectionType': collection_type,
+                            'id': item_id,
+                            'name': name,
+                            'type': item_type,
                         }
                     )
 
         return {'success': True, 'libraries': libraries}
     except requests.exceptions.Timeout:
         raise HTTPException(
-            status_code=504, detail='Jellyfin server timeout'
+            status_code=504, detail='Jellyfin server timeout - server took too long to respond'
         )
-    except requests.exceptions.ConnectionError:
+    except requests.exceptions.ConnectionError as e:
+        logger.error(f'Connection error to Jellyfin: {e}')
         raise HTTPException(
             status_code=503,
-            detail='Cannot connect to Jellyfin server',
+            detail=f'Cannot connect to Jellyfin server at {jellyfin_url}. Check that the URL is correct and the server is running.',
         )
     except requests.exceptions.HTTPError as e:
         if e.response.status_code == 401:
             raise HTTPException(
-                status_code=401, detail='Jellyfin API key is invalid'
+                status_code=401, detail='Jellyfin API key is invalid or expired'
             )
         raise HTTPException(
             status_code=e.response.status_code,
@@ -1408,7 +1467,7 @@ def jellyfin_libraries_endpoint(
     except Exception as e:
         logger.error(f'Error fetching Jellyfin libraries: {e}')
         raise HTTPException(
-            status_code=500, detail='Failed to fetch Jellyfin libraries'
+            status_code=500, detail=f'Failed to fetch Jellyfin libraries: {str(e)}'
         )
 
 
