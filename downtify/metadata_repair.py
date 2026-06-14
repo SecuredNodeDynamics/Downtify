@@ -179,6 +179,8 @@ def scan_library(
                 'batch_scanned': batch_scanned,
                 'total': total,
                 'matched': len(items),
+                'items': list(items),
+                'clean': list(clean_items),
                 'start': start,
                 'next_offset': current_offset,
             })

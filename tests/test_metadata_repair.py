@@ -172,6 +172,8 @@ def test_scan_library_reports_progress(tmp_path, monkeypatch):
     assert [update['scanned'] for update in updates] == [1, 2]
     assert updates[-1]['total'] == 3
     assert updates[-1]['matched'] == 2
+    assert len(updates[-1]['items']) == 2
+    assert updates[-1]['clean'] == []
 
 
 def test_scan_library_treats_year_derived_from_release_date_as_fixed(

@@ -91,7 +91,9 @@
         {{ t('metadata.serverOnly') }}
       </p>
 
-      <div class="mb-5 inline-flex rounded-full border border-white/10 bg-base-100/75 p-1">
+      <div
+        class="mb-5 inline-flex rounded-full border border-white/10 bg-base-100/75 p-1"
+      >
         <button
           class="rounded-full px-4 py-2 text-sm font-medium transition-colors"
           :class="
@@ -102,6 +104,7 @@
           @click="activeTab = 'needs'"
         >
           {{ t('metadata.needsFix') }}
+          <span class="ml-1 text-xs opacity-70">{{ items.length }}</span>
         </button>
         <button
           class="rounded-full px-4 py-2 text-sm font-medium transition-colors"
@@ -113,6 +116,9 @@
           @click="activeTab = 'completed'"
         >
           {{ t('metadata.completed') }}
+          <span class="ml-1 text-xs opacity-70">{{
+            completedItems.length
+          }}</span>
         </button>
         <button
           class="rounded-full px-4 py-2 text-sm font-medium transition-colors"
@@ -124,10 +130,11 @@
           @click="activeTab = 'clean'"
         >
           {{ t('metadata.clean') }}
+          <span class="ml-1 text-xs opacity-70">{{ cleanItems.length }}</span>
         </button>
       </div>
 
-      <div v-if="loading && items.length === 0" class="space-y-3">
+      <div v-if="loading && visibleItems.length === 0" class="space-y-3">
         <div v-for="n in 5" :key="n" class="skeleton h-24 rounded-2xl" />
       </div>
 

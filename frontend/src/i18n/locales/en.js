@@ -159,7 +159,7 @@ export default {
     resultLimit: 'Fixes to show',
     scanned: 'Scanned',
     matches: 'Matches',
-    needsFix: 'Needs fix',
+    needsFix: 'Needs Fix',
     total: 'Total files',
     serverOnly:
       'This scans files on the Downtify server download location. Local browser-only download folders are not available to the backend yet.',
