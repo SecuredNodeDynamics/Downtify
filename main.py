@@ -256,7 +256,7 @@ def build_app() -> FastAPI:
     @app.get('/list')
     def list_downloads() -> list[str]:
         audio_exts = {'.mp3', '.m4a', '.flac', '.ogg', '.wav', '.aac', '.opus'}
-        base = api.state.downloader.download_dir.resolve()
+        base = api._active_download_dir().resolve()
         if not base.exists():
             return []
         files: list[str] = []
@@ -274,7 +274,7 @@ def build_app() -> FastAPI:
     @app.delete('/delete')
     def delete_download(file: str) -> dict:
         # Resolve and confine to the active download directory.
-        base = api.state.downloader.download_dir.resolve()
+        base = api._active_download_dir().resolve()
         try:
             full = (base / file).resolve()
             full.relative_to(base)
@@ -291,7 +291,7 @@ def build_app() -> FastAPI:
     @app.get('/cover')
     def get_cover(file: str):
         # Resolve and confine to the active download directory.
-        base = api.state.downloader.download_dir.resolve()
+        base = api._active_download_dir().resolve()
         try:
             full = (base / file).resolve()
             full.relative_to(base)
@@ -315,7 +315,7 @@ def build_app() -> FastAPI:
 
     @app.get('/downloads/{file_path:path}')
     def get_download(file_path: str):
-        base = api.state.downloader.download_dir.resolve()
+        base = api._active_download_dir().resolve()
         try:
             full = (base / file_path).resolve()
             full.relative_to(base)

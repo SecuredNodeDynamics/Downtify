@@ -740,7 +740,7 @@ def update_app() -> dict[str, Any]:
 @router.get('/api/health')
 def get_health() -> dict[str, Any]:
     download_dir = (
-        state.downloader.download_dir
+        _active_download_dir()
         if state.downloader is not None
         else Path('/downloads')
     )
@@ -1550,6 +1550,7 @@ async def _run_download(
 
     if state.downloader is None:
         raise RuntimeError('Downloader not ready')
+    _active_download_dir()
 
     loop = state.loop or asyncio.get_running_loop()
     job = state.download_jobs.get(song_id)
@@ -1752,9 +1753,10 @@ async def _process_batch(
     # directory (playlist_subdir=None) where relative paths still resolve.
     organize = bool(state.downloader and state.downloader.organize_by_artist)
     try:
+        download_dir = _active_download_dir()
         await asyncio.to_thread(
             m3u.write_m3u,
-            state.downloader.download_dir,
+            download_dir,
             playlist_name,
             entries,
             playlist_subdir=None if organize else playlist_subdir,
@@ -1941,8 +1943,9 @@ async def write_playlist_m3u_endpoint(request: Request) -> dict[str, Any]:
     entries = [t for t in tracks if isinstance(t, dict)]
     playlist_subdir = m3u.sanitize_playlist_name(playlist_name)
     organize = bool(state.downloader and state.downloader.organize_by_artist)
+    download_dir = _active_download_dir()
     target, kept = m3u.write_m3u(
-        state.downloader.download_dir,
+        download_dir,
         playlist_name,
         entries,
         playlist_subdir=None if organize else playlist_subdir,
@@ -2267,11 +2270,12 @@ def _jellyfin_artist_inventory(
 def reconcile_jellyfin_artists() -> dict[str, Any]:
     if state.downloader is None:
         raise HTTPException(status_code=500, detail='Downloader not ready')
+    download_dir = _active_download_dir()
     try:
         url, headers = _configured_jellyfin()
         library = _matching_jellyfin_library(url, headers)
         jellyfin_artists = _jellyfin_artist_inventory(url, headers, library)
-        local = _local_artist_inventory(state.downloader.download_dir)
+        local = _local_artist_inventory(download_dir)
         folders = local['folders']
         tags = local['tags']
 

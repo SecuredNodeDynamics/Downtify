@@ -117,7 +117,8 @@ def test_health_payload_prefers_saved_server_media_location(
         api.state.settings_path = tmp_path / 'data' / 'settings.json'
         api.state.settings_path.parent.mkdir()
         api.state.version = '1.2.3'
-        api.state.settings = {'server_media_location': '/mnt/media/Music'}
+        media = tmp_path / 'media' / 'Music'
+        api.state.settings = {'server_media_location': str(media)}
         api.state.download_jobs = {}
         api.state.history_db = None
 
@@ -130,7 +131,43 @@ def test_health_payload_prefers_saved_server_media_location(
         api.state.download_jobs = old_jobs
         api.state.history_db = old_history
 
-    assert payload['downloads']['external_path'] == '/mnt/media/Music'
+    assert payload['downloads']['external_path'] == str(media)
+
+
+def test_health_retargets_downloader_to_saved_server_media_location(tmp_path):
+    old_downloader = api.state.downloader
+    old_settings_path = api.state.settings_path
+    old_version = api.state.version
+    old_settings = api.state.settings
+    old_jobs = api.state.download_jobs
+    old_history = api.state.history_db
+    old_default = api.state.default_download_dir
+    media = tmp_path / 'media' / 'Music'
+    try:
+        api.state.downloader = Downloader(tmp_path / 'downloads')
+        api.state.default_download_dir = tmp_path / 'downloads'
+        api.state.settings_path = tmp_path / 'data' / 'settings.json'
+        api.state.settings_path.parent.mkdir()
+        api.state.version = '1.2.3'
+        api.state.settings = {'server_media_location': str(media)}
+        api.state.download_jobs = {}
+        api.state.history_db = None
+
+        payload = get_health()
+    finally:
+        api.state.downloader = old_downloader
+        api.state.settings_path = old_settings_path
+        api.state.version = old_version
+        api.state.settings = old_settings
+        api.state.download_jobs = old_jobs
+        api.state.history_db = old_history
+        api.state.default_download_dir = old_default
+
+    assert api.state.downloader is old_downloader
+    assert payload['downloads']['path'] == str(media)
+    assert payload['downloads']['container_path'] == str(media)
+    assert payload['downloads']['external_path'] == str(media)
+    assert media.exists()
 
 
 def test_download_summary_measures_existing_external_path(tmp_path):
