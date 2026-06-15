@@ -76,6 +76,7 @@ def test_artist_image_scan_keeps_items_from_previous_batch(tmp_path, monkeypatch
                 'file': 'Artist One/song.mp3',
             }
         ],
+        'clean': [{'file': 'Artist One/clean.mp3'}],
         'next_offset': 1,
     }
 
@@ -93,6 +94,7 @@ def test_artist_image_scan_keeps_items_from_previous_batch(tmp_path, monkeypatch
                     'file': 'Artist Two/song.mp3',
                 }
             ],
+            'clean': [{'file': 'Artist Two/clean.mp3'}],
             'next_offset': 2,
             'complete': True,
         }
@@ -109,6 +111,10 @@ def test_artist_image_scan_keeps_items_from_previous_batch(tmp_path, monkeypatch
         assert [
             item['artist_id'] for item in api.state.artist_image_scan['items']
         ] == ['artist-one', 'artist-two']
+        assert [item['file'] for item in api.state.artist_image_scan['clean']] == [
+            'Artist One/clean.mp3',
+            'Artist Two/clean.mp3',
+        ]
         assert api.state.artist_image_scan['matched'] == 2
     finally:
         api.state.downloader = old_downloader

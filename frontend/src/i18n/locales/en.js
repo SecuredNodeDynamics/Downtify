@@ -172,6 +172,7 @@ export default {
     fixed: 'Fixed',
     completed: 'Completed',
     clean: 'No Repair Needed',
+    repairFailed: 'Repair Failed',
     artistImages: 'Local Artist Images',
     artistImagesSubtitle:
       'Find artist credits missing local image files, create missing artist folders, and save artwork as Artist Name.jpg/png/webp.',
@@ -180,6 +181,9 @@ export default {
     missingImages: 'Missing local images',
     emptyArtistImages:
       'No missing local artist images found with available artwork.',
+    emptyArtistImageCompleted: 'No artist image repairs completed yet.',
+    emptyArtistImageClean: 'No artist image scan results without repairs yet.',
+    emptyArtistImageFailed: 'No artist image repairs failed.',
     before: 'Before',
     after: 'After',
     blank: 'Blank',

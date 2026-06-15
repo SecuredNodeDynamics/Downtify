@@ -242,6 +242,8 @@ class AppState:
         'total': 0,
         'matched': 0,
         'items': [],
+        'clean': [],
+        'failed': [],
         'completed': [],
         'error': '',
         'next_offset': 0,
@@ -747,10 +749,16 @@ async def _run_artist_image_scan(limit: int, start: int) -> None:
             list(update.get('items') or []),
         )
         items = _exclude_completed_artist_images(items)
+        clean = _merge_items_by(
+            list(state.artist_image_scan.get('clean') or []),
+            list(update.get('clean') or []),
+            'file',
+        )
         state.artist_image_scan = {
             **state.artist_image_scan,
             **update,
             'items': items,
+            'clean': clean,
             'matched': len(items),
             'status': 'scanning',
             'limit': limit,
@@ -770,10 +778,16 @@ async def _run_artist_image_scan(limit: int, start: int) -> None:
             result_items,
         )
         items = _exclude_completed_artist_images(items)
+        clean = _merge_items_by(
+            list(state.artist_image_scan.get('clean') or []),
+            list(result.get('clean') or []),
+            'file',
+        )
         state.artist_image_scan = {
             **state.artist_image_scan,
             **result,
             'items': items,
+            'clean': clean,
             'matched': len(items),
             'limit': limit,
             'status': 'done',
@@ -817,6 +831,7 @@ async def scan_artist_images(request: Request) -> dict[str, Any]:
         if continuing
         else []
     )
+    previous_clean = (previous.get('clean') or []) if continuing else []
     state.artist_image_scan = {
         'status': 'scanning',
         'limit': limit,
@@ -825,6 +840,8 @@ async def scan_artist_images(request: Request) -> dict[str, Any]:
         'total': 0,
         'matched': len(previous_items),
         'items': previous_items,
+        'clean': previous_clean,
+        'failed': previous.get('failed') or [],
         'completed': previous.get('completed') or [],
         'error': '',
         'next_offset': start,

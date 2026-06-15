@@ -174,6 +174,7 @@ export default {
     fixed: 'Corrigido',
     completed: 'Concluido',
     clean: 'Sem reparo necessario',
+    repairFailed: 'Reparo falhou',
     artistImages: 'Imagens locais de artistas',
     artistImagesSubtitle:
       'Encontre pastas de artistas sem imagem local e salve nova arte como Nome do artista.jpg/png/webp. O Jellyfin pode mostrar arte em cache ou de provedores que nao esta salva na sua pasta de musica.',
@@ -182,6 +183,12 @@ export default {
     missingImages: 'Imagens locais ausentes',
     emptyArtistImages:
       'Nenhuma imagem local de artista ausente com arte disponivel foi encontrada.',
+    emptyArtistImageCompleted:
+      'Nenhum reparo de imagem de artista foi concluido ainda.',
+    emptyArtistImageClean:
+      'Ainda nao ha resultados de imagem de artista sem reparo.',
+    emptyArtistImageFailed:
+      'Nenhum reparo de imagem de artista falhou.',
     before: 'Antes',
     after: 'Depois',
     blank: 'Vazio',

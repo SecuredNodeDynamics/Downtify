@@ -525,6 +525,33 @@ def test_scan_artist_images_lists_available_missing_art(tmp_path, monkeypatch):
     assert result['items'][0]['source'] == 'Wikimedia Commons'
 
 
+def test_scan_artist_images_reports_clean_items(tmp_path, monkeypatch):
+    track = tmp_path / 'Artist - Song.mp3'
+    track.write_bytes(b'not really audio')
+
+    monkeypatch.setattr(
+        metadata_repair,
+        '_song_from_file',
+        lambda _path: {'name': 'Song', 'artists': ['Artist']},
+    )
+    monkeypatch.setattr(
+        metadata_repair,
+        '_artist_image_scan_candidates',
+        lambda *_args: [],
+    )
+
+    result = metadata_repair.scan_artist_images(tmp_path, limit=10)
+
+    assert result['items'] == []
+    assert result['clean'] == [
+        {
+            'file': 'Artist - Song.mp3',
+            'artist': 'Artist',
+            'folder': '',
+        }
+    ]
+
+
 def test_artist_image_scan_includes_featured_musicbrainz_artists(
     tmp_path,
     monkeypatch,

@@ -282,24 +282,6 @@ def _combined_artist_refs(
     return artists
 
 
-def _artist_attempt_key(root: Path, path: Path, song: dict[str, Any]) -> str:
-    title = str(song.get('name') or '').strip().casefold()
-    album = str(song.get('album_name') or '').strip().casefold()
-    artists = [str(artist).strip() for artist in song.get('artists') or []]
-    if title or artists or album:
-        parts = [
-            title,
-            '|'.join(artist.casefold() for artist in artists),
-            album,
-        ]
-        return 'track:' + '::'.join(parts)
-    try:
-        relative = path.resolve().relative_to(root)
-    except ValueError:
-        return path.stem.casefold()
-    return f'folder:{relative.parts[0].casefold()}' if relative.parts else ''
-
-
 def scan_artist_images(
     root: Path,
     limit: int = 100,
@@ -317,20 +299,16 @@ def scan_artist_images(
     start = max(0, min(start, total))
     selected = files[start : start + max(1, limit)]
     items: list[dict[str, Any]] = []
-    seen: set[tuple[str, str]] = set()
-    attempted: set[str] = set()
+    clean_items: list[dict[str, Any]] = []
+    seen: set[tuple[str, str, str]] = set()
     batch_scanned = 0
     for path in selected:
         batch_scanned += 1
         current_offset = start + batch_scanned
+        current: dict[str, Any] | None = None
         try:
             current = _song_from_file(path)
-            attempt_key = _artist_attempt_key(root, path, current)
-            if attempt_key in attempted:
-                candidates = []
-            else:
-                attempted.add(attempt_key)
-                candidates = _artist_image_scan_candidates(root, path, current)
+            candidates = _artist_image_scan_candidates(root, path, current)
         except Exception:
             logger.opt(exception=True).warning(
                 'Failed to scan artist image candidate {}',
@@ -338,17 +316,20 @@ def scan_artist_images(
             )
             candidates = []
         for item in candidates:
-            key = (item['artist_id'], item['folder'])
+            key = (item['artist_id'], item['artist'], item['folder'])
             if key in seen:
                 continue
             seen.add(key)
             items.append(item)
+        if not candidates:
+            clean_items.append(_artist_image_clean_item(root, path, current))
         if progress_cb is not None:
             progress_cb({
                 'scanned': current_offset,
                 'batch_scanned': batch_scanned,
                 'total': total,
                 'items': list(items),
+                'clean': list(clean_items),
                 'matched': len(items),
                 'start': start,
                 'next_offset': current_offset,
@@ -360,10 +341,34 @@ def scan_artist_images(
         'batch_scanned': batch_scanned,
         'total': total,
         'items': items,
+        'clean': clean_items,
         'matched': len(items),
         'start': start,
         'next_offset': next_offset,
         'complete': next_offset >= total,
+    }
+
+
+def _artist_image_clean_item(
+    root: Path,
+    path: Path,
+    current: dict[str, Any] | None,
+) -> dict[str, Any]:
+    artists = []
+    if current is not None:
+        artists = [
+            str(artist).strip()
+            for artist in current.get('artists') or []
+            if str(artist).strip()
+        ]
+    try:
+        file = path.relative_to(root.resolve()).as_posix()
+    except ValueError:
+        file = path.name
+    return {
+        'file': file,
+        'artist': ', '.join(artists),
+        'folder': file.split('/', 1)[0] if '/' in file else '',
     }
 
 

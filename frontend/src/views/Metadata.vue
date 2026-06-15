@@ -290,7 +290,7 @@
             <button
               class="btn btn-sm h-11 rounded-full border-white/10 bg-base-100/85 hover:bg-base-100"
               :disabled="
-                artistImageLoading ||
+                activeArtistImageTab !== 'needs' ||
                 artistImageItems.length === 0 ||
                 repairingAllImages
               "
@@ -341,16 +341,77 @@
           </div>
         </section>
 
+        <div
+          class="mb-5 inline-flex rounded-full border border-white/10 bg-base-100/75 p-1"
+        >
+          <button
+            class="rounded-full px-4 py-2 text-sm font-medium transition-colors"
+            :class="
+              activeArtistImageTab === 'needs'
+                ? 'bg-primary text-primary-content shadow-glow-sm'
+                : 'text-base-content/60 hover:text-base-content'
+            "
+            @click="activeArtistImageTab = 'needs'"
+          >
+            {{ t('metadata.needsFix') }}
+            <span class="ml-2 rounded-full bg-current/10 px-2 py-0.5 text-sm font-bold">
+              {{ artistImageItems.length }}
+            </span>
+          </button>
+          <button
+            class="rounded-full px-4 py-2 text-sm font-medium transition-colors"
+            :class="
+              activeArtistImageTab === 'completed'
+                ? 'bg-primary text-primary-content shadow-glow-sm'
+                : 'text-base-content/60 hover:text-base-content'
+            "
+            @click="activeArtistImageTab = 'completed'"
+          >
+            {{ t('metadata.completed') }}
+            <span class="ml-2 rounded-full bg-current/10 px-2 py-0.5 text-sm font-bold">
+              {{ completedArtistImages.length }}
+            </span>
+          </button>
+          <button
+            class="rounded-full px-4 py-2 text-sm font-medium transition-colors"
+            :class="
+              activeArtistImageTab === 'clean'
+                ? 'bg-primary text-primary-content shadow-glow-sm'
+                : 'text-base-content/60 hover:text-base-content'
+            "
+            @click="activeArtistImageTab = 'clean'"
+          >
+            {{ t('metadata.clean') }}
+            <span class="ml-2 rounded-full bg-current/10 px-2 py-0.5 text-sm font-bold">
+              {{ cleanArtistImageItems.length }}
+            </span>
+          </button>
+          <button
+            class="rounded-full px-4 py-2 text-sm font-medium transition-colors"
+            :class="
+              activeArtistImageTab === 'failed'
+                ? 'bg-primary text-primary-content shadow-glow-sm'
+                : 'text-base-content/60 hover:text-base-content'
+            "
+            @click="activeArtistImageTab = 'failed'"
+          >
+            {{ t('metadata.repairFailed') }}
+            <span class="ml-2 rounded-full bg-current/10 px-2 py-0.5 text-sm font-bold">
+              {{ failedArtistImages.length }}
+            </span>
+          </button>
+        </div>
+
         <div class="max-h-[34rem] overflow-y-auto pr-2">
           <div
-            v-if="artistImageLoading && artistImageItems.length === 0"
+            v-if="artistImageLoading && visibleArtistImageItems.length === 0"
             class="space-y-3"
           >
             <div v-for="n in 4" :key="n" class="skeleton h-20 rounded-2xl" />
           </div>
 
           <div
-            v-else-if="artistImageItems.length === 0"
+            v-else-if="visibleArtistImageItems.length === 0"
             class="surface rounded-2xl p-10 text-center"
           >
             <Icon
@@ -361,14 +422,14 @@
               {{
                 artistImageLoading
                   ? t('metadata.scanning')
-                  : t('metadata.emptyArtistImages')
+                  : emptyArtistImageMessage
               }}
             </p>
           </div>
 
           <ul v-else class="space-y-3">
             <li
-              v-for="item in artistImageItems"
+              v-for="item in visibleArtistImageItems"
               :key="itemKey(item)"
               class="surface rounded-2xl p-4"
               :class="
@@ -386,10 +447,19 @@
                     {{ item.target || item.folder }}
                   </p>
                   <p class="mt-1 text-xs text-primary">
-                    {{ item.source }}
+                    {{ artistImageItemMeta(item) }}
+                  </p>
+                  <p
+                    v-if="activeArtistImageTab === 'failed'"
+                    class="mt-2 text-xs text-error"
+                  >
+                    {{ item.error }}
                   </p>
                 </div>
-                <div class="grid grid-cols-[5rem_5rem] items-center gap-3 justify-self-center">
+                <div
+                  v-if="activeArtistImageTab === 'needs'"
+                  class="grid grid-cols-[5rem_5rem] items-center gap-3 justify-self-center"
+                >
                   <div>
                     <p class="mb-1 text-center text-[0.65rem] uppercase text-base-content/40">
                       {{ t('metadata.before') }}
@@ -430,6 +500,7 @@
                   </div>
                 </div>
                 <button
+                  v-if="activeArtistImageTab === 'needs'"
                   class="btn btn-sm h-10 rounded-full border-white/10 bg-base-100/85 hover:bg-base-100"
                   :class="fixedArtistImages[itemKey(item)] ? 'text-primary' : ''"
                   :disabled="
@@ -485,7 +556,10 @@ const artistImageLoading = ref(false)
 const artistImageError = ref('')
 const artistImageLimit = ref(50)
 const artistImageItems = ref([])
+const cleanArtistImageItems = ref([])
 const completedArtistImages = ref([])
+const failedArtistImages = ref([])
+const activeArtistImageTab = ref('needs')
 const applyingArtistImages = ref({})
 const fixedArtistImages = ref({})
 const repairingAllImages = ref(false)
@@ -501,6 +575,29 @@ const visibleItems = computed(() =>
       : items.value
 )
 
+const visibleArtistImageItems = computed(() =>
+  activeArtistImageTab.value === 'completed'
+    ? completedArtistImages.value
+    : activeArtistImageTab.value === 'clean'
+      ? cleanArtistImageItems.value
+      : activeArtistImageTab.value === 'failed'
+        ? failedArtistImages.value
+        : artistImageItems.value
+)
+
+const emptyArtistImageMessage = computed(() => {
+  if (activeArtistImageTab.value === 'completed') {
+    return t('metadata.emptyArtistImageCompleted')
+  }
+  if (activeArtistImageTab.value === 'clean') {
+    return t('metadata.emptyArtistImageClean')
+  }
+  if (activeArtistImageTab.value === 'failed') {
+    return t('metadata.emptyArtistImageFailed')
+  }
+  return t('metadata.emptyArtistImages')
+})
+
 function displaySong(song) {
   const artists = (song?.artists || []).join(', ')
   const title = song?.name || t('common.unknownTrack')
@@ -514,6 +611,20 @@ function itemKey(item) {
 
 function pendingArtistImageItems(items) {
   return (items || []).filter((item) => !fixedArtistImages.value[itemKey(item)])
+}
+
+function artistImageItemMeta(item) {
+  if (activeArtistImageTab.value === 'completed') {
+    const files = [...(item.saved || []), ...(item.verified || [])]
+    return files.join(', ') || item.file || item.folder || ''
+  }
+  if (activeArtistImageTab.value === 'clean') {
+    return item.file || item.folder || t('metadata.clean')
+  }
+  if (activeArtistImageTab.value === 'failed') {
+    return item.file || item.target || item.folder || ''
+  }
+  return item.source || ''
 }
 
 function applyScanStatus(data) {
@@ -545,8 +656,12 @@ function applyArtistImageStatus(data) {
     ...artistImageSummary.value,
     matched: artistImageItems.value.length,
   }
+  cleanArtistImageItems.value = data.clean || cleanArtistImageItems.value
   completedArtistImages.value =
     data.completed || completedArtistImages.value
+  if (Array.isArray(data.failed) && data.failed.length > 0) {
+    failedArtistImages.value = data.failed
+  }
   if (data.status === 'error') {
     artistImageError.value = data.error || t('metadata.failedArtistImageScan')
   }
@@ -697,6 +812,7 @@ async function scanArtistImages() {
   artistImageLoading.value = true
   artistImageError.value = ''
   fixedArtistImages.value = {}
+  failedArtistImages.value = []
   try {
     const res = await API.scanArtistImages(artistImageLimit.value)
     applyArtistImageStatus(res.data)
@@ -728,6 +844,9 @@ async function applyArtistImage(item) {
     }
     fixedArtistImages.value = { ...fixedArtistImages.value, [key]: true }
     completedArtistImages.value = [res.data, ...completedArtistImages.value]
+    failedArtistImages.value = failedArtistImages.value.filter(
+      (existing) => itemKey(existing) !== key
+    )
     artistImageItems.value = artistImageItems.value.filter(
       (existing) => itemKey(existing) !== key
     )
@@ -740,6 +859,15 @@ async function applyArtistImage(item) {
     artistImageError.value = detail
       ? `${t('metadata.failedArtistImageApply')} ${detail}`
       : t('metadata.failedArtistImageApply')
+    failedArtistImages.value = [
+      {
+        ...item,
+        error: detail || t('metadata.failedArtistImageApply'),
+      },
+      ...failedArtistImages.value.filter(
+        (existing) => itemKey(existing) !== key
+      ),
+    ]
   } finally {
     applyingArtistImages.value = {
       ...applyingArtistImages.value,
