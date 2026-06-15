@@ -156,6 +156,9 @@ export default {
     title: 'Metadatos',
     subtitle:
       'Escanea archivos existentes en el servidor y repara etiquetas con coincidencias de MusicBrainz.',
+    metadataTab: 'Metadatos',
+    artistImagesTab: 'Imagenes de artistas',
+    jellyfinTab: 'Jellyfin',
     scan: 'Escanear biblioteca',
     scanAll: 'Escanear todo',
     scanning: 'Escaneando biblioteca...',

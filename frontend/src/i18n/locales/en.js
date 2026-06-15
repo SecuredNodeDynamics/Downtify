@@ -153,6 +153,9 @@ export default {
     title: 'Metadata',
     subtitle:
       'Scan existing server library files and repair tags with MusicBrainz matches.',
+    metadataTab: 'Metadata',
+    artistImagesTab: 'Artist Images',
+    jellyfinTab: 'Jellyfin',
     scan: 'Scan library',
     scanAll: 'Scan all',
     scanning: 'Scanning library...',

@@ -4,7 +4,7 @@
     <Settings />
 
     <main class="mx-auto max-w-5xl px-4 py-8 sm:px-6">
-      <div class="mb-8 flex flex-wrap items-end justify-between gap-4">
+      <div class="mb-5">
         <div>
           <h1 class="text-2xl font-bold tracking-tight">
             {{ t('metadata.title') }}
@@ -13,6 +13,60 @@
             {{ t('metadata.subtitle') }}
           </p>
         </div>
+      </div>
+
+      <div
+        class="tab-glow-shell mb-6 inline-flex rounded-full border bg-base-100/75 p-1"
+      >
+        <button
+          class="rounded-full px-4 py-2 text-sm font-medium transition-colors"
+          :class="
+            activeToolTab === 'metadata'
+              ? 'bg-primary text-primary-content shadow-glow-sm'
+              : 'text-base-content/60 hover:text-base-content'
+          "
+          @click="activeToolTab = 'metadata'"
+        >
+          <Icon icon="clarity:tag-line" class="mr-2 inline h-4 w-4" />
+          {{ t('metadata.metadataTab') }}
+        </button>
+        <button
+          class="rounded-full px-4 py-2 text-sm font-medium transition-colors"
+          :class="
+            activeToolTab === 'images'
+              ? 'bg-primary text-primary-content shadow-glow-sm'
+              : 'text-base-content/60 hover:text-base-content'
+          "
+          @click="activeToolTab = 'images'"
+        >
+          <Icon icon="clarity:image-gallery-line" class="mr-2 inline h-4 w-4" />
+          {{ t('metadata.artistImagesTab') }}
+        </button>
+        <button
+          v-if="sm.settings.value.enable_jellyfin_tools"
+          class="rounded-full px-4 py-2 text-sm font-medium transition-colors"
+          :class="
+            activeToolTab === 'jellyfin'
+              ? 'bg-primary text-primary-content shadow-glow-sm'
+              : 'text-base-content/60 hover:text-base-content'
+          "
+          @click="activeToolTab = 'jellyfin'"
+        >
+          <Icon icon="clarity:server-line" class="mr-2 inline h-4 w-4" />
+          {{ t('metadata.jellyfinTab') }}
+        </button>
+      </div>
+
+      <section v-if="activeToolTab === 'metadata'">
+        <div class="mb-5 flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h2 class="text-xl font-bold tracking-tight">
+              {{ t('metadata.metadataTab') }}
+            </h2>
+            <p class="mt-1 text-sm text-base-content/60">
+              {{ t('metadata.subtitle') }}
+            </p>
+          </div>
         <div class="flex items-center gap-2">
           <select
             v-model.number="scanLimit"
@@ -266,10 +320,9 @@
         </ul>
       </div>
 
-      <section
-        v-if="sm.settings.value.enable_jellyfin_tools"
-        class="mt-10 border-t border-white/10 pt-8"
-      >
+      </section>
+
+      <section v-if="activeToolTab === 'images'">
         <div class="mb-5 flex flex-wrap items-end justify-between gap-4">
           <div class="min-w-0 flex-1">
             <h2 class="text-xl font-bold tracking-tight">
@@ -555,7 +608,12 @@
         </div>
       </section>
 
-      <section class="mt-10 border-t border-white/10 pt-8">
+      <section
+        v-if="
+          activeToolTab === 'jellyfin' &&
+          sm.settings.value.enable_jellyfin_tools
+        "
+      >
         <div class="mb-5 flex flex-wrap items-end justify-between gap-4">
           <div class="min-w-0 flex-1">
             <div class="flex items-center gap-2">
@@ -703,7 +761,7 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 
 import Navbar from '/src/components/Navbar.vue'
@@ -714,6 +772,7 @@ import { useI18n } from '/src/i18n'
 
 const { t } = useI18n()
 const sm = useSettingsManager()
+const activeToolTab = ref('metadata')
 const loading = ref(false)
 const error = ref('')
 const items = ref([])
@@ -824,6 +883,15 @@ const jellyfinLibraryName = computed(() => {
   const library = artistReconciliation.value?.library || {}
   return library.name || library.id || t('metadata.notCheckedYet')
 })
+
+watch(
+  () => sm.settings.value.enable_jellyfin_tools,
+  (enabled) => {
+    if (!enabled && activeToolTab.value === 'jellyfin') {
+      activeToolTab.value = 'metadata'
+    }
+  }
+)
 
 function displaySong(song) {
   const artists = (song?.artists || []).join(', ')
