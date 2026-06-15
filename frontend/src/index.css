@@ -142,6 +142,13 @@
     @apply bg-primary text-primary-content hover:bg-primary hover:text-primary-content shadow-glow-sm;
   }
 
+  .tab-glow-shell {
+    @apply border-primary/25 shadow-glow-sm;
+    box-shadow:
+      0 0 0 1px rgba(26, 208, 92, 0.08),
+      0 0 24px rgba(26, 208, 92, 0.16);
+  }
+
   .btn {
     @apply border-primary/20 shadow-glow-sm transition-all;
     box-shadow:
@@ -253,6 +260,16 @@
   [data-theme='downtify-light'] .skeleton {
     @apply bg-black/10;
   }
+
+  .scan-skeleton-glow {
+    @apply border border-primary/25;
+    animation:
+      pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite,
+      scanGlow 2s ease-in-out infinite;
+    box-shadow:
+      0 0 0 1px rgba(26, 208, 92, 0.08),
+      0 0 18px rgba(26, 208, 92, 0.14);
+  }
 }
 
 @layer utilities {
@@ -262,5 +279,21 @@
   .grid-fluid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  }
+}
+
+@keyframes scanGlow {
+  0%,
+  100% {
+    border-color: rgba(26, 208, 92, 0.18);
+    box-shadow:
+      0 0 0 1px rgba(26, 208, 92, 0.06),
+      0 0 16px rgba(26, 208, 92, 0.10);
+  }
+  50% {
+    border-color: rgba(26, 208, 92, 0.55);
+    box-shadow:
+      0 0 0 1px rgba(26, 208, 92, 0.18),
+      0 0 34px rgba(26, 208, 92, 0.30);
   }
 }

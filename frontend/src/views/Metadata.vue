@@ -92,7 +92,7 @@
       </p>
 
       <div
-        class="mb-5 inline-flex rounded-full border border-white/10 bg-base-100/75 p-1"
+        class="tab-glow-shell mb-5 inline-flex rounded-full border bg-base-100/75 p-1"
       >
         <button
           class="rounded-full px-4 py-2 text-sm font-medium transition-colors"
@@ -140,7 +140,11 @@
 
       <div class="max-h-[45rem] overflow-y-auto pr-2">
         <div v-if="loading && visibleItems.length === 0" class="space-y-3">
-          <div v-for="n in 5" :key="n" class="skeleton h-24 rounded-2xl" />
+          <div
+            v-for="n in 5"
+            :key="n"
+            class="skeleton scan-skeleton-glow h-24 rounded-2xl"
+          />
         </div>
 
         <div
@@ -342,7 +346,7 @@
         </section>
 
         <div
-          class="mb-5 inline-flex rounded-full border border-white/10 bg-base-100/75 p-1"
+          class="tab-glow-shell mb-5 inline-flex rounded-full border bg-base-100/75 p-1"
         >
           <button
             class="rounded-full px-4 py-2 text-sm font-medium transition-colors"
@@ -407,7 +411,11 @@
             v-if="artistImageLoading && visibleArtistImageItems.length === 0"
             class="space-y-3"
           >
-            <div v-for="n in 4" :key="n" class="skeleton h-20 rounded-2xl" />
+            <div
+              v-for="n in 4"
+              :key="n"
+              class="skeleton scan-skeleton-glow h-20 rounded-2xl"
+            />
           </div>
 
           <div
