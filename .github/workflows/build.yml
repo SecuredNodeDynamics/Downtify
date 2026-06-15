@@ -29,12 +29,12 @@ jobs:
         with:
           annotations: |
             type=org.opencontainers.image.description, value=Download your Spotify playlists and songs along with album art and metadata in a self-hosted way via Docker.
-            type=org.opencontainers.image.url, value=https://github.com/henriquesebastiao/downtify
-            type=org.opencontainers.image.source, value=https://github.com/henriquesebastiao/downtify
+            type=org.opencontainers.image.url, value=https://github.com/SecuredNodeDynamics/Downtify
+            type=org.opencontainers.image.source, value=https://github.com/SecuredNodeDynamics/Downtify
             type=org.opencontainers.image.version, value=${{ steps.version.outputs.VERSION }}
-            type=org.opencontainers.image.authors, value=Henrique Sebastião <contato@henriquesebastiao.com>
+            type=org.opencontainers.image.authors, value=SecuredNodeDynamics
             type=org.opencontainers.image.licenses, value=GPL-3.0
-            type=org.opencontainers.image.vendor, value=Henrique Sebastião
+            type=org.opencontainers.image.vendor, value=SecuredNodeDynamics
             type=org.opencontainers.image.base.name, value=python:3.13-alpine
             type=org.opencontainers.image.title, value=Downtify
     
@@ -58,10 +58,10 @@ jobs:
           context: .
           push: true
           tags: |
-            henriquesebastiao/downtify:latest
-            henriquesebastiao/downtify:${{ steps.version.outputs.VERSION }}
-            ghcr.io/${{ github.repository }}:latest
-            ghcr.io/${{ github.repository }}:${{ steps.version.outputs.VERSION }}
+            securednodedynamics/downtify:latest
+            securednodedynamics/downtify:${{ steps.version.outputs.VERSION }}
+            ghcr.io/securednodedynamics/downtify:latest
+            ghcr.io/securednodedynamics/downtify:${{ steps.version.outputs.VERSION }}
           platforms: linux/amd64,linux/arm64
           build-args: |
             DOCKER_METADATA_OUTPUT_JSON

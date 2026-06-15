@@ -32,7 +32,7 @@ YouTube periodically challenges automated downloaders. These variables give you 
 ```yaml
 services:
   downtify:
-    image: ghcr.io/henriquesebastiao/downtify:latest
+    image: ghcr.io/securednodedynamics/downtify:latest
     ports:
       - '8000:8000'
     volumes:

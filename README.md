@@ -1,5 +1,5 @@
 <h1 align="center">
-  <a href="https://github.com/henriquesebastiao/downtify" target="_blank" rel="noopener noreferrer">
+  <a href="https://github.com/SecuredNodeDynamics/Downtify" target="_blank" rel="noopener noreferrer">
     <picture>
       <img width="80" src="https://github.com/user-attachments/assets/628d4334-7326-446e-9f2a-4d3ab4fc95c3">
     </picture>
@@ -14,11 +14,11 @@
 
 <div align="center">
 
-[![Test](https://github.com/henriquesebastiao/downtify/actions/workflows/test.yml/badge.svg)](https://github.com/henriquesebastiao/downtify/actions/workflows/test.yml)
-[![GitHub Release](https://img.shields.io/github/v/release/henriquesebastiao/downtify?color=blue)](https://github.com/henriquesebastiao/downtify/releases)
-[![GitHub License](https://img.shields.io/github/license/henriquesebastiao/downtify?color=blue)](/LICENSE)
-[![Docker Pulls](https://img.shields.io/docker/pulls/henriquesebastiao/downtify?color=blue)](https://hub.docker.com/r/henriquesebastiao/downtify)
-[![Visitors](https://api.visitorbadge.io/api/visitors?path=henriquesebastiao%2Fdowntify&label=repository%20visits&countColor=%231182c3&style=flat)](https://github.com/henriquesebastiao/downtify)
+[![Test](https://github.com/SecuredNodeDynamics/Downtify/actions/workflows/test.yml/badge.svg)](https://github.com/SecuredNodeDynamics/Downtify/actions/workflows/test.yml)
+[![GitHub Release](https://img.shields.io/github/v/release/SecuredNodeDynamics/Downtify?color=blue)](https://github.com/SecuredNodeDynamics/Downtify/releases)
+[![GitHub License](https://img.shields.io/github/license/SecuredNodeDynamics/Downtify?color=blue)](/LICENSE)
+[![Docker Pulls](https://img.shields.io/docker/pulls/securednodedynamics/downtify?color=blue)](https://hub.docker.com/r/securednodedynamics/downtify)
+[![Visitors](https://api.visitorbadge.io/api/visitors?path=SecuredNodeDynamics%2FDowntify&label=repository%20visits&countColor=%231182c3&style=flat)](https://github.com/SecuredNodeDynamics/Downtify)
 
 </div>
 
@@ -58,7 +58,7 @@ It resolves track metadata directly from Spotify's public embed pages, finds the
 docker run -d -p 8000:8000 --name downtify \
   -v /path/to/downloads:/downloads \
   -v downtify_data:/data \
-  ghcr.io/henriquesebastiao/downtify
+  ghcr.io/securednodedynamics/downtify
 ```
 
 Open [http://localhost:8000](http://localhost:8000), paste a Spotify link, and hit download.
@@ -71,7 +71,7 @@ Open [http://localhost:8000](http://localhost:8000), paste a Spotify link, and h
 services:
   downtify:
     container_name: downtify
-    image: ghcr.io/henriquesebastiao/downtify:latest
+    image: ghcr.io/securednodedynamics/downtify:latest
     ports:
       - '8000:8000'
     volumes:
@@ -263,7 +263,7 @@ Pull requests with new translations are very welcome — just open a PR against 
 ## 🤝 Contributing
 
 Contributions, issues and feature requests are welcome!
-Check the [issues page](https://github.com/henriquesebastiao/downtify/issues) or open a pull request.
+Check the [issues page](https://github.com/SecuredNodeDynamics/Downtify/issues) or open a pull request.
 
 If Downtify has been useful to you, consider leaving a ⭐ — it helps the project grow and reach more people!
 
@@ -271,4 +271,4 @@ If Downtify has been useful to you, consider leaving a ⭐ — it helps the proj
 
 ## 📄 License
 
-Licensed under the [GPL-3.0](https://github.com/henriquesebastiao/downtify?tab=GPL-3.0-1-ov-file#readme) License.
+Licensed under the [GPL-3.0](https://github.com/SecuredNodeDynamics/Downtify?tab=GPL-3.0-1-ov-file#readme) License.

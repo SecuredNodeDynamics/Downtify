@@ -19,19 +19,19 @@ RUN npm run build
 
 FROM python:3.13-alpine
 
-LABEL maintainer="Henrique Sebastião <contato@henriquesebastiao.com>"
+LABEL maintainer="SecuredNodeDynamics"
 LABEL version="2.9.0"
 LABEL description="Self-hosted Spotify downloader"
 
 LABEL org.opencontainers.image.title="Downtify" \
       org.opencontainers.image.description="Download your Spotify playlists and songs along with album art and metadata in a self-hosted way via Docker." \
       org.opencontainers.image.version="2.9.0" \
-      org.opencontainers.image.authors="Henrique Sebastião <contato@henriquesebastiao.com>" \
-      org.opencontainers.image.url="https://github.com/henriquesebastiao/downtify" \
-      org.opencontainers.image.source="https://github.com/henriquesebastiao/downtify" \
+      org.opencontainers.image.authors="SecuredNodeDynamics" \
+      org.opencontainers.image.url="https://github.com/SecuredNodeDynamics/Downtify" \
+      org.opencontainers.image.source="https://github.com/SecuredNodeDynamics/Downtify" \
       org.opencontainers.image.licenses="GPL-3.0" \
-      org.opencontainers.image.documentation="https://github.com/henriquesebastiao/downtify#readme" \
-      org.opencontainers.image.vendor="Henrique Sebastião" \
+      org.opencontainers.image.documentation="https://github.com/SecuredNodeDynamics/Downtify#readme" \
+      org.opencontainers.image.vendor="SecuredNodeDynamics" \
       org.opencontainers.image.base.name="python:3.13-alpine"
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
