@@ -348,9 +348,31 @@ def _save_settings(path: Path, settings: dict[str, Any]) -> None:
         logger.warning('Could not persist settings: {}', exc)
 
 
+def _same_configured_path(left: str, right: str) -> bool:
+    return os.path.normpath(os.path.expanduser(left)) == os.path.normpath(
+        os.path.expanduser(right)
+    )
+
+
+def _server_media_location() -> str:
+    return str(state.settings.get('server_media_location') or '').strip()
+
+
+def _compose_host_media_location() -> str:
+    return os.getenv('DOWNTIFY_MEDIA_SAVE_LOCATION', '').strip()
+
+
+def _server_media_location_is_compose_host_path() -> bool:
+    saved = _server_media_location()
+    configured = _compose_host_media_location()
+    return bool(saved and configured and _same_configured_path(saved, configured))
+
+
 def _effective_download_dir(fallback: Path | str | None = None) -> Path:
-    saved = str(state.settings.get('server_media_location') or '').strip()
+    saved = _server_media_location()
     if saved:
+        if _server_media_location_is_compose_host_path():
+            return state.default_download_dir
         return Path(saved).expanduser()
     if fallback is not None:
         return Path(fallback)
@@ -468,10 +490,10 @@ def _mount_source_for(
 
 
 def _external_download_path(download_dir: Path) -> Optional[str]:
-    saved = str(state.settings.get('server_media_location') or '').strip()
+    saved = _server_media_location()
     if saved:
         return saved
-    configured = os.getenv('DOWNTIFY_MEDIA_SAVE_LOCATION', '').strip()
+    configured = _compose_host_media_location()
     if configured:
         return configured
     return _mount_source_for(download_dir)
@@ -482,7 +504,7 @@ def _download_directory_summary(download_dir: Path) -> dict[str, Any]:
     storage_dir = download_dir
     if external_path:
         external_dir = Path(external_path)
-        if external_dir.exists():
+        if _same_configured_path(str(external_dir), str(download_dir)):
             storage_dir = external_dir
 
     summary = _directory_summary(storage_dir, external_path=external_path)

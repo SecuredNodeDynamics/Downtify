@@ -171,8 +171,6 @@ def test_health_retargets_downloader_to_saved_server_media_location(tmp_path):
 
 
 def test_download_summary_measures_existing_external_path(tmp_path):
-    downloads = tmp_path / 'downloads'
-    downloads.mkdir()
     media = tmp_path / 'media'
     media.mkdir()
     (media / 'song.flac').write_text('audio', encoding='utf-8')
@@ -181,15 +179,58 @@ def test_download_summary_measures_existing_external_path(tmp_path):
     try:
         api.state.settings = {'server_media_location': str(media)}
 
-        summary = _download_directory_summary(downloads)
+        summary = _download_directory_summary(media)
     finally:
         api.state.settings = old_settings
 
     assert summary['external_path'] == str(media)
-    assert summary['container_path'] == str(downloads)
+    assert summary['container_path'] == str(media)
     assert summary['storage_path'] == str(media)
     assert summary['storage_path_matches_display'] is True
     assert summary['audio_count'] == 1
+
+
+def test_health_counts_container_mount_when_saved_location_is_compose_host_path(
+    tmp_path,
+    monkeypatch,
+):
+    old_downloader = api.state.downloader
+    old_settings_path = api.state.settings_path
+    old_version = api.state.version
+    old_settings = api.state.settings
+    old_jobs = api.state.download_jobs
+    old_history = api.state.history_db
+    old_default = api.state.default_download_dir
+    downloads = tmp_path / 'downloads'
+    media = tmp_path / 'media' / 'Music'
+    try:
+        downloads.mkdir()
+        (downloads / 'song.flac').write_text('audio', encoding='utf-8')
+        monkeypatch.setenv('DOWNTIFY_MEDIA_SAVE_LOCATION', str(media))
+        api.state.downloader = Downloader(downloads)
+        api.state.default_download_dir = downloads
+        api.state.settings_path = tmp_path / 'data' / 'settings.json'
+        api.state.settings_path.parent.mkdir()
+        api.state.version = '1.2.3'
+        api.state.settings = {'server_media_location': str(media)}
+        api.state.download_jobs = {}
+        api.state.history_db = None
+
+        payload = get_health()
+    finally:
+        api.state.downloader = old_downloader
+        api.state.settings_path = old_settings_path
+        api.state.version = old_version
+        api.state.settings = old_settings
+        api.state.download_jobs = old_jobs
+        api.state.history_db = old_history
+        api.state.default_download_dir = old_default
+
+    assert payload['downloads']['external_path'] == str(media)
+    assert payload['downloads']['container_path'] == str(downloads)
+    assert payload['downloads']['storage_path'] == str(downloads)
+    assert payload['downloads']['storage_path_matches_display'] is False
+    assert payload['downloads']['audio_count'] == 1
 
 
 def test_download_summary_marks_unmounted_external_path(tmp_path):
