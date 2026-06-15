@@ -829,10 +829,10 @@ async def apply_artist_image(request: Request) -> dict[str, Any]:
         'id': str(payload.get('artist_id') or '').strip(),
         'name': str(payload.get('artist') or '').strip(),
     }
-    if not file or not artist['id'] or not artist['name']:
+    if not file or not artist['name']:
         raise HTTPException(
             status_code=400,
-            detail='file, artist_id and artist are required',
+            detail='file and artist are required',
         )
     try:
         result = metadata_repair.repair_artist_image(

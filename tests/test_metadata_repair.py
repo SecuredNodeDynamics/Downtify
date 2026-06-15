@@ -199,6 +199,45 @@ def test_scan_library_reports_musicbrainz_match(tmp_path, monkeypatch):
     assert result['items'][0]['matched'] is True
 
 
+def test_scan_library_reports_missing_featured_artist_from_musicbrainz(
+    tmp_path,
+    monkeypatch,
+):
+    track = tmp_path / 'Primary - Song.mp3'
+    track.write_bytes(b'not really audio')
+
+    monkeypatch.setattr(
+        metadata_repair,
+        '_song_from_file',
+        lambda _path: {
+            'name': 'Song',
+            'artists': ['Primary'],
+            'album_name': 'Album',
+        },
+    )
+    monkeypatch.setattr(
+        metadata_repair,
+        'enrich_song_metadata',
+        lambda song: {
+            **song,
+            'artists': ['Primary', 'Featured Artist'],
+            'artist': 'Primary, Featured Artist',
+            'musicbrainz_recording_id': 'recording-mbid',
+            'musicbrainz_artist_ids': [
+                {'id': 'primary-mbid', 'name': 'Primary'},
+                {'id': 'featured-mbid', 'name': 'Featured Artist'},
+            ],
+        },
+    )
+
+    result = metadata_repair.scan_library(tmp_path)
+
+    assert result['matched'] == 1
+    artist_change = result['items'][0]['changes'][0]
+    assert artist_change['field'] == 'artists'
+    assert artist_change['after'] == 'Primary, Featured Artist'
+
+
 def test_scan_library_hides_matches_without_changes(tmp_path, monkeypatch):
     track = tmp_path / 'Artist - Song.mp3'
     track.write_bytes(b'not really audio')
@@ -484,6 +523,146 @@ def test_scan_artist_images_lists_available_missing_art(tmp_path, monkeypatch):
     assert result['matched'] == 1
     assert result['items'][0]['artist'] == 'Artist'
     assert result['items'][0]['source'] == 'Wikimedia Commons'
+
+
+def test_artist_image_scan_includes_featured_musicbrainz_artists(
+    tmp_path,
+    monkeypatch,
+):
+    album = tmp_path / 'Primary' / 'Album'
+    album.mkdir(parents=True)
+    track = album / 'song.mp3'
+    track.write_bytes(b'not really audio')
+
+    monkeypatch.setattr(
+        metadata_repair,
+        '_song_from_file',
+        lambda _path: {
+            'name': 'Song',
+            'artists': ['Primary'],
+            'musicbrainz_artist_ids': [
+                {'id': 'primary-mbid', 'name': 'Primary'},
+            ],
+        },
+    )
+    monkeypatch.setattr(
+        metadata_repair,
+        'enrich_song_metadata',
+        lambda song: {
+            **song,
+            'artists': ['Primary', 'Featured Artist'],
+            'musicbrainz_artist_ids': [
+                {'id': 'primary-mbid', 'name': 'Primary'},
+                {'id': 'featured-mbid', 'name': 'Featured Artist'},
+            ],
+        },
+    )
+    seen_artists = []
+
+    def fake_missing(_root, _path, artists):
+        seen_artists.extend(artists)
+        return [
+            {
+                'artist': artist['name'],
+                'artist_id': artist['id'],
+                'file': 'Primary/Album/song.mp3',
+                'folder': artist['name'],
+                'source': 'Wikimedia Commons',
+            }
+            for artist in artists
+        ]
+
+    monkeypatch.setattr(metadata_repair, 'missing_artist_image_items', fake_missing)
+
+    result = metadata_repair.scan_artist_images(tmp_path, limit=10)
+
+    assert [artist['name'] for artist in seen_artists] == [
+        'Primary',
+        'Featured Artist',
+    ]
+    assert [item['artist'] for item in result['items']] == [
+        'Primary',
+        'Featured Artist',
+    ]
+
+
+def test_artist_image_scan_includes_name_only_side_artists(
+    tmp_path,
+    monkeypatch,
+):
+    track = tmp_path / 'song.mp3'
+    track.write_bytes(b'not really audio')
+
+    monkeypatch.setattr(
+        metadata_repair,
+        '_song_from_file',
+        lambda _path: {
+            'name': 'Song',
+            'artists': ['Primary', 'No Id Guest'],
+        },
+    )
+    monkeypatch.setattr(metadata_repair, 'enrich_song_metadata', lambda song: song)
+    seen_artists = []
+
+    def fake_missing(_root, _path, artists):
+        seen_artists.extend(artists)
+        return [
+            {
+                'artist': artist['name'],
+                'artist_id': artist['id'],
+                'file': 'song.mp3',
+                'folder': artist['name'],
+                'source': 'Album cover fallback',
+            }
+            for artist in artists
+        ]
+
+    monkeypatch.setattr(metadata_repair, 'missing_artist_image_items', fake_missing)
+
+    result = metadata_repair.scan_artist_images(tmp_path, limit=10)
+
+    assert seen_artists == [
+        {'id': '', 'name': 'Primary'},
+        {'id': '', 'name': 'No Id Guest'},
+    ]
+    assert [item['artist_id'] for item in result['items']] == ['', '']
+
+
+def test_artist_image_scan_checks_tracks_with_same_primary_artist(
+    tmp_path,
+    monkeypatch,
+):
+    for title in ['one', 'two']:
+        (tmp_path / f'{title}.mp3').write_bytes(b'not really audio')
+
+    monkeypatch.setattr(
+        metadata_repair,
+        '_song_from_file',
+        lambda path: {
+            'name': path.stem,
+            'artists': ['Primary'],
+        },
+    )
+    monkeypatch.setattr(
+        metadata_repair,
+        '_artist_image_scan_candidates',
+        lambda root, path, _current=None: [
+            {
+                'artist': f'Guest {path.stem}',
+                'artist_id': f'guest-{path.stem}',
+                'file': path.relative_to(root).as_posix(),
+                'folder': f'Guest {path.stem}',
+                'source': 'Wikimedia Commons',
+            }
+        ],
+    )
+
+    result = metadata_repair.scan_artist_images(tmp_path, limit=10)
+
+    assert [item['artist'] for item in result['items']] == [
+        'Guest one',
+        'Guest two',
+    ]
 
 
 def test_scan_artist_images_reports_progress(tmp_path, monkeypatch):

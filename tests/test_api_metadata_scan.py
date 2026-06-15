@@ -11,6 +11,14 @@ class FakeDownloader:
         self.download_dir = download_dir
 
 
+class FakeRequest:
+    def __init__(self, payload):
+        self.payload = payload
+
+    async def json(self):
+        return self.payload
+
+
 def test_metadata_scan_keeps_items_from_previous_batch(tmp_path, monkeypatch):
     old_downloader = api.state.downloader
     old_scan = dict(api.state.metadata_scan)
@@ -102,6 +110,45 @@ def test_artist_image_scan_keeps_items_from_previous_batch(tmp_path, monkeypatch
             item['artist_id'] for item in api.state.artist_image_scan['items']
         ] == ['artist-one', 'artist-two']
         assert api.state.artist_image_scan['matched'] == 2
+    finally:
+        api.state.downloader = old_downloader
+        api.state.artist_image_scan = old_scan
+
+
+def test_apply_artist_image_allows_name_only_artist(tmp_path, monkeypatch):
+    old_downloader = api.state.downloader
+    old_scan = dict(api.state.artist_image_scan)
+    api.state.downloader = FakeDownloader(tmp_path)
+    api.state.artist_image_scan = {**old_scan, 'completed': []}
+
+    captured = {}
+
+    def fake_repair(root, file, artist):
+        captured['root'] = root
+        captured['file'] = file
+        captured['artist'] = artist
+        return {
+            'artist': artist['name'],
+            'artist_id': artist['id'],
+            'file': file,
+            'saved': ['Guest Artist/Guest Artist.jpg'],
+        }
+
+    monkeypatch.setattr(api.metadata_repair, 'repair_artist_image', fake_repair)
+    try:
+        result = asyncio.run(
+            api.apply_artist_image(
+                FakeRequest({
+                    'file': 'song.mp3',
+                    'artist': 'Guest Artist',
+                    'artist_id': '',
+                })
+            )
+        )
+
+        assert captured['artist'] == {'id': '', 'name': 'Guest Artist'}
+        assert result['saved'] == ['Guest Artist/Guest Artist.jpg']
+        assert api.state.artist_image_scan['completed'][0] == result
     finally:
         api.state.downloader = old_downloader
         api.state.artist_image_scan = old_scan

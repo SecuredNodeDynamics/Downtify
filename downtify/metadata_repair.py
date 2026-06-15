@@ -238,24 +238,56 @@ def _artist_image_scan_candidates(
     current: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     current = current or _song_from_file(path)
-    artists = current.get('musicbrainz_artist_ids') or []
-    if not artists:
-        candidate = enrich_song_metadata(current)
-        artists = candidate.get('musicbrainz_artist_ids') or []
+    candidate = enrich_song_metadata(current)
+    artists = _combined_artist_refs(current, candidate)
     return missing_artist_image_items(root, path, artists)
 
 
+def _combined_artist_refs(
+    current: dict[str, Any],
+    candidate: dict[str, Any],
+) -> list[dict[str, str]]:
+    artists: list[dict[str, str]] = []
+    seen_ids: set[str] = set()
+    seen_names: set[str] = set()
+
+    def add(artist_id: Any, name: Any) -> None:
+        artist_id = str(artist_id or '').strip()
+        name = str(name or '').strip()
+        if not artist_id and not name:
+            return
+        if artist_id and artist_id in seen_ids:
+            return
+        name_key = name.casefold()
+        if not artist_id and name_key in seen_names:
+            return
+        artists.append({'id': artist_id, 'name': name})
+        if artist_id:
+            seen_ids.add(artist_id)
+        if name_key:
+            seen_names.add(name_key)
+
+    for source in [current, candidate]:
+        for artist in source.get('musicbrainz_artist_ids') or []:
+            if isinstance(artist, dict):
+                add(artist.get('id'), artist.get('name'))
+        for name in source.get('artists') or []:
+            add('', name)
+
+    return artists
+
+
 def _artist_attempt_key(root: Path, path: Path, song: dict[str, Any]) -> str:
-    artist_ids = [
-        str(artist.get('id') or '').strip()
-        for artist in song.get('musicbrainz_artist_ids') or []
-        if isinstance(artist, dict) and artist.get('id')
-    ]
-    if artist_ids:
-        return 'mbid:' + '|'.join(artist_ids)
+    title = str(song.get('name') or '').strip().casefold()
+    album = str(song.get('album_name') or '').strip().casefold()
     artists = [str(artist).strip() for artist in song.get('artists') or []]
-    if artists:
-        return 'artist:' + '|'.join(artists).casefold()
+    if title or artists or album:
+        parts = [
+            title,
+            '|'.join(artist.casefold() for artist in artists),
+            album,
+        ]
+        return 'track:' + '::'.join(parts)
     try:
         relative = path.resolve().relative_to(root)
     except ValueError:
