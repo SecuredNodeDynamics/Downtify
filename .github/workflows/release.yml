@@ -128,4 +128,7 @@ jobs:
         if: inputs.docker
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh workflow run build.yml --ref "${{ steps.release.outputs.tag }}"
+        run: >
+          gh workflow run build.yml
+          --ref "${{ steps.release.outputs.tag }}"
+          -f version="${{ steps.release.outputs.version }}"

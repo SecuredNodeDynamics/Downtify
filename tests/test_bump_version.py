@@ -104,7 +104,9 @@ def _setup_fake_repo(base: Path) -> None:
         encoding='utf-8',
     )
     (base / 'Makefile').write_text(
-        'DOWNTIFY_VERSION := 1.0.0\n', encoding='utf-8'
+        'DOWNTIFY_VERSION := 1.0.0\n'
+        'TARGET := ghcr.io/securednodedynamics/downtify\n',
+        encoding='utf-8',
     )
     (base / 'Dockerfile').write_text(
         'LABEL version="1.0.0"\n'
@@ -148,6 +150,10 @@ def test_bump_updates_all_three_files(tmp_path):
         in (tmp_path / 'frontend' / 'package-lock.json').read_text()
     )
     assert 'DOWNTIFY_VERSION := 2.3.4' in (tmp_path / 'Makefile').read_text()
+    assert (
+        'TARGET := ghcr.io/securednodedynamics/downtify'
+        in (tmp_path / 'Makefile').read_text()
+    )
     dockerfile = (tmp_path / 'Dockerfile').read_text()
     assert 'LABEL version="2.3.4"' in dockerfile
     assert 'org.opencontainers.image.version="2.3.4"' in dockerfile
