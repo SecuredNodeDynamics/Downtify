@@ -208,6 +208,9 @@ export default {
     jellyfinToolsSubtitle:
       'Compare artistas do Jellyfin com pastas locais e atualize a biblioteca depois dos reparos.',
     reconcileArtists: 'Comparar artistas',
+    reconcilingArtists: 'Comparando artistas...',
+    reconcilingArtistsHint:
+      'Comparando metadados de artistas do Jellyfin com pastas locais e tags.',
     refreshJellyfin: 'Atualizar Jellyfin',
     jellyfinReconcileOk: 'Comparacao de artistas concluida.',
     jellyfinRefreshOk: 'Atualizacao do Jellyfin iniciada.',

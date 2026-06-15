@@ -706,7 +706,23 @@
           </p>
         </div>
 
-        <div v-if="artistReconciliation" class="grid gap-3 lg:grid-cols-4">
+        <div
+          v-if="reconcilingArtists"
+          class="surface scan-skeleton-glow rounded-2xl p-10 text-center"
+        >
+          <span class="loading loading-spinner loading-md text-primary" />
+          <p class="mt-4 text-sm font-medium text-base-content/70">
+            {{ t('metadata.reconcilingArtists') }}
+          </p>
+          <p class="mt-1 text-xs text-base-content/45">
+            {{ t('metadata.reconcilingArtistsHint') }}
+          </p>
+        </div>
+
+        <div
+          v-else-if="artistReconciliation"
+          class="grid gap-3 lg:grid-cols-4"
+        >
           <div
             v-for="bucket in reconciliationBuckets"
             :key="bucket.key"

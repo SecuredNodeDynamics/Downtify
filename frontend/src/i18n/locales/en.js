@@ -202,6 +202,9 @@ export default {
     jellyfinToolsSubtitle:
       'Compare Jellyfin artist metadata with local folders, then trigger a library refresh after repairs.',
     reconcileArtists: 'Reconcile artists',
+    reconcilingArtists: 'Reconciling artists...',
+    reconcilingArtistsHint:
+      'Comparing Jellyfin artist metadata with local folders and embedded tags.',
     refreshJellyfin: 'Refresh Jellyfin',
     jellyfinReconcileOk: 'Artist reconciliation completed.',
     jellyfinRefreshOk: 'Jellyfin refresh started.',
