@@ -266,72 +266,10 @@
         </ul>
       </div>
 
-      <section class="mt-10 border-t border-white/10 pt-8">
-        <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 class="text-xl font-bold tracking-tight">
-              {{ t('metadata.jellyfinTools') }}
-            </h2>
-          </div>
-          <div class="flex items-center gap-2">
-            <button
-              class="btn btn-sm h-10 rounded-full border-white/10 bg-base-100/85 hover:bg-base-100"
-              :disabled="reconcilingArtists"
-              @click="reconcileArtists"
-            >
-              <span
-                v-if="reconcilingArtists"
-                class="loading loading-spinner loading-xs mr-2"
-              />
-              <Icon v-else icon="clarity:compare-line" class="h-4 w-4 mr-2" />
-              {{ t('metadata.reconcileArtists') }}
-            </button>
-            <button
-              class="btn btn-sm h-10 rounded-full border-white/10 bg-base-100/85 hover:bg-base-100"
-              :disabled="refreshingJellyfin"
-              @click="refreshJellyfin"
-            >
-              <span
-                v-if="refreshingJellyfin"
-                class="loading loading-spinner loading-xs mr-2"
-              />
-              <Icon v-else icon="clarity:sync-line" class="h-4 w-4 mr-2" />
-              {{ t('metadata.refreshJellyfin') }}
-            </button>
-          </div>
-        </div>
-        <p
-          v-if="jellyfinMessage"
-          class="mb-4 text-sm"
-          :class="jellyfinError ? 'text-error' : 'text-primary'"
-        >
-          {{ jellyfinMessage }}
-        </p>
-        <div v-if="artistReconciliation" class="surface rounded-2xl p-4">
-          <h3 class="mb-3 text-sm font-semibold">
-            {{ t('metadata.artistReconciliation') }}
-          </h3>
-          <div class="grid gap-3 sm:grid-cols-4">
-            <div
-              v-for="bucket in reconciliationBuckets"
-              :key="bucket.key"
-              class="rounded-xl border border-white/10 bg-base-100/70 p-3"
-            >
-              <p class="text-xs uppercase text-base-content/40">
-                {{ bucket.label }}
-              </p>
-              <p class="mt-1 text-2xl font-semibold text-primary">
-                {{ bucket.items.length }}
-              </p>
-              <p class="mt-2 line-clamp-2 text-xs text-base-content/45">
-                {{ bucket.items.slice(0, 4).map((item) => item.name).join(', ') }}
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section class="mt-10 border-t border-white/10 pt-8">
+      <section
+        v-if="sm.settings.value.enable_jellyfin_tools"
+        class="mt-10 border-t border-white/10 pt-8"
+      >
         <div class="mb-5 flex flex-wrap items-end justify-between gap-4">
           <div class="min-w-0 flex-1">
             <h2 class="text-xl font-bold tracking-tight">
@@ -618,53 +556,148 @@
       </section>
 
       <section class="mt-10 border-t border-white/10 pt-8">
-        <div class="mb-4 flex items-center justify-between gap-3">
-          <h2 class="text-xl font-bold tracking-tight">
-            {{ t('metadata.repairLog') }}
-          </h2>
-          <button
-            class="btn btn-sm h-10 rounded-full border-white/10 bg-base-100/85 hover:bg-base-100"
-            @click="loadRepairLog"
-          >
-            <Icon icon="clarity:refresh-line" class="h-4 w-4 mr-2" />
-            {{ t('metadata.repairLog') }}
-          </button>
+        <div class="mb-5 flex flex-wrap items-end justify-between gap-4">
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-2">
+              <Icon icon="clarity:server-line" class="h-5 w-5 text-primary" />
+              <h2 class="text-xl font-bold tracking-tight">
+                {{ t('metadata.jellyfinTools') }}
+              </h2>
+            </div>
+            <p class="mt-1 text-sm text-base-content/60">
+              {{ t('metadata.jellyfinToolsSubtitle') }}
+            </p>
+          </div>
+          <div class="flex shrink-0 flex-wrap items-center gap-2">
+            <button
+              class="btn btn-primary btn-sm h-11 rounded-full px-5"
+              :disabled="reconcilingArtists"
+              @click="reconcileArtists"
+            >
+              <span
+                v-if="reconcilingArtists"
+                class="loading loading-spinner loading-xs mr-2"
+              />
+              <Icon v-else icon="clarity:compare-line" class="h-4 w-4 mr-2" />
+              {{ t('metadata.reconcileArtists') }}
+            </button>
+            <button
+              class="btn btn-sm h-11 rounded-full border-white/10 bg-base-100/85 hover:bg-base-100"
+              :disabled="refreshingJellyfin"
+              @click="refreshJellyfin"
+            >
+              <span
+                v-if="refreshingJellyfin"
+                class="loading loading-spinner loading-xs mr-2"
+              />
+              <Icon v-else icon="clarity:sync-line" class="h-4 w-4 mr-2" />
+              {{ t('metadata.refreshJellyfin') }}
+            </button>
+          </div>
         </div>
+
+        <div class="mb-5 grid gap-3 sm:grid-cols-3">
+          <div class="surface rounded-2xl p-4">
+            <p class="text-xs uppercase text-base-content/40">
+              {{ t('metadata.jellyfinLibrary') }}
+            </p>
+            <p class="mt-1 truncate text-lg font-semibold">
+              {{ jellyfinLibraryName }}
+            </p>
+          </div>
+          <div class="surface rounded-2xl p-4">
+            <p class="text-xs uppercase text-base-content/40">
+              {{ t('metadata.jellyfinArtists') }}
+            </p>
+            <p class="mt-1 text-2xl font-semibold text-primary">
+              {{ jellyfinCounts.jellyfin }}
+            </p>
+          </div>
+          <div class="surface rounded-2xl p-4">
+            <p class="text-xs uppercase text-base-content/40">
+              {{ t('metadata.localArtistFolders') }}
+            </p>
+            <p class="mt-1 text-2xl font-semibold">
+              {{ jellyfinCounts.folders }}
+            </p>
+          </div>
+        </div>
+
         <div
-          v-if="repairLog.length === 0"
-          class="surface rounded-2xl p-8 text-center text-sm text-base-content/50"
+          v-if="jellyfinMessage"
+          class="surface mb-5 flex items-center gap-3 rounded-2xl p-4 text-sm"
+          :class="jellyfinError ? 'text-error' : 'text-primary'"
         >
-          {{ t('metadata.emptyRepairLog') }}
+          <Icon
+            :icon="
+              jellyfinError
+                ? 'clarity:exclamation-circle-line'
+                : 'clarity:check-circle-line'
+            "
+            class="h-5 w-5 shrink-0"
+          />
+          <span>{{ jellyfinMessage }}</span>
         </div>
-        <ul v-else class="space-y-3">
-          <li
-            v-for="entry in repairLog"
-            :key="`${entry.created_at}-${entry.kind}-${entry.target}`"
+
+        <div
+          v-if="artistReconciliation"
+          class="mb-5 flex flex-wrap items-center justify-between gap-3"
+        >
+          <h3 class="text-sm font-semibold text-base-content/80">
+            {{ t('metadata.artistReconciliation') }}
+          </h3>
+          <p class="text-xs text-base-content/45">
+            {{ t('metadata.lastChecked') }} {{ lastReconciled }}
+          </p>
+        </div>
+
+        <div v-if="artistReconciliation" class="grid gap-3 lg:grid-cols-4">
+          <div
+            v-for="bucket in reconciliationBuckets"
+            :key="bucket.key"
             class="surface rounded-2xl p-4"
           >
-            <div class="flex flex-wrap items-center justify-between gap-3">
-              <div class="min-w-0">
-                <p class="truncate text-sm font-semibold">
-                  {{ entry.target }}
+            <div class="flex items-start justify-between gap-3">
+              <div>
+                <p class="text-xs uppercase text-base-content/40">
+                  {{ bucket.label }}
                 </p>
-                <p class="mt-1 text-xs text-base-content/45">
-                  {{ entry.kind }} · {{ entry.detail || entry.created_at }}
+                <p class="mt-1 text-2xl font-semibold text-primary">
+                  {{ bucket.count }}
                 </p>
               </div>
-              <span
-                class="pill"
-                :class="
-                  entry.status === 'success'
-                    ? 'badge-soft'
-                    : 'bg-error/10 text-error'
-                "
-              >
-                {{ entry.status }}
-              </span>
+              <Icon :icon="bucket.icon" class="h-5 w-5 text-primary/70" />
             </div>
-          </li>
-        </ul>
+            <ul
+              v-if="bucket.items.length > 0"
+              class="mt-3 max-h-36 space-y-1 overflow-y-auto pr-1 text-xs text-base-content/60"
+            >
+              <li
+                v-for="item in bucket.items.slice(0, 12)"
+                :key="`${bucket.key}-${item.name}`"
+                class="truncate rounded-lg bg-white/5 px-2 py-1"
+              >
+                {{ item.name }}
+              </li>
+            </ul>
+            <p v-else class="mt-3 text-xs text-base-content/40">
+              {{ t('metadata.noArtistsInBucket') }}
+            </p>
+          </div>
+        </div>
+
+        <div
+          v-else
+          class="surface rounded-2xl p-8 text-center text-sm text-base-content/50"
+        >
+          <Icon
+            icon="clarity:compare-line"
+            class="mx-auto mb-3 h-10 w-10 text-base-content/20"
+          />
+          <p>{{ t('metadata.emptyReconciliation') }}</p>
+        </div>
       </section>
+
     </main>
   </div>
 </template>
@@ -676,9 +709,11 @@ import { Icon } from '@iconify/vue'
 import Navbar from '/src/components/Navbar.vue'
 import Settings from '/src/components/Settings.vue'
 import API from '/src/model/api'
+import { useSettingsManager } from '/src/model/settings'
 import { useI18n } from '/src/i18n'
 
 const { t } = useI18n()
+const sm = useSettingsManager()
 const loading = ref(false)
 const error = ref('')
 const items = ref([])
@@ -702,12 +737,12 @@ const applyingArtistImages = ref({})
 const fixedArtistImages = ref({})
 const repairingAllImages = ref(false)
 const artistImageSummary = ref({ scanned: 0, matched: 0, total: 0 })
-const repairLog = ref([])
 const artistReconciliation = ref(null)
 const reconcilingArtists = ref(false)
 const refreshingJellyfin = ref(false)
 const jellyfinMessage = ref('')
 const jellyfinError = ref(false)
+const lastReconciled = ref('')
 let pollTimer = null
 let artistImagePollTimer = null
 
@@ -749,23 +784,45 @@ const reconciliationBuckets = computed(() => {
       key: 'jellyfin_only',
       label: t('metadata.jellyfinOnly'),
       items: data.jellyfin_only || [],
+      count: data.counts?.jellyfin_only || 0,
+      icon: 'clarity:cloud-line',
     },
     {
       key: 'folder_only',
       label: t('metadata.folderOnly'),
       items: data.folder_only || [],
+      count: data.counts?.folder_only || 0,
+      icon: 'clarity:folder-line',
     },
     {
       key: 'tag_only',
       label: t('metadata.tagOnly'),
       items: data.tag_only || [],
+      count: data.counts?.tag_only || 0,
+      icon: 'clarity:tag-line',
     },
     {
       key: 'matched',
       label: t('metadata.matchedArtists'),
       items: data.matched || [],
+      count: data.counts?.matched || 0,
+      icon: 'clarity:check-circle-line',
     },
   ]
+})
+
+const jellyfinCounts = computed(() => {
+  const counts = artistReconciliation.value?.counts || {}
+  return {
+    jellyfin: counts.jellyfin || 0,
+    folders: counts.folders || 0,
+    tags: counts.tags || 0,
+  }
+})
+
+const jellyfinLibraryName = computed(() => {
+  const library = artistReconciliation.value?.library || {}
+  return library.name || library.id || t('metadata.notCheckedYet')
 })
 
 function displaySong(song) {
@@ -921,15 +978,6 @@ async function scanAll() {
   }
 }
 
-async function loadRepairLog() {
-  try {
-    const res = await API.getRepairLog(25)
-    repairLog.value = res.data || []
-  } catch {
-    // The repair UI remains usable if the log cannot be fetched.
-  }
-}
-
 async function reconcileArtists() {
   reconcilingArtists.value = true
   jellyfinMessage.value = ''
@@ -937,6 +985,8 @@ async function reconcileArtists() {
   try {
     const res = await API.reconcileJellyfinArtists()
     artistReconciliation.value = res.data
+    lastReconciled.value = new Date().toLocaleString()
+    jellyfinMessage.value = t('metadata.jellyfinReconcileOk')
   } catch (err) {
     jellyfinError.value = true
     jellyfinMessage.value =
@@ -981,7 +1031,6 @@ onMounted(async () => {
   } catch {
     // The page can still start a fresh artist image scan.
   }
-  loadRepairLog()
 })
 
 onBeforeUnmount(() => {
@@ -1003,7 +1052,6 @@ async function apply(item) {
         ...summary.value,
         matched: Math.max(0, summary.value.matched - 1),
       }
-      loadRepairLog()
     } else {
       error.value = t('metadata.failedVerify')
     }
@@ -1100,7 +1148,6 @@ async function applyArtistImage(item) {
       ...artistImageSummary.value,
       matched: artistImageItems.value.length,
     }
-    loadRepairLog()
   } catch (err) {
     const detail = err?.response?.data?.detail
     artistImageError.value = detail

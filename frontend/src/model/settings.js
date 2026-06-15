@@ -17,6 +17,7 @@ const settings = ref({
   jellyfin_url: '',
   jellyfin_api_key: '',
   jellyfin_music_library: '',
+  enable_jellyfin_tools: true,
   artist_folder_policy: 'artwork_available',
   max_parallel_downloads: 3,
 })

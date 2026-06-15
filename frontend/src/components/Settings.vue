@@ -28,7 +28,7 @@
       <!-- Body -->
       <div class="px-6 pt-5">
         <div
-          class="mb-5 grid grid-cols-2 rounded-full border border-white/10 bg-base-100/75 p-1"
+          class="mb-5 grid grid-cols-3 rounded-full border border-white/10 bg-base-100/75 p-1"
         >
           <button
             type="button"
@@ -53,6 +53,18 @@
             @click="activeTab = 'api'"
           >
             {{ t('settings.apiTab') }}
+          </button>
+          <button
+            type="button"
+            class="rounded-full px-4 py-2 text-sm font-medium transition-colors"
+            :class="
+              activeTab === 'logs'
+                ? 'bg-primary text-primary-content shadow-glow-sm'
+                : 'text-base-content/60 hover:text-base-content'
+            "
+            @click="activeTab = 'logs'"
+          >
+            {{ t('settings.logsTab') }}
           </button>
         </div>
       </div>
@@ -481,7 +493,7 @@
         </transition>
       </div>
 
-      <div v-else class="px-6 pb-5 space-y-5">
+      <div v-else-if="activeTab === 'api'" class="px-6 pb-5 space-y-5">
         <div>
           <label
             class="block text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2"
@@ -489,6 +501,21 @@
             {{ t('settings.jellyfinSection') }}
           </label>
           <div class="space-y-3">
+            <label
+              class="flex items-start gap-3 rounded-xl border border-white/10 bg-base-100/85 px-3 py-2.5 cursor-pointer hover:border-white/20"
+            >
+              <input
+                type="checkbox"
+                class="checkbox checkbox-sm checkbox-primary mt-0.5"
+                v-model="sm.settings.value.enable_jellyfin_tools"
+              />
+              <span class="flex-1 text-sm">
+                <span class="block">{{ t('settings.enableJellyfinTools') }}</span>
+                <span class="block text-[11px] text-base-content/50">
+                  {{ t('settings.enableJellyfinToolsHint') }}
+                </span>
+              </span>
+            </label>
             <div>
               <label class="block text-xs text-base-content/50 mb-1.5">
                 {{ t('settings.jellyfinUrl') }}
@@ -608,6 +635,85 @@
         </transition>
       </div>
 
+      <div v-else-if="activeTab === 'logs'" class="px-6 pb-5 space-y-5">
+        <div class="flex items-center justify-between gap-3">
+          <div>
+            <label
+              class="block text-xs font-semibold uppercase tracking-wider text-base-content/50"
+            >
+              {{ t('metadata.repairLog') }}
+            </label>
+            <p class="mt-1 text-[11px] text-base-content/45">
+              {{ t('settings.logsHint') }}
+            </p>
+          </div>
+          <button
+            type="button"
+            class="btn btn-sm h-9 rounded-full border-white/10 bg-base-100/85 hover:bg-base-100"
+            :disabled="repairLogLoading"
+            @click="loadRepairLog"
+          >
+            <span
+              v-if="repairLogLoading"
+              class="loading loading-spinner loading-xs mr-2"
+            />
+            <Icon v-else icon="clarity:refresh-line" class="h-4 w-4 mr-2" />
+            {{ t('common.refresh') }}
+          </button>
+        </div>
+
+        <div
+          v-if="repairLogError"
+          class="surface rounded-xl p-3 flex items-center gap-2 text-sm text-error"
+        >
+          <Icon
+            icon="clarity:exclamation-circle-line"
+            class="h-4 w-4 shrink-0"
+          />
+          {{ repairLogError }}
+        </div>
+
+        <div
+          v-if="repairLog.length === 0 && !repairLogLoading"
+          class="surface rounded-2xl p-8 text-center text-sm text-base-content/50"
+        >
+          <Icon
+            icon="clarity:history-line"
+            class="mx-auto mb-3 h-9 w-9 text-base-content/20"
+          />
+          {{ t('metadata.emptyRepairLog') }}
+        </div>
+
+        <ul v-else class="max-h-[24rem] space-y-3 overflow-y-auto pr-1">
+          <li
+            v-for="entry in repairLog"
+            :key="`${entry.created_at}-${entry.kind}-${entry.target}`"
+            class="surface rounded-2xl p-4"
+          >
+            <div class="flex items-start justify-between gap-3">
+              <div class="min-w-0">
+                <p class="truncate text-sm font-semibold">
+                  {{ entry.target }}
+                </p>
+                <p class="mt-1 text-xs text-base-content/45">
+                  {{ logKindLabel(entry.kind) }} · {{ entry.detail || entry.created_at }}
+                </p>
+              </div>
+              <span
+                class="pill shrink-0"
+                :class="
+                  entry.status === 'success'
+                    ? 'badge-soft'
+                    : 'bg-error/10 text-error'
+                "
+              >
+                {{ entry.status }}
+              </span>
+            </div>
+          </li>
+        </ul>
+      </div>
+
       <!-- Footer -->
       <div
         class="flex items-center justify-end gap-2 px-6 py-4 border-t border-white/5"
@@ -658,6 +764,9 @@ const activeTab = ref('general')
 const jellyfinLibraries = ref([])
 const jellyfinLibraryLoading = ref(false)
 const jellyfinLibraryError = ref('')
+const repairLog = ref([])
+const repairLogLoading = ref(false)
+const repairLogError = ref('')
 function normalizedJellyfinLibraryName(value) {
   return String(value || '')
     .normalize('NFKC')
@@ -691,6 +800,9 @@ watch(activeTab, (newTab) => {
       onJellyfinConfigChange()
     }
   }
+  if (newTab === 'logs') {
+    loadRepairLog()
+  }
 })
 
 const localFolderBlockMessage = computed(() => {
@@ -719,6 +831,26 @@ function providerLabel(provider) {
   if (provider === 'youtube-music') return 'YouTube Music'
   if (provider === 'youtube') return 'YouTube'
   return provider
+}
+
+function logKindLabel(kind) {
+  if (kind === 'artist_image') return t('metadata.artistImages')
+  if (kind === 'metadata') return t('metadata.title')
+  return kind
+}
+
+async function loadRepairLog() {
+  repairLogLoading.value = true
+  repairLogError.value = ''
+  try {
+    const res = await API.getRepairLog(50)
+    repairLog.value = res.data || []
+  } catch (err) {
+    repairLogError.value =
+      err?.response?.data?.detail || t('settings.logsError')
+  } finally {
+    repairLogLoading.value = false
+  }
 }
 
 async function selectLocalDestination() {

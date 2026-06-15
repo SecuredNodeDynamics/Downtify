@@ -67,6 +67,7 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     'jellyfin_url': '',
     'jellyfin_api_key': '',
     'jellyfin_music_library': '',
+    'enable_jellyfin_tools': True,
     'artist_folder_policy': 'artwork_available',
 }
 
