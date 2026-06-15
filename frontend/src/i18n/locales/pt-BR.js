@@ -294,8 +294,45 @@ export default {
     generalTab: 'Geral',
     apiTab: 'API',
     logsTab: 'Registros',
+    aboutTab: 'Sobre',
     logsHint: 'Tentativas recentes de reparo de metadados e imagens de artistas.',
     logsError: 'Falha ao carregar os registros.',
+    aboutTitle: 'Sobre o Downtify',
+    aboutSubtitle:
+      'Guia rapido de cada pagina e secao de manutencao do app.',
+    aboutSearchTitle: 'Busca',
+    aboutSearchText:
+      'Busque musicas, albuns, playlists ou cole links do Spotify e YouTube Music. Revise resultados e envie downloads para a fila.',
+    aboutLibraryTitle: 'Biblioteca',
+    aboutLibraryText:
+      'Explore musicas baixadas no servidor, agrupadas por artistas e albuns. Use para verificar o que o Downtify salvou.',
+    aboutQueueTitle: 'Fila e downloads',
+    aboutQueueText:
+      'Acompanhe downloads ativos, arquivos concluidos, falhas, novas tentativas e acoes manuais para salvar arquivos.',
+    aboutPlayerTitle: 'Player',
+    aboutPlayerText:
+      'Reproduza faixas baixadas no app com arte, controles de fila, aleatorio, repeticao e volume.',
+    aboutMonitorTitle: 'Monitor de playlists',
+    aboutMonitorText:
+      'Monitore playlists do Spotify. O Downtify baixa a playlist atual e depois verifica novas musicas.',
+    aboutMetadataTitle: 'Ferramenta de metadados',
+    aboutMetadataText:
+      'Escaneie arquivos do servidor, compare tags locais com MusicBrainz e aplique reparos verificados.',
+    aboutArtistImagesTitle: 'Ferramenta de imagens',
+    aboutArtistImagesText:
+      'Encontre artistas sem arte local, crie pastas permitidas e salve imagens que o Jellyfin pode usar localmente.',
+    aboutJellyfinTitle: 'Ferramentas Jellyfin',
+    aboutJellyfinText:
+      'Compare artistas do Jellyfin com pastas locais e atualize o Jellyfin depois de reparar metadados ou imagens.',
+    aboutHealthTitle: 'Saude',
+    aboutHealthText:
+      'Verifique backend, caminhos de armazenamento, ferramentas, fila, falhas recentes e visibilidade dos downloads.',
+    aboutSettingsTitle: 'Configuracoes',
+    aboutSettingsText:
+      'Configure provedores, qualidade, letras, organizacao, API do Jellyfin, registros e downloads locais ou do servidor.',
+    aboutWorkflowTitle: 'Fluxo recomendado',
+    aboutWorkflowText:
+      'Busque e baixe musicas, revise a fila, explore a biblioteca e use Metadados e Imagens antes de atualizar o Jellyfin.',
     audioSource: 'Fonte de áudio',
     lyricsSource: 'Fonte de letras',
     lyricsHint: 'apenas o lrclib está ativo',

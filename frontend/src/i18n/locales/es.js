@@ -295,8 +295,45 @@ export default {
     generalTab: 'General',
     apiTab: 'API',
     logsTab: 'Registros',
+    aboutTab: 'Acerca',
     logsHint: 'Intentos recientes de reparar metadatos e imagenes de artistas.',
     logsError: 'No se pudieron cargar los registros.',
+    aboutTitle: 'Acerca de Downtify',
+    aboutSubtitle:
+      'Guia rapida de cada pagina y seccion de mantenimiento de la app.',
+    aboutSearchTitle: 'Busqueda',
+    aboutSearchText:
+      'Busca canciones, albumes, listas o pega enlaces de Spotify y YouTube Music. Revisa coincidencias y envia descargas a la cola.',
+    aboutLibraryTitle: 'Biblioteca',
+    aboutLibraryText:
+      'Explora la musica descargada en el servidor, agrupada por artistas y albumes. Sirve para revisar lo que Downtify guardo.',
+    aboutQueueTitle: 'Cola y descargas',
+    aboutQueueText:
+      'Sigue descargas activas, archivos completados, fallos, reintentos y acciones manuales para guardar archivos.',
+    aboutPlayerTitle: 'Reproductor',
+    aboutPlayerText:
+      'Reproduce pistas descargadas dentro de la app con arte, controles de cola, aleatorio, repeticion y volumen.',
+    aboutMonitorTitle: 'Monitor de listas',
+    aboutMonitorText:
+      'Vigila listas de Spotify. Downtify descarga la lista actual y luego revisa si hay canciones nuevas.',
+    aboutMetadataTitle: 'Herramienta de metadatos',
+    aboutMetadataText:
+      'Escanea archivos del servidor, compara etiquetas locales con MusicBrainz y aplica reparaciones verificadas.',
+    aboutArtistImagesTitle: 'Herramienta de imagenes',
+    aboutArtistImagesText:
+      'Encuentra artistas sin arte local, crea carpetas permitidas y guarda imagenes que Jellyfin puede usar localmente.',
+    aboutJellyfinTitle: 'Herramientas Jellyfin',
+    aboutJellyfinText:
+      'Compara artistas de Jellyfin con carpetas locales y actualiza Jellyfin despues de reparar metadatos o imagenes.',
+    aboutHealthTitle: 'Salud',
+    aboutHealthText:
+      'Revisa estado del backend, rutas de almacenamiento, herramientas, cola, fallos recientes y visibilidad de descargas.',
+    aboutSettingsTitle: 'Ajustes',
+    aboutSettingsText:
+      'Configura proveedores, calidad, letras, organizacion, API de Jellyfin, registros y descargas locales o del servidor.',
+    aboutWorkflowTitle: 'Flujo recomendado',
+    aboutWorkflowText:
+      'Busca y descarga musica, revisa la cola, explora la biblioteca y usa Metadatos e Imagenes antes de actualizar Jellyfin.',
     audioSource: 'Fuente de audio',
     lyricsSource: 'Fuente de letras',
     lyricsHint: 'solo lrclib está activo',

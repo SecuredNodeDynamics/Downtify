@@ -286,8 +286,45 @@ export default {
     generalTab: 'General',
     apiTab: 'API',
     logsTab: 'Logs',
+    aboutTab: 'About',
     logsHint: 'Recent metadata and artist image repair attempts.',
     logsError: 'Failed to load logs.',
+    aboutTitle: 'About Downtify',
+    aboutSubtitle:
+      'A quick guide to each page and maintenance section in the app.',
+    aboutSearchTitle: 'Search',
+    aboutSearchText:
+      'Find songs, albums, playlists, or paste Spotify and YouTube Music links. Preview matches when available, then queue downloads.',
+    aboutLibraryTitle: 'Library',
+    aboutLibraryText:
+      'Browse music already downloaded on the server, grouped by artists and albums. Use it to inspect what Downtify has saved.',
+    aboutQueueTitle: 'Queue and downloads',
+    aboutQueueText:
+      'Track active downloads, completed files, failures, retries, and manual save actions for files created by Downtify.',
+    aboutPlayerTitle: 'Player',
+    aboutPlayerText:
+      'Play downloaded tracks directly in the app with album art, queue controls, shuffle, repeat, and volume controls.',
+    aboutMonitorTitle: 'Playlist Monitor',
+    aboutMonitorText:
+      'Watch Spotify playlists for new tracks. Downtify downloads the current playlist and checks later for additions.',
+    aboutMetadataTitle: 'Metadata tool',
+    aboutMetadataText:
+      'Scan server music files, compare local tags against MusicBrainz matches, and apply verified tag repairs.',
+    aboutArtistImagesTitle: 'Artist Images tool',
+    aboutArtistImagesText:
+      'Find artists missing local artwork, create allowed artist folders, and save images that Jellyfin can use locally.',
+    aboutJellyfinTitle: 'Jellyfin tools',
+    aboutJellyfinText:
+      'Compare Jellyfin artist metadata with local folders, then refresh Jellyfin after metadata or image repairs.',
+    aboutHealthTitle: 'Health',
+    aboutHealthText:
+      'Check backend status, storage paths, tools, queue activity, recent failures, and download directory visibility.',
+    aboutSettingsTitle: 'Settings',
+    aboutSettingsText:
+      'Configure providers, quality, lyrics, folder organization, Jellyfin API access, logs, and local or server download behavior.',
+    aboutWorkflowTitle: 'Suggested workflow',
+    aboutWorkflowText:
+      'Search and download music, review the queue, browse the library, then use Metadata and Artist Images to clean files before refreshing Jellyfin.',
     audioSource: 'Audio source',
     lyricsSource: 'Lyrics source',
     lyricsHint: 'only lrclib is active',

@@ -2,7 +2,7 @@
   <input type="checkbox" id="settings-modal" class="modal-toggle" />
   <div class="modal modal-bottom sm:modal-middle">
     <div
-      class="modal-box surface-strong rounded-t-3xl sm:rounded-3xl p-0 max-w-lg"
+      class="modal-box surface-strong rounded-t-3xl sm:rounded-3xl p-0 max-w-3xl"
     >
       <!-- Header -->
       <div
@@ -28,7 +28,7 @@
       <!-- Body -->
       <div class="px-6 pt-5">
         <div
-          class="mb-5 grid grid-cols-3 rounded-full border border-white/10 bg-base-100/75 p-1"
+          class="mb-5 grid grid-cols-4 rounded-full border border-white/10 bg-base-100/75 p-1"
         >
           <button
             type="button"
@@ -65,6 +65,18 @@
             @click="activeTab = 'logs'"
           >
             {{ t('settings.logsTab') }}
+          </button>
+          <button
+            type="button"
+            class="rounded-full px-4 py-2 text-sm font-medium transition-colors"
+            :class="
+              activeTab === 'about'
+                ? 'bg-primary text-primary-content shadow-glow-sm'
+                : 'text-base-content/60 hover:text-base-content'
+            "
+            @click="activeTab = 'about'"
+          >
+            {{ t('settings.aboutTab') }}
           </button>
         </div>
       </div>
@@ -714,6 +726,59 @@
         </ul>
       </div>
 
+      <div v-else-if="activeTab === 'about'" class="px-6 pb-5 space-y-5">
+        <div>
+          <label
+            class="block text-xs font-semibold uppercase tracking-wider text-base-content/50"
+          >
+            {{ t('settings.aboutTitle') }}
+          </label>
+          <p class="mt-1 text-sm text-base-content/60">
+            {{ t('settings.aboutSubtitle') }}
+          </p>
+        </div>
+
+        <div class="grid gap-3 md:grid-cols-2">
+          <div
+            v-for="section in aboutSections"
+            :key="section.title"
+            class="surface rounded-2xl p-4"
+          >
+            <div class="flex items-start gap-3">
+              <Icon
+                :icon="section.icon"
+                class="mt-0.5 h-5 w-5 shrink-0 text-primary"
+              />
+              <div class="min-w-0">
+                <p class="text-sm font-semibold">
+                  {{ section.title }}
+                </p>
+                <p class="mt-1 text-xs leading-relaxed text-base-content/55">
+                  {{ section.text }}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="surface rounded-2xl p-4">
+          <div class="flex items-start gap-3">
+            <Icon
+              icon="clarity:flow-chart-line"
+              class="mt-0.5 h-5 w-5 shrink-0 text-primary"
+            />
+            <div>
+              <p class="text-sm font-semibold">
+                {{ t('settings.aboutWorkflowTitle') }}
+              </p>
+              <p class="mt-1 text-xs leading-relaxed text-base-content/55">
+                {{ t('settings.aboutWorkflowText') }}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Footer -->
       <div
         class="flex items-center justify-end gap-2 px-6 py-4 border-t border-white/5"
@@ -779,6 +844,59 @@ function normalizedJellyfinLibraryName(value) {
 const uniqueJellyfinLibraries = computed(() => {
   return uniqueLibrariesByName(jellyfinLibraries.value)
 })
+
+const aboutSections = computed(() => [
+  {
+    icon: 'clarity:search-line',
+    title: t('settings.aboutSearchTitle'),
+    text: t('settings.aboutSearchText'),
+  },
+  {
+    icon: 'clarity:library-line',
+    title: t('settings.aboutLibraryTitle'),
+    text: t('settings.aboutLibraryText'),
+  },
+  {
+    icon: 'clarity:download-line',
+    title: t('settings.aboutQueueTitle'),
+    text: t('settings.aboutQueueText'),
+  },
+  {
+    icon: 'clarity:headphones-line',
+    title: t('settings.aboutPlayerTitle'),
+    text: t('settings.aboutPlayerText'),
+  },
+  {
+    icon: 'clarity:eye-line',
+    title: t('settings.aboutMonitorTitle'),
+    text: t('settings.aboutMonitorText'),
+  },
+  {
+    icon: 'clarity:tag-line',
+    title: t('settings.aboutMetadataTitle'),
+    text: t('settings.aboutMetadataText'),
+  },
+  {
+    icon: 'clarity:image-gallery-line',
+    title: t('settings.aboutArtistImagesTitle'),
+    text: t('settings.aboutArtistImagesText'),
+  },
+  {
+    icon: 'clarity:server-line',
+    title: t('settings.aboutJellyfinTitle'),
+    text: t('settings.aboutJellyfinText'),
+  },
+  {
+    icon: 'clarity:info-standard-line',
+    title: t('settings.aboutHealthTitle'),
+    text: t('settings.aboutHealthText'),
+  },
+  {
+    icon: 'clarity:cog-line',
+    title: t('settings.aboutSettingsTitle'),
+    text: t('settings.aboutSettingsText'),
+  },
+])
 
 function uniqueLibrariesByName(libraries) {
   const seen = new Set()
