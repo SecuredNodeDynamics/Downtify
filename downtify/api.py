@@ -629,6 +629,93 @@ def _run_update_command(args: list[str], cwd: Path) -> subprocess.CompletedProce
     )
 
 
+def _docker_self_update_container() -> str:
+    return (
+        os.getenv('DOWNTIFY_SELF_UPDATE_CONTAINER', '').strip()
+        or os.getenv('HOSTNAME', '').strip()
+        or 'downtify'
+    )
+
+
+def _docker_self_update_image() -> str:
+    return os.getenv(
+        'DOWNTIFY_SELF_UPDATE_IMAGE',
+        'containrrr/watchtower:latest',
+    ).strip()
+
+
+def _start_docker_self_update() -> dict[str, Any]:
+    docker = shutil.which('docker')
+    socket_path = Path('/var/run/docker.sock')
+    container = _docker_self_update_container()
+    helper_name = f'downtify-self-update-{int(datetime.now(timezone.utc).timestamp())}'
+    image = _docker_self_update_image()
+    commands = [
+        'docker run --rm -v /var/run/docker.sock:/var/run/docker.sock '
+        f'{image} --run-once --cleanup {container}'
+    ]
+    if not docker or not socket_path.exists():
+        return {
+            'success': False,
+            'updated': False,
+            'mode': 'docker',
+            'requires_restart': True,
+            'requires_manual': True,
+            'message': (
+                'Docker self-update needs the host Docker socket mounted at '
+                '/var/run/docker.sock and the Docker CLI available in the '
+                'Downtify container.'
+            ),
+            'commands': commands,
+        }
+
+    command = [
+        docker,
+        'run',
+        '-d',
+        '--name',
+        helper_name,
+        '-v',
+        '/var/run/docker.sock:/var/run/docker.sock',
+        image,
+        '--run-once',
+        '--cleanup',
+        container,
+    ]
+    result = subprocess.run(
+        command,
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+    output = (result.stdout or result.stderr or '').strip()
+    if result.returncode != 0:
+        return {
+            'success': False,
+            'updated': False,
+            'mode': 'docker',
+            'requires_restart': True,
+            'requires_manual': True,
+            'message': 'Could not start Docker self-update helper.',
+            'commands': commands,
+            'pull_output': output,
+        }
+
+    return {
+        'success': True,
+        'updated': False,
+        'mode': 'docker',
+        'requires_restart': True,
+        'requires_manual': False,
+        'message': (
+            'Docker self-update started. Downtify will restart after the new '
+            'image is pulled and the container is recreated.'
+        ),
+        'helper_container': output,
+    }
+
+
 @router.get('/api/version')
 def get_version() -> str:
     return state.version
@@ -668,22 +755,7 @@ def update_app() -> dict[str, Any]:
         }
 
     if _is_docker_runtime():
-        return {
-            **status,
-            'success': False,
-            'updated': False,
-            'mode': 'docker',
-            'requires_restart': True,
-            'requires_manual': True,
-            'message': (
-                'This Downtify instance is running in Docker. Pull the new '
-                'image and recreate the container to update safely.'
-            ),
-            'commands': [
-                'docker compose pull downtify',
-                'docker compose up -d downtify',
-            ],
-        }
+        return {**status, **_start_docker_self_update()}
 
     root = _project_root()
     if not (root / '.git').exists():

@@ -354,7 +354,7 @@ export default {
     updateCheckError: 'No se pudieron buscar actualizaciones.',
     updateApp: 'Actualizar app',
     updateHint:
-      'Las instalaciones desde codigo fuente pueden actualizarse directamente. Docker necesita los comandos compose mostrados.',
+      'Las instalaciones Docker se actualizan desde la app si el socket Docker esta montado; la app se reiniciara.',
     updateError: 'No se pudo actualizar Downtify.',
     updateFinished: 'Actualizacion finalizada',
     restartRequired: 'Reinicia Downtify para usar la version actualizada.',

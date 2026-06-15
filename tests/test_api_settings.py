@@ -18,6 +18,7 @@ from downtify.api import (
     _is_newer_version,
     _load_settings,
     _normalized_jellyfin_library_name,
+    _start_docker_self_update,
     check_update,
     jellyfin_libraries_endpoint,
     update_settings_endpoint,
@@ -263,6 +264,49 @@ def test_check_update_reports_available_update(monkeypatch):
         assert result['update_available'] is True
     finally:
         api.state.version = old_version
+
+
+def test_docker_self_update_reports_missing_capabilities(monkeypatch):
+    monkeypatch.setattr(api.shutil, 'which', lambda _name: None)
+    monkeypatch.setattr(api.Path, 'exists', lambda _self: False)
+
+    result = _start_docker_self_update()
+
+    assert result['success'] is False
+    assert result['requires_manual'] is True
+    assert 'docker run --rm' in result['commands'][0]
+
+
+def test_docker_self_update_starts_watchtower_helper(monkeypatch):
+    captured = {}
+
+    class FakeResult:
+        returncode = 0
+        stdout = 'helper-container-id\n'
+        stderr = ''
+
+    def fake_run(command, **_kwargs):
+        captured['command'] = command
+        return FakeResult()
+
+    monkeypatch.setattr(api.shutil, 'which', lambda _name: '/usr/bin/docker')
+    monkeypatch.setattr(api.Path, 'exists', lambda _self: True)
+    monkeypatch.setenv('DOWNTIFY_SELF_UPDATE_CONTAINER', 'downtify')
+    monkeypatch.setattr(api.subprocess, 'run', fake_run)
+
+    result = _start_docker_self_update()
+
+    assert result['success'] is True
+    assert result['requires_manual'] is False
+    assert result['helper_container'] == 'helper-container-id'
+    assert captured['command'][:4] == [
+        '/usr/bin/docker',
+        'run',
+        '-d',
+        '--name',
+    ]
+    assert 'containrrr/watchtower:latest' in captured['command']
+    assert captured['command'][-1] == 'downtify'
 
 
 def test_load_settings_empty_object_returns_defaults(tmp_path):

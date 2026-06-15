@@ -20,6 +20,7 @@ services:
     volumes:
       - ./downloads:/downloads
       - downtify_data:/data
+      - /var/run/docker.sock:/var/run/docker.sock
     restart: unless-stopped
 
 volumes:
@@ -73,12 +74,20 @@ services:
 
 ## Updating
 
+With the Docker socket volume mounted, open **Settings -> Help** and use
+**Update app**. Downtify starts a one-shot update helper, pulls the current
+image tag, and recreates the container.
+
+You can also update from the host:
+
 ```bash
 docker compose pull
 docker compose up -d
 ```
 
-Your music and settings are preserved in the volumes.
+Your music and settings are preserved in the volumes. Mounting the Docker
+socket lets Downtify control Docker on the host, so only enable it for an app
+instance you trust.
 
 ## Troubleshooting compose errors
 
@@ -106,5 +115,6 @@ the host manager. Downtify's image is hosted on GitHub Container Registry at
 |------------------------------|---------|
 | `./downloads:/downloads` | Downloaded audio files (local directory) |
 | `downtify_data:/data` | Application database and settings (named volume) |
+| `/var/run/docker.sock:/var/run/docker.sock` | Allows the Help tab to update the Docker container from inside the app |
 
 You can replace the named volume with a local path (`./data:/data`) if you prefer to manage it yourself.

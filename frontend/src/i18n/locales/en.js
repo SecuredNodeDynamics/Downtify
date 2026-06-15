@@ -345,7 +345,7 @@ export default {
     updateCheckError: 'Could not check for updates.',
     updateApp: 'Update app',
     updateHint:
-      'Source installs can update directly. Docker installs need the shown compose commands.',
+      'Docker installs update in place when the Docker socket is mounted; the app will restart.',
     updateError: 'Could not update Downtify.',
     updateFinished: 'Update finished',
     restartRequired: 'Restart Downtify to use the updated version.',

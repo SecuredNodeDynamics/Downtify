@@ -8,9 +8,11 @@ services:
     volumes:
       - ${DOWNTIFY_MEDIA_SAVE_LOCATION:-./docker/downloads}:/downloads
       - ./docker/data:/data
+      - /var/run/docker.sock:/var/run/docker.sock
     environment:
       - DOWNTIFY_PORT=30321
       - DOWNTIFY_MEDIA_SAVE_LOCATION=${DOWNTIFY_MEDIA_SAVE_LOCATION:-}
+      - DOWNTIFY_SELF_UPDATE_CONTAINER=downtify
     dns:
       - 1.1.1.1
       - 1.0.0.1

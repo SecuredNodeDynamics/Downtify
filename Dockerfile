@@ -46,6 +46,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /downtify
 
 RUN apk add --no-cache \
+    docker-cli \
     ffmpeg \
     shadow \
     su-exec \
