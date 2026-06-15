@@ -44,6 +44,14 @@
         </button>
 
         <button
+          class="icon-btn"
+          @click="router.push({ name: 'Metadata' })"
+          :title="t('nav.metadata')"
+        >
+          <Icon icon="clarity:tag-line" class="h-5 w-5" />
+        </button>
+
+        <button
           class="icon-btn relative"
           @click="router.push({ name: 'Download' })"
           :title="t('nav.queue')"
