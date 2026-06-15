@@ -367,6 +367,17 @@ def _apply_download_dir_from_settings() -> Path:
     return target
 
 
+def _active_download_dir() -> Path:
+    try:
+        return _apply_download_dir_from_settings()
+    except Exception as exc:
+        logger.warning('Could not prepare download directory: {}', exc)
+        raise HTTPException(
+            status_code=400,
+            detail=f'Could not access server media location: {exc}',
+        ) from exc
+
+
 def _directory_summary(
     path: Path,
     external_path: Optional[str] = None,
@@ -813,6 +824,22 @@ def _artist_folder_policy() -> str:
     return 'artwork_available'
 
 
+def _scan_resume_start(
+    previous: dict[str, Any],
+    reset: bool,
+    root: Path,
+) -> tuple[int, bool]:
+    root_key = str(root.resolve())
+    previous_root = str(previous.get('root') or '')
+    if reset or previous_root != root_key:
+        return 0, False
+    total = int(previous.get('total') or 0)
+    start = int(previous.get('next_offset') or 0)
+    if total > 0 and start >= total:
+        return 0, False
+    return start, start > 0
+
+
 def _add_repair_log(
     kind: str,
     status: str,
@@ -963,9 +990,10 @@ async def _run_metadata_scan(limit: int, start: int, scan_all: bool = False) -> 
         }
 
     try:
+        download_dir = _active_download_dir()
         result = await asyncio.to_thread(
             metadata_repair.scan_library,
-            state.downloader.download_dir,
+            download_dir,
             1_000_000 if scan_all else limit,
             start,
             progress,
@@ -1006,6 +1034,7 @@ async def _run_metadata_scan(limit: int, start: int, scan_all: bool = False) -> 
 async def start_metadata_scan(request: Request) -> dict[str, Any]:
     if state.downloader is None:
         raise HTTPException(status_code=500, detail='Downloader not ready')
+    download_dir = _active_download_dir()
     try:
         payload = await request.json()
     except Exception:
@@ -1022,11 +1051,7 @@ async def start_metadata_scan(request: Request) -> dict[str, Any]:
         return _metadata_scan_status()
 
     previous = state.metadata_scan
-    total = int(previous.get('total') or 0)
-    start = 0 if reset else int(previous.get('next_offset') or 0)
-    if total > 0 and start >= total:
-        start = 0
-    continuing = start > 0
+    start, continuing = _scan_resume_start(previous, reset, download_dir)
     previous_items = (
         _exclude_completed_metadata_items(previous.get('items') or [])
         if continuing
@@ -1046,6 +1071,7 @@ async def start_metadata_scan(request: Request) -> dict[str, Any]:
         'completed': previous.get('completed') or [],
         'error': '',
         'errors': [],
+        'root': str(download_dir.resolve()),
         'next_offset': start,
         'complete': False,
         'started_at': datetime.now(timezone.utc).isoformat(),
@@ -1101,9 +1127,10 @@ async def _run_artist_image_scan(
         }
 
     try:
+        download_dir = _active_download_dir()
         result = await asyncio.to_thread(
             metadata_repair.scan_artist_images,
-            state.downloader.download_dir,
+            download_dir,
             1_000_000 if scan_all else limit,
             start,
             progress,
@@ -1145,6 +1172,7 @@ async def _run_artist_image_scan(
 async def scan_artist_images(request: Request) -> dict[str, Any]:
     if state.downloader is None:
         raise HTTPException(status_code=500, detail='Downloader not ready')
+    download_dir = _active_download_dir()
     try:
         payload = await request.json()
     except Exception:
@@ -1159,11 +1187,7 @@ async def scan_artist_images(request: Request) -> dict[str, Any]:
     if task is not None and not task.done():
         return dict(state.artist_image_scan)
     previous = state.artist_image_scan
-    total = int(previous.get('total') or 0)
-    start = 0 if reset else int(previous.get('next_offset') or 0)
-    if total > 0 and start >= total:
-        start = 0
-    continuing = start > 0
+    start, continuing = _scan_resume_start(previous, reset, download_dir)
     previous_items = (
         _exclude_completed_artist_images(previous.get('items') or [])
         if continuing
@@ -1182,6 +1206,7 @@ async def scan_artist_images(request: Request) -> dict[str, Any]:
         'failed': previous.get('failed') or [],
         'completed': previous.get('completed') or [],
         'error': '',
+        'root': str(download_dir.resolve()),
         'next_offset': start,
         'complete': False,
         'started_at': datetime.now(timezone.utc).isoformat(),
@@ -1225,9 +1250,10 @@ def artist_image_preview(
 ) -> Response:
     if state.downloader is None:
         raise HTTPException(status_code=500, detail='Downloader not ready')
+    download_dir = _active_download_dir()
     try:
         path = metadata_repair.safe_library_path(
-            state.downloader.download_dir,
+            download_dir,
             file,
         )
         data, _source = artist_art.artist_or_fallback_image(
@@ -1254,6 +1280,7 @@ def artist_image_preview(
 async def apply_artist_image(request: Request) -> dict[str, Any]:
     if state.downloader is None:
         raise HTTPException(status_code=500, detail='Downloader not ready')
+    download_dir = _active_download_dir()
     try:
         payload = await request.json()
     except Exception as exc:
@@ -1270,7 +1297,7 @@ async def apply_artist_image(request: Request) -> dict[str, Any]:
         )
     try:
         result = metadata_repair.repair_artist_image(
-            state.downloader.download_dir,
+            download_dir,
             file,
             artist,
             artist_folder_policy=_artist_folder_policy(),
@@ -1314,6 +1341,7 @@ async def apply_artist_image(request: Request) -> dict[str, Any]:
 async def apply_metadata(request: Request) -> dict[str, Any]:
     if state.downloader is None:
         raise HTTPException(status_code=500, detail='Downloader not ready')
+    download_dir = _active_download_dir()
     try:
         payload = await request.json()
     except Exception as exc:
@@ -1323,7 +1351,7 @@ async def apply_metadata(request: Request) -> dict[str, Any]:
         raise HTTPException(status_code=400, detail='file is required')
     try:
         result = metadata_repair.repair_file(
-            state.downloader.download_dir,
+            download_dir,
             file,
             artist_folder_policy=_artist_folder_policy(),
         )

@@ -62,6 +62,53 @@ def test_metadata_scan_keeps_items_from_previous_batch(tmp_path, monkeypatch):
         api.state.metadata_scan = old_scan
 
 
+def test_metadata_scan_resets_offset_when_download_root_changes(tmp_path, monkeypatch):
+    old_downloader = api.state.downloader
+    old_scan = dict(api.state.metadata_scan)
+    old_settings = api.state.settings
+    old_default = api.state.default_download_dir
+    old_task = api.state.metadata_scan_task
+    new_root = tmp_path / 'new-media'
+    api.state.downloader = FakeDownloader(tmp_path / 'old-media')
+    api.state.settings = {'server_media_location': str(new_root)}
+    api.state.default_download_dir = tmp_path / 'fallback'
+    api.state.metadata_scan_task = None
+    api.state.metadata_scan = {
+        **old_scan,
+        'root': str((tmp_path / 'old-media').resolve()),
+        'next_offset': 50,
+        'total': 100,
+        'items': [{'file': 'old.mp3'}],
+        'clean': [{'file': 'old-clean.mp3'}],
+    }
+
+    captured = {}
+
+    def fake_create_task(coro):
+        captured['coro'] = coro
+        return None
+
+    monkeypatch.setattr(asyncio, 'create_task', fake_create_task)
+    try:
+        result = asyncio.run(
+            api.start_metadata_scan(FakeRequest({'limit': 25}))
+        )
+
+        assert result['next_offset'] == 0
+        assert result['items'] == []
+        assert result['clean'] == []
+        assert result['root'] == str(new_root.resolve())
+        assert api.state.downloader.download_dir == new_root
+    finally:
+        if captured.get('coro') is not None:
+            captured['coro'].close()
+        api.state.downloader = old_downloader
+        api.state.metadata_scan = old_scan
+        api.state.settings = old_settings
+        api.state.default_download_dir = old_default
+        api.state.metadata_scan_task = old_task
+
+
 def test_artist_image_scan_keeps_items_from_previous_batch(tmp_path, monkeypatch):
     old_downloader = api.state.downloader
     old_scan = dict(api.state.artist_image_scan)
@@ -125,6 +172,56 @@ def test_artist_image_scan_keeps_items_from_previous_batch(tmp_path, monkeypatch
     finally:
         api.state.downloader = old_downloader
         api.state.artist_image_scan = old_scan
+
+
+def test_artist_image_scan_resets_offset_when_download_root_changes(
+    tmp_path,
+    monkeypatch,
+):
+    old_downloader = api.state.downloader
+    old_scan = dict(api.state.artist_image_scan)
+    old_settings = api.state.settings
+    old_default = api.state.default_download_dir
+    old_task = api.state.artist_image_scan_task
+    new_root = tmp_path / 'new-media'
+    api.state.downloader = FakeDownloader(tmp_path / 'old-media')
+    api.state.settings = {'server_media_location': str(new_root)}
+    api.state.default_download_dir = tmp_path / 'fallback'
+    api.state.artist_image_scan_task = None
+    api.state.artist_image_scan = {
+        **old_scan,
+        'root': str((tmp_path / 'old-media').resolve()),
+        'next_offset': 50,
+        'total': 100,
+        'items': [{'artist': 'Old', 'artist_id': '', 'folder': 'Old'}],
+        'clean': [{'file': 'old-clean.mp3'}],
+    }
+
+    captured = {}
+
+    def fake_create_task(coro):
+        captured['coro'] = coro
+        return None
+
+    monkeypatch.setattr(asyncio, 'create_task', fake_create_task)
+    try:
+        result = asyncio.run(
+            api.scan_artist_images(FakeRequest({'limit': 25}))
+        )
+
+        assert result['next_offset'] == 0
+        assert result['items'] == []
+        assert result['clean'] == []
+        assert result['root'] == str(new_root.resolve())
+        assert api.state.downloader.download_dir == new_root
+    finally:
+        if captured.get('coro') is not None:
+            captured['coro'].close()
+        api.state.downloader = old_downloader
+        api.state.artist_image_scan = old_scan
+        api.state.settings = old_settings
+        api.state.default_download_dir = old_default
+        api.state.artist_image_scan_task = old_task
 
 
 def test_apply_artist_image_allows_name_only_artist(tmp_path, monkeypatch):
