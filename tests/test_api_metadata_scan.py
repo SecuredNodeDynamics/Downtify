@@ -4,6 +4,7 @@ import asyncio
 from pathlib import Path
 
 from downtify import api
+from downtify.api import artist_folder_image_preview
 
 
 class FakeDownloader:
@@ -279,3 +280,26 @@ def test_apply_artist_image_allows_name_only_artist(tmp_path, monkeypatch):
         api.state.downloader = old_downloader
         api.state.artist_image_scan = old_scan
         api.state.repair_log = old_repair_log
+
+
+def test_artist_folder_image_preview_serves_local_artist_art(tmp_path):
+    old_downloader = api.state.downloader
+    old_settings = api.state.settings
+    old_default = api.state.default_download_dir
+    try:
+        artist_dir = tmp_path / 'Artist One'
+        artist_dir.mkdir()
+        image = b'\xff\xd8\xff\xe0image'
+        (artist_dir / 'Artist One.jpg').write_bytes(image)
+        api.state.downloader = FakeDownloader(tmp_path)
+        api.state.settings = {'server_media_location': str(tmp_path)}
+        api.state.default_download_dir = tmp_path
+
+        response = artist_folder_image_preview('Artist One')
+
+        assert response.body == image
+        assert response.media_type == 'image/jpeg'
+    finally:
+        api.state.downloader = old_downloader
+        api.state.settings = old_settings
+        api.state.default_download_dir = old_default

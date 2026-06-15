@@ -1236,6 +1236,10 @@ def _artist_image_preview_url(item: dict[str, Any]) -> str:
     )
 
 
+def _artist_folder_preview_url(folder: str) -> str:
+    return f'/api/metadata/artist-images/folder-preview?folder={quote(folder)}'
+
+
 def _with_artist_image_preview(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [
         {
@@ -1244,6 +1248,33 @@ def _with_artist_image_preview(items: list[dict[str, Any]]) -> list[dict[str, An
         }
         for item in items
     ]
+
+
+@router.get('/api/metadata/artist-images/folder-preview')
+def artist_folder_image_preview(folder: str = Query(...)) -> Response:
+    if state.downloader is None:
+        raise HTTPException(status_code=500, detail='Downloader not ready')
+    download_dir = _active_download_dir().resolve()
+    try:
+        target = (download_dir / folder).resolve()
+        target.relative_to(download_dir)
+    except (ValueError, RuntimeError) as exc:
+        raise HTTPException(status_code=400, detail='Invalid folder') from exc
+    if not target.is_dir():
+        raise HTTPException(status_code=404, detail='Artist folder not found')
+    image_paths = artist_art.artist_image_paths(target)
+    if not image_paths:
+        raise HTTPException(status_code=404, detail='Artist image not found')
+    image = image_paths[0]
+    try:
+        data = image.read_bytes()
+    except OSError as exc:
+        raise HTTPException(status_code=404, detail='Artist image not found') from exc
+    return Response(
+        content=data,
+        media_type=artist_art.media_type_for_image(data),
+        headers={'Cache-Control': 'no-store'},
+    )
 
 
 @router.get('/api/metadata/artist-images/preview')
@@ -2169,10 +2200,23 @@ def _artist_compare_key(value: Any) -> str:
     return re.sub(r'\s+', ' ', normalized).strip().casefold()
 
 
-def _named_items(names: dict[str, str]) -> list[dict[str, str]]:
+def _named_items(
+    names: dict[str, str],
+    folders: dict[str, str] | None = None,
+) -> list[dict[str, str]]:
     return [
-        {'name': name}
-        for _key, name in sorted(
+        {
+            'name': name,
+            **(
+                {
+                    'folder': folder,
+                    'preview_url': _artist_folder_preview_url(folder),
+                }
+                if (folder := (folders or {}).get(key))
+                else {}
+            ),
+        }
+        for key, name in sorted(
             names.items(),
             key=lambda item: item[1].casefold(),
         )
@@ -2303,13 +2347,13 @@ def reconcile_jellyfin_artists() -> dict[str, Any]:
             }),
             'folder_only': _named_items({
                 key: folders[key] for key in folder_keys - jellyfin_keys
-            }),
+            }, folders),
             'tag_only': _named_items({
                 key: tags[key] for key in tag_keys - jellyfin_keys
             }),
             'matched': _named_items({
                 key: folders[key] for key in jellyfin_keys & folder_keys
-            }),
+            }, folders),
         }
     except HTTPException:
         raise

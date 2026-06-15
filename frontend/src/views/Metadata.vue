@@ -721,37 +721,84 @@
 
         <div
           v-else-if="artistReconciliation"
-          class="grid gap-3 lg:grid-cols-4"
+          class="surface rounded-2xl p-4"
         >
-          <div
-            v-for="bucket in reconciliationBuckets"
-            :key="bucket.key"
-            class="surface rounded-2xl p-4"
-          >
-            <div class="flex items-start justify-between gap-3">
-              <div>
-                <p class="text-xs uppercase text-base-content/40">
-                  {{ bucket.label }}
-                </p>
-                <p class="mt-1 text-2xl font-semibold text-primary">
-                  {{ bucket.count }}
-                </p>
-              </div>
-              <Icon :icon="bucket.icon" class="h-5 w-5 text-primary/70" />
-            </div>
-            <ul
-              v-if="bucket.items.length > 0"
-              class="mt-3 max-h-36 space-y-1 overflow-y-auto pr-1 text-xs text-base-content/60"
+          <div class="mb-4 grid gap-3 md:grid-cols-4">
+            <button
+              v-for="bucket in reconciliationBuckets"
+              :key="bucket.key"
+              type="button"
+              class="rounded-2xl border border-primary/20 bg-base-100/70 p-3 text-left transition-colors hover:border-primary/45 hover:bg-base-100/90"
             >
-              <li
-                v-for="item in bucket.items.slice(0, 12)"
-                :key="`${bucket.key}-${item.name}`"
-                class="truncate rounded-lg bg-white/5 px-2 py-1"
+              <div class="flex items-start justify-between gap-3">
+                <div>
+                  <p class="text-xs uppercase text-base-content/40">
+                    {{ bucket.label }}
+                  </p>
+                  <p class="mt-1 text-2xl font-semibold text-primary">
+                    {{ bucket.count }}
+                  </p>
+                </div>
+                <Icon :icon="bucket.icon" class="h-5 w-5 text-primary/70" />
+              </div>
+            </button>
+          </div>
+
+          <div
+            v-if="reconciliationGridItems.length > 0"
+            class="max-h-[34rem] overflow-y-auto pr-1"
+          >
+            <div class="grid grid-cols-2 gap-3 md:grid-cols-4">
+              <article
+                v-for="item in reconciliationGridItems"
+                :key="`${item.bucketKey}-${item.name}`"
+                class="overflow-hidden rounded-2xl border border-primary/20 bg-base-100/75 shadow-glow-sm"
               >
-                {{ item.name }}
-              </li>
-            </ul>
-            <p v-else class="mt-3 text-xs text-base-content/40">
+                <div class="aspect-square bg-base-100/80">
+                  <img
+                    v-if="item.preview_url"
+                    :src="item.preview_url"
+                    :alt="item.name"
+                    class="h-full w-full object-cover"
+                    loading="lazy"
+                  />
+                  <div
+                    v-else
+                    class="flex h-full w-full items-center justify-center bg-primary/5"
+                  >
+                    <Icon
+                      icon="clarity:image-gallery-line"
+                      class="h-10 w-10 text-base-content/25"
+                    />
+                  </div>
+                </div>
+                <div class="p-3">
+                  <p class="truncate text-sm font-semibold">
+                    {{ item.name }}
+                  </p>
+                  <div class="mt-2 flex items-center justify-between gap-2">
+                    <span class="pill max-w-full truncate text-[11px]">
+                      {{ item.bucketLabel }}
+                    </span>
+                    <Icon
+                      :icon="item.icon"
+                      class="h-4 w-4 shrink-0 text-primary/70"
+                    />
+                  </div>
+                </div>
+              </article>
+            </div>
+          </div>
+
+          <div
+            v-else
+            class="rounded-2xl border border-white/10 bg-base-100/60 p-8 text-center"
+          >
+            <Icon
+              icon="clarity:user-line"
+              class="mx-auto mb-3 h-10 w-10 text-base-content/20"
+            />
+            <p class="text-sm text-base-content/50">
               {{ t('metadata.noArtistsInBucket') }}
             </p>
           </div>
@@ -882,6 +929,17 @@ const reconciliationBuckets = computed(() => {
     },
   ]
 })
+
+const reconciliationGridItems = computed(() =>
+  reconciliationBuckets.value.flatMap((bucket) =>
+    (bucket.items || []).map((item) => ({
+      ...item,
+      bucketKey: bucket.key,
+      bucketLabel: bucket.label,
+      icon: bucket.icon,
+    }))
+  )
+)
 
 const jellyfinCounts = computed(() => {
   const counts = artistReconciliation.value?.counts || {}
