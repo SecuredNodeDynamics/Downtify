@@ -80,6 +80,26 @@ docker compose up -d
 
 Your music and settings are preserved in the volumes.
 
+## Troubleshooting compose errors
+
+If you see `mapping key "services" already defined`, your compose file has
+more than one top-level `services:` block. Keep one `services:` block and put
+the `downtify:` service under it. Do not paste multiple examples into the same
+file unless you merge them first.
+
+If you see `pull access denied for downtify`, Docker is trying to pull an image
+named only `downtify`. Set the image explicitly:
+
+```yaml
+services:
+  downtify:
+    image: ghcr.io/securednodedynamics/downtify:latest
+```
+
+The `lscr.io/v2` error usually comes from another app/image registry check in
+the host manager. Downtify's image is hosted on GitHub Container Registry at
+`ghcr.io/securednodedynamics/downtify:latest`.
+
 ## Volumes
 
 | Path inside the compose file | Purpose |

@@ -1,9 +1,8 @@
 services:
   downtify:
     container_name: downtify
-    image: 'ghcr.io/securednodedynamics/downtify:${TAG-latest}'
+    image: ghcr.io/securednodedynamics/downtify:${TAG:-latest}
     restart: unless-stopped
-    build: .
     ports:
       - '8000:30321'
     volumes:

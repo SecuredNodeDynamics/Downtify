@@ -21,15 +21,15 @@ Drop a Spotify link, get a tagged audio file. No account, no API key, no Premium
 <div class="hero__cta" markdown>
 
 [Get started](getting-started/installation.md){ .md-button .md-button--primary }
-[Source on GitHub](https://github.com/henriquesebastiao/downtify){ .md-button }
+[Source on GitHub](https://github.com/SecuredNodeDynamics/Downtify){ .md-button }
 
 </div>
 
 <div class="hero__shields" markdown>
 
-[![Release](https://img.shields.io/github/v/release/henriquesebastiao/downtify?color=1AD05C&label=release)](https://github.com/henriquesebastiao/downtify/releases)
-[![Docker Pulls](https://img.shields.io/docker/pulls/henriquesebastiao/downtify?color=1AD05C)](https://hub.docker.com/r/henriquesebastiao/downtify)
-[![License](https://img.shields.io/github/license/henriquesebastiao/downtify?color=1AD05C)](https://github.com/henriquesebastiao/downtify/blob/main/LICENSE)
+[![Release](https://img.shields.io/github/v/release/SecuredNodeDynamics/Downtify?color=1AD05C&label=release)](https://github.com/SecuredNodeDynamics/Downtify/releases)
+[![Docker Pulls](https://img.shields.io/docker/pulls/securednodedynamics/downtify?color=1AD05C)](https://hub.docker.com/r/securednodedynamics/downtify)
+[![License](https://img.shields.io/github/license/SecuredNodeDynamics/Downtify?color=1AD05C)](https://github.com/SecuredNodeDynamics/Downtify/blob/main/LICENSE)
 
 </div>
 
@@ -119,7 +119,7 @@ Spotify's official API gates downloads behind a Premium subscription. Downtify t
 docker run -d -p 8000:8000 --name downtify \
   -v /path/to/music:/downloads \
   -v downtify_data:/data \
-  ghcr.io/henriquesebastiao/downtify
+  ghcr.io/securednodedynamics/downtify
 ```
 
 Open [`localhost:8000`](http://localhost:8000), paste a link, hit download. Files land in `/path/to/music` with the tags already in place.
