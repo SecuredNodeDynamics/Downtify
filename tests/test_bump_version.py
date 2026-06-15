@@ -94,6 +94,15 @@ def _setup_fake_repo(base: Path) -> None:
     (base / 'frontend' / 'package.json').write_text(
         '{\n  "version": "1.0.0"\n}\n', encoding='utf-8'
     )
+    (base / 'frontend' / 'package-lock.json').write_text(
+        '{\n  "version": "1.0.0",\n'
+        '  "packages": {\n'
+        '    "": { "version": "1.0.0" },\n'
+        '    "node_modules/example": { "version": "1.0.0" }\n'
+        '  }\n'
+        '}\n',
+        encoding='utf-8',
+    )
     (base / 'Makefile').write_text(
         'DOWNTIFY_VERSION := 1.0.0\n', encoding='utf-8'
     )
@@ -129,6 +138,14 @@ def test_bump_updates_all_three_files(tmp_path):
     assert (
         '"version": "2.3.4"'
         in (tmp_path / 'frontend' / 'package.json').read_text()
+    )
+    assert (
+        '"version": "2.3.4"'
+        in (tmp_path / 'frontend' / 'package-lock.json').read_text()
+    )
+    assert (
+        '"node_modules/example": {\n      "version": "1.0.0"'
+        in (tmp_path / 'frontend' / 'package-lock.json').read_text()
     )
     assert 'DOWNTIFY_VERSION := 2.3.4' in (tmp_path / 'Makefile').read_text()
     dockerfile = (tmp_path / 'Dockerfile').read_text()

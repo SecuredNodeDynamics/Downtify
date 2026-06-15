@@ -98,6 +98,26 @@ for path, replacements in files.items():
     if text != original:
         path.write_text(text, encoding="utf-8")
         print(f"updated {path.relative_to(root)}")
+
+lockfile = root / "frontend/package-lock.json"
+if lockfile.exists():
+    import json
+
+    data = json.loads(lockfile.read_text(encoding="utf-8"))
+    changed = False
+    if data.get("version") == old:
+        data["version"] = new
+        changed = True
+    root_package = data.get("packages", {}).get("")
+    if isinstance(root_package, dict) and root_package.get("version") == old:
+        root_package["version"] = new
+        changed = True
+    if changed:
+        lockfile.write_text(
+            json.dumps(data, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        print(f"updated {lockfile.relative_to(root)}")
 PY
 
 echo

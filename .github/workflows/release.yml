@@ -1,0 +1,131 @@
+name: Create Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: 'Version bump to apply when version is empty'
+        required: true
+        default: patch
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+      version:
+        description: 'Exact version to release, for example 2.10.0'
+        required: false
+        type: string
+      prerelease:
+        description: 'Mark the GitHub release as a prerelease'
+        required: true
+        default: false
+        type: boolean
+      draft:
+        description: 'Create as a draft release'
+        required: true
+        default: false
+        type: boolean
+      docker:
+        description: 'Dispatch the Docker image build after release creation'
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Compute release version
+        id: release
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_REF_TYPE}" != "branch" ]]; then
+            echo "Run this workflow from a branch, not ${GITHUB_REF_TYPE}." >&2
+            exit 1
+          fi
+          requested="${{ inputs.version }}"
+          if [[ -n "$requested" ]]; then
+            ./version.sh "$requested"
+          else
+            ./version.sh "${{ inputs.bump }}"
+          fi
+          version="$(./version.sh --current)"
+          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid version: $version" >&2
+            exit 1
+          fi
+          tag="v${version}"
+          if git rev-parse "$tag" >/dev/null 2>&1; then
+            echo "Tag already exists: $tag" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Commit version bump
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add \
+            downtify/__init__.py \
+            pyproject.toml \
+            frontend/package.json \
+            frontend/package-lock.json \
+            Makefile \
+            Dockerfile \
+            frontend/src/components/Hero.vue
+          if git diff --cached --quiet; then
+            echo "Version files already match ${{ steps.release.outputs.version }}"
+          else
+            git commit -m "chore: release ${{ steps.release.outputs.tag }}"
+          fi
+
+      - name: Push version commit and tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          git tag -a "${{ steps.release.outputs.tag }}" -m "Release ${{ steps.release.outputs.tag }}"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
+          git push origin "${{ steps.release.outputs.tag }}"
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          args=(
+            "${{ steps.release.outputs.tag }}"
+            --title "Downtify ${{ steps.release.outputs.tag }}"
+            --generate-notes
+          )
+          if [[ "${{ inputs.prerelease }}" == "true" ]]; then
+            args+=(--prerelease)
+          fi
+          if [[ "${{ inputs.draft }}" == "true" ]]; then
+            args+=(--draft)
+          fi
+          gh release create "${args[@]}"
+
+      - name: Dispatch Docker image build
+        if: inputs.docker
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow run build.yml --ref "${{ steps.release.outputs.tag }}"
