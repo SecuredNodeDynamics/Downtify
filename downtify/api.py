@@ -501,6 +501,39 @@ def _metadata_scan_status() -> dict[str, Any]:
     return dict(state.metadata_scan)
 
 
+def _merge_items_by(
+    existing: list[dict[str, Any]],
+    incoming: list[dict[str, Any]],
+    key_field: str,
+) -> list[dict[str, Any]]:
+    merged: dict[str, dict[str, Any]] = {}
+    order: list[str] = []
+    for item in [*existing, *incoming]:
+        key = str(item.get(key_field) or '')
+        if not key:
+            continue
+        if key not in merged:
+            order.append(key)
+        merged[key] = item
+    return [merged[key] for key in order]
+
+
+def _merge_artist_image_items(
+    existing: list[dict[str, Any]],
+    incoming: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    merged: dict[tuple[str, str], dict[str, Any]] = {}
+    order: list[tuple[str, str]] = []
+    for item in [*existing, *incoming]:
+        key = (str(item.get('artist_id') or ''), str(item.get('folder') or ''))
+        if not any(key):
+            continue
+        if key not in merged:
+            order.append(key)
+        merged[key] = item
+    return [merged[key] for key in order]
+
+
 async def _run_metadata_scan(limit: int, start: int) -> None:
     if state.downloader is None:
         state.metadata_scan = {
@@ -511,9 +544,22 @@ async def _run_metadata_scan(limit: int, start: int) -> None:
         return
 
     def progress(update: dict[str, Any]) -> None:
+        items = _merge_items_by(
+            list(state.metadata_scan.get('items') or []),
+            list(update.get('items') or []),
+            'file',
+        )
+        clean = _merge_items_by(
+            list(state.metadata_scan.get('clean') or []),
+            list(update.get('clean') or []),
+            'file',
+        )
         state.metadata_scan = {
             **state.metadata_scan,
             **update,
+            'items': items,
+            'clean': clean,
+            'matched': len(items),
             'status': 'scanning',
             'limit': limit,
         }
@@ -526,9 +572,22 @@ async def _run_metadata_scan(limit: int, start: int) -> None:
             start,
             progress,
         )
+        items = _merge_items_by(
+            list(state.metadata_scan.get('items') or []),
+            list(result.get('items') or []),
+            'file',
+        )
+        clean = _merge_items_by(
+            list(state.metadata_scan.get('clean') or []),
+            list(result.get('clean') or []),
+            'file',
+        )
         state.metadata_scan = {
             **state.metadata_scan,
             **result,
+            'items': items,
+            'clean': clean,
+            'matched': len(items),
             'limit': limit,
             'status': 'done',
             'error': '',
@@ -567,6 +626,7 @@ async def start_metadata_scan(request: Request) -> dict[str, Any]:
     start = 0 if reset else int(previous.get('next_offset') or 0)
     if total > 0 and start >= total:
         start = 0
+    continuing = start > 0
 
     state.metadata_scan = {
         'status': 'scanning',
@@ -574,9 +634,9 @@ async def start_metadata_scan(request: Request) -> dict[str, Any]:
         'scanned': 0,
         'batch_scanned': 0,
         'total': 0,
-        'matched': 0,
-        'items': [],
-        'clean': [],
+        'matched': len(previous.get('items') or []) if continuing else 0,
+        'items': (previous.get('items') or []) if continuing else [],
+        'clean': (previous.get('clean') or []) if continuing else [],
         'completed': previous.get('completed') or [],
         'error': '',
         'errors': [],
@@ -610,9 +670,15 @@ async def _run_artist_image_scan(limit: int, start: int) -> None:
                 **update,
                 'items': _with_artist_image_preview(update['items']),
             }
+        items = _merge_artist_image_items(
+            list(state.artist_image_scan.get('items') or []),
+            list(update.get('items') or []),
+        )
         state.artist_image_scan = {
             **state.artist_image_scan,
             **update,
+            'items': items,
+            'matched': len(items),
             'status': 'scanning',
             'limit': limit,
         }
@@ -625,10 +691,16 @@ async def _run_artist_image_scan(limit: int, start: int) -> None:
             start,
             progress,
         )
+        result_items = _with_artist_image_preview(result.get('items') or [])
+        items = _merge_artist_image_items(
+            list(state.artist_image_scan.get('items') or []),
+            result_items,
+        )
         state.artist_image_scan = {
             **state.artist_image_scan,
             **result,
-            'items': _with_artist_image_preview(result.get('items') or []),
+            'items': items,
+            'matched': len(items),
             'limit': limit,
             'status': 'done',
             'error': '',
@@ -665,14 +737,15 @@ async def scan_artist_images(request: Request) -> dict[str, Any]:
     start = 0 if reset else int(previous.get('next_offset') or 0)
     if total > 0 and start >= total:
         start = 0
+    continuing = start > 0
     state.artist_image_scan = {
         'status': 'scanning',
         'limit': limit,
         'scanned': 0,
         'batch_scanned': 0,
         'total': 0,
-        'matched': 0,
-        'items': [],
+        'matched': len(previous.get('items') or []) if continuing else 0,
+        'items': (previous.get('items') or []) if continuing else [],
         'completed': previous.get('completed') or [],
         'error': '',
         'next_offset': start,
@@ -1470,7 +1543,7 @@ def jellyfin_debug(
         )
         items_response.raise_for_status()
         items_data = items_response.json()
-        
+
         return {
             'virtual_folders_raw_response': virtual_data,
             'virtual_folders_count': len(virtual_data)
@@ -1508,7 +1581,7 @@ def jellyfin_libraries_endpoint(
     try:
         # Normalize URL (remove trailing slash and handle http/https)
         url = jellyfin_url.rstrip('/')
-        
+
         # Ensure we have a valid URL
         if not url.startswith(('http://', 'https://')):
             url = 'http://' + url
