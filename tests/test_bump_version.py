@@ -90,6 +90,16 @@ def _setup_fake_repo(base: Path) -> None:
     (base / 'pyproject.toml').write_text(
         '[project]\nversion = "1.0.0"\n', encoding='utf-8'
     )
+    (base / 'uv.lock').write_text(
+        '[[package]]\n'
+        'name = "downtify"\n'
+        'version = "1.0.0"\n'
+        'source = { virtual = "." }\n\n'
+        '[[package]]\n'
+        'name = "example"\n'
+        'version = "1.0.0"\n',
+        encoding='utf-8',
+    )
     (base / 'frontend').mkdir()
     (base / 'frontend' / 'package.json').write_text(
         '{\n  "version": "1.0.0"\n}\n', encoding='utf-8'
@@ -137,6 +147,9 @@ def test_bump_updates_all_three_files(tmp_path):
         in (tmp_path / 'downtify' / '__init__.py').read_text()
     )
     assert 'version = "2.3.4"' in (tmp_path / 'pyproject.toml').read_text()
+    uv_lock = (tmp_path / 'uv.lock').read_text()
+    assert 'name = "downtify"\nversion = "2.3.4"' in uv_lock
+    assert 'name = "example"\nversion = "1.0.0"' in uv_lock
     assert (
         '"version": "2.3.4"'
         in (tmp_path / 'frontend' / 'package.json').read_text()

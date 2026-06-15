@@ -68,6 +68,7 @@ echo "Bumping $OLD_VERSION → $NEW_VERSION"
 
 "${PYTHON:-python}" - <<PY
 from pathlib import Path
+import re
 
 root = Path(r"$REPO_ROOT")
 old = "$OLD_VERSION"
@@ -98,6 +99,19 @@ for path, replacements in files.items():
     if text != original:
         path.write_text(text, encoding="utf-8")
         print(f"updated {path.relative_to(root)}")
+
+uv_lock = root / "uv.lock"
+if uv_lock.exists():
+    text = uv_lock.read_text(encoding="utf-8")
+    updated = re.sub(
+        r'(\[\[package\]\]\nname = "downtify"\nversion = ")[^"]+(")',
+        rf'\g<1>{new}\2',
+        text,
+        count=1,
+    )
+    if updated != text:
+        uv_lock.write_text(updated, encoding="utf-8")
+        print(f"updated {uv_lock.relative_to(root)}")
 
 lockfile = root / "frontend/package-lock.json"
 if lockfile.exists():
