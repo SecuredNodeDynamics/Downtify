@@ -651,7 +651,7 @@
           </div>
         </div>
 
-        <div class="mb-5 grid gap-3 sm:grid-cols-3">
+        <div class="mb-5 grid gap-3 sm:grid-cols-4">
           <div class="surface rounded-2xl p-4">
             <p class="text-xs uppercase text-base-content/40">
               {{ t('metadata.jellyfinLibrary') }}
@@ -674,6 +674,14 @@
             </p>
             <p class="mt-1 text-2xl font-semibold">
               {{ jellyfinCounts.folders }}
+            </p>
+          </div>
+          <div class="surface rounded-2xl p-4">
+            <p class="text-xs uppercase text-base-content/40">
+              {{ t('metadata.missingLocalImages') }}
+            </p>
+            <p class="mt-1 text-2xl font-semibold text-primary">
+              {{ jellyfinCounts.missingImages }}
             </p>
           </div>
         </div>
@@ -729,6 +737,12 @@
               :key="bucket.key"
               type="button"
               class="rounded-2xl border border-primary/20 bg-base-100/70 p-3 text-left transition-colors hover:border-primary/45 hover:bg-base-100/90"
+              :class="
+                activeReconciliationBucket === bucket.key
+                  ? 'border-primary/60 shadow-glow-sm'
+                  : ''
+              "
+              @click="activeReconciliationBucket = bucket.key"
             >
               <div class="flex items-start justify-between gap-3">
                 <div>
@@ -776,6 +790,22 @@
                   <p class="truncate text-sm font-semibold">
                     {{ item.name }}
                   </p>
+                  <div class="mt-2 flex items-center gap-2">
+                    <span
+                      class="pill truncate text-[11px]"
+                      :class="
+                        item.has_image
+                          ? 'badge-soft'
+                          : 'bg-warning/10 text-warning'
+                      "
+                    >
+                      {{
+                        item.has_image
+                          ? t('metadata.localImageReady')
+                          : t('metadata.missingLocalImage')
+                      }}
+                    </span>
+                  </div>
                   <div class="mt-2 flex items-center justify-between gap-2">
                     <span class="pill max-w-full truncate text-[11px]">
                       {{ item.bucketLabel }}
@@ -785,6 +815,32 @@
                       class="h-4 w-4 shrink-0 text-primary/70"
                     />
                   </div>
+                  <button
+                    v-if="item.missing_image && item.file"
+                    class="btn btn-primary btn-xs mt-3 h-8 w-full rounded-full"
+                    :disabled="
+                      applyingArtistImages[jellyfinRepairKey(item)] ||
+                      fixedArtistImages[jellyfinRepairKey(item)]
+                    "
+                    @click="applyJellyfinArtistImage(item)"
+                  >
+                    <span
+                      v-if="applyingArtistImages[jellyfinRepairKey(item)]"
+                      class="loading loading-spinner loading-xs mr-2"
+                    />
+                    <Icon v-else icon="clarity:image-gallery-line" class="h-4 w-4 mr-2" />
+                    {{
+                      fixedArtistImages[jellyfinRepairKey(item)]
+                        ? t('metadata.fixed')
+                        : t('metadata.applyImage')
+                    }}
+                  </button>
+                  <p
+                    v-else-if="item.missing_image"
+                    class="mt-3 text-[11px] leading-snug text-base-content/45"
+                  >
+                    {{ t('metadata.noRepairFile') }}
+                  </p>
                 </div>
               </article>
             </div>
@@ -857,6 +913,7 @@ const fixedArtistImages = ref({})
 const repairingAllImages = ref(false)
 const artistImageSummary = ref({ scanned: 0, matched: 0, total: 0 })
 const artistReconciliation = ref(null)
+const activeReconciliationBucket = ref('missing_images')
 const reconcilingArtists = ref(false)
 const refreshingJellyfin = ref(false)
 const jellyfinMessage = ref('')
@@ -900,6 +957,13 @@ const reconciliationBuckets = computed(() => {
   const data = artistReconciliation.value || {}
   return [
     {
+      key: 'missing_images',
+      label: t('metadata.missingLocalImages'),
+      items: data.missing_images || [],
+      count: data.counts?.missing_local_images || 0,
+      icon: 'clarity:image-gallery-line',
+    },
+    {
       key: 'jellyfin_only',
       label: t('metadata.jellyfinOnly'),
       items: data.jellyfin_only || [],
@@ -931,14 +995,16 @@ const reconciliationBuckets = computed(() => {
 })
 
 const reconciliationGridItems = computed(() =>
-  reconciliationBuckets.value.flatMap((bucket) =>
-    (bucket.items || []).map((item) => ({
-      ...item,
-      bucketKey: bucket.key,
-      bucketLabel: bucket.label,
-      icon: bucket.icon,
-    }))
-  )
+  reconciliationBuckets.value
+    .filter((bucket) => bucket.key === activeReconciliationBucket.value)
+    .flatMap((bucket) =>
+      (bucket.items || []).map((item) => ({
+        ...item,
+        bucketKey: bucket.key,
+        bucketLabel: bucket.label,
+        icon: bucket.icon,
+      }))
+    )
 )
 
 const jellyfinCounts = computed(() => {
@@ -947,6 +1013,7 @@ const jellyfinCounts = computed(() => {
     jellyfin: counts.jellyfin || 0,
     folders: counts.folders || 0,
     tags: counts.tags || 0,
+    missingImages: counts.missing_local_images || 0,
   }
 })
 
@@ -975,8 +1042,54 @@ function itemKey(item) {
   return `${item.artist_id || item.artist}-${item.folder}`
 }
 
+function jellyfinRepairKey(item) {
+  return `${item.name || item.artist}-${item.folder || ''}-${item.file || ''}`
+}
+
 function pendingArtistImageItems(items) {
   return (items || []).filter((item) => !fixedArtistImages.value[itemKey(item)])
+}
+
+function firstSavedFolder(result) {
+  const path = [...(result?.verified || []), ...(result?.saved || [])].find(Boolean)
+  return path ? String(path).split('/', 1)[0] : ''
+}
+
+function markJellyfinArtistImageFixed(item, result) {
+  const folder = item.folder || firstSavedFolder(result)
+  const updateItem = (existing) => {
+    if ((existing.name || existing.artist) !== item.name) return existing
+    return {
+      ...existing,
+      folder: folder || existing.folder,
+      has_image: true,
+      missing_image: false,
+      preview_url:
+        folder
+          ? `/api/metadata/artist-images/folder-preview?folder=${encodeURIComponent(folder)}`
+          : existing.preview_url,
+    }
+  }
+  const current = artistReconciliation.value || {}
+  const counts = current.counts || {}
+  artistReconciliation.value = {
+    ...current,
+    counts: {
+      ...counts,
+      missing_local_images: Math.max(
+        0,
+        (counts.missing_local_images || 0) - 1
+      ),
+      local_images: (counts.local_images || 0) + 1,
+    },
+    matched: (current.matched || []).map(updateItem),
+    folder_only: (current.folder_only || []).map(updateItem),
+    jellyfin_only: (current.jellyfin_only || []).map(updateItem),
+    tag_only: (current.tag_only || []).map(updateItem),
+    missing_images: (current.missing_images || []).filter(
+      (existing) => (existing.name || existing.artist) !== item.name
+    ),
+  }
 }
 
 function artistImageItemMeta(item) {
@@ -1301,6 +1414,46 @@ async function applyArtistImage(item) {
         (existing) => itemKey(existing) !== key
       ),
     ]
+  } finally {
+    applyingArtistImages.value = {
+      ...applyingArtistImages.value,
+      [key]: false,
+    }
+  }
+}
+
+async function applyJellyfinArtistImage(item) {
+  const key = jellyfinRepairKey(item)
+  applyingArtistImages.value = {
+    ...applyingArtistImages.value,
+    [key]: true,
+  }
+  jellyfinMessage.value = ''
+  jellyfinError.value = false
+  try {
+    const repairItem = {
+      file: item.file,
+      artist: item.name,
+      artist_id: item.artist_id || '',
+      folder: item.folder || item.name,
+    }
+    const res = await API.applyArtistImage(repairItem)
+    const savedOrVerified = [
+      ...(res.data?.saved || []),
+      ...(res.data?.verified || []),
+    ]
+    if (savedOrVerified.length === 0) {
+      throw new Error(t('metadata.failedArtistImageApply'))
+    }
+    fixedArtistImages.value = { ...fixedArtistImages.value, [key]: true }
+    completedArtistImages.value = [res.data, ...completedArtistImages.value]
+    markJellyfinArtistImageFixed(item, res.data)
+    jellyfinMessage.value = t('metadata.artistImageRepairOk')
+  } catch (err) {
+    const detail =
+      err?.response?.data?.detail || err?.message || t('metadata.failedArtistImageApply')
+    jellyfinError.value = true
+    jellyfinMessage.value = `${t('metadata.failedArtistImageApply')} ${detail}`
   } finally {
     applyingArtistImages.value = {
       ...applyingArtistImages.value,

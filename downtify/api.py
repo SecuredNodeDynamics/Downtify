@@ -2275,16 +2275,29 @@ def _artist_compare_key(value: Any) -> str:
 def _named_items(
     names: dict[str, str],
     folders: dict[str, str] | None = None,
-) -> list[dict[str, str]]:
+    folder_images: dict[str, bool] | None = None,
+    files: dict[str, str] | None = None,
+) -> list[dict[str, Any]]:
     return [
         {
             'name': name,
+            'has_image': bool((folder_images or {}).get(key)),
+            'missing_image': not bool((folder_images or {}).get(key)),
             **(
                 {
                     'folder': folder,
-                    'preview_url': _artist_folder_preview_url(folder),
+                    **(
+                        {'preview_url': _artist_folder_preview_url(folder)}
+                        if (folder_images or {}).get(key)
+                        else {}
+                    ),
                 }
                 if (folder := (folders or {}).get(key))
+                else {}
+            ),
+            **(
+                {'file': file}
+                if (file := (files or {}).get(key))
                 else {}
             ),
         }
@@ -2295,9 +2308,11 @@ def _named_items(
     ]
 
 
-def _local_artist_inventory(root: Path) -> dict[str, dict[str, str]]:
+def _local_artist_inventory(root: Path) -> dict[str, dict[str, Any]]:
     folders: dict[str, str] = {}
+    folder_images: dict[str, bool] = {}
     tag_artists: dict[str, str] = {}
+    tag_files: dict[str, str] = {}
 
     if root.exists():
         for item in root.iterdir():
@@ -2305,6 +2320,7 @@ def _local_artist_inventory(root: Path) -> dict[str, dict[str, str]]:
                 key = _artist_compare_key(item.name)
                 if key:
                     folders.setdefault(key, item.name)
+                    folder_images[key] = bool(artist_art.artist_image_paths(item))
         for path in root.rglob('*'):
             if not path.is_file() or path.suffix.lower() not in AUDIO_EXTENSIONS:
                 continue
@@ -2320,8 +2336,17 @@ def _local_artist_inventory(root: Path) -> dict[str, dict[str, str]]:
                 key = _artist_compare_key(artist)
                 if key:
                     tag_artists.setdefault(key, str(artist))
+                    try:
+                        tag_files.setdefault(key, path.relative_to(root).as_posix())
+                    except ValueError:
+                        tag_files.setdefault(key, path.name)
 
-    return {'folders': folders, 'tags': tag_artists}
+    return {
+        'folders': folders,
+        'folder_images': folder_images,
+        'tags': tag_artists,
+        'tag_files': tag_files,
+    }
 
 
 def _artist_names_from_jellyfin_items(items: list[dict[str, Any]]) -> dict[str, str]:
@@ -2397,11 +2422,17 @@ def reconcile_jellyfin_artists() -> dict[str, Any]:
         jellyfin_artists = _jellyfin_artist_inventory(url, headers, library)
         local = _local_artist_inventory(download_dir)
         folders = local['folders']
+        folder_images = local.get('folder_images', {})
         tags = local['tags']
+        tag_files = local.get('tag_files', {})
 
         jellyfin_keys = set(jellyfin_artists)
         folder_keys = set(folders)
         tag_keys = set(tags)
+        matched_keys = jellyfin_keys & folder_keys
+        missing_image_keys = {
+            key for key in jellyfin_keys if not folder_images.get(key)
+        }
         return {
             'success': True,
             'library': library or {},
@@ -2412,20 +2443,27 @@ def reconcile_jellyfin_artists() -> dict[str, Any]:
                 'jellyfin_only': len(jellyfin_keys - folder_keys),
                 'folder_only': len(folder_keys - jellyfin_keys),
                 'tag_only': len(tag_keys - jellyfin_keys),
-                'matched': len(jellyfin_keys & folder_keys),
+                'matched': len(matched_keys),
+                'local_images': sum(
+                    1 for key in jellyfin_keys if folder_images.get(key)
+                ),
+                'missing_local_images': len(missing_image_keys),
             },
             'jellyfin_only': _named_items({
                 key: jellyfin_artists[key] for key in jellyfin_keys - folder_keys
-            }),
+            }, files=tag_files),
             'folder_only': _named_items({
                 key: folders[key] for key in folder_keys - jellyfin_keys
-            }, folders),
+            }, folders, folder_images, tag_files),
             'tag_only': _named_items({
                 key: tags[key] for key in tag_keys - jellyfin_keys
-            }),
+            }, files=tag_files),
             'matched': _named_items({
-                key: folders[key] for key in jellyfin_keys & folder_keys
-            }, folders),
+                key: folders[key] for key in matched_keys
+            }, folders, folder_images, tag_files),
+            'missing_images': _named_items({
+                key: jellyfin_artists[key] for key in missing_image_keys
+            }, folders, folder_images, tag_files),
         }
     except HTTPException:
         raise

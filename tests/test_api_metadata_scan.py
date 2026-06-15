@@ -303,3 +303,54 @@ def test_artist_folder_image_preview_serves_local_artist_art(tmp_path):
         api.state.downloader = old_downloader
         api.state.settings = old_settings
         api.state.default_download_dir = old_default
+
+
+def test_local_artist_inventory_tracks_folder_images_and_tag_files(
+    tmp_path,
+    monkeypatch,
+):
+    artist_dir = tmp_path / 'Artist One'
+    album_dir = artist_dir / 'Album'
+    album_dir.mkdir(parents=True)
+    track = album_dir / 'song.mp3'
+    track.write_bytes(b'audio')
+    (artist_dir / 'Artist One.jpg').write_bytes(b'image')
+
+    guest_track = tmp_path / 'guest.mp3'
+    guest_track.write_bytes(b'audio')
+
+    def fake_song(path):
+        if path == track:
+            return {'artists': ['Artist One']}
+        return {'artists': ['Guest Artist']}
+
+    monkeypatch.setattr(api.metadata_repair, '_song_from_file', fake_song)
+
+    inventory = api._local_artist_inventory(tmp_path)
+
+    assert inventory['folders']['artist one'] == 'Artist One'
+    assert inventory['folder_images']['artist one'] is True
+    assert inventory['tags']['guest artist'] == 'Guest Artist'
+    assert inventory['tag_files']['guest artist'] == 'guest.mp3'
+
+
+def test_named_items_include_image_state_and_repair_file():
+    result = api._named_items(
+        {'artist one': 'Artist One', 'guest artist': 'Guest Artist'},
+        folders={'artist one': 'Artist One'},
+        folder_images={'artist one': True},
+        files={
+            'artist one': 'Artist One/Album/song.mp3',
+            'guest artist': 'guest.mp3',
+        },
+    )
+
+    by_name = {item['name']: item for item in result}
+
+    assert by_name['Artist One']['has_image'] is True
+    assert by_name['Artist One']['missing_image'] is False
+    assert by_name['Artist One']['preview_url'].endswith('folder=Artist%20One')
+    assert by_name['Artist One']['file'] == 'Artist One/Album/song.mp3'
+    assert by_name['Guest Artist']['has_image'] is False
+    assert by_name['Guest Artist']['missing_image'] is True
+    assert by_name['Guest Artist']['file'] == 'guest.mp3'
