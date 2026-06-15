@@ -3,17 +3,31 @@ _effective_lyrics_providers."""
 
 from __future__ import annotations
 
+import asyncio
 import json
 
 import requests
 
+from downtify import api
 from downtify.api import (
     DEFAULT_SETTINGS,
+    _apply_download_dir_from_settings,
+    _effective_download_dir,
     _effective_lyrics_providers,
     _load_settings,
     _normalized_jellyfin_library_name,
     jellyfin_libraries_endpoint,
+    update_settings_endpoint,
 )
+from downtify.downloader import Downloader
+
+
+class FakeRequest:
+    def __init__(self, payload):
+        self.payload = payload
+
+    async def json(self):
+        return self.payload
 
 
 def test_default_settings_has_required_keys():
@@ -128,6 +142,66 @@ def test_load_settings_preserves_organize_by_album(tmp_path):
     result = _load_settings(path)
     assert result['organize_by_artist'] is True
     assert result['organize_by_album'] is True
+
+
+def test_effective_download_dir_prefers_saved_server_media_location(tmp_path):
+    old_settings = api.state.settings
+    try:
+        media = tmp_path / 'media'
+        api.state.settings = {'server_media_location': str(media)}
+
+        assert _effective_download_dir(tmp_path / 'downloads') == media
+    finally:
+        api.state.settings = old_settings
+
+
+def test_apply_download_dir_from_settings_updates_downloader(tmp_path):
+    old_settings = api.state.settings
+    old_downloader = api.state.downloader
+    old_default = api.state.default_download_dir
+    try:
+        media = tmp_path / 'media'
+        api.state.settings = {'server_media_location': str(media)}
+        api.state.default_download_dir = tmp_path / 'downloads'
+        api.state.downloader = Downloader(tmp_path / 'downloads')
+
+        result = _apply_download_dir_from_settings()
+
+        assert result == media
+        assert api.state.downloader.download_dir == media
+        assert media.exists()
+    finally:
+        api.state.settings = old_settings
+        api.state.downloader = old_downloader
+        api.state.default_download_dir = old_default
+
+
+def test_update_settings_server_media_location_retargets_downloader(tmp_path):
+    old_settings = api.state.settings
+    old_downloader = api.state.downloader
+    old_settings_path = api.state.settings_path
+    old_default = api.state.default_download_dir
+    try:
+        media = tmp_path / 'media'
+        api.state.settings = dict(DEFAULT_SETTINGS)
+        api.state.default_download_dir = tmp_path / 'downloads'
+        api.state.downloader = Downloader(tmp_path / 'downloads')
+        api.state.settings_path = None
+
+        asyncio.run(
+            update_settings_endpoint(
+                FakeRequest({'server_media_location': str(media)})
+            )
+        )
+
+        assert api.state.settings['server_media_location'] == str(media)
+        assert api.state.downloader.download_dir == media
+        assert media.exists()
+    finally:
+        api.state.settings = old_settings
+        api.state.downloader = old_downloader
+        api.state.settings_path = old_settings_path
+        api.state.default_download_dir = old_default
 
 
 def test_load_settings_empty_object_returns_defaults(tmp_path):

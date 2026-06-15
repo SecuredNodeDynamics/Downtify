@@ -399,7 +399,7 @@ export default {
     serverMediaLocation: 'Ubicación de medios del servidor',
     serverMediaLocationPlaceholder: '/mnt/media/Music',
     serverMediaLocationHint:
-      'Se muestra en Salud como la ubicación de descarga del servidor.',
+      'Ruta del servidor donde Downtify escribe nuevas descargas. En Docker, monta esta ruta o usa la ubicacion de medios de compose.',
     downloadDestinationLocalHint:
       'Cuando termine una descarga, Downtify guardará una copia en la carpeta que elijas en este dispositivo.',
     downloadDestinationBrowserHint:

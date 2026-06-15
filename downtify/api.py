@@ -273,6 +273,7 @@ class ConnectionManager:
 class AppState:
     version: str = '0.0.0'
     downloader: Optional[Downloader] = None
+    default_download_dir: Path = Path('/downloads')
     connections: ConnectionManager = ConnectionManager()
     settings: dict[str, Any] = dict(DEFAULT_SETTINGS)
     settings_path: Optional[Path] = None
@@ -340,6 +341,25 @@ def _save_settings(path: Path, settings: dict[str, Any]) -> None:
         path.write_text(json.dumps(settings, indent=2), encoding='utf-8')
     except Exception as exc:
         logger.warning('Could not persist settings: {}', exc)
+
+
+def _effective_download_dir(fallback: Path | str | None = None) -> Path:
+    saved = str(state.settings.get('server_media_location') or '').strip()
+    if saved:
+        return Path(saved).expanduser()
+    if fallback is not None:
+        return Path(fallback)
+    return state.default_download_dir
+
+
+def _apply_download_dir_from_settings() -> Path:
+    target = _effective_download_dir(
+        state.downloader.download_dir if state.downloader else state.default_download_dir
+    )
+    target.mkdir(parents=True, exist_ok=True)
+    if state.downloader is not None:
+        state.downloader.download_dir = target
+    return target
 
 
 def _directory_summary(
@@ -1732,6 +1752,8 @@ async def update_settings_endpoint(
                 state.downloader.enhance_metadata = bool(
                     payload['enhance_metadata']
                 )
+            if 'server_media_location' in payload:
+                _apply_download_dir_from_settings()
         if 'max_parallel_downloads' in payload:
             try:
                 count = max(1, int(payload['max_parallel_downloads']))

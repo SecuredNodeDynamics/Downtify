@@ -20,7 +20,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from load_dotenv import load_dotenv
 from loguru import logger
@@ -206,13 +206,16 @@ def build_app() -> FastAPI:
     settings_path = DATABASE_DIR / 'settings.json'
     api.state.settings_path = settings_path
     api.state.settings = api._load_settings(settings_path)
+    api.state.default_download_dir = DOWNLOAD_DIR
     api.state.history_db = DownloadHistoryDB(
         DATABASE_DIR / 'download_history.db'
     )
 
     api.state.version = runtime_version
+    active_download_dir = api._effective_download_dir(DOWNLOAD_DIR)
+    active_download_dir.mkdir(parents=True, exist_ok=True)
     api.state.downloader = Downloader(
-        DOWNLOAD_DIR,
+        active_download_dir,
         audio_format=api.state.settings['format'],
         audio_bitrate=api.state.settings.get('bitrate', '320'),
         output_template=api.state.settings['output'].replace(
@@ -253,7 +256,7 @@ def build_app() -> FastAPI:
     @app.get('/list')
     def list_downloads() -> list[str]:
         audio_exts = {'.mp3', '.m4a', '.flac', '.ogg', '.wav', '.aac', '.opus'}
-        base = DOWNLOAD_DIR.resolve()
+        base = api.state.downloader.download_dir.resolve()
         if not base.exists():
             return []
         files: list[str] = []
@@ -270,8 +273,8 @@ def build_app() -> FastAPI:
 
     @app.delete('/delete')
     def delete_download(file: str) -> dict:
-        # Resolve and confine to DOWNLOAD_DIR to prevent path traversal.
-        base = DOWNLOAD_DIR.resolve()
+        # Resolve and confine to the active download directory.
+        base = api.state.downloader.download_dir.resolve()
         try:
             full = (base / file).resolve()
             full.relative_to(base)
@@ -287,8 +290,8 @@ def build_app() -> FastAPI:
 
     @app.get('/cover')
     def get_cover(file: str):
-        # Resolve and confine to DOWNLOAD_DIR to prevent path traversal.
-        base = DOWNLOAD_DIR.resolve()
+        # Resolve and confine to the active download directory.
+        base = api.state.downloader.download_dir.resolve()
         try:
             full = (base / file).resolve()
             full.relative_to(base)
@@ -310,11 +313,17 @@ def build_app() -> FastAPI:
             },
         )
 
-    app.mount(
-        '/downloads',
-        StaticFiles(directory=str(DOWNLOAD_DIR)),
-        name='downloads',
-    )
+    @app.get('/downloads/{file_path:path}')
+    def get_download(file_path: str):
+        base = api.state.downloader.download_dir.resolve()
+        try:
+            full = (base / file_path).resolve()
+            full.relative_to(base)
+        except (ValueError, RuntimeError):
+            raise HTTPException(status_code=400, detail='Invalid path')
+        if not full.is_file():
+            raise HTTPException(status_code=404, detail='File not found')
+        return FileResponse(full)
     app.mount(
         '/',
         SPAStaticFiles(directory=WEB_GUI_LOCATION, html=True),

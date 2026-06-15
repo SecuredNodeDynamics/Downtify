@@ -390,7 +390,7 @@ export default {
     serverMediaLocation: 'Server media location',
     serverMediaLocationPlaceholder: '/mnt/media/Music',
     serverMediaLocationHint:
-      'Shown on the Health page as the server download location.',
+      'Server path where Downtify writes new downloads. In Docker, mount this path or use the compose media location setting.',
     downloadDestinationLocalHint:
       'When a download finishes, Downtify saves a copy to the folder you choose on this device.',
     downloadDestinationBrowserHint:
