@@ -158,7 +158,7 @@ def test_effective_download_dir_prefers_saved_server_media_location(tmp_path):
         api.state.settings = old_settings
 
 
-def test_effective_download_dir_uses_container_mount_for_compose_host_path(
+def test_effective_download_dir_prefers_saved_path_even_when_env_matches(
     tmp_path,
     monkeypatch,
 ):
@@ -171,7 +171,7 @@ def test_effective_download_dir_uses_container_mount_for_compose_host_path(
         api.state.settings = {'server_media_location': str(media)}
         api.state.default_download_dir = downloads
 
-        assert _effective_download_dir(tmp_path / 'fallback') == downloads
+        assert _effective_download_dir(tmp_path / 'fallback') == media
     finally:
         api.state.settings = old_settings
         api.state.default_download_dir = old_default

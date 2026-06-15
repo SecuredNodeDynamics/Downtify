@@ -190,7 +190,7 @@ def test_download_summary_measures_existing_external_path(tmp_path):
     assert summary['audio_count'] == 1
 
 
-def test_health_counts_container_mount_when_saved_location_is_compose_host_path(
+def test_health_measures_saved_location_even_when_env_matches(
     tmp_path,
     monkeypatch,
 ):
@@ -205,7 +205,8 @@ def test_health_counts_container_mount_when_saved_location_is_compose_host_path(
     media = tmp_path / 'media' / 'Music'
     try:
         downloads.mkdir()
-        (downloads / 'song.flac').write_text('audio', encoding='utf-8')
+        media.mkdir(parents=True)
+        (media / 'song.flac').write_text('audio', encoding='utf-8')
         monkeypatch.setenv('DOWNTIFY_MEDIA_SAVE_LOCATION', str(media))
         api.state.downloader = Downloader(downloads)
         api.state.default_download_dir = downloads
@@ -227,9 +228,9 @@ def test_health_counts_container_mount_when_saved_location_is_compose_host_path(
         api.state.default_download_dir = old_default
 
     assert payload['downloads']['external_path'] == str(media)
-    assert payload['downloads']['container_path'] == str(downloads)
-    assert payload['downloads']['storage_path'] == str(downloads)
-    assert payload['downloads']['storage_path_matches_display'] is False
+    assert payload['downloads']['container_path'] == str(media)
+    assert payload['downloads']['storage_path'] == str(media)
+    assert payload['downloads']['storage_path_matches_display'] is True
     assert payload['downloads']['audio_count'] == 1
 
 
