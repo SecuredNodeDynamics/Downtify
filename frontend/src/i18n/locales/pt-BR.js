@@ -156,6 +156,7 @@ export default {
     subtitle:
       'Escaneie arquivos existentes no servidor e repare tags com correspondencias do MusicBrainz.',
     scan: 'Escanear biblioteca',
+    scanAll: 'Escanear tudo',
     scanning: 'Escaneando biblioteca...',
     scanLimit: 'Arquivos para escanear',
     resultLimit: 'Correcoes para mostrar',
@@ -200,6 +201,18 @@ export default {
     failedArtistImageApply: 'Falha ao reparar imagem do artista.',
     failedVerify:
       'A escrita terminou, mas o arquivo ainda tem alteracoes pendentes.',
+    jellyfinTools: 'Ferramentas Jellyfin',
+    reconcileArtists: 'Comparar artistas',
+    refreshJellyfin: 'Atualizar Jellyfin',
+    jellyfinRefreshOk: 'Atualizacao do Jellyfin iniciada.',
+    jellyfinRefreshFailed: 'Falha ao atualizar Jellyfin.',
+    artistReconciliation: 'Comparacao de artistas',
+    jellyfinOnly: 'So no Jellyfin',
+    folderOnly: 'So pasta',
+    tagOnly: 'So tags locais',
+    matchedArtists: 'Correspondem',
+    repairLog: 'Registro de reparos',
+    emptyRepairLog: 'Nenhum reparo registrado ainda.',
   },
   monitor: {
     title: 'Monitor de playlists',
@@ -277,6 +290,12 @@ export default {
     enhanceMetadata: 'Melhorar tags com MusicBrainz',
     enhanceMetadataHint:
       'Depois que o Downtify resolve uma faixa, usa correspondencias confiaveis do MusicBrainz para melhorar titulo, artista, album e data de lancamento.',
+    artistFolderPolicy: 'Criacao de pastas de artistas',
+    artistFolderPolicyHint:
+      'Controla quais pastas de artistas ausentes o reparo de imagens pode criar a partir dos creditos.',
+    artistFolderPolicyArtwork: 'Todos os artistas creditados com arte',
+    artistFolderPolicyPrimary: 'Somente artista principal',
+    artistFolderPolicyExisting: 'Somente pastas existentes',
     jellyfinSection: 'API do Jellyfin',
     jellyfinUrl: 'URL do Jellyfin',
     jellyfinUrlPlaceholder: 'http://10.128.1.30:8096',

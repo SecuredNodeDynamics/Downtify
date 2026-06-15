@@ -154,6 +154,7 @@ export default {
     subtitle:
       'Scan existing server library files and repair tags with MusicBrainz matches.',
     scan: 'Scan library',
+    scanAll: 'Scan all',
     scanning: 'Scanning library...',
     scanLimit: 'Files to scan',
     resultLimit: 'Fixes to show',
@@ -194,6 +195,18 @@ export default {
     failedArtistImageApply: 'Failed to repair artist image.',
     failedVerify:
       'The metadata write finished, but the file still has remaining changes.',
+    jellyfinTools: 'Jellyfin tools',
+    reconcileArtists: 'Reconcile artists',
+    refreshJellyfin: 'Refresh Jellyfin',
+    jellyfinRefreshOk: 'Jellyfin refresh started.',
+    jellyfinRefreshFailed: 'Failed to refresh Jellyfin.',
+    artistReconciliation: 'Artist reconciliation',
+    jellyfinOnly: 'In Jellyfin only',
+    folderOnly: 'Folder only',
+    tagOnly: 'Local tags only',
+    matchedArtists: 'Matched',
+    repairLog: 'Repair log',
+    emptyRepairLog: 'No repairs logged yet.',
   },
   monitor: {
     title: 'Playlist Monitor',
@@ -270,6 +283,12 @@ export default {
     enhanceMetadata: 'Enhance tags with MusicBrainz',
     enhanceMetadataHint:
       'After Downtify resolves a track, use high-confidence MusicBrainz matches to improve title, artist, album and release date tags.',
+    artistFolderPolicy: 'Artist folder creation',
+    artistFolderPolicyHint:
+      'Controls which missing artist folders image repair can create from track credits.',
+    artistFolderPolicyArtwork: 'All credited artists with artwork',
+    artistFolderPolicyPrimary: 'Primary artist only',
+    artistFolderPolicyExisting: 'Existing folders only',
     jellyfinSection: 'Jellyfin API',
     jellyfinUrl: 'Jellyfin URL',
     jellyfinUrlPlaceholder: 'http://10.128.1.30:8096',

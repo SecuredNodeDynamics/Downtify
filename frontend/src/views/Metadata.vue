@@ -38,6 +38,14 @@
           </button>
           <button
             class="btn btn-sm h-11 rounded-full border-white/10 bg-base-100/85 hover:bg-base-100"
+            :disabled="loading"
+            @click="scanAll"
+          >
+            <Icon icon="clarity:fast-forward-line" class="h-4 w-4 mr-2" />
+            {{ t('metadata.scanAll') }}
+          </button>
+          <button
+            class="btn btn-sm h-11 rounded-full border-white/10 bg-base-100/85 hover:bg-base-100"
             :disabled="
               loading ||
               activeTab !== 'needs' ||
@@ -259,6 +267,71 @@
       </div>
 
       <section class="mt-10 border-t border-white/10 pt-8">
+        <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 class="text-xl font-bold tracking-tight">
+              {{ t('metadata.jellyfinTools') }}
+            </h2>
+          </div>
+          <div class="flex items-center gap-2">
+            <button
+              class="btn btn-sm h-10 rounded-full border-white/10 bg-base-100/85 hover:bg-base-100"
+              :disabled="reconcilingArtists"
+              @click="reconcileArtists"
+            >
+              <span
+                v-if="reconcilingArtists"
+                class="loading loading-spinner loading-xs mr-2"
+              />
+              <Icon v-else icon="clarity:compare-line" class="h-4 w-4 mr-2" />
+              {{ t('metadata.reconcileArtists') }}
+            </button>
+            <button
+              class="btn btn-sm h-10 rounded-full border-white/10 bg-base-100/85 hover:bg-base-100"
+              :disabled="refreshingJellyfin"
+              @click="refreshJellyfin"
+            >
+              <span
+                v-if="refreshingJellyfin"
+                class="loading loading-spinner loading-xs mr-2"
+              />
+              <Icon v-else icon="clarity:sync-line" class="h-4 w-4 mr-2" />
+              {{ t('metadata.refreshJellyfin') }}
+            </button>
+          </div>
+        </div>
+        <p
+          v-if="jellyfinMessage"
+          class="mb-4 text-sm"
+          :class="jellyfinError ? 'text-error' : 'text-primary'"
+        >
+          {{ jellyfinMessage }}
+        </p>
+        <div v-if="artistReconciliation" class="surface rounded-2xl p-4">
+          <h3 class="mb-3 text-sm font-semibold">
+            {{ t('metadata.artistReconciliation') }}
+          </h3>
+          <div class="grid gap-3 sm:grid-cols-4">
+            <div
+              v-for="bucket in reconciliationBuckets"
+              :key="bucket.key"
+              class="rounded-xl border border-white/10 bg-base-100/70 p-3"
+            >
+              <p class="text-xs uppercase text-base-content/40">
+                {{ bucket.label }}
+              </p>
+              <p class="mt-1 text-2xl font-semibold text-primary">
+                {{ bucket.items.length }}
+              </p>
+              <p class="mt-2 line-clamp-2 text-xs text-base-content/45">
+                {{ bucket.items.slice(0, 4).map((item) => item.name).join(', ') }}
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="mt-10 border-t border-white/10 pt-8">
         <div class="mb-5 flex flex-wrap items-end justify-between gap-4">
           <div class="min-w-0 flex-1">
             <h2 class="text-xl font-bold tracking-tight">
@@ -290,6 +363,14 @@
               />
               <Icon v-else icon="clarity:image-gallery-line" class="h-4 w-4 mr-2" />
               {{ t('metadata.scanArtistImages') }}
+            </button>
+            <button
+              class="btn btn-sm h-11 rounded-full border-white/10 bg-base-100/85 hover:bg-base-100"
+              :disabled="artistImageLoading"
+              @click="scanAllArtistImages"
+            >
+              <Icon icon="clarity:fast-forward-line" class="h-4 w-4 mr-2" />
+              {{ t('metadata.scanAll') }}
             </button>
             <button
               class="btn btn-sm h-11 rounded-full border-white/10 bg-base-100/85 hover:bg-base-100"
@@ -535,6 +616,55 @@
           </ul>
         </div>
       </section>
+
+      <section class="mt-10 border-t border-white/10 pt-8">
+        <div class="mb-4 flex items-center justify-between gap-3">
+          <h2 class="text-xl font-bold tracking-tight">
+            {{ t('metadata.repairLog') }}
+          </h2>
+          <button
+            class="btn btn-sm h-10 rounded-full border-white/10 bg-base-100/85 hover:bg-base-100"
+            @click="loadRepairLog"
+          >
+            <Icon icon="clarity:refresh-line" class="h-4 w-4 mr-2" />
+            {{ t('metadata.repairLog') }}
+          </button>
+        </div>
+        <div
+          v-if="repairLog.length === 0"
+          class="surface rounded-2xl p-8 text-center text-sm text-base-content/50"
+        >
+          {{ t('metadata.emptyRepairLog') }}
+        </div>
+        <ul v-else class="space-y-3">
+          <li
+            v-for="entry in repairLog"
+            :key="`${entry.created_at}-${entry.kind}-${entry.target}`"
+            class="surface rounded-2xl p-4"
+          >
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <div class="min-w-0">
+                <p class="truncate text-sm font-semibold">
+                  {{ entry.target }}
+                </p>
+                <p class="mt-1 text-xs text-base-content/45">
+                  {{ entry.kind }} · {{ entry.detail || entry.created_at }}
+                </p>
+              </div>
+              <span
+                class="pill"
+                :class="
+                  entry.status === 'success'
+                    ? 'badge-soft'
+                    : 'bg-error/10 text-error'
+                "
+              >
+                {{ entry.status }}
+              </span>
+            </div>
+          </li>
+        </ul>
+      </section>
     </main>
   </div>
 </template>
@@ -572,6 +702,12 @@ const applyingArtistImages = ref({})
 const fixedArtistImages = ref({})
 const repairingAllImages = ref(false)
 const artistImageSummary = ref({ scanned: 0, matched: 0, total: 0 })
+const repairLog = ref([])
+const artistReconciliation = ref(null)
+const reconcilingArtists = ref(false)
+const refreshingJellyfin = ref(false)
+const jellyfinMessage = ref('')
+const jellyfinError = ref(false)
 let pollTimer = null
 let artistImagePollTimer = null
 
@@ -604,6 +740,32 @@ const emptyArtistImageMessage = computed(() => {
     return t('metadata.emptyArtistImageFailed')
   }
   return t('metadata.emptyArtistImages')
+})
+
+const reconciliationBuckets = computed(() => {
+  const data = artistReconciliation.value || {}
+  return [
+    {
+      key: 'jellyfin_only',
+      label: t('metadata.jellyfinOnly'),
+      items: data.jellyfin_only || [],
+    },
+    {
+      key: 'folder_only',
+      label: t('metadata.folderOnly'),
+      items: data.folder_only || [],
+    },
+    {
+      key: 'tag_only',
+      label: t('metadata.tagOnly'),
+      items: data.tag_only || [],
+    },
+    {
+      key: 'matched',
+      label: t('metadata.matchedArtists'),
+      items: data.matched || [],
+    },
+  ]
 })
 
 function displaySong(song) {
@@ -743,6 +905,63 @@ async function scan() {
   }
 }
 
+async function scanAll() {
+  loading.value = true
+  error.value = ''
+  fixed.value = {}
+  try {
+    const res = await API.startMetadataScan(scanLimit.value, true, true)
+    applyScanStatus(res.data)
+    if (res.data.status === 'scanning') {
+      startPolling()
+    }
+  } catch {
+    error.value = t('metadata.failedScan')
+    loading.value = false
+  }
+}
+
+async function loadRepairLog() {
+  try {
+    const res = await API.getRepairLog(25)
+    repairLog.value = res.data || []
+  } catch {
+    // The repair UI remains usable if the log cannot be fetched.
+  }
+}
+
+async function reconcileArtists() {
+  reconcilingArtists.value = true
+  jellyfinMessage.value = ''
+  jellyfinError.value = false
+  try {
+    const res = await API.reconcileJellyfinArtists()
+    artistReconciliation.value = res.data
+  } catch (err) {
+    jellyfinError.value = true
+    jellyfinMessage.value =
+      err?.response?.data?.detail || t('metadata.jellyfinRefreshFailed')
+  } finally {
+    reconcilingArtists.value = false
+  }
+}
+
+async function refreshJellyfin() {
+  refreshingJellyfin.value = true
+  jellyfinMessage.value = ''
+  jellyfinError.value = false
+  try {
+    await API.refreshJellyfinLibrary()
+    jellyfinMessage.value = t('metadata.jellyfinRefreshOk')
+  } catch (err) {
+    jellyfinError.value = true
+    jellyfinMessage.value =
+      err?.response?.data?.detail || t('metadata.jellyfinRefreshFailed')
+  } finally {
+    refreshingJellyfin.value = false
+  }
+}
+
 onMounted(async () => {
   try {
     const res = await API.getMetadataScanStatus()
@@ -762,6 +981,7 @@ onMounted(async () => {
   } catch {
     // The page can still start a fresh artist image scan.
   }
+  loadRepairLog()
 })
 
 onBeforeUnmount(() => {
@@ -783,6 +1003,7 @@ async function apply(item) {
         ...summary.value,
         matched: Math.max(0, summary.value.matched - 1),
       }
+      loadRepairLog()
     } else {
       error.value = t('metadata.failedVerify')
     }
@@ -833,6 +1054,23 @@ async function scanArtistImages() {
   }
 }
 
+async function scanAllArtistImages() {
+  artistImageLoading.value = true
+  artistImageError.value = ''
+  fixedArtistImages.value = {}
+  failedArtistImages.value = []
+  try {
+    const res = await API.scanArtistImages(artistImageLimit.value, true, true)
+    applyArtistImageStatus(res.data)
+    if (res.data.status === 'scanning') {
+      startArtistImagePolling()
+    }
+  } catch {
+    artistImageError.value = t('metadata.failedArtistImageScan')
+    artistImageLoading.value = false
+  }
+}
+
 async function applyArtistImage(item) {
   const key = itemKey(item)
   applyingArtistImages.value = {
@@ -862,6 +1100,7 @@ async function applyArtistImage(item) {
       ...artistImageSummary.value,
       matched: artistImageItems.value.length,
     }
+    loadRepairLog()
   } catch (err) {
     const detail = err?.response?.data?.detail
     artistImageError.value = detail

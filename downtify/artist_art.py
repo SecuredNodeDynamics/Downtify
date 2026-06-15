@@ -124,6 +124,19 @@ def artist_folders_for_file(
     return folders
 
 
+def _allows_missing_artist_folder(policy: str) -> bool:
+    return policy != 'existing_only'
+
+
+def _artists_for_policy(
+    artists: list[dict[str, str]],
+    policy: str,
+) -> list[dict[str, str]]:
+    if policy == 'primary_only':
+        return artists[:1]
+    return artists
+
+
 def has_artist_image(folder: Path) -> bool:
     if any((folder / name).exists() for name in IMAGE_NAMES):
         return True
@@ -350,11 +363,12 @@ def save_missing_artist_images(
     root: Path,
     path: Path,
     artists: list[dict[str, str]],
+    artist_folder_policy: str = 'artwork_available',
 ) -> list[str]:
     """Write local artist images for existing artist folders if missing."""
 
     saved: list[str] = []
-    for artist in artists:
+    for artist in _artists_for_policy(artists, artist_folder_policy):
         folders = artist_folders_for_file(
             root,
             path,
@@ -367,6 +381,7 @@ def save_missing_artist_images(
             not folders
             and planned_folder is not None
             and not planned_folder.exists()
+            and _allows_missing_artist_folder(artist_folder_policy)
         ):
             folders = [planned_folder]
         if not folders:
@@ -392,9 +407,10 @@ def missing_artist_image_items(
     root: Path,
     path: Path,
     artists: list[dict[str, str]],
+    artist_folder_policy: str = 'artwork_available',
 ) -> list[dict[str, Any]]:
     items: list[dict[str, Any]] = []
-    for artist in artists:
+    for artist in _artists_for_policy(artists, artist_folder_policy):
         folders = [
             folder
             for folder in artist_folders_for_file(
@@ -410,6 +426,7 @@ def missing_artist_image_items(
             not folders
             and planned_folder is not None
             and not planned_folder.exists()
+            and _allows_missing_artist_folder(artist_folder_policy)
         ):
             folders = [planned_folder]
         image, source = artist_or_fallback_image(artist.get('id', ''), path)

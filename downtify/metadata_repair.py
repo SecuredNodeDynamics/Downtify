@@ -241,11 +241,17 @@ def _artist_image_scan_candidates(
     root: Path,
     path: Path,
     current: dict[str, Any] | None = None,
+    artist_folder_policy: str = 'artwork_available',
 ) -> list[dict[str, Any]]:
     current = current or _song_from_file(path)
     candidate = enrich_song_metadata(current)
     artists = _combined_artist_refs(current, candidate)
-    return missing_artist_image_items(root, path, artists)
+    return missing_artist_image_items(
+        root,
+        path,
+        artists,
+        artist_folder_policy=artist_folder_policy,
+    )
 
 
 def _combined_artist_refs(
@@ -287,6 +293,7 @@ def scan_artist_images(
     limit: int = 100,
     start: int = 0,
     progress_cb: ProgressCallback | None = None,
+    artist_folder_policy: str = 'artwork_available',
 ) -> dict[str, Any]:
     root = root.resolve()
     files = [
@@ -308,7 +315,12 @@ def scan_artist_images(
         current: dict[str, Any] | None = None
         try:
             current = _song_from_file(path)
-            candidates = _artist_image_scan_candidates(root, path, current)
+            candidates = _artist_image_scan_candidates(
+                root,
+                path,
+                current,
+                artist_folder_policy=artist_folder_policy,
+            )
         except Exception:
             logger.opt(exception=True).warning(
                 'Failed to scan artist image candidate {}',
@@ -422,12 +434,22 @@ def apply_text_tags(path: Path, metadata: dict[str, Any]) -> None:
     audio.save()
 
 
-def repair_artist_image(root: Path, relative_file: str, artist: dict[str, str]):
+def repair_artist_image(
+    root: Path,
+    relative_file: str,
+    artist: dict[str, str],
+    artist_folder_policy: str = 'artwork_available',
+):
     path = safe_library_path(root, relative_file)
     if not path.exists() or not path.is_file():
         raise FileNotFoundError(relative_file)
     root = root.resolve()
-    saved = save_missing_artist_images(root, path, [artist])
+    saved = save_missing_artist_images(
+        root,
+        path,
+        [artist],
+        artist_folder_policy=artist_folder_policy,
+    )
     verified = _verified_artist_image_paths(root, path, artist)
     if not verified:
         raise ValueError('Artist image was not written')
@@ -462,7 +484,11 @@ def _verified_artist_image_paths(
     return sorted(set(verified))
 
 
-def repair_file(root: Path, relative_file: str) -> dict[str, Any]:
+def repair_file(
+    root: Path,
+    relative_file: str,
+    artist_folder_policy: str = 'artwork_available',
+) -> dict[str, Any]:
     path = safe_library_path(root, relative_file)
     if not path.exists() or not path.is_file():
         raise FileNotFoundError(relative_file)
@@ -476,6 +502,7 @@ def repair_file(root: Path, relative_file: str) -> dict[str, Any]:
             root.resolve(),
             path,
             candidate.get('musicbrainz_artist_ids') or [],
+            artist_folder_policy=artist_folder_policy,
         )
     except Exception:
         logger.opt(exception=True).warning(

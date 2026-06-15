@@ -329,6 +329,28 @@
               </span>
             </span>
           </label>
+          <label class="mt-3 block text-xs text-base-content/55">
+            <span class="mb-1 block font-semibold text-base-content/70">
+              {{ t('settings.artistFolderPolicy') }}
+            </span>
+            <select
+              class="select h-10 w-full rounded-xl border-white/10 bg-base-100/85 text-sm"
+              v-model="sm.settings.value.artist_folder_policy"
+            >
+              <option value="artwork_available">
+                {{ t('settings.artistFolderPolicyArtwork') }}
+              </option>
+              <option value="primary_only">
+                {{ t('settings.artistFolderPolicyPrimary') }}
+              </option>
+              <option value="existing_only">
+                {{ t('settings.artistFolderPolicyExisting') }}
+              </option>
+            </select>
+            <span class="mt-1 block text-[11px] text-base-content/50">
+              {{ t('settings.artistFolderPolicyHint') }}
+            </span>
+          </label>
         </div>
 
         <!-- Playlists -->

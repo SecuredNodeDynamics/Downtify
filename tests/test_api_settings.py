@@ -32,6 +32,7 @@ def test_default_settings_has_required_keys():
         'jellyfin_url',
         'jellyfin_api_key',
         'jellyfin_music_library',
+        'artist_folder_policy',
     }
     assert required <= set(DEFAULT_SETTINGS)
 
@@ -54,6 +55,10 @@ def test_default_download_lyrics_is_true():
 
 def test_default_enhance_metadata_is_true():
     assert DEFAULT_SETTINGS['enhance_metadata'] is True
+
+
+def test_default_artist_folder_policy_creates_available_artwork_folders():
+    assert DEFAULT_SETTINGS['artist_folder_policy'] == 'artwork_available'
 
 
 def test_default_format_is_mp3():

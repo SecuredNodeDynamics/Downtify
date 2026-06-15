@@ -17,6 +17,7 @@ const settings = ref({
   jellyfin_url: '',
   jellyfin_api_key: '',
   jellyfin_music_library: '',
+  artist_folder_policy: 'artwork_available',
   max_parallel_downloads: 3,
 })
 
@@ -25,6 +26,7 @@ const settingsOptions = {
   lyrics_providers: ['lrclib', 'genius', 'musixmatch', 'azlyrics'],
   format: ['mp3', 'flac', 'ogg', 'opus', 'm4a'],
   bitrate: ['128', '192', '256', '320'],
+  artist_folder_policy: ['artwork_available', 'primary_only', 'existing_only'],
   max_parallel_downloads: [1, 2, 3, 5, 8, 12],
   output: '{artists} - {title}.{output-ext}',
 }

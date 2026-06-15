@@ -92,6 +92,56 @@ def test_missing_artist_image_items_include_missing_artist_folder(
     assert not (tmp_path / 'Guest Artist').exists()
 
 
+def test_missing_artist_image_items_can_skip_missing_artist_folders(
+    tmp_path,
+    monkeypatch,
+):
+    track = tmp_path / 'song.mp3'
+    track.write_bytes(b'not really audio')
+
+    monkeypatch.setattr(
+        artist_art,
+        'artist_or_fallback_image',
+        lambda *_args: (b'image', 'Album cover fallback'),
+    )
+
+    items = artist_art.missing_artist_image_items(
+        tmp_path,
+        track,
+        [{'id': 'guest-mbid', 'name': 'Guest Artist'}],
+        artist_folder_policy='existing_only',
+    )
+
+    assert items == []
+    assert not (tmp_path / 'Guest Artist').exists()
+
+
+def test_missing_artist_image_items_primary_only_policy_limits_side_artists(
+    tmp_path,
+    monkeypatch,
+):
+    track = tmp_path / 'song.mp3'
+    track.write_bytes(b'not really audio')
+
+    monkeypatch.setattr(
+        artist_art,
+        'artist_or_fallback_image',
+        lambda *_args: (b'image', 'Album cover fallback'),
+    )
+
+    items = artist_art.missing_artist_image_items(
+        tmp_path,
+        track,
+        [
+            {'id': 'primary-mbid', 'name': 'Primary Artist'},
+            {'id': 'guest-mbid', 'name': 'Guest Artist'},
+        ],
+        artist_folder_policy='primary_only',
+    )
+
+    assert [item['artist'] for item in items] == ['Primary Artist']
+
+
 def test_save_missing_artist_images_creates_missing_artist_folder(
     tmp_path,
     monkeypatch,
@@ -423,7 +473,7 @@ def test_repair_file_applies_high_confidence_metadata(tmp_path, monkeypatch):
     monkeypatch.setattr(
         metadata_repair,
         'save_missing_artist_images',
-        lambda *_args: [],
+        lambda *_args, **_kwargs: [],
     )
 
     result = metadata_repair.repair_file(tmp_path, 'song.mp3')
@@ -468,7 +518,7 @@ def test_repair_file_saves_missing_artist_images(tmp_path, monkeypatch):
 
     saved = {}
 
-    def fake_save(root, path, artists):
+    def fake_save(root, path, artists, **_kwargs):
         saved['root'] = root
         saved['path'] = path
         saved['artists'] = artists
@@ -507,7 +557,7 @@ def test_scan_artist_images_lists_available_missing_art(tmp_path, monkeypatch):
     monkeypatch.setattr(
         metadata_repair,
         'missing_artist_image_items',
-        lambda root, path, artists: [
+        lambda root, path, artists, **_kwargs: [
             {
                 'artist': artists[0]['name'],
                 'artist_id': artists[0]['id'],
@@ -586,7 +636,7 @@ def test_artist_image_scan_includes_featured_musicbrainz_artists(
     )
     seen_artists = []
 
-    def fake_missing(_root, _path, artists):
+    def fake_missing(_root, _path, artists, **_kwargs):
         seen_artists.extend(artists)
         return [
             {
@@ -631,7 +681,7 @@ def test_artist_image_scan_includes_name_only_side_artists(
     monkeypatch.setattr(metadata_repair, 'enrich_song_metadata', lambda song: song)
     seen_artists = []
 
-    def fake_missing(_root, _path, artists):
+    def fake_missing(_root, _path, artists, **_kwargs):
         seen_artists.extend(artists)
         return [
             {
@@ -673,7 +723,7 @@ def test_artist_image_scan_checks_tracks_with_same_primary_artist(
     monkeypatch.setattr(
         metadata_repair,
         '_artist_image_scan_candidates',
-        lambda root, path, _current=None: [
+        lambda root, path, _current=None, **_kwargs: [
             {
                 'artist': f'Guest {path.stem}',
                 'artist_id': f'guest-{path.stem}',
@@ -706,7 +756,7 @@ def test_scan_artist_images_reports_progress(tmp_path, monkeypatch):
     monkeypatch.setattr(
         metadata_repair,
         '_artist_image_scan_candidates',
-        lambda root, path, _current=None: [
+        lambda root, path, _current=None, **_kwargs: [
             {
                 'artist': 'Artist',
                 'artist_id': 'artist-mbid',
@@ -743,7 +793,7 @@ def test_scan_artist_images_scans_selected_batch(tmp_path, monkeypatch):
     monkeypatch.setattr(
         metadata_repair,
         '_artist_image_scan_candidates',
-        lambda root, path, _current=None: [
+        lambda root, path, _current=None, **_kwargs: [
             {
                 'artist': path.stem,
                 'artist_id': path.stem,
@@ -780,7 +830,7 @@ def test_repair_artist_image_writes_for_requested_artist(
 
     saved = {}
 
-    def fake_save(root, path, artists):
+    def fake_save(root, path, artists, **_kwargs):
         saved['root'] = root
         saved['path'] = path
         saved['artists'] = artists
@@ -814,7 +864,7 @@ def test_repair_artist_image_fails_when_image_not_written(
     monkeypatch.setattr(
         metadata_repair,
         'save_missing_artist_images',
-        lambda *_args: ['Artist/Artist.jpg'],
+        lambda *_args, **_kwargs: ['Artist/Artist.jpg'],
     )
 
     with pytest.raises(ValueError, match='Artist image was not written'):

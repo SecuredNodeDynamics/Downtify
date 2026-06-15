@@ -80,7 +80,13 @@ def test_artist_image_scan_keeps_items_from_previous_batch(tmp_path, monkeypatch
         'next_offset': 1,
     }
 
-    def fake_scan_artist_images(_root, _limit, _start, progress_cb):
+    def fake_scan_artist_images(
+        _root,
+        _limit,
+        _start,
+        progress_cb,
+        _artist_folder_policy='artwork_available',
+    ):
         result = {
             'scanned': 2,
             'batch_scanned': 1,
@@ -124,6 +130,7 @@ def test_artist_image_scan_keeps_items_from_previous_batch(tmp_path, monkeypatch
 def test_apply_artist_image_allows_name_only_artist(tmp_path, monkeypatch):
     old_downloader = api.state.downloader
     old_scan = dict(api.state.artist_image_scan)
+    old_repair_log = list(api.state.repair_log)
     api.state.downloader = FakeDownloader(tmp_path)
     api.state.artist_image_scan = {
         **old_scan,
@@ -141,7 +148,7 @@ def test_apply_artist_image_allows_name_only_artist(tmp_path, monkeypatch):
 
     captured = {}
 
-    def fake_repair(root, file, artist):
+    def fake_repair(root, file, artist, **_kwargs):
         captured['root'] = root
         captured['file'] = file
         captured['artist'] = artist
@@ -169,6 +176,9 @@ def test_apply_artist_image_allows_name_only_artist(tmp_path, monkeypatch):
         assert api.state.artist_image_scan['completed'][0] == result
         assert api.state.artist_image_scan['items'] == []
         assert api.state.artist_image_scan['matched'] == 0
+        assert api.state.repair_log[0]['kind'] == 'artist_image'
+        assert api.state.repair_log[0]['status'] == 'success'
     finally:
         api.state.downloader = old_downloader
         api.state.artist_image_scan = old_scan
+        api.state.repair_log = old_repair_log

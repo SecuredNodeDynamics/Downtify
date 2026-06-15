@@ -67,6 +67,7 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     'jellyfin_url': '',
     'jellyfin_api_key': '',
     'jellyfin_music_library': '',
+    'artist_folder_policy': 'artwork_available',
 }
 
 AUDIO_EXTENSIONS = {'.mp3', '.m4a', '.flac', '.ogg', '.wav', '.aac', '.opus'}
@@ -95,6 +96,67 @@ def _jellyfin_auth_headers(api_key: str) -> dict[str, str]:
         'X-Emby-Token': api_key,
         'X-MediaBrowser-Token': api_key,
     }
+
+
+def _jellyfin_base_url(value: str) -> str:
+    url = value.rstrip('/')
+    if url and not url.startswith(('http://', 'https://')):
+        url = 'http://' + url
+    return url
+
+
+def _configured_jellyfin() -> tuple[str, dict[str, str]]:
+    jellyfin_url = str(state.settings.get('jellyfin_url') or '').strip()
+    jellyfin_api_key = str(state.settings.get('jellyfin_api_key') or '').strip()
+    if not jellyfin_url or not jellyfin_api_key:
+        raise HTTPException(
+            status_code=400,
+            detail='Jellyfin URL and API key are required',
+        )
+    return _jellyfin_base_url(jellyfin_url), _jellyfin_auth_headers(jellyfin_api_key)
+
+
+def _matching_jellyfin_library(
+    url: str,
+    headers: dict[str, str],
+) -> dict[str, Any] | None:
+    configured = _normalized_jellyfin_library_name(
+        state.settings.get('jellyfin_music_library')
+    )
+    libraries: list[dict[str, Any]] = []
+
+    try:
+        response = requests.get(
+            f'{url}/Library/VirtualFolders',
+            headers=headers,
+            timeout=10,
+        )
+        response.raise_for_status()
+        libraries = _libraries_from_virtual_folders(response.json())
+    except Exception:
+        logger.opt(exception=True).warning(
+            'Could not fetch Jellyfin virtual folders for matching'
+        )
+
+    if not libraries:
+        response = requests.get(
+            f'{url}/Items',
+            headers=headers,
+            params={'Recursive': False},
+            timeout=10,
+        )
+        response.raise_for_status()
+        libraries = _libraries_from_items(response.json())
+
+    if configured:
+        for library in libraries:
+            names = {
+                _normalized_jellyfin_library_name(library.get('name')),
+                _normalized_jellyfin_library_name(library.get('id')),
+            }
+            if configured in names:
+                return library
+    return libraries[0] if libraries else None
 
 
 def _dedupe_jellyfin_libraries(candidates: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -250,6 +312,7 @@ class AppState:
         'complete': False,
     }
     artist_image_scan_task: Optional[asyncio.Task] = None
+    repair_log: list[dict[str, Any]] = []
 
 
 state = AppState()
@@ -503,6 +566,34 @@ def _metadata_scan_status() -> dict[str, Any]:
     return dict(state.metadata_scan)
 
 
+def _artist_folder_policy() -> str:
+    policy = str(state.settings.get('artist_folder_policy') or '').strip()
+    if policy in {'artwork_available', 'primary_only', 'existing_only'}:
+        return policy
+    return 'artwork_available'
+
+
+def _add_repair_log(
+    kind: str,
+    status: str,
+    target: str,
+    detail: str = '',
+    result: dict[str, Any] | None = None,
+) -> None:
+    state.repair_log.insert(
+        0,
+        {
+            'kind': kind,
+            'status': status,
+            'target': target,
+            'detail': detail,
+            'result': result or {},
+            'created_at': datetime.now(timezone.utc).isoformat(),
+        },
+    )
+    del state.repair_log[100:]
+
+
 def _merge_items_by(
     existing: list[dict[str, Any]],
     incoming: list[dict[str, Any]],
@@ -600,7 +691,7 @@ def _exclude_completed_artist_images(
     ]
 
 
-async def _run_metadata_scan(limit: int, start: int) -> None:
+async def _run_metadata_scan(limit: int, start: int, scan_all: bool = False) -> None:
     if state.downloader is None:
         state.metadata_scan = {
             **state.metadata_scan,
@@ -635,7 +726,7 @@ async def _run_metadata_scan(limit: int, start: int) -> None:
         result = await asyncio.to_thread(
             metadata_repair.scan_library,
             state.downloader.download_dir,
-            limit,
+            1_000_000 if scan_all else limit,
             start,
             progress,
         )
@@ -684,6 +775,7 @@ async def start_metadata_scan(request: Request) -> dict[str, Any]:
     except (TypeError, ValueError):
         limit = 100
     reset = bool(payload.get('reset', False))
+    scan_all = bool(payload.get('all', False))
 
     task = state.metadata_scan_task
     if task is not None and not task.done():
@@ -719,7 +811,7 @@ async def start_metadata_scan(request: Request) -> dict[str, Any]:
         'started_at': datetime.now(timezone.utc).isoformat(),
     }
     state.metadata_scan_task = asyncio.create_task(
-        _run_metadata_scan(limit, start)
+        _run_metadata_scan(limit, start, scan_all)
     )
     return _metadata_scan_status()
 
@@ -729,7 +821,11 @@ def metadata_scan_status() -> dict[str, Any]:
     return _metadata_scan_status()
 
 
-async def _run_artist_image_scan(limit: int, start: int) -> None:
+async def _run_artist_image_scan(
+    limit: int,
+    start: int,
+    scan_all: bool = False,
+) -> None:
     if state.downloader is None:
         state.artist_image_scan = {
             **state.artist_image_scan,
@@ -768,9 +864,10 @@ async def _run_artist_image_scan(limit: int, start: int) -> None:
         result = await asyncio.to_thread(
             metadata_repair.scan_artist_images,
             state.downloader.download_dir,
-            limit,
+            1_000_000 if scan_all else limit,
             start,
             progress,
+            _artist_folder_policy(),
         )
         result_items = _with_artist_image_preview(result.get('items') or [])
         items = _merge_artist_image_items(
@@ -817,6 +914,7 @@ async def scan_artist_images(request: Request) -> dict[str, Any]:
     except (TypeError, ValueError):
         limit = 50
     reset = bool(payload.get('reset', False))
+    scan_all = bool(payload.get('all', False))
     task = state.artist_image_scan_task
     if task is not None and not task.done():
         return dict(state.artist_image_scan)
@@ -849,7 +947,7 @@ async def scan_artist_images(request: Request) -> dict[str, Any]:
         'started_at': datetime.now(timezone.utc).isoformat(),
     }
     state.artist_image_scan_task = asyncio.create_task(
-        _run_artist_image_scan(limit, start)
+        _run_artist_image_scan(limit, start, scan_all)
     )
     return dict(state.artist_image_scan)
 
@@ -935,6 +1033,7 @@ async def apply_artist_image(request: Request) -> dict[str, Any]:
             state.downloader.download_dir,
             file,
             artist,
+            artist_folder_policy=_artist_folder_policy(),
         )
         completed = list(state.artist_image_scan.get('completed') or [])
         completed.append(result)
@@ -951,13 +1050,23 @@ async def apply_artist_image(request: Request) -> dict[str, Any]:
             'matched': len(items),
             'completed': completed,
         }
+        detail = ', '.join(result.get('verified') or result.get('saved') or [])
+        _add_repair_log(
+            'artist_image',
+            'success',
+            result.get('artist') or file,
+            detail,
+            result=result,
+        )
         return result
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail='File not found') from exc
     except ValueError as exc:
+        _add_repair_log('artist_image', 'failed', artist['name'], str(exc))
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
         logger.exception('Artist image repair failed for {}', file)
+        _add_repair_log('artist_image', 'failed', artist['name'], str(exc))
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
@@ -974,7 +1083,9 @@ async def apply_metadata(request: Request) -> dict[str, Any]:
         raise HTTPException(status_code=400, detail='file is required')
     try:
         result = metadata_repair.repair_file(
-            state.downloader.download_dir, file
+            state.downloader.download_dir,
+            file,
+            artist_folder_policy=_artist_folder_policy(),
         )
         completed = list(state.metadata_scan.get('completed') or [])
         completed.append(result)
@@ -989,14 +1100,22 @@ async def apply_metadata(request: Request) -> dict[str, Any]:
             'matched': len(items),
             'completed': completed,
         }
+        _add_repair_log('metadata', 'success', file, result=result)
         return result
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail='File not found') from exc
     except ValueError as exc:
+        _add_repair_log('metadata', 'failed', file, str(exc))
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
         logger.exception('Metadata repair failed for {}', file)
+        _add_repair_log('metadata', 'failed', file, str(exc))
         raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@router.get('/api/metadata/repair-log')
+def metadata_repair_log(limit: int = Query(50)) -> list[dict[str, Any]]:
+    return state.repair_log[: max(1, min(100, limit))]
 
 
 @router.get('/api/album/youtube')
@@ -1763,6 +1882,215 @@ def jellyfin_libraries_endpoint(
         raise HTTPException(
             status_code=500, detail=f'Failed to fetch Jellyfin libraries: {str(e)}'
         )
+
+
+def _artist_compare_key(value: Any) -> str:
+    normalized = unicodedata.normalize('NFKC', str(value or ''))
+    normalized = ''.join(
+        char for char in normalized if unicodedata.category(char) not in {'Cc', 'Cf'}
+    )
+    return re.sub(r'\s+', ' ', normalized).strip().casefold()
+
+
+def _named_items(names: dict[str, str]) -> list[dict[str, str]]:
+    return [
+        {'name': name}
+        for _key, name in sorted(
+            names.items(),
+            key=lambda item: item[1].casefold(),
+        )
+    ]
+
+
+def _local_artist_inventory(root: Path) -> dict[str, dict[str, str]]:
+    folders: dict[str, str] = {}
+    tag_artists: dict[str, str] = {}
+
+    if root.exists():
+        for item in root.iterdir():
+            if item.is_dir():
+                key = _artist_compare_key(item.name)
+                if key:
+                    folders.setdefault(key, item.name)
+        for path in root.rglob('*'):
+            if not path.is_file() or path.suffix.lower() not in AUDIO_EXTENSIONS:
+                continue
+            try:
+                song = metadata_repair._song_from_file(path)
+            except Exception:
+                logger.opt(exception=True).warning(
+                    'Could not read artists from {} for reconciliation',
+                    path,
+                )
+                continue
+            for artist in song.get('artists') or []:
+                key = _artist_compare_key(artist)
+                if key:
+                    tag_artists.setdefault(key, str(artist))
+
+    return {'folders': folders, 'tags': tag_artists}
+
+
+def _artist_names_from_jellyfin_items(items: list[dict[str, Any]]) -> dict[str, str]:
+    artists: dict[str, str] = {}
+    for item in items:
+        names: list[Any] = []
+        names.extend(item.get('Artists') or [])
+        names.extend(item.get('AlbumArtists') or [])
+        for artist_item in item.get('ArtistItems') or []:
+            if isinstance(artist_item, dict):
+                names.append(artist_item.get('Name'))
+        for name in names:
+            key = _artist_compare_key(name)
+            if key:
+                artists.setdefault(key, str(name).strip())
+    return artists
+
+
+def _jellyfin_artist_inventory(
+    url: str,
+    headers: dict[str, str],
+    library: dict[str, Any] | None,
+) -> dict[str, str]:
+    params: dict[str, Any] = {'Recursive': True}
+    if library and library.get('id'):
+        params['ParentId'] = library['id']
+
+    artists: dict[str, str] = {}
+    try:
+        response = requests.get(
+            f'{url}/Artists',
+            headers=headers,
+            params=params,
+            timeout=20,
+        )
+        response.raise_for_status()
+        for item in response.json().get('Items', []):
+            name = item.get('Name')
+            key = _artist_compare_key(name)
+            if key:
+                artists.setdefault(key, str(name).strip())
+    except Exception:
+        logger.opt(exception=True).warning(
+            'Could not fetch Jellyfin /Artists; falling back to audio items'
+        )
+
+    if artists:
+        return artists
+
+    item_params = {
+        **params,
+        'IncludeItemTypes': 'Audio',
+        'Fields': 'Artists,AlbumArtists,ArtistItems',
+    }
+    response = requests.get(
+        f'{url}/Items',
+        headers=headers,
+        params=item_params,
+        timeout=30,
+    )
+    response.raise_for_status()
+    return _artist_names_from_jellyfin_items(response.json().get('Items', []))
+
+
+@router.get('/api/jellyfin/artists/reconcile')
+def reconcile_jellyfin_artists() -> dict[str, Any]:
+    if state.downloader is None:
+        raise HTTPException(status_code=500, detail='Downloader not ready')
+    try:
+        url, headers = _configured_jellyfin()
+        library = _matching_jellyfin_library(url, headers)
+        jellyfin_artists = _jellyfin_artist_inventory(url, headers, library)
+        local = _local_artist_inventory(state.downloader.download_dir)
+        folders = local['folders']
+        tags = local['tags']
+
+        jellyfin_keys = set(jellyfin_artists)
+        folder_keys = set(folders)
+        tag_keys = set(tags)
+        return {
+            'success': True,
+            'library': library or {},
+            'counts': {
+                'jellyfin': len(jellyfin_keys),
+                'folders': len(folder_keys),
+                'tags': len(tag_keys),
+                'jellyfin_only': len(jellyfin_keys - folder_keys),
+                'folder_only': len(folder_keys - jellyfin_keys),
+                'tag_only': len(tag_keys - jellyfin_keys),
+                'matched': len(jellyfin_keys & folder_keys),
+            },
+            'jellyfin_only': _named_items({
+                key: jellyfin_artists[key] for key in jellyfin_keys - folder_keys
+            }),
+            'folder_only': _named_items({
+                key: folders[key] for key in folder_keys - jellyfin_keys
+            }),
+            'tag_only': _named_items({
+                key: tags[key] for key in tag_keys - jellyfin_keys
+            }),
+            'matched': _named_items({
+                key: folders[key] for key in jellyfin_keys & folder_keys
+            }),
+        }
+    except HTTPException:
+        raise
+    except requests.exceptions.Timeout as exc:
+        raise HTTPException(status_code=504, detail='Jellyfin server timeout') from exc
+    except requests.exceptions.ConnectionError as exc:
+        raise HTTPException(status_code=503, detail='Cannot connect to Jellyfin') from exc
+    except requests.exceptions.HTTPError as exc:
+        status_code = exc.response.status_code if exc.response is not None else 502
+        raise HTTPException(status_code=status_code, detail='Jellyfin request failed') from exc
+    except Exception as exc:
+        logger.exception('Jellyfin artist reconciliation failed')
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@router.post('/api/jellyfin/refresh')
+def refresh_jellyfin_library() -> dict[str, Any]:
+    try:
+        url, headers = _configured_jellyfin()
+        library = _matching_jellyfin_library(url, headers)
+        if library and library.get('id'):
+            response = requests.post(
+                f'{url}/Items/{library["id"]}/Refresh',
+                headers=headers,
+                params={
+                    'Recursive': True,
+                    'MetadataRefreshMode': 'Default',
+                    'ImageRefreshMode': 'Default',
+                    'ReplaceAllMetadata': False,
+                    'ReplaceAllImages': False,
+                },
+                timeout=20,
+            )
+            response.raise_for_status()
+            return {
+                'success': True,
+                'source': 'library',
+                'library': library,
+            }
+
+        response = requests.post(
+            f'{url}/Library/Refresh',
+            headers=headers,
+            timeout=20,
+        )
+        response.raise_for_status()
+        return {'success': True, 'source': 'global', 'library': library or {}}
+    except HTTPException:
+        raise
+    except requests.exceptions.Timeout as exc:
+        raise HTTPException(status_code=504, detail='Jellyfin server timeout') from exc
+    except requests.exceptions.ConnectionError as exc:
+        raise HTTPException(status_code=503, detail='Cannot connect to Jellyfin') from exc
+    except requests.exceptions.HTTPError as exc:
+        status_code = exc.response.status_code if exc.response is not None else 502
+        raise HTTPException(status_code=status_code, detail='Jellyfin refresh failed') from exc
+    except Exception as exc:
+        logger.exception('Jellyfin library refresh failed')
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 @router.websocket('/api/ws')

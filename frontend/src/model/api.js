@@ -105,8 +105,8 @@ function getHealth() {
   return API.get('/api/health')
 }
 
-function startMetadataScan(limit = 100, reset = false) {
-  return API.post('/api/metadata/scan', { limit, reset })
+function startMetadataScan(limit = 100, reset = false, scanAll = false) {
+  return API.post('/api/metadata/scan', { limit, reset, all: scanAll })
 }
 
 function getMetadataScanStatus() {
@@ -117,8 +117,12 @@ function applyMetadata(file) {
   return API.post('/api/metadata/apply', { file })
 }
 
-function scanArtistImages(limit = 50) {
-  return API.post('/api/metadata/artist-images/scan', { limit })
+function scanArtistImages(limit = 50, scanAll = false, reset = false) {
+  return API.post('/api/metadata/artist-images/scan', {
+    limit,
+    all: scanAll,
+    reset,
+  })
 }
 
 function getArtistImageScanStatus() {
@@ -131,6 +135,10 @@ function applyArtistImage(item) {
     artist: item.artist,
     artist_id: item.artist_id,
   })
+}
+
+function getRepairLog(limit = 25) {
+  return API.get('/api/metadata/repair-log', { params: { limit } })
 }
 
 function encodePath(fileName) {
@@ -208,6 +216,14 @@ function getJellyfinDebug(jellyfinUrl, jellyfinApiKey) {
   })
 }
 
+function reconcileJellyfinArtists() {
+  return API.get('/api/jellyfin/artists/reconcile')
+}
+
+function refreshJellyfinLibrary() {
+  return API.post('/api/jellyfin/refresh')
+}
+
 function ws_onmessage(fn) {
   return (wsConnection.onmessage = fn)
 }
@@ -238,6 +254,8 @@ export default {
   setSettings,
   getJellyfinLibraries,
   getJellyfinDebug,
+  reconcileJellyfinArtists,
+  refreshJellyfinLibrary,
   check_for_update,
   getHealth,
   startMetadataScan,
@@ -246,6 +264,7 @@ export default {
   scanArtistImages,
   getArtistImageScanStatus,
   applyArtistImage,
+  getRepairLog,
   ws_onmessage,
   ws_onerror,
   getVersion,
