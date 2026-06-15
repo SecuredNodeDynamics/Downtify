@@ -174,7 +174,7 @@ export default {
     clean: 'No Repair Needed',
     artistImages: 'Local Artist Images',
     artistImagesSubtitle:
-      'Find artist folders missing local image files and save new artwork as Artist Name.jpg/png/webp. Jellyfin may still show cached or provider artwork that is not stored in your music folder.',
+      'Find artist credits missing local image files, create missing artist folders, and save artwork as Artist Name.jpg/png/webp.',
     artistImageLimit: 'Artist images to show',
     scanArtistImages: 'Scan artist images',
     missingImages: 'Missing local images',

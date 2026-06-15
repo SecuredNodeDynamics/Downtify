@@ -66,6 +66,105 @@ def test_missing_artist_image_items_include_named_target(tmp_path, monkeypatch):
     assert items[0]['target'] == 'Artist/Artist.jpg'
 
 
+def test_missing_artist_image_items_include_missing_artist_folder(
+    tmp_path,
+    monkeypatch,
+):
+    album = tmp_path / 'Primary Artist' / 'Album'
+    album.mkdir(parents=True)
+    track = album / 'song.mp3'
+    track.write_bytes(b'not really audio')
+
+    monkeypatch.setattr(
+        artist_art,
+        'artist_or_fallback_image',
+        lambda *_args: (b'image', 'Album cover fallback'),
+    )
+
+    items = artist_art.missing_artist_image_items(
+        tmp_path,
+        track,
+        [{'id': 'guest-mbid', 'name': 'Guest Artist'}],
+    )
+
+    assert items[0]['folder'] == 'Guest Artist'
+    assert items[0]['target'] == 'Guest Artist/Guest Artist.jpg'
+    assert not (tmp_path / 'Guest Artist').exists()
+
+
+def test_save_missing_artist_images_creates_missing_artist_folder(
+    tmp_path,
+    monkeypatch,
+):
+    album = tmp_path / 'Primary Artist' / 'Album'
+    album.mkdir(parents=True)
+    track = album / 'song.mp3'
+    track.write_bytes(b'not really audio')
+
+    monkeypatch.setattr(
+        artist_art,
+        'artist_or_fallback_image',
+        lambda *_args: (b'image', 'Album cover fallback'),
+    )
+
+    saved = artist_art.save_missing_artist_images(
+        tmp_path,
+        track,
+        [{'id': 'guest-mbid', 'name': 'Guest Artist'}],
+    )
+
+    assert saved == ['Guest Artist/Guest Artist.jpg']
+    assert (tmp_path / 'Guest Artist' / 'Guest Artist.jpg').read_bytes() == b'image'
+
+
+def test_save_missing_artist_images_does_not_create_empty_folder_without_image(
+    tmp_path,
+    monkeypatch,
+):
+    track = tmp_path / 'song.mp3'
+    track.write_bytes(b'not really audio')
+
+    monkeypatch.setattr(
+        artist_art,
+        'artist_or_fallback_image',
+        lambda *_args: (None, ''),
+    )
+
+    saved = artist_art.save_missing_artist_images(
+        tmp_path,
+        track,
+        [{'id': 'guest-mbid', 'name': 'Guest Artist'}],
+    )
+
+    assert saved == []
+    assert not (tmp_path / 'Guest Artist').exists()
+
+
+def test_missing_artist_image_items_skip_existing_folder_with_image(
+    tmp_path,
+    monkeypatch,
+):
+    artist = tmp_path / 'Artist'
+    artist.mkdir()
+    (artist / 'thumb.jpg').write_bytes(b'image')
+    track = tmp_path / 'song.mp3'
+    track.write_bytes(b'not really audio')
+
+    monkeypatch.setattr(
+        artist_art,
+        'artist_or_fallback_image',
+        lambda *_args: (b'image', 'Album cover fallback'),
+    )
+
+    items = artist_art.missing_artist_image_items(
+        tmp_path,
+        track,
+        [{'id': 'artist-mbid', 'name': 'Artist'}],
+    )
+
+    assert items == []
+
+
 def test_scan_library_reports_musicbrainz_match(tmp_path, monkeypatch):
     media = tmp_path / 'Artist' / 'Album'
     media.mkdir(parents=True)

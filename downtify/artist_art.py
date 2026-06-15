@@ -55,14 +55,32 @@ def _safe_image_stem(value: str) -> str:
     return stem or 'artist'
 
 
-def _safe_artist_folder(root: Path, name: str) -> Path | None:
+def _artist_folder_name(name: str) -> str:
+    return _safe_image_stem(name)
+
+
+def _safe_artist_folder_path(root: Path, name: str) -> Path | None:
     if not name:
         return None
-    target = (root / name).resolve()
+    target = (root / _artist_folder_name(name)).resolve()
     try:
         target.relative_to(root.resolve())
     except ValueError:
         return None
+    return target
+
+
+def _safe_artist_folder(
+    root: Path,
+    name: str,
+    *,
+    create: bool = False,
+) -> Path | None:
+    target = _safe_artist_folder_path(root, name)
+    if target is None:
+        return None
+    if create:
+        target.mkdir(parents=True, exist_ok=True)
     return target if target.is_dir() else None
 
 
@@ -70,14 +88,20 @@ def artist_folders_for_file(
     root: Path,
     path: Path,
     artists: list[dict[str, str]],
+    *,
+    include_missing: bool = False,
 ) -> list[Path]:
-    """Return existing artist folders that should receive local artwork."""
+    """Return artist folders that should receive local artwork."""
 
     root = root.resolve()
     folders: list[Path] = []
     seen: set[Path] = set()
     for artist in artists:
-        folder = _safe_artist_folder(root, artist.get('name', ''))
+        folder = _safe_artist_folder(
+            root,
+            artist.get('name', ''),
+            create=include_missing,
+        )
         if folder and folder not in seen:
             folders.append(folder)
             seen.add(folder)
@@ -309,14 +333,27 @@ def save_missing_artist_images(
 
     saved: list[str] = []
     for artist in artists:
-        folders = artist_folders_for_file(root, path, [artist])
+        folders = artist_folders_for_file(
+            root,
+            path,
+            [artist],
+            include_missing=False,
+        )
         folders = [folder for folder in folders if not has_artist_image(folder)]
+        planned_folder = _safe_artist_folder_path(root, artist.get('name', ''))
+        if (
+            not folders
+            and planned_folder is not None
+            and not planned_folder.exists()
+        ):
+            folders = [planned_folder]
         if not folders:
             continue
         image, _source = artist_or_fallback_image(artist.get('id', ''), path)
         if not image:
             continue
         for folder in folders:
+            folder.mkdir(parents=True, exist_ok=True)
             target = artist_image_target_path(
                 folder,
                 artist.get('name', ''),
@@ -338,11 +375,21 @@ def missing_artist_image_items(
     for artist in artists:
         folders = [
             folder
-            for folder in artist_folders_for_file(root, path, [artist])
+            for folder in artist_folders_for_file(
+                root,
+                path,
+                [artist],
+                include_missing=False,
+            )
             if not has_artist_image(folder)
         ]
-        if not folders:
-            continue
+        planned_folder = _safe_artist_folder_path(root, artist.get('name', ''))
+        if (
+            not folders
+            and planned_folder is not None
+            and not planned_folder.exists()
+        ):
+            folders = [planned_folder]
         image, source = artist_or_fallback_image(artist.get('id', ''), path)
         if not image:
             continue
