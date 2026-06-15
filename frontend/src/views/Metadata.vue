@@ -256,7 +256,7 @@
 
       <section class="mt-10 border-t border-white/10 pt-8">
         <div class="mb-5 flex flex-wrap items-end justify-between gap-4">
-          <div>
+          <div class="min-w-0 flex-1">
             <h2 class="text-xl font-bold tracking-tight">
               {{ t('metadata.artistImages') }}
             </h2>
@@ -264,7 +264,7 @@
               {{ t('metadata.artistImagesSubtitle') }}
             </p>
           </div>
-          <div class="flex items-center gap-2">
+          <div class="flex shrink-0 items-center gap-2">
             <select
               v-model.number="artistImageLimit"
               class="select h-11 rounded-full border-white/10 bg-base-100/85 text-sm"
