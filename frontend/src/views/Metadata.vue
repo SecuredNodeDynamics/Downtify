@@ -369,7 +369,7 @@
           <ul v-else class="space-y-3">
             <li
               v-for="item in artistImageItems"
-              :key="`${item.artist_id}-${item.folder}`"
+              :key="itemKey(item)"
               class="surface rounded-2xl p-4"
               :class="
                 applyingArtistImages[itemKey(item)]
@@ -509,7 +509,11 @@ function displaySong(song) {
 }
 
 function itemKey(item) {
-  return `${item.artist_id}-${item.folder}`
+  return `${item.artist_id || item.artist}-${item.folder}`
+}
+
+function pendingArtistImageItems(items) {
+  return (items || []).filter((item) => !fixedArtistImages.value[itemKey(item)])
 }
 
 function applyScanStatus(data) {
@@ -536,7 +540,11 @@ function applyArtistImageStatus(data) {
     matched: data.matched || 0,
     total: data.total || 0,
   }
-  artistImageItems.value = data.items || []
+  artistImageItems.value = pendingArtistImageItems(data.items)
+  artistImageSummary.value = {
+    ...artistImageSummary.value,
+    matched: artistImageItems.value.length,
+  }
   completedArtistImages.value =
     data.completed || completedArtistImages.value
   if (data.status === 'error') {
@@ -710,7 +718,11 @@ async function applyArtistImage(item) {
   artistImageError.value = ''
   try {
     const res = await API.applyArtistImage(item)
-    if ((res.data?.saved || []).length === 0) {
+    const savedOrVerified = [
+      ...(res.data?.saved || []),
+      ...(res.data?.verified || []),
+    ]
+    if (savedOrVerified.length === 0) {
       artistImageError.value = t('metadata.failedArtistImageApply')
       return
     }
@@ -719,6 +731,10 @@ async function applyArtistImage(item) {
     artistImageItems.value = artistImageItems.value.filter(
       (existing) => itemKey(existing) !== key
     )
+    artistImageSummary.value = {
+      ...artistImageSummary.value,
+      matched: artistImageItems.value.length,
+    }
   } catch (err) {
     const detail = err?.response?.data?.detail
     artistImageError.value = detail

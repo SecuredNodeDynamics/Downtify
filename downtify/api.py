@@ -518,20 +518,84 @@ def _merge_items_by(
     return [merged[key] for key in order]
 
 
+def _completed_metadata_files() -> set[str]:
+    return {
+        str(item.get('file') or '')
+        for item in state.metadata_scan.get('completed') or []
+        if item.get('file')
+    }
+
+
+def _exclude_completed_metadata_items(
+    items: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    completed = _completed_metadata_files()
+    if not completed:
+        return items
+    return [
+        item
+        for item in items
+        if str(item.get('file') or '') not in completed
+    ]
+
+
 def _merge_artist_image_items(
     existing: list[dict[str, Any]],
     incoming: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    merged: dict[tuple[str, str], dict[str, Any]] = {}
-    order: list[tuple[str, str]] = []
+    merged: dict[tuple[str, str, str], dict[str, Any]] = {}
+    order: list[tuple[str, str, str]] = []
     for item in [*existing, *incoming]:
-        key = (str(item.get('artist_id') or ''), str(item.get('folder') or ''))
+        key = _artist_image_item_key(item)
         if not any(key):
             continue
         if key not in merged:
             order.append(key)
         merged[key] = item
     return [merged[key] for key in order]
+
+
+def _artist_image_item_key(item: dict[str, Any]) -> tuple[str, str, str]:
+    return (
+        str(item.get('artist_id') or ''),
+        str(item.get('artist') or ''),
+        str(item.get('folder') or ''),
+    )
+
+
+def _completed_artist_image_keys() -> set[tuple[str, str, str]]:
+    keys: set[tuple[str, str, str]] = set()
+    for item in state.artist_image_scan.get('completed') or []:
+        keys.update(_completed_artist_image_keys_for_result(item))
+    return keys
+
+
+def _completed_artist_image_keys_for_result(
+    item: dict[str, Any],
+) -> set[tuple[str, str, str]]:
+    artist = str(item.get('artist') or '')
+    artist_id = str(item.get('artist_id') or '')
+    keys: set[tuple[str, str, str]] = set()
+    for saved in item.get('saved') or []:
+        folder = str(saved).split('/', 1)[0]
+        keys.add((artist_id, artist, folder))
+    for verified in item.get('verified') or []:
+        folder = str(verified).split('/', 1)[0]
+        keys.add((artist_id, artist, folder))
+    return keys
+
+
+def _exclude_completed_artist_images(
+    items: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    completed = _completed_artist_image_keys()
+    if not completed:
+        return items
+    return [
+        item
+        for item in items
+        if _artist_image_item_key(item) not in completed
+    ]
 
 
 async def _run_metadata_scan(limit: int, start: int) -> None:
@@ -549,6 +613,7 @@ async def _run_metadata_scan(limit: int, start: int) -> None:
             list(update.get('items') or []),
             'file',
         )
+        items = _exclude_completed_metadata_items(items)
         clean = _merge_items_by(
             list(state.metadata_scan.get('clean') or []),
             list(update.get('clean') or []),
@@ -577,6 +642,7 @@ async def _run_metadata_scan(limit: int, start: int) -> None:
             list(result.get('items') or []),
             'file',
         )
+        items = _exclude_completed_metadata_items(items)
         clean = _merge_items_by(
             list(state.metadata_scan.get('clean') or []),
             list(result.get('clean') or []),
@@ -627,6 +693,12 @@ async def start_metadata_scan(request: Request) -> dict[str, Any]:
     if total > 0 and start >= total:
         start = 0
     continuing = start > 0
+    previous_items = (
+        _exclude_completed_metadata_items(previous.get('items') or [])
+        if continuing
+        else []
+    )
+    previous_clean = (previous.get('clean') or []) if continuing else []
 
     state.metadata_scan = {
         'status': 'scanning',
@@ -634,9 +706,9 @@ async def start_metadata_scan(request: Request) -> dict[str, Any]:
         'scanned': 0,
         'batch_scanned': 0,
         'total': 0,
-        'matched': len(previous.get('items') or []) if continuing else 0,
-        'items': (previous.get('items') or []) if continuing else [],
-        'clean': (previous.get('clean') or []) if continuing else [],
+        'matched': len(previous_items),
+        'items': previous_items,
+        'clean': previous_clean,
         'completed': previous.get('completed') or [],
         'error': '',
         'errors': [],
@@ -674,6 +746,7 @@ async def _run_artist_image_scan(limit: int, start: int) -> None:
             list(state.artist_image_scan.get('items') or []),
             list(update.get('items') or []),
         )
+        items = _exclude_completed_artist_images(items)
         state.artist_image_scan = {
             **state.artist_image_scan,
             **update,
@@ -696,6 +769,7 @@ async def _run_artist_image_scan(limit: int, start: int) -> None:
             list(state.artist_image_scan.get('items') or []),
             result_items,
         )
+        items = _exclude_completed_artist_images(items)
         state.artist_image_scan = {
             **state.artist_image_scan,
             **result,
@@ -738,14 +812,19 @@ async def scan_artist_images(request: Request) -> dict[str, Any]:
     if total > 0 and start >= total:
         start = 0
     continuing = start > 0
+    previous_items = (
+        _exclude_completed_artist_images(previous.get('items') or [])
+        if continuing
+        else []
+    )
     state.artist_image_scan = {
         'status': 'scanning',
         'limit': limit,
         'scanned': 0,
         'batch_scanned': 0,
         'total': 0,
-        'matched': len(previous.get('items') or []) if continuing else 0,
-        'items': (previous.get('items') or []) if continuing else [],
+        'matched': len(previous_items),
+        'items': previous_items,
         'completed': previous.get('completed') or [],
         'error': '',
         'next_offset': start,
@@ -842,8 +921,17 @@ async def apply_artist_image(request: Request) -> dict[str, Any]:
         )
         completed = list(state.artist_image_scan.get('completed') or [])
         completed.append(result)
+        result_keys = _completed_artist_image_keys()
+        result_keys.update(_completed_artist_image_keys_for_result(result))
+        items = [
+            item
+            for item in state.artist_image_scan.get('items') or []
+            if _artist_image_item_key(item) not in result_keys
+        ]
         state.artist_image_scan = {
             **state.artist_image_scan,
+            'items': items,
+            'matched': len(items),
             'completed': completed,
         }
         return result
@@ -873,8 +961,15 @@ async def apply_metadata(request: Request) -> dict[str, Any]:
         )
         completed = list(state.metadata_scan.get('completed') or [])
         completed.append(result)
+        items = [
+            item
+            for item in state.metadata_scan.get('items') or []
+            if str(item.get('file') or '') != result.get('file')
+        ]
         state.metadata_scan = {
             **state.metadata_scan,
+            'items': items,
+            'matched': len(items),
             'completed': completed,
         }
         return result

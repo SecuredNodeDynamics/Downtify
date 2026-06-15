@@ -8,7 +8,12 @@ from typing import Any, Callable
 from loguru import logger
 from mutagen import File as MutagenFile
 
-from .artist_art import missing_artist_image_items, save_missing_artist_images
+from .artist_art import (
+    artist_folders_for_file,
+    artist_image_paths,
+    missing_artist_image_items,
+    save_missing_artist_images,
+)
 from .musicbrainz import enrich_song_metadata
 
 AUDIO_EXTENSIONS = {'.mp3', '.m4a', '.mp4', '.aac', '.flac', '.ogg', '.opus'}
@@ -416,13 +421,40 @@ def repair_artist_image(root: Path, relative_file: str, artist: dict[str, str]):
     path = safe_library_path(root, relative_file)
     if not path.exists() or not path.is_file():
         raise FileNotFoundError(relative_file)
-    saved = save_missing_artist_images(root.resolve(), path, [artist])
+    root = root.resolve()
+    saved = save_missing_artist_images(root, path, [artist])
+    verified = _verified_artist_image_paths(root, path, artist)
+    if not verified:
+        raise ValueError('Artist image was not written')
     return {
         'artist': artist.get('name', ''),
         'artist_id': artist.get('id', ''),
-        'file': path.relative_to(root.resolve()).as_posix(),
+        'file': path.relative_to(root).as_posix(),
         'saved': saved,
+        'verified': verified,
     }
+
+
+def _verified_artist_image_paths(
+    root: Path,
+    path: Path,
+    artist: dict[str, str],
+) -> list[str]:
+    verified: list[str] = []
+    folders = artist_folders_for_file(
+        root,
+        path,
+        [artist],
+        include_missing=False,
+    )
+    for folder in folders:
+        for image_path in artist_image_paths(folder):
+            try:
+                relative = image_path.resolve().relative_to(root)
+            except ValueError:
+                continue
+            verified.append(relative.as_posix())
+    return sorted(set(verified))
 
 
 def repair_file(root: Path, relative_file: str) -> dict[str, Any]:

@@ -119,7 +119,19 @@ def test_apply_artist_image_allows_name_only_artist(tmp_path, monkeypatch):
     old_downloader = api.state.downloader
     old_scan = dict(api.state.artist_image_scan)
     api.state.downloader = FakeDownloader(tmp_path)
-    api.state.artist_image_scan = {**old_scan, 'completed': []}
+    api.state.artist_image_scan = {
+        **old_scan,
+        'completed': [],
+        'items': [
+            {
+                'artist': 'Guest Artist',
+                'artist_id': '',
+                'folder': 'Guest Artist',
+                'file': 'song.mp3',
+            }
+        ],
+        'matched': 1,
+    }
 
     captured = {}
 
@@ -149,6 +161,8 @@ def test_apply_artist_image_allows_name_only_artist(tmp_path, monkeypatch):
         assert captured['artist'] == {'id': '', 'name': 'Guest Artist'}
         assert result['saved'] == ['Guest Artist/Guest Artist.jpg']
         assert api.state.artist_image_scan['completed'][0] == result
+        assert api.state.artist_image_scan['items'] == []
+        assert api.state.artist_image_scan['matched'] == 0
     finally:
         api.state.downloader = old_downloader
         api.state.artist_image_scan = old_scan

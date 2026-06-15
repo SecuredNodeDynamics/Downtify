@@ -757,6 +757,7 @@ def test_repair_artist_image_writes_for_requested_artist(
         saved['root'] = root
         saved['path'] = path
         saved['artists'] = artists
+        (root / 'Artist' / 'Artist.jpg').write_bytes(b'image')
         return ['Artist/Artist.jpg']
 
     monkeypatch.setattr(metadata_repair, 'save_missing_artist_images', fake_save)
@@ -771,6 +772,30 @@ def test_repair_artist_image_writes_for_requested_artist(
     assert saved['path'] == track.resolve()
     assert saved['artists'] == [{'id': 'artist-mbid', 'name': 'Artist'}]
     assert result['saved'] == ['Artist/Artist.jpg']
+    assert result['verified'] == ['Artist/Artist.jpg']
+
+
+def test_repair_artist_image_fails_when_image_not_written(
+    tmp_path,
+    monkeypatch,
+):
+    album = tmp_path / 'Artist' / 'Album'
+    album.mkdir(parents=True)
+    track = album / 'song.mp3'
+    track.write_bytes(b'not really audio')
+
+    monkeypatch.setattr(
+        metadata_repair,
+        'save_missing_artist_images',
+        lambda *_args: ['Artist/Artist.jpg'],
+    )
+
+    with pytest.raises(ValueError, match='Artist image was not written'):
+        metadata_repair.repair_artist_image(
+            tmp_path,
+            'Artist/Album/song.mp3',
+            {'id': 'artist-mbid', 'name': 'Artist'},
+        )
 
 
 def test_repair_file_fails_when_metadata_does_not_persist(

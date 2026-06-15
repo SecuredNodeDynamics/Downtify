@@ -133,6 +133,28 @@ def has_artist_image(folder: Path) -> bool:
     )
 
 
+def artist_image_paths(folder: Path) -> list[Path]:
+    paths = [
+        folder / name
+        for name in IMAGE_NAMES
+        if (folder / name).is_file()
+    ]
+    paths.extend(
+        path
+        for path in folder.iterdir()
+        if path.is_file() and path.suffix.casefold() in IMAGE_EXTENSIONS
+    )
+    seen: set[Path] = set()
+    unique: list[Path] = []
+    for path in paths:
+        resolved = path.resolve()
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        unique.append(path)
+    return unique
+
+
 def _wikidata_id_from_url(url: str) -> str:
     parsed = urlparse(url)
     if 'wikidata.org' not in parsed.netloc:
