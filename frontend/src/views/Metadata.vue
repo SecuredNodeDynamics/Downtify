@@ -616,12 +616,9 @@
       >
         <div class="mb-5 flex flex-wrap items-end justify-between gap-4">
           <div class="min-w-0 flex-1">
-            <div class="flex items-center gap-2">
-              <Icon icon="clarity:server-line" class="h-5 w-5 text-primary" />
-              <h2 class="text-xl font-bold tracking-tight">
-                {{ t('metadata.jellyfinTools') }}
-              </h2>
-            </div>
+            <h2 class="text-xl font-bold tracking-tight">
+              {{ t('metadata.jellyfinTools') }}
+            </h2>
             <p class="mt-1 text-sm text-base-content/60">
               {{ t('metadata.jellyfinToolsSubtitle') }}
             </p>
@@ -636,7 +633,7 @@
                 v-if="reconcilingArtists"
                 class="loading loading-spinner loading-xs mr-2"
               />
-              <Icon v-else icon="clarity:compare-line" class="h-4 w-4 mr-2" />
+              <Icon v-else icon="clarity:user-line" class="h-4 w-4 mr-2" />
               {{ t('metadata.reconcileArtists') }}
             </button>
             <button
