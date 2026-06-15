@@ -12,10 +12,13 @@ from downtify import api
 from downtify.api import (
     DEFAULT_SETTINGS,
     _apply_download_dir_from_settings,
+    _clean_version,
     _effective_download_dir,
     _effective_lyrics_providers,
+    _is_newer_version,
     _load_settings,
     _normalized_jellyfin_library_name,
+    check_update,
     jellyfin_libraries_endpoint,
     update_settings_endpoint,
 )
@@ -202,6 +205,45 @@ def test_update_settings_server_media_location_retargets_downloader(tmp_path):
         api.state.downloader = old_downloader
         api.state.settings_path = old_settings_path
         api.state.default_download_dir = old_default
+
+
+def test_clean_version_accepts_v_prefixed_semver():
+    assert _clean_version('v2.10.1') == '2.10.1'
+
+
+def test_clean_version_rejects_invalid_values():
+    assert _clean_version('latest') is None
+
+
+def test_is_newer_version_compares_semver():
+    assert _is_newer_version('2.10.0', '2.9.9') is True
+    assert _is_newer_version('2.9.0', '2.9.0') is False
+
+
+def test_check_update_reports_available_update(monkeypatch):
+    old_version = api.state.version
+    try:
+        api.state.version = '2.9.0'
+        monkeypatch.setattr(
+            api,
+            '_latest_github_version',
+            lambda: {
+                'latest_version': '2.10.0',
+                'release_url': 'https://github.com/example/release',
+                'source': 'release',
+                'name': 'v2.10.0',
+                'published_at': None,
+                'error': '',
+            },
+        )
+
+        result = check_update()
+
+        assert result['current_version'] == '2.9.0'
+        assert result['latest_version'] == '2.10.0'
+        assert result['update_available'] is True
+    finally:
+        api.state.version = old_version
 
 
 def test_load_settings_empty_object_returns_defaults(tmp_path):

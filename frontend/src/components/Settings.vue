@@ -28,7 +28,7 @@
       <!-- Body -->
       <div class="px-6 pt-5">
         <div
-          class="mb-5 grid grid-cols-4 rounded-full border border-white/10 bg-base-100/75 p-1"
+          class="mb-5 grid grid-cols-2 rounded-2xl border border-white/10 bg-base-100/75 p-1 sm:grid-cols-5 sm:rounded-full"
         >
           <button
             type="button"
@@ -77,6 +77,18 @@
             @click="activeTab = 'about'"
           >
             {{ t('settings.aboutTab') }}
+          </button>
+          <button
+            type="button"
+            class="rounded-full px-4 py-2 text-sm font-medium transition-colors"
+            :class="
+              activeTab === 'help'
+                ? 'bg-primary text-primary-content shadow-glow-sm'
+                : 'text-base-content/60 hover:text-base-content'
+            "
+            @click="activeTab = 'help'"
+          >
+            {{ t('settings.helpTab') }}
           </button>
         </div>
       </div>
@@ -779,6 +791,144 @@
         </div>
       </div>
 
+      <div v-else-if="activeTab === 'help'" class="px-6 pb-5 space-y-5">
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <label
+              class="block text-xs font-semibold uppercase tracking-wider text-base-content/50"
+            >
+              {{ t('settings.helpTitle') }}
+            </label>
+            <p class="mt-1 text-sm text-base-content/60">
+              {{ t('settings.helpSubtitle') }}
+            </p>
+          </div>
+          <button
+            type="button"
+            class="btn btn-sm h-9 rounded-full border-white/10 bg-base-100/85 hover:bg-base-100"
+            :disabled="helpLoading"
+            @click="loadUpdateStatus"
+          >
+            <span
+              v-if="helpLoading"
+              class="loading loading-spinner loading-xs mr-2"
+            />
+            <Icon v-else icon="clarity:refresh-line" class="h-4 w-4 mr-2" />
+            {{ t('settings.checkUpdates') }}
+          </button>
+        </div>
+
+        <div class="grid gap-3 md:grid-cols-2">
+          <div class="surface rounded-2xl p-4">
+            <p class="text-xs uppercase tracking-wider text-base-content/45">
+              {{ t('settings.currentVersion') }}
+            </p>
+            <p class="mt-2 text-2xl font-bold text-base-content">
+              v{{ currentAppVersion }}
+            </p>
+          </div>
+          <div class="surface rounded-2xl p-4">
+            <p class="text-xs uppercase tracking-wider text-base-content/45">
+              {{ t('settings.latestVersion') }}
+            </p>
+            <p class="mt-2 text-2xl font-bold text-base-content">
+              {{ latestVersionLabel }}
+            </p>
+          </div>
+        </div>
+
+        <div
+          v-if="helpError"
+          class="surface rounded-xl p-3 flex items-center gap-2 text-sm text-error"
+        >
+          <Icon
+            icon="clarity:exclamation-circle-line"
+            class="h-4 w-4 shrink-0"
+          />
+          {{ helpError }}
+        </div>
+
+        <div class="surface rounded-2xl p-4">
+          <div class="flex items-start gap-3">
+            <Icon
+              :icon="updateStatusIcon"
+              class="mt-0.5 h-5 w-5 shrink-0 text-primary"
+            />
+            <div class="min-w-0 flex-1">
+              <p class="text-sm font-semibold">
+                {{ updateStatusTitle }}
+              </p>
+              <p class="mt-1 text-xs leading-relaxed text-base-content/55">
+                {{ updateStatusMessage }}
+              </p>
+              <a
+                v-if="updateStatus?.release_url"
+                :href="updateStatus.release_url"
+                target="_blank"
+                rel="noreferrer"
+                class="mt-2 inline-flex text-xs font-medium text-primary hover:text-primary-focus"
+              >
+                {{ t('settings.viewRelease') }}
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            class="btn btn-primary btn-sm h-10 rounded-full px-5"
+            :disabled="!canRunUpdate || updateRunning"
+            @click="runUpdate"
+          >
+            <span
+              v-if="updateRunning"
+              class="loading loading-spinner loading-xs mr-2"
+            />
+            <Icon v-else icon="clarity:download-cloud-line" class="h-4 w-4 mr-2" />
+            {{ t('settings.updateApp') }}
+          </button>
+          <p class="text-xs text-base-content/45">
+            {{ t('settings.updateHint') }}
+          </p>
+        </div>
+
+        <div
+          v-if="updateResult"
+          class="surface rounded-2xl p-4"
+          :class="updateResult.success ? 'text-base-content' : 'text-error'"
+        >
+          <p class="text-sm font-semibold">
+            {{ updateResult.message || t('settings.updateFinished') }}
+          </p>
+          <p
+            v-if="updateResult.requires_restart"
+            class="mt-1 text-xs text-base-content/55"
+          >
+            {{ t('settings.restartRequired') }}
+          </p>
+          <div
+            v-if="updateResult.commands?.length"
+            class="mt-3 space-y-2"
+          >
+            <p class="text-xs text-base-content/55">
+              {{ t('settings.manualUpdateCommands') }}
+            </p>
+            <code
+              v-for="command in updateResult.commands"
+              :key="command"
+              class="block rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-xs text-base-content"
+            >
+              {{ command }}
+            </code>
+          </div>
+          <pre
+            v-if="updateResult.pull_output"
+            class="mt-3 max-h-40 overflow-auto rounded-xl border border-white/10 bg-black/30 p-3 text-xs text-base-content/70"
+          >{{ updateResult.pull_output }}</pre>
+        </div>
+      </div>
+
       <!-- Footer -->
       <div
         class="flex items-center justify-end gap-2 px-6 py-4 border-t border-white/5"
@@ -832,6 +982,11 @@ const jellyfinLibraryError = ref('')
 const repairLog = ref([])
 const repairLogLoading = ref(false)
 const repairLogError = ref('')
+const updateStatus = ref(null)
+const helpLoading = ref(false)
+const helpError = ref('')
+const updateRunning = ref(false)
+const updateResult = ref(null)
 function normalizedJellyfinLibraryName(value) {
   return String(value || '')
     .normalize('NFKC')
@@ -898,6 +1053,51 @@ const aboutSections = computed(() => [
   },
 ])
 
+const currentAppVersion = computed(() => {
+  return updateStatus.value?.current_version || __APP_VERSION__ || '0.0.0'
+})
+
+const latestVersionLabel = computed(() => {
+  if (helpLoading.value && !updateStatus.value) return t('settings.checking')
+  const latest = updateStatus.value?.latest_version
+  return latest ? `v${latest}` : t('settings.unknownVersion')
+})
+
+const canRunUpdate = computed(() => {
+  return Boolean(updateStatus.value?.update_available)
+})
+
+const updateStatusIcon = computed(() => {
+  if (helpLoading.value) return 'clarity:refresh-line'
+  if (updateStatus.value?.update_available) return 'clarity:download-cloud-line'
+  if (helpError.value || updateStatus.value?.error) {
+    return 'clarity:exclamation-circle-line'
+  }
+  return 'clarity:check-circle-line'
+})
+
+const updateStatusTitle = computed(() => {
+  if (helpLoading.value) return t('settings.checkingUpdates')
+  if (updateStatus.value?.update_available) {
+    return t('settings.updateAvailable')
+  }
+  if (helpError.value || updateStatus.value?.error) {
+    return t('settings.updateCheckFailed')
+  }
+  return t('settings.upToDate')
+})
+
+const updateStatusMessage = computed(() => {
+  if (helpLoading.value) return t('settings.checkingUpdatesHint')
+  if (updateStatus.value?.update_available) {
+    return t('settings.updateAvailableHint', {
+      version: updateStatus.value.latest_version,
+    })
+  }
+  if (updateStatus.value?.error) return updateStatus.value.error
+  return t('settings.upToDateHint')
+})
+
 function uniqueLibrariesByName(libraries) {
   const seen = new Set()
   return (libraries || []).filter((lib) => {
@@ -920,6 +1120,9 @@ watch(activeTab, (newTab) => {
   }
   if (newTab === 'logs') {
     loadRepairLog()
+  }
+  if (newTab === 'help') {
+    loadUpdateStatus()
   }
 })
 
@@ -968,6 +1171,36 @@ async function loadRepairLog() {
       err?.response?.data?.detail || t('settings.logsError')
   } finally {
     repairLogLoading.value = false
+  }
+}
+
+async function loadUpdateStatus() {
+  helpLoading.value = true
+  helpError.value = ''
+  try {
+    const res = await API.check_for_update()
+    updateStatus.value = res.data || null
+  } catch (err) {
+    helpError.value =
+      err?.response?.data?.detail || t('settings.updateCheckError')
+  } finally {
+    helpLoading.value = false
+  }
+}
+
+async function runUpdate() {
+  updateRunning.value = true
+  helpError.value = ''
+  updateResult.value = null
+  try {
+    const res = await API.updateApp()
+    updateResult.value = res.data || null
+    if (res.data?.current_version) updateStatus.value = res.data
+  } catch (err) {
+    helpError.value =
+      err?.response?.data?.detail || t('settings.updateError')
+  } finally {
+    updateRunning.value = false
   }
 }
 

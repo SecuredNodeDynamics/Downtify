@@ -14,6 +14,7 @@ working without changes:
 * ``POST /api/settings/update``
 * ``WS   /api/ws``
 * ``GET  /api/check_update``
+* ``POST /api/update``
 """
 
 from __future__ import annotations
@@ -50,6 +51,7 @@ from . import artist_art, m3u, metadata_repair, providers, spotify
 from .downloader import Downloader, preview_audio_for_song
 from .history import DownloadHistoryDB
 from .monitor import PlaylistMonitorDB, check_playlist
+from .versioning import parse_version
 
 DEFAULT_SETTINGS: dict[str, Any] = {
     'audio_providers': ['youtube-music'],
@@ -72,6 +74,9 @@ DEFAULT_SETTINGS: dict[str, Any] = {
 }
 
 AUDIO_EXTENSIONS = {'.mp3', '.m4a', '.flac', '.ogg', '.wav', '.aac', '.opus'}
+GITHUB_REPO = 'SecuredNodeDynamics/Downtify'
+GITHUB_API_BASE = f'https://api.github.com/repos/{GITHUB_REPO}'
+GITHUB_RELEASES_URL = f'https://github.com/{GITHUB_REPO}/releases'
 
 
 def _effective_lyrics_providers(settings: dict[str, Any]) -> list[str]:
@@ -497,14 +502,228 @@ def _command_version(command: str, args: list[str]) -> dict[str, Any]:
     return {'available': True, 'path': path, 'version': version}
 
 
+def _clean_version(value: Any) -> Optional[str]:
+    version = str(value or '').strip().lstrip('vV')
+    return version if parse_version(version) is not None else None
+
+
+def _is_newer_version(candidate: str, current: str) -> bool:
+    candidate_parsed = parse_version(candidate)
+    current_parsed = parse_version(current)
+    if candidate_parsed is None or current_parsed is None:
+        return False
+    return candidate_parsed > current_parsed
+
+
+def _github_headers() -> dict[str, str]:
+    return {
+        'Accept': 'application/vnd.github+json',
+        'User-Agent': f'Downtify/{state.version}',
+    }
+
+
+def _latest_github_version(timeout: int = 8) -> dict[str, Any]:
+    try:
+        response = requests.get(
+            f'{GITHUB_API_BASE}/releases/latest',
+            headers=_github_headers(),
+            timeout=timeout,
+        )
+        if response.status_code != 404:
+            response.raise_for_status()
+            payload = response.json()
+            version = _clean_version(payload.get('tag_name'))
+            if version:
+                return {
+                    'latest_version': version,
+                    'release_url': payload.get('html_url')
+                    or GITHUB_RELEASES_URL,
+                    'source': 'release',
+                    'name': payload.get('name') or payload.get('tag_name'),
+                    'published_at': payload.get('published_at'),
+                    'error': '',
+                }
+    except Exception as exc:
+        logger.warning('Could not check latest GitHub release: {}', exc)
+
+    try:
+        response = requests.get(
+            f'{GITHUB_API_BASE}/tags',
+            headers=_github_headers(),
+            timeout=timeout,
+        )
+        response.raise_for_status()
+        tags = response.json()
+        versions = [
+            version
+            for tag in tags
+            if isinstance(tag, dict)
+            and (version := _clean_version(tag.get('name')))
+        ]
+        if versions:
+            latest = max(versions, key=lambda item: parse_version(item) or (0, 0, 0))
+            return {
+                'latest_version': latest,
+                'release_url': f'{GITHUB_RELEASES_URL}/tag/v{latest}',
+                'source': 'tag',
+                'name': f'v{latest}',
+                'published_at': None,
+                'error': '',
+            }
+    except Exception as exc:
+        logger.warning('Could not check latest GitHub tag: {}', exc)
+        return {
+            'latest_version': None,
+            'release_url': GITHUB_RELEASES_URL,
+            'source': 'github',
+            'name': None,
+            'published_at': None,
+            'error': str(exc),
+        }
+
+    return {
+        'latest_version': None,
+        'release_url': GITHUB_RELEASES_URL,
+        'source': 'github',
+        'name': None,
+        'published_at': None,
+        'error': 'No valid releases or tags found',
+    }
+
+
+def _project_root() -> Path:
+    return Path(__file__).resolve().parent.parent
+
+
+def _is_docker_runtime() -> bool:
+    return (
+        Path('/.dockerenv').exists()
+        or bool(os.getenv('DOWNTIFY_CONTAINER'))
+        or os.getenv('container') in {'docker', 'podman'}
+    )
+
+
+def _run_update_command(args: list[str], cwd: Path) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        args,
+        cwd=cwd,
+        capture_output=True,
+        text=True,
+        timeout=120,
+        check=False,
+    )
+
+
 @router.get('/api/version')
 def get_version() -> str:
     return state.version
 
 
 @router.get('/api/check_update')
-def check_update() -> Optional[dict[str, Any]]:
-    return None
+def check_update() -> dict[str, Any]:
+    latest = _latest_github_version()
+    latest_version = latest.get('latest_version')
+    update_available = bool(
+        latest_version and _is_newer_version(latest_version, state.version)
+    )
+    return {
+        'current_version': state.version,
+        'latest_version': latest_version,
+        'update_available': update_available,
+        'release_url': latest.get('release_url') or GITHUB_RELEASES_URL,
+        'source': latest.get('source'),
+        'name': latest.get('name'),
+        'published_at': latest.get('published_at'),
+        'error': latest.get('error') or '',
+    }
+
+
+@router.post('/api/update')
+def update_app() -> dict[str, Any]:
+    status = check_update()
+    if not status.get('update_available'):
+        return {
+            **status,
+            'success': True,
+            'updated': False,
+            'mode': 'noop',
+            'requires_restart': False,
+            'requires_manual': False,
+            'message': 'Downtify is already up to date.',
+        }
+
+    if _is_docker_runtime():
+        return {
+            **status,
+            'success': False,
+            'updated': False,
+            'mode': 'docker',
+            'requires_restart': True,
+            'requires_manual': True,
+            'message': (
+                'This Downtify instance is running in Docker. Pull the new '
+                'image and recreate the container to update safely.'
+            ),
+            'commands': [
+                'docker compose pull downtify',
+                'docker compose up -d downtify',
+            ],
+        }
+
+    root = _project_root()
+    if not (root / '.git').exists():
+        return {
+            **status,
+            'success': False,
+            'updated': False,
+            'mode': 'source',
+            'requires_restart': True,
+            'requires_manual': True,
+            'message': (
+                'This installation is not a Git checkout, so Downtify cannot '
+                'update it automatically.'
+            ),
+        }
+
+    git = shutil.which('git')
+    if not git:
+        raise HTTPException(status_code=500, detail='git is not installed')
+
+    try:
+        remote = _run_update_command([git, 'remote', 'get-url', 'origin'], root)
+        fetch = _run_update_command([git, 'fetch', '--tags', 'origin'], root)
+        pull = _run_update_command([git, 'pull', '--ff-only'], root)
+    except subprocess.TimeoutExpired as exc:
+        raise HTTPException(
+            status_code=504, detail='Update command timed out'
+        ) from exc
+
+    if remote.returncode != 0 or fetch.returncode != 0 or pull.returncode != 0:
+        return {
+            **status,
+            'success': False,
+            'updated': False,
+            'mode': 'source',
+            'requires_restart': True,
+            'requires_manual': True,
+            'message': 'Automatic update failed. Check the command output.',
+            'remote': (remote.stdout or remote.stderr or '').strip(),
+            'fetch_output': (fetch.stdout or fetch.stderr or '').strip(),
+            'pull_output': (pull.stdout or pull.stderr or '').strip(),
+        }
+
+    return {
+        **status,
+        'success': True,
+        'updated': True,
+        'mode': 'source',
+        'requires_restart': True,
+        'requires_manual': False,
+        'message': 'Update downloaded. Restart Downtify to run the new version.',
+        'remote': remote.stdout.strip(),
+        'fetch_output': (fetch.stdout or fetch.stderr or '').strip(),
+        'pull_output': (pull.stdout or pull.stderr or '').strip(),
+    }
 
 
 @router.get('/api/health')

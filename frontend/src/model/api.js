@@ -101,6 +101,10 @@ function check_for_update() {
   return API.get('/api/check_update')
 }
 
+function updateApp() {
+  return API.post('/api/update')
+}
+
 function getHealth() {
   return API.get('/api/health')
 }
@@ -257,6 +261,7 @@ export default {
   reconcileJellyfinArtists,
   refreshJellyfinLibrary,
   check_for_update,
+  updateApp,
   getHealth,
   startMetadataScan,
   getMetadataScanStatus,
