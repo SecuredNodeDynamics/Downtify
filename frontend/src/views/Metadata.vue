@@ -648,6 +648,22 @@
               <Icon v-else icon="clarity:sync-line" class="h-4 w-4 mr-2" />
               {{ t('metadata.refreshJellyfin') }}
             </button>
+            <button
+              class="btn btn-sm h-11 rounded-full border-white/10 bg-base-100/85 hover:bg-base-100"
+              :disabled="
+                repairingAllJellyfin ||
+                reconcilingArtists ||
+                jellyfinRepairableItems.length === 0
+              "
+              @click="repairAllJellyfinArtistImages"
+            >
+              <span
+                v-if="repairingAllJellyfin"
+                class="loading loading-spinner loading-xs mr-2"
+              />
+              <Icon v-else icon="clarity:image-gallery-line" class="h-4 w-4 mr-2" />
+              {{ t('metadata.repairAll') }}
+            </button>
           </div>
         </div>
 
@@ -916,6 +932,7 @@ const artistReconciliation = ref(null)
 const activeReconciliationBucket = ref('missing_images')
 const reconcilingArtists = ref(false)
 const refreshingJellyfin = ref(false)
+const repairingAllJellyfin = ref(false)
 const jellyfinMessage = ref('')
 const jellyfinError = ref(false)
 const lastReconciled = ref('')
@@ -1021,6 +1038,15 @@ const jellyfinLibraryName = computed(() => {
   const library = artistReconciliation.value?.library || {}
   return library.name || library.id || t('metadata.notCheckedYet')
 })
+
+const jellyfinRepairableItems = computed(() =>
+  (artistReconciliation.value?.missing_images || []).filter(
+    (item) =>
+      item?.missing_image &&
+      item?.file &&
+      !fixedArtistImages.value[jellyfinRepairKey(item)]
+  )
+)
 
 watch(
   () => sm.settings.value.enable_jellyfin_tools,
@@ -1469,5 +1495,32 @@ async function repairAllArtistImages() {
     await applyArtistImage(item)
   }
   repairingAllImages.value = false
+}
+
+async function repairAllJellyfinArtistImages() {
+  const targets = [...jellyfinRepairableItems.value]
+  if (targets.length === 0) return
+
+  repairingAllJellyfin.value = true
+  jellyfinMessage.value = ''
+  jellyfinError.value = false
+
+  let succeeded = 0
+  for (const item of targets) {
+    // eslint-disable-next-line no-await-in-loop
+    await applyJellyfinArtistImage(item)
+    if (fixedArtistImages.value[jellyfinRepairKey(item)]) {
+      succeeded += 1
+    }
+  }
+
+  if (succeeded === targets.length) {
+    jellyfinError.value = false
+    jellyfinMessage.value = t('metadata.artistImageRepairOk')
+  } else {
+    jellyfinError.value = true
+    jellyfinMessage.value = `${t('metadata.failedArtistImageApply')} (${succeeded}/${targets.length})`
+  }
+  repairingAllJellyfin.value = false
 }
 </script>
