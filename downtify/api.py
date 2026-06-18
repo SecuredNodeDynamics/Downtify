@@ -2514,6 +2514,7 @@ def _named_items(
 def _local_artist_inventory(root: Path) -> dict[str, dict[str, Any]]:
     folders: dict[str, str] = {}
     folder_images: dict[str, bool] = {}
+    folder_files: dict[str, str] = {}
     tag_artists: dict[str, str] = {}
     tag_files: dict[str, str] = {}
 
@@ -2532,6 +2533,16 @@ def _local_artist_inventory(root: Path) -> dict[str, dict[str, Any]]:
                 or path.suffix.lower() not in AUDIO_EXTENSIONS
             ):
                 continue
+            try:
+                relative_path = path.relative_to(root)
+            except ValueError:
+                relative_path = Path(path.name)
+            if len(relative_path.parts) > 1:
+                folder_key = _artist_compare_key(relative_path.parts[0])
+                if folder_key in folders:
+                    folder_files.setdefault(
+                        folder_key, relative_path.as_posix()
+                    )
             try:
                 song = metadata_repair._song_from_file(path)
             except Exception:
@@ -2554,6 +2565,7 @@ def _local_artist_inventory(root: Path) -> dict[str, dict[str, Any]]:
     return {
         'folders': folders,
         'folder_images': folder_images,
+        'folder_files': folder_files,
         'tags': tag_artists,
         'tag_files': tag_files,
     }
@@ -2635,8 +2647,10 @@ def reconcile_jellyfin_artists() -> dict[str, Any]:
         local = _local_artist_inventory(download_dir)
         folders = local['folders']
         folder_images = local.get('folder_images', {})
+        folder_files = local.get('folder_files', {})
         tags = local['tags']
         tag_files = local.get('tag_files', {})
+        repair_files = {**folder_files, **tag_files}
 
         jellyfin_keys = set(jellyfin_artists)
         folder_keys = set(folders)
@@ -2672,23 +2686,23 @@ def reconcile_jellyfin_artists() -> dict[str, Any]:
                 {key: folders[key] for key in folder_keys - jellyfin_keys},
                 folders,
                 folder_images,
-                tag_files,
+                repair_files,
             ),
             'tag_only': _named_items(
                 {key: tags[key] for key in tag_keys - jellyfin_keys},
-                files=tag_files,
+                files=repair_files,
             ),
             'matched': _named_items(
                 {key: folders[key] for key in matched_keys},
                 folders,
                 folder_images,
-                tag_files,
+                repair_files,
             ),
             'missing_images': _named_items(
                 {key: jellyfin_artists[key] for key in missing_image_keys},
                 folders,
                 folder_images,
-                tag_files,
+                repair_files,
             ),
         }
     except HTTPException:

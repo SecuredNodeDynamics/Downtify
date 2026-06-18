@@ -63,7 +63,9 @@ def test_metadata_scan_keeps_items_from_previous_batch(tmp_path, monkeypatch):
         api.state.metadata_scan = old_scan
 
 
-def test_metadata_scan_resets_offset_when_download_root_changes(tmp_path, monkeypatch):
+def test_metadata_scan_resets_offset_when_download_root_changes(
+    tmp_path, monkeypatch
+):
     old_downloader = api.state.downloader
     old_scan = dict(api.state.metadata_scan)
     old_settings = api.state.settings
@@ -110,7 +112,9 @@ def test_metadata_scan_resets_offset_when_download_root_changes(tmp_path, monkey
         api.state.metadata_scan_task = old_task
 
 
-def test_artist_image_scan_keeps_items_from_previous_batch(tmp_path, monkeypatch):
+def test_artist_image_scan_keeps_items_from_previous_batch(
+    tmp_path, monkeypatch
+):
     old_downloader = api.state.downloader
     old_scan = dict(api.state.artist_image_scan)
     api.state.downloader = FakeDownloader(tmp_path)
@@ -165,7 +169,9 @@ def test_artist_image_scan_keeps_items_from_previous_batch(tmp_path, monkeypatch
         assert [
             item['artist_id'] for item in api.state.artist_image_scan['items']
         ] == ['artist-one', 'artist-two']
-        assert [item['file'] for item in api.state.artist_image_scan['clean']] == [
+        assert [
+            item['file'] for item in api.state.artist_image_scan['clean']
+        ] == [
             'Artist One/clean.mp3',
             'Artist Two/clean.mp3',
         ]
@@ -257,7 +263,9 @@ def test_apply_artist_image_allows_name_only_artist(tmp_path, monkeypatch):
             'saved': ['Guest Artist/Guest Artist.jpg'],
         }
 
-    monkeypatch.setattr(api.metadata_repair, 'repair_artist_image', fake_repair)
+    monkeypatch.setattr(
+        api.metadata_repair, 'repair_artist_image', fake_repair
+    )
     try:
         result = asyncio.run(
             api.apply_artist_image(
@@ -282,7 +290,9 @@ def test_apply_artist_image_allows_name_only_artist(tmp_path, monkeypatch):
         api.state.repair_log = old_repair_log
 
 
-def test_apply_metadata_uses_mapped_server_media_location(tmp_path, monkeypatch):
+def test_apply_metadata_uses_mapped_server_media_location(
+    tmp_path, monkeypatch
+):
     old_downloader = api.state.downloader
     old_settings = api.state.settings
     old_default = api.state.default_download_dir
@@ -352,7 +362,9 @@ def test_apply_artist_image_passes_requested_folder(tmp_path, monkeypatch):
             'verified': ['Local Folder/Jellyfin Artist.jpg'],
         }
 
-    monkeypatch.setattr(api.metadata_repair, 'repair_artist_image', fake_repair)
+    monkeypatch.setattr(
+        api.metadata_repair, 'repair_artist_image', fake_repair
+    )
     try:
         result = asyncio.run(
             api.apply_artist_image(
@@ -421,8 +433,32 @@ def test_local_artist_inventory_tracks_folder_images_and_tag_files(
 
     assert inventory['folders']['artist one'] == 'Artist One'
     assert inventory['folder_images']['artist one'] is True
+    assert (
+        inventory['folder_files']['artist one'] == 'Artist One/Album/song.mp3'
+    )
     assert inventory['tags']['guest artist'] == 'Guest Artist'
     assert inventory['tag_files']['guest artist'] == 'guest.mp3'
+
+
+def test_local_artist_inventory_uses_folder_audio_when_tags_do_not_match(
+    tmp_path,
+    monkeypatch,
+):
+    album = tmp_path / 'Folder Artist' / 'Album'
+    album.mkdir(parents=True)
+    track = album / 'song.mp3'
+    track.write_bytes(b'audio')
+    monkeypatch.setattr(
+        api.metadata_repair,
+        '_song_from_file',
+        lambda _path: {'artists': ['Different Tagged Artist']},
+    )
+
+    inventory = api._local_artist_inventory(tmp_path)
+
+    assert inventory['folder_files']['folder artist'] == (
+        'Folder Artist/Album/song.mp3'
+    )
 
 
 def test_named_items_include_image_state_and_repair_file():
