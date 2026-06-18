@@ -511,6 +511,42 @@
           </button>
         </div>
 
+        <div
+          v-if="activeArtistImageTab === 'clean'"
+          class="mb-5 flex justify-end"
+        >
+          <div
+            class="inline-flex rounded-full border border-white/10 bg-base-100/75 p-1"
+          >
+            <button
+              type="button"
+              class="rounded-full p-2 transition-colors"
+              :class="
+                cleanArtistImageView === 'list'
+                  ? 'bg-primary text-primary-content'
+                  : 'text-base-content/55 hover:text-base-content'
+              "
+              :title="t('metadata.listView')"
+              @click="cleanArtistImageView = 'list'"
+            >
+              <Icon icon="clarity:view-list-line" class="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              class="rounded-full p-2 transition-colors"
+              :class="
+                cleanArtistImageView === 'grid'
+                  ? 'bg-primary text-primary-content'
+                  : 'text-base-content/55 hover:text-base-content'
+              "
+              :title="t('metadata.gridView')"
+              @click="cleanArtistImageView = 'grid'"
+            >
+              <Icon icon="clarity:grid-view-line" class="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+
         <div class="max-h-[34rem] overflow-y-auto pr-2">
           <div
             v-if="artistImageLoading && visibleArtistImageItems.length === 0"
@@ -538,6 +574,53 @@
                   : emptyArtistImageMessage
               }}
             </p>
+          </div>
+
+          <div
+            v-else-if="
+              activeArtistImageTab === 'clean' &&
+              cleanArtistImageView === 'grid'
+            "
+            class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
+          >
+            <article
+              v-for="item in visibleArtistImageItems"
+              :key="itemKey(item)"
+              class="surface overflow-hidden rounded-2xl"
+            >
+              <div
+                class="flex aspect-square items-center justify-center overflow-hidden bg-base-100/80"
+              >
+                <img
+                  v-if="item.preview_url"
+                  :src="item.preview_url"
+                  :alt="item.artist"
+                  class="h-full w-full object-cover"
+                  loading="lazy"
+                />
+                <Icon
+                  v-else
+                  icon="clarity:user-line"
+                  class="h-14 w-14 text-base-content/25"
+                />
+              </div>
+              <div class="p-4">
+                <div class="flex items-start justify-between gap-3">
+                  <p class="min-w-0 truncate text-sm font-semibold">
+                    {{ item.artist || t('common.unknownArtist') }}
+                  </p>
+                  <span class="pill badge-soft shrink-0">
+                    {{ t('metadata.clean') }}
+                  </span>
+                </div>
+                <p class="mt-2 truncate text-xs text-base-content/45">
+                  {{ item.folder || item.file }}
+                </p>
+                <p class="mt-1 truncate text-xs text-primary">
+                  {{ item.file }}
+                </p>
+              </div>
+            </article>
           </div>
 
           <ul v-else class="space-y-3">
@@ -1101,6 +1184,7 @@ const cleanArtistImageItems = ref([])
 const completedArtistImages = ref([])
 const failedArtistImages = ref([])
 const activeArtistImageTab = ref('needs')
+const cleanArtistImageView = ref('grid')
 const applyingArtistImages = ref({})
 const fixedArtistImages = ref({})
 const repairingAllImages = ref(false)

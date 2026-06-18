@@ -1369,6 +1369,11 @@ async def _run_artist_image_scan(
                 **update,
                 'items': _with_artist_image_preview(update['items']),
             }
+        if 'clean' in update:
+            update = {
+                **update,
+                'clean': _with_clean_artist_image_preview(update['clean']),
+            }
         items = _merge_artist_image_items(
             list(state.artist_image_scan.get('items') or []),
             list(update.get('items') or []),
@@ -1407,7 +1412,7 @@ async def _run_artist_image_scan(
         items = _exclude_completed_artist_images(items)
         clean = _merge_items_by(
             list(state.artist_image_scan.get('clean') or []),
-            list(result.get('clean') or []),
+            _with_clean_artist_image_preview(result.get('clean') or []),
             'file',
         )
         state.artist_image_scan = {
@@ -1507,6 +1512,23 @@ def _with_artist_image_preview(
             **item,
             'preview_url': item.get('preview_url')
             or _artist_image_preview_url(item),
+        }
+        for item in items
+    ]
+
+
+def _with_clean_artist_image_preview(
+    items: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    return [
+        {
+            **item,
+            'preview_url': item.get('preview_url')
+            or (
+                _artist_folder_preview_url(str(item.get('folder')))
+                if item.get('folder')
+                else _artist_image_preview_url(item)
+            ),
         }
         for item in items
     ]

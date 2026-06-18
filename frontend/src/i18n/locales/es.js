@@ -180,6 +180,8 @@ export default {
     fixed: 'Corregido',
     completed: 'Completado',
     clean: 'No necesita correccion',
+    listView: 'Vista de lista',
+    gridView: 'Vista de tarjetas',
     repairFailed: 'Correccion fallida',
     artistImages: 'Imagenes locales de artistas',
     artistImagesSubtitle:

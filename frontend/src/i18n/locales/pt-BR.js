@@ -179,6 +179,8 @@ export default {
     fixed: 'Corrigido',
     completed: 'Concluido',
     clean: 'Sem reparo necessario',
+    listView: 'Visualizacao em lista',
+    gridView: 'Grade de cartoes',
     repairFailed: 'Reparo falhou',
     artistImages: 'Imagens locais de artistas',
     artistImagesSubtitle:

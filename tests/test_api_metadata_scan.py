@@ -481,3 +481,17 @@ def test_named_items_include_image_state_and_repair_file():
     assert by_name['Guest Artist']['has_image'] is False
     assert by_name['Guest Artist']['missing_image'] is True
     assert by_name['Guest Artist']['file'] == 'guest.mp3'
+
+
+def test_clean_artist_image_items_include_existing_art_preview():
+    result = api._with_clean_artist_image_preview([
+        {
+            'file': 'Artist/Album/song.mp3',
+            'artist': 'Artist',
+            'folder': 'Artist',
+        },
+        {'file': 'loose-song.mp3', 'artist': 'Loose Artist', 'folder': ''},
+    ])
+
+    assert result[0]['preview_url'].endswith('folder=Artist')
+    assert '/api/metadata/artist-images/preview?' in result[1]['preview_url']

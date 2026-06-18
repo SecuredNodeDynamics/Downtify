@@ -177,6 +177,8 @@ export default {
     fixed: 'Fixed',
     completed: 'Completed',
     clean: 'No Repair Needed',
+    listView: 'List view',
+    gridView: 'Card grid view',
     repairFailed: 'Repair Failed',
     artistImages: 'Local Artist Images',
     artistImagesSubtitle:
