@@ -816,7 +816,7 @@ def _start_docker_self_update() -> dict[str, Any]:
         'success': True,
         'updated': True,
         'mode': 'docker',
-        'requires_restart': True,
+        'requires_restart': False,
         'requires_manual': False,
         'message': (
             'Latest Docker image pulled. Downtify is recreating the container '
