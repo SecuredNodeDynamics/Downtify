@@ -240,6 +240,35 @@ def test_apply_download_dir_from_settings_updates_downloader(tmp_path):
         api.state.default_download_dir = old_default
 
 
+def test_apply_download_dir_from_settings_does_not_compound_mapped_host_path(
+    tmp_path,
+    monkeypatch,
+):
+    old_settings = api.state.settings
+    old_downloader = api.state.downloader
+    old_default = api.state.default_download_dir
+    try:
+        host_media = tmp_path / 'media' / 'Music'
+        container_media = tmp_path / 'container' / 'downloads'
+        monkeypatch.setenv('DOWNTIFY_MEDIA_SAVE_LOCATION', str(host_media))
+        api.state.settings = {
+            'server_media_location': str(host_media / 'test') + '/'
+        }
+        api.state.default_download_dir = container_media
+        api.state.downloader = Downloader(container_media)
+
+        first = _apply_download_dir_from_settings()
+        second = _apply_download_dir_from_settings()
+
+        assert first == container_media / 'test'
+        assert second == container_media / 'test'
+        assert api.state.downloader.download_dir == container_media / 'test'
+    finally:
+        api.state.settings = old_settings
+        api.state.downloader = old_downloader
+        api.state.default_download_dir = old_default
+
+
 def test_update_settings_server_media_location_retargets_downloader(tmp_path):
     old_settings = api.state.settings
     old_downloader = api.state.downloader

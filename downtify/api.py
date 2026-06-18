@@ -396,11 +396,12 @@ def _container_media_path_for(saved: str, container_root: Path) -> Path:
 
 def _effective_download_dir(fallback: Path | str | None = None) -> Path:
     saved = _server_media_location()
-    container_root = (
-        Path(fallback) if fallback is not None else state.default_download_dir
-    )
     if saved:
+        container_root = state.default_download_dir
         return _container_media_path_for(saved, container_root)
+    if fallback is not None:
+        return Path(fallback)
+    container_root = state.default_download_dir
     return container_root
 
 
