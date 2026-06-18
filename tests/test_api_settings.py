@@ -13,6 +13,7 @@ from downtify.api import (
     DEFAULT_SETTINGS,
     _apply_download_dir_from_settings,
     _clean_version,
+    _download_playlist_subdir,
     _effective_download_dir,
     _effective_lyrics_providers,
     _is_newer_version,
@@ -263,6 +264,24 @@ def test_apply_download_dir_from_settings_does_not_compound_mapped_host_path(
         assert first == container_media / 'test'
         assert second == container_media / 'test'
         assert api.state.downloader.download_dir == container_media / 'test'
+    finally:
+        api.state.settings = old_settings
+        api.state.downloader = old_downloader
+        api.state.default_download_dir = old_default
+
+
+def test_download_playlist_subdir_skips_active_root_name(tmp_path):
+    old_settings = api.state.settings
+    old_downloader = api.state.downloader
+    old_default = api.state.default_download_dir
+    try:
+        download_root = tmp_path / 'downloads' / 'test'
+        api.state.settings = {}
+        api.state.default_download_dir = download_root
+        api.state.downloader = Downloader(download_root)
+
+        assert _download_playlist_subdir('test') is None
+        assert _download_playlist_subdir('My Playlist') == 'My Playlist'
     finally:
         api.state.settings = old_settings
         api.state.downloader = old_downloader

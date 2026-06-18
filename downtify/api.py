@@ -428,6 +428,22 @@ def _active_download_dir() -> Path:
         ) from exc
 
 
+def _download_playlist_subdir(playlist_name: str) -> Optional[str]:
+    subdir = m3u.sanitize_playlist_name(playlist_name)
+    if not subdir:
+        return None
+    download_root_name = _active_download_dir().name
+    if subdir.casefold() == download_root_name.casefold():
+        logger.info(
+            'Skipping redundant playlist subfolder {!r} because the active '
+            'download root is already named {!r}',
+            subdir,
+            download_root_name,
+        )
+        return None
+    return subdir
+
+
 def _directory_summary(
     path: Path,
     external_path: Optional[str] = None,
@@ -1953,7 +1969,7 @@ async def _process_batch(
             playlist_name, _ = await asyncio.to_thread(
                 spotify.playlist_info_and_tracks, parsed[1]
             )
-            playlist_subdir = m3u.sanitize_playlist_name(playlist_name)
+            playlist_subdir = _download_playlist_subdir(playlist_name)
         except Exception:
             logger.exception(
                 'Failed to resolve playlist name for {}', playlist_url
@@ -2193,7 +2209,7 @@ async def write_playlist_m3u_endpoint(request: Request) -> dict[str, Any]:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
     entries = [t for t in tracks if isinstance(t, dict)]
-    playlist_subdir = m3u.sanitize_playlist_name(playlist_name)
+    playlist_subdir = _download_playlist_subdir(playlist_name)
     organize = bool(state.downloader and state.downloader.organize_by_artist)
     download_dir = _active_download_dir()
     target, kept = m3u.write_m3u(
