@@ -813,12 +813,32 @@ def _start_docker_self_update() -> dict[str, Any]:
             ),
         }
 
+    helper_message = (
+        f'Docker self-update helper {output or helper_name} started for '
+        f'{container}. Downtify container restart/recreate is scheduled.'
+    )
+    logger.warning(helper_message)
+    terminal_output = '\n'.join(
+        part
+        for part in [
+            f'$ docker pull {target_image}',
+            pull_output,
+            (
+                '$ docker run --rm -v /var/run/docker.sock:/var/run/docker.sock '
+                f'{image} --run-once --cleanup --include-restarting {container}'
+            ),
+            helper_message,
+        ]
+        if part
+    )
+
     return {
         'success': True,
         'updated': True,
         'mode': 'docker',
         'requires_restart': False,
         'requires_manual': False,
+        'restart_scheduled': True,
         'message': (
             'Latest Docker image pulled. Downtify is recreating the container '
             'and will restart shortly.'
@@ -826,6 +846,7 @@ def _start_docker_self_update() -> dict[str, Any]:
         'helper_container': output,
         'target_image': target_image,
         'pull_output': pull_output,
+        'terminal_output': terminal_output,
     }
 
 

@@ -368,6 +368,8 @@ export default {
     updateError: 'Nao foi possivel atualizar o Downtify.',
     updateFinished: 'Atualizacao concluida',
     restartRequired: 'Reinicie o Downtify para usar a versao atualizada.',
+    restartScheduled:
+      'A reinicializacao do Docker foi agendada. O conteiner sera recriado em instantes.',
     manualUpdateCommands: 'Execute estes comandos no host Docker:',
     viewRelease: 'Ver versao',
     audioSource: 'Fonte de áudio',

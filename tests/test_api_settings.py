@@ -381,10 +381,14 @@ def test_docker_self_update_pulls_image_and_starts_watchtower_helper(
     assert result['updated'] is True
     assert result['requires_restart'] is False
     assert result['requires_manual'] is False
+    assert result['restart_scheduled'] is True
     assert result['helper_container'] == 'helper-container-id'
     assert (
         result['target_image'] == 'ghcr.io/securednodedynamics/downtify:latest'
     )
+    assert 'container restart/recreate is scheduled' in result[
+        'terminal_output'
+    ]
     assert captured['commands'][0] == [
         '/usr/bin/docker',
         'inspect',

@@ -907,6 +907,12 @@
           >
             {{ t('settings.restartRequired') }}
           </p>
+          <p
+            v-if="updateResult.restart_scheduled"
+            class="mt-1 text-xs text-success"
+          >
+            {{ t('settings.restartScheduled') }}
+          </p>
           <div
             v-if="updateResult.commands?.length"
             class="mt-3 space-y-2"
@@ -923,9 +929,9 @@
             </code>
           </div>
           <pre
-            v-if="updateResult.pull_output"
+            v-if="updateResult.terminal_output || updateResult.pull_output"
             class="mt-3 max-h-40 overflow-auto rounded-xl border border-white/10 bg-black/30 p-3 text-xs text-base-content/70"
-          >{{ updateResult.pull_output }}</pre>
+          >{{ updateResult.terminal_output || updateResult.pull_output }}</pre>
         </div>
       </div>
 
