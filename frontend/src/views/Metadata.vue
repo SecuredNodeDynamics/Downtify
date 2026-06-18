@@ -67,259 +67,264 @@
               {{ t('metadata.subtitle') }}
             </p>
           </div>
-        <div class="flex items-center gap-2">
-          <select
-            v-model.number="scanLimit"
-            class="select h-11 rounded-full border-white/10 bg-base-100/85 text-sm"
-            :disabled="loading"
-            :title="t('metadata.resultLimit')"
-          >
-            <option :value="25">25</option>
-            <option :value="50">50</option>
-            <option :value="100">100</option>
-          </select>
-          <button
-            class="btn btn-primary btn-sm h-11 rounded-full px-5"
-            :disabled="loading"
-            @click="scan"
-          >
-            <span
-              v-if="loading"
-              class="loading loading-spinner loading-xs mr-2"
-            />
-            <Icon v-else icon="clarity:refresh-line" class="h-4 w-4 mr-2" />
-            {{ t('metadata.scan') }}
-          </button>
-          <button
-            class="btn btn-sm h-11 rounded-full border-white/10 bg-base-100/85 hover:bg-base-100"
-            :disabled="loading"
-            @click="scanAll"
-          >
-            <Icon icon="clarity:fast-forward-line" class="h-4 w-4 mr-2" />
-            {{ t('metadata.scanAll') }}
-          </button>
-          <button
-            class="btn btn-sm h-11 rounded-full border-white/10 bg-base-100/85 hover:bg-base-100"
-            :disabled="
-              loading ||
-              activeTab !== 'needs' ||
-              items.length === 0 ||
-              repairingAll
-            "
-            @click="repairAll"
-          >
-            <span
-              v-if="repairingAll"
-              class="loading loading-spinner loading-xs mr-2"
-            />
-            <Icon v-else icon="clarity:check-circle-line" class="h-4 w-4 mr-2" />
-            {{ t('metadata.repairAll') }}
-          </button>
-        </div>
-      </div>
-
-      <div
-        v-if="error"
-        class="surface mb-4 flex items-center gap-3 rounded-2xl p-4 text-sm text-error"
-      >
-        <Icon icon="clarity:exclamation-circle-line" class="h-5 w-5" />
-        <span>{{ error }}</span>
-      </div>
-
-      <section class="mb-5 grid gap-3 sm:grid-cols-3">
-        <div class="surface rounded-2xl p-4">
-          <p class="text-xs uppercase text-base-content/40">
-            {{ t('metadata.scanned') }}
-          </p>
-          <p class="mt-1 text-2xl font-semibold">{{ summary.scanned }}</p>
-        </div>
-        <div class="surface rounded-2xl p-4">
-          <p class="text-xs uppercase text-base-content/40">
-            {{ t('metadata.needsFix') }}
-          </p>
-          <p class="mt-1 text-2xl font-semibold text-primary">
-            {{ summary.matched }}
-          </p>
-        </div>
-        <div class="surface rounded-2xl p-4">
-          <p class="text-xs uppercase text-base-content/40">
-            {{ t('metadata.total') }}
-          </p>
-          <p class="mt-1 text-2xl font-semibold">{{ summary.total }}</p>
-        </div>
-      </section>
-
-      <p class="mb-5 text-xs text-base-content/45">
-        {{ t('metadata.serverOnly') }}
-      </p>
-
-      <div
-        class="tab-glow-shell mb-5 inline-flex rounded-full border bg-base-100/75 p-1"
-      >
-        <button
-          class="rounded-full px-4 py-2 text-sm font-medium transition-colors"
-          :class="
-            activeTab === 'needs'
-              ? 'bg-primary text-primary-content shadow-glow-sm'
-              : 'text-base-content/60 hover:text-base-content'
-          "
-          @click="activeTab = 'needs'"
-        >
-          {{ t('metadata.needsFix') }}
-          <span class="ml-2 rounded-full bg-current/10 px-2 py-0.5 text-sm font-bold">
-            {{ items.length }}
-          </span>
-        </button>
-        <button
-          class="rounded-full px-4 py-2 text-sm font-medium transition-colors"
-          :class="
-            activeTab === 'completed'
-              ? 'bg-primary text-primary-content shadow-glow-sm'
-              : 'text-base-content/60 hover:text-base-content'
-          "
-          @click="activeTab = 'completed'"
-        >
-          {{ t('metadata.completed') }}
-          <span class="ml-2 rounded-full bg-current/10 px-2 py-0.5 text-sm font-bold">
-            {{ completedItems.length }}
-          </span>
-        </button>
-        <button
-          class="rounded-full px-4 py-2 text-sm font-medium transition-colors"
-          :class="
-            activeTab === 'clean'
-              ? 'bg-primary text-primary-content shadow-glow-sm'
-              : 'text-base-content/60 hover:text-base-content'
-          "
-          @click="activeTab = 'clean'"
-        >
-          {{ t('metadata.clean') }}
-          <span class="ml-2 rounded-full bg-current/10 px-2 py-0.5 text-sm font-bold">
-            {{ cleanItems.length }}
-          </span>
-        </button>
-      </div>
-
-      <div class="max-h-[45rem] overflow-y-auto pr-2">
-        <div v-if="loading && visibleItems.length === 0" class="space-y-3">
-          <div
-            v-for="n in 5"
-            :key="n"
-            class="skeleton scan-skeleton-glow h-24 rounded-2xl"
-          />
+          <div class="flex items-center gap-2">
+            <select
+              v-model.number="scanLimit"
+              class="select h-11 rounded-full border-white/10 bg-base-100/85 text-sm"
+              :disabled="loading"
+              :title="t('metadata.resultLimit')"
+            >
+              <option :value="25">25</option>
+              <option :value="50">50</option>
+              <option :value="100">100</option>
+            </select>
+            <button
+              class="btn btn-primary btn-sm h-11 rounded-full px-5"
+              :disabled="loading"
+              @click="scan"
+            >
+              <span
+                v-if="loading"
+                class="loading loading-spinner loading-xs mr-2"
+              />
+              <Icon v-else icon="clarity:refresh-line" class="h-4 w-4 mr-2" />
+              {{ t('metadata.scan') }}
+            </button>
+            <button
+              class="btn btn-sm h-11 rounded-full border-white/10 bg-base-100/85 hover:bg-base-100"
+              :disabled="loading"
+              @click="scanAll"
+            >
+              <Icon icon="clarity:fast-forward-line" class="h-4 w-4 mr-2" />
+              {{ t('metadata.scanAll') }}
+            </button>
+            <button
+              class="btn btn-sm h-11 rounded-full border-white/10 bg-base-100/85 hover:bg-base-100"
+              :disabled="
+                loading ||
+                activeTab !== 'needs' ||
+                items.length === 0 ||
+                repairingAll
+              "
+              @click="repairAll"
+            >
+              <span
+                v-if="repairingAll"
+                class="loading loading-spinner loading-xs mr-2"
+              />
+              <Icon
+                v-else
+                icon="clarity:check-circle-line"
+                class="h-4 w-4 mr-2"
+              />
+              {{ t('metadata.repairAll') }}
+            </button>
+          </div>
         </div>
 
         <div
-          v-else-if="visibleItems.length === 0"
-          class="surface rounded-2xl p-10 text-center"
+          v-if="error"
+          class="surface mb-4 flex items-center gap-3 rounded-2xl p-4 text-sm text-error"
         >
-          <Icon
-            icon="clarity:tag-line"
-            class="mx-auto mb-3 h-10 w-10 text-base-content/20"
-          />
-          <p class="text-sm text-base-content/50">
-            {{ loading ? t('metadata.scanning') : t('metadata.empty') }}
-          </p>
+          <Icon icon="clarity:exclamation-circle-line" class="h-5 w-5" />
+          <span>{{ error }}</span>
         </div>
 
-        <ul v-else class="space-y-3">
-          <li
-            v-for="item in visibleItems"
-            :key="item.file"
-            class="surface rounded-2xl p-4 transition-all duration-300"
-            :class="
-              applying[item.file]
-                ? 'scale-[1.01] border-primary/40 shadow-glow-sm'
-                : ''
-            "
-          >
-            <div class="flex flex-wrap items-start justify-between gap-3">
-              <div class="min-w-0">
-                <p class="truncate text-sm font-semibold">{{ item.file }}</p>
-                <p class="mt-1 text-xs text-base-content/45">
-                  {{ displaySong(item.current) }}
-                </p>
-              </div>
-              <span
-                class="pill shrink-0"
-                :class="
-                  activeTab === 'completed'
-                    ? 'badge-soft'
-                    : activeTab === 'clean'
-                      ? 'bg-white/5 text-base-content/50'
-                    : 'bg-warning/10 text-warning'
-                "
-              >
-                {{
-                  activeTab === 'completed'
-                    ? t('metadata.fixed')
-                    : activeTab === 'clean'
-                      ? t('metadata.clean')
-                    : t('metadata.needsFix')
-                }}
-              </span>
-            </div>
+        <section class="mb-5 grid gap-3 sm:grid-cols-3">
+          <div class="surface rounded-2xl p-4">
+            <p class="text-xs uppercase text-base-content/40">
+              {{ t('metadata.scanned') }}
+            </p>
+            <p class="mt-1 text-2xl font-semibold">{{ summary.scanned }}</p>
+          </div>
+          <div class="surface rounded-2xl p-4">
+            <p class="text-xs uppercase text-base-content/40">
+              {{ t('metadata.needsFix') }}
+            </p>
+            <p class="mt-1 text-2xl font-semibold text-primary">
+              {{ summary.matched }}
+            </p>
+          </div>
+          <div class="surface rounded-2xl p-4">
+            <p class="text-xs uppercase text-base-content/40">
+              {{ t('metadata.total') }}
+            </p>
+            <p class="mt-1 text-2xl font-semibold">{{ summary.total }}</p>
+          </div>
+        </section>
 
-            <div
-              class="mt-4 rounded-xl border border-white/10 bg-base-100/70 p-3"
+        <p class="mb-5 text-xs text-base-content/45">
+          {{ t('metadata.serverOnly') }}
+        </p>
+
+        <div
+          class="tab-glow-shell mb-5 inline-flex rounded-full border bg-base-100/75 p-1"
+        >
+          <button
+            class="rounded-full px-4 py-2 text-sm font-medium transition-colors"
+            :class="
+              activeTab === 'needs'
+                ? 'bg-primary text-primary-content shadow-glow-sm'
+                : 'text-base-content/60 hover:text-base-content'
+            "
+            @click="activeTab = 'needs'"
+          >
+            {{ t('metadata.needsFix') }}
+            <span
+              class="ml-2 rounded-full bg-current/10 px-2 py-0.5 text-sm font-bold"
             >
-              <p class="text-xs font-semibold text-primary">
-                {{ displaySong(item.candidate) }}
-              </p>
-              <div
-                v-if="item.changes.length"
-                class="mt-3 grid gap-2 text-xs sm:grid-cols-2"
-              >
-                <div
-                  v-for="change in item.changes"
-                  :key="`${item.file}-${change.field}`"
-                  class="rounded-lg bg-white/5 p-2"
-                >
-                  <p class="font-semibold text-base-content/70">
-                    {{ change.label }}
-                  </p>
-                  <p class="truncate text-base-content/40">
-                    {{ change.before || t('metadata.blank') }}
-                  </p>
-                  <p class="truncate text-primary">
-                    {{ change.after || t('metadata.blank') }}
+              {{ items.length }}
+            </span>
+          </button>
+          <button
+            class="rounded-full px-4 py-2 text-sm font-medium transition-colors"
+            :class="
+              activeTab === 'completed'
+                ? 'bg-primary text-primary-content shadow-glow-sm'
+                : 'text-base-content/60 hover:text-base-content'
+            "
+            @click="activeTab = 'completed'"
+          >
+            {{ t('metadata.completed') }}
+            <span
+              class="ml-2 rounded-full bg-current/10 px-2 py-0.5 text-sm font-bold"
+            >
+              {{ completedItems.length }}
+            </span>
+          </button>
+          <button
+            class="rounded-full px-4 py-2 text-sm font-medium transition-colors"
+            :class="
+              activeTab === 'clean'
+                ? 'bg-primary text-primary-content shadow-glow-sm'
+                : 'text-base-content/60 hover:text-base-content'
+            "
+            @click="activeTab = 'clean'"
+          >
+            {{ t('metadata.clean') }}
+            <span
+              class="ml-2 rounded-full bg-current/10 px-2 py-0.5 text-sm font-bold"
+            >
+              {{ cleanItems.length }}
+            </span>
+          </button>
+        </div>
+
+        <div class="max-h-[45rem] overflow-y-auto pr-2">
+          <div v-if="loading && visibleItems.length === 0" class="space-y-3">
+            <div
+              v-for="n in 5"
+              :key="n"
+              class="skeleton scan-skeleton-glow h-24 rounded-2xl"
+            />
+          </div>
+
+          <div
+            v-else-if="visibleItems.length === 0"
+            class="surface rounded-2xl p-10 text-center"
+          >
+            <Icon
+              icon="clarity:tag-line"
+              class="mx-auto mb-3 h-10 w-10 text-base-content/20"
+            />
+            <p class="text-sm text-base-content/50">
+              {{ loading ? t('metadata.scanning') : t('metadata.empty') }}
+            </p>
+          </div>
+
+          <ul v-else class="space-y-3">
+            <li
+              v-for="item in visibleItems"
+              :key="item.file"
+              class="surface rounded-2xl p-4 transition-all duration-300"
+              :class="
+                applying[item.file]
+                  ? 'scale-[1.01] border-primary/40 shadow-glow-sm'
+                  : ''
+              "
+            >
+              <div class="flex flex-wrap items-start justify-between gap-3">
+                <div class="min-w-0">
+                  <p class="truncate text-sm font-semibold">{{ item.file }}</p>
+                  <p class="mt-1 text-xs text-base-content/45">
+                    {{ displaySong(item.current) }}
                   </p>
                 </div>
-              </div>
-              <p v-else class="mt-2 text-xs text-base-content/45">
-                {{ t('metadata.idsOnly') }}
-              </p>
-            </div>
-
-            <div v-if="activeTab === 'needs'" class="mt-4 flex justify-end">
-              <button
-                class="btn btn-sm h-10 rounded-full border-white/10 bg-base-100/85 hover:bg-base-100"
-                :class="fixed[item.file] ? 'text-primary' : ''"
-                :disabled="applying[item.file] || fixed[item.file]"
-                @click="apply(item)"
-              >
                 <span
-                  v-if="applying[item.file]"
-                  class="loading loading-spinner loading-xs mr-2"
-                />
-                <Icon
-                  v-else
-                  icon="clarity:check-line"
-                  class="h-4 w-4 mr-2"
-                />
-                {{
-                  applying[item.file]
-                    ? t('metadata.fixing')
-                    : fixed[item.file]
+                  class="pill shrink-0"
+                  :class="
+                    activeTab === 'completed'
+                      ? 'badge-soft'
+                      : activeTab === 'clean'
+                        ? 'bg-white/5 text-base-content/50'
+                        : 'bg-warning/10 text-warning'
+                  "
+                >
+                  {{
+                    activeTab === 'completed'
                       ? t('metadata.fixed')
-                      : t('metadata.apply')
-                }}
-              </button>
-            </div>
-          </li>
-        </ul>
-      </div>
+                      : activeTab === 'clean'
+                        ? t('metadata.clean')
+                        : t('metadata.needsFix')
+                  }}
+                </span>
+              </div>
 
+              <div
+                class="mt-4 rounded-xl border border-white/10 bg-base-100/70 p-3"
+              >
+                <p class="text-xs font-semibold text-primary">
+                  {{ displaySong(item.candidate) }}
+                </p>
+                <div
+                  v-if="item.changes.length"
+                  class="mt-3 grid gap-2 text-xs sm:grid-cols-2"
+                >
+                  <div
+                    v-for="change in item.changes"
+                    :key="`${item.file}-${change.field}`"
+                    class="rounded-lg bg-white/5 p-2"
+                  >
+                    <p class="font-semibold text-base-content/70">
+                      {{ change.label }}
+                    </p>
+                    <p class="truncate text-base-content/40">
+                      {{ change.before || t('metadata.blank') }}
+                    </p>
+                    <p class="truncate text-primary">
+                      {{ change.after || t('metadata.blank') }}
+                    </p>
+                  </div>
+                </div>
+                <p v-else class="mt-2 text-xs text-base-content/45">
+                  {{ t('metadata.idsOnly') }}
+                </p>
+              </div>
+
+              <div v-if="activeTab === 'needs'" class="mt-4 flex justify-end">
+                <button
+                  class="btn btn-sm h-10 rounded-full border-white/10 bg-base-100/85 hover:bg-base-100"
+                  :class="fixed[item.file] ? 'text-primary' : ''"
+                  :disabled="applying[item.file] || fixed[item.file]"
+                  @click="apply(item)"
+                >
+                  <span
+                    v-if="applying[item.file]"
+                    class="loading loading-spinner loading-xs mr-2"
+                  />
+                  <Icon v-else icon="clarity:check-line" class="h-4 w-4 mr-2" />
+                  {{
+                    applying[item.file]
+                      ? t('metadata.fixing')
+                      : fixed[item.file]
+                        ? t('metadata.fixed')
+                        : t('metadata.apply')
+                  }}
+                </button>
+              </div>
+            </li>
+          </ul>
+        </div>
       </section>
 
       <section v-if="activeToolTab === 'images'">
@@ -352,7 +357,11 @@
                 v-if="artistImageLoading"
                 class="loading loading-spinner loading-xs mr-2"
               />
-              <Icon v-else icon="clarity:image-gallery-line" class="h-4 w-4 mr-2" />
+              <Icon
+                v-else
+                icon="clarity:image-gallery-line"
+                class="h-4 w-4 mr-2"
+              />
               {{ t('metadata.scanArtistImages') }}
             </button>
             <button
@@ -376,7 +385,11 @@
                 v-if="repairingAllImages"
                 class="loading loading-spinner loading-xs mr-2"
               />
-              <Icon v-else icon="clarity:check-circle-line" class="h-4 w-4 mr-2" />
+              <Icon
+                v-else
+                icon="clarity:check-circle-line"
+                class="h-4 w-4 mr-2"
+              />
               {{ t('metadata.repairAll') }}
             </button>
           </div>
@@ -430,7 +443,9 @@
             @click="activeArtistImageTab = 'needs'"
           >
             {{ t('metadata.needsFix') }}
-            <span class="ml-2 rounded-full bg-current/10 px-2 py-0.5 text-sm font-bold">
+            <span
+              class="ml-2 rounded-full bg-current/10 px-2 py-0.5 text-sm font-bold"
+            >
               {{ artistImageItems.length }}
             </span>
           </button>
@@ -444,7 +459,9 @@
             @click="activeArtistImageTab = 'completed'"
           >
             {{ t('metadata.completed') }}
-            <span class="ml-2 rounded-full bg-current/10 px-2 py-0.5 text-sm font-bold">
+            <span
+              class="ml-2 rounded-full bg-current/10 px-2 py-0.5 text-sm font-bold"
+            >
               {{ completedArtistImages.length }}
             </span>
           </button>
@@ -458,7 +475,9 @@
             @click="activeArtistImageTab = 'clean'"
           >
             {{ t('metadata.clean') }}
-            <span class="ml-2 rounded-full bg-current/10 px-2 py-0.5 text-sm font-bold">
+            <span
+              class="ml-2 rounded-full bg-current/10 px-2 py-0.5 text-sm font-bold"
+            >
               {{ cleanArtistImageItems.length }}
             </span>
           </button>
@@ -472,7 +491,9 @@
             @click="activeArtistImageTab = 'failed'"
           >
             {{ t('metadata.repairFailed') }}
-            <span class="ml-2 rounded-full bg-current/10 px-2 py-0.5 text-sm font-bold">
+            <span
+              class="ml-2 rounded-full bg-current/10 px-2 py-0.5 text-sm font-bold"
+            >
               {{ failedArtistImages.length }}
             </span>
           </button>
@@ -518,7 +539,9 @@
                   : ''
               "
             >
-              <div class="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto_auto] md:items-center">
+              <div
+                class="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto_auto] md:items-center"
+              >
                 <div class="min-w-0">
                   <p class="truncate text-sm font-semibold">
                     {{ item.artist }}
@@ -541,7 +564,9 @@
                   class="grid grid-cols-[5rem_5rem] items-center gap-3 justify-self-center"
                 >
                   <div>
-                    <p class="mb-1 text-center text-[0.65rem] uppercase text-base-content/40">
+                    <p
+                      class="mb-1 text-center text-[0.65rem] uppercase text-base-content/40"
+                    >
                       {{ t('metadata.before') }}
                     </p>
                     <div
@@ -554,7 +579,9 @@
                     </div>
                   </div>
                   <div>
-                    <p class="mb-1 text-center text-[0.65rem] uppercase text-base-content/40">
+                    <p
+                      class="mb-1 text-center text-[0.65rem] uppercase text-base-content/40"
+                    >
                       {{ t('metadata.after') }}
                     </p>
                     <div
@@ -582,7 +609,9 @@
                 <button
                   v-if="activeArtistImageTab === 'needs'"
                   class="btn btn-sm h-10 rounded-full border-white/10 bg-base-100/85 hover:bg-base-100"
-                  :class="fixedArtistImages[itemKey(item)] ? 'text-primary' : ''"
+                  :class="
+                    fixedArtistImages[itemKey(item)] ? 'text-primary' : ''
+                  "
                   :disabled="
                     applyingArtistImages[itemKey(item)] ||
                     fixedArtistImages[itemKey(item)]
@@ -661,7 +690,11 @@
                 v-if="repairingAllJellyfin"
                 class="loading loading-spinner loading-xs mr-2"
               />
-              <Icon v-else icon="clarity:image-gallery-line" class="h-4 w-4 mr-2" />
+              <Icon
+                v-else
+                icon="clarity:image-gallery-line"
+                class="h-4 w-4 mr-2"
+              />
               {{ t('metadata.repairAll') }}
             </button>
           </div>
@@ -675,6 +708,26 @@
             <p class="mt-1 truncate text-lg font-semibold">
               {{ jellyfinLibraryName }}
             </p>
+            <button
+              class="btn btn-primary btn-xs mt-3 h-8 rounded-full"
+              :disabled="
+                repairingAllJellyfin ||
+                reconcilingArtists ||
+                jellyfinRepairableItems.length === 0
+              "
+              @click="repairAllJellyfinArtistImages"
+            >
+              <span
+                v-if="repairingAllJellyfin"
+                class="loading loading-spinner loading-xs mr-2"
+              />
+              <Icon
+                v-else
+                icon="clarity:magic-wand-line"
+                class="h-4 w-4 mr-2"
+              />
+              {{ t('metadata.bulkFixGroup') }}
+            </button>
           </div>
           <div class="surface rounded-2xl p-4">
             <p class="text-xs uppercase text-base-content/40">
@@ -683,6 +736,27 @@
             <p class="mt-1 text-2xl font-semibold text-primary">
               {{ jellyfinCounts.jellyfin }}
             </p>
+            <button
+              class="btn btn-primary btn-xs mt-3 h-8 rounded-full"
+              :disabled="
+                repairingJellyfinBucket === 'jellyfin_only' ||
+                repairingAllJellyfin ||
+                reconcilingArtists ||
+                jellyfinRepairableBucketItems('jellyfin_only').length === 0
+              "
+              @click="repairJellyfinBucket('jellyfin_only')"
+            >
+              <span
+                v-if="repairingJellyfinBucket === 'jellyfin_only'"
+                class="loading loading-spinner loading-xs mr-2"
+              />
+              <Icon
+                v-else
+                icon="clarity:magic-wand-line"
+                class="h-4 w-4 mr-2"
+              />
+              {{ t('metadata.bulkFixGroup') }}
+            </button>
           </div>
           <div class="surface rounded-2xl p-4">
             <p class="text-xs uppercase text-base-content/40">
@@ -691,6 +765,27 @@
             <p class="mt-1 text-2xl font-semibold">
               {{ jellyfinCounts.folders }}
             </p>
+            <button
+              class="btn btn-primary btn-xs mt-3 h-8 rounded-full"
+              :disabled="
+                repairingJellyfinBucket === 'folder_only' ||
+                repairingAllJellyfin ||
+                reconcilingArtists ||
+                jellyfinRepairableBucketItems('folder_only').length === 0
+              "
+              @click="repairJellyfinBucket('folder_only')"
+            >
+              <span
+                v-if="repairingJellyfinBucket === 'folder_only'"
+                class="loading loading-spinner loading-xs mr-2"
+              />
+              <Icon
+                v-else
+                icon="clarity:magic-wand-line"
+                class="h-4 w-4 mr-2"
+              />
+              {{ t('metadata.bulkFixGroup') }}
+            </button>
           </div>
           <div class="surface rounded-2xl p-4">
             <p class="text-xs uppercase text-base-content/40">
@@ -699,6 +794,27 @@
             <p class="mt-1 text-2xl font-semibold text-primary">
               {{ jellyfinCounts.missingImages }}
             </p>
+            <button
+              class="btn btn-primary btn-xs mt-3 h-8 rounded-full"
+              :disabled="
+                repairingJellyfinBucket === 'missing_images' ||
+                repairingAllJellyfin ||
+                reconcilingArtists ||
+                jellyfinRepairableBucketItems('missing_images').length === 0
+              "
+              @click="repairJellyfinBucket('missing_images')"
+            >
+              <span
+                v-if="repairingJellyfinBucket === 'missing_images'"
+                class="loading loading-spinner loading-xs mr-2"
+              />
+              <Icon
+                v-else
+                icon="clarity:magic-wand-line"
+                class="h-4 w-4 mr-2"
+              />
+              {{ t('metadata.bulkFixGroup') }}
+            </button>
           </div>
         </div>
 
@@ -743,10 +859,7 @@
           </p>
         </div>
 
-        <div
-          v-else-if="artistReconciliation"
-          class="surface rounded-2xl p-4"
-        >
+        <div v-else-if="artistReconciliation" class="surface rounded-2xl p-4">
           <div class="mb-4 grid gap-3 md:grid-cols-4">
             <button
               v-for="bucket in reconciliationBuckets"
@@ -768,9 +881,58 @@
                   <p class="mt-1 text-2xl font-semibold text-primary">
                     {{ bucket.count }}
                   </p>
+                  <p
+                    v-if="bucket.repairableCount > 0"
+                    class="mt-2 text-[11px] font-medium text-primary"
+                  >
+                    {{
+                      t('metadata.bulkFixAvailable', {
+                        count: bucket.repairableCount,
+                      })
+                    }}
+                  </p>
                 </div>
                 <Icon :icon="bucket.icon" class="h-5 w-5 text-primary/70" />
               </div>
+            </button>
+          </div>
+
+          <div
+            v-if="activeReconciliationBucketMeta"
+            class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/10 bg-base-100/60 p-3"
+          >
+            <div class="min-w-0">
+              <p class="text-sm font-semibold">
+                {{ activeReconciliationBucketMeta.label }}
+              </p>
+              <p class="text-xs text-base-content/45">
+                {{
+                  t('metadata.bulkFixReady', {
+                    count: activeReconciliationBucketMeta.repairableCount,
+                  })
+                }}
+              </p>
+            </div>
+            <button
+              class="btn btn-primary btn-sm h-9 rounded-full px-4"
+              :disabled="
+                repairingJellyfinBucket === activeReconciliationBucket ||
+                repairingAllJellyfin ||
+                reconcilingArtists ||
+                activeReconciliationBucketMeta.repairableCount === 0
+              "
+              @click="repairJellyfinBucket(activeReconciliationBucket)"
+            >
+              <span
+                v-if="repairingJellyfinBucket === activeReconciliationBucket"
+                class="loading loading-spinner loading-xs mr-2"
+              />
+              <Icon
+                v-else
+                icon="clarity:magic-wand-line"
+                class="h-4 w-4 mr-2"
+              />
+              {{ t('metadata.bulkFixGroup') }}
             </button>
           </div>
 
@@ -844,7 +1006,11 @@
                       v-if="applyingArtistImages[jellyfinRepairKey(item)]"
                       class="loading loading-spinner loading-xs mr-2"
                     />
-                    <Icon v-else icon="clarity:image-gallery-line" class="h-4 w-4 mr-2" />
+                    <Icon
+                      v-else
+                      icon="clarity:image-gallery-line"
+                      class="h-4 w-4 mr-2"
+                    />
                     {{
                       fixedArtistImages[jellyfinRepairKey(item)]
                         ? t('metadata.fixed')
@@ -887,7 +1053,6 @@
           <p>{{ t('metadata.emptyReconciliation') }}</p>
         </div>
       </section>
-
     </main>
   </div>
 </template>
@@ -933,6 +1098,7 @@ const activeReconciliationBucket = ref('missing_images')
 const reconcilingArtists = ref(false)
 const refreshingJellyfin = ref(false)
 const repairingAllJellyfin = ref(false)
+const repairingJellyfinBucket = ref('')
 const jellyfinMessage = ref('')
 const jellyfinError = ref(false)
 const lastReconciled = ref('')
@@ -972,7 +1138,7 @@ const emptyArtistImageMessage = computed(() => {
 
 const reconciliationBuckets = computed(() => {
   const data = artistReconciliation.value || {}
-  return [
+  const buckets = [
     {
       key: 'missing_images',
       label: t('metadata.missingLocalImages'),
@@ -1009,6 +1175,10 @@ const reconciliationBuckets = computed(() => {
       icon: 'clarity:check-circle-line',
     },
   ]
+  return buckets.map((bucket) => ({
+    ...bucket,
+    repairableCount: jellyfinRepairableBucketItems(bucket.key).length,
+  }))
 })
 
 const reconciliationGridItems = computed(() =>
@@ -1040,11 +1210,12 @@ const jellyfinLibraryName = computed(() => {
 })
 
 const jellyfinRepairableItems = computed(() =>
-  (artistReconciliation.value?.missing_images || []).filter(
-    (item) =>
-      item?.missing_image &&
-      item?.file &&
-      !fixedArtistImages.value[jellyfinRepairKey(item)]
+  jellyfinRepairableBucketItems('missing_images')
+)
+
+const activeReconciliationBucketMeta = computed(() =>
+  reconciliationBuckets.value.find(
+    (bucket) => bucket.key === activeReconciliationBucket.value
   )
 )
 
@@ -1072,12 +1243,31 @@ function jellyfinRepairKey(item) {
   return `${item.name || item.artist}-${item.folder || ''}-${item.file || ''}`
 }
 
+function jellyfinBucketItems(bucketKey) {
+  const data = artistReconciliation.value || {}
+  return data[bucketKey] || []
+}
+
+function isJellyfinRepairableItem(item) {
+  return (
+    item?.missing_image &&
+    item?.file &&
+    !fixedArtistImages.value[jellyfinRepairKey(item)]
+  )
+}
+
+function jellyfinRepairableBucketItems(bucketKey) {
+  return jellyfinBucketItems(bucketKey).filter(isJellyfinRepairableItem)
+}
+
 function pendingArtistImageItems(items) {
   return (items || []).filter((item) => !fixedArtistImages.value[itemKey(item)])
 }
 
 function firstSavedFolder(result) {
-  const path = [...(result?.verified || []), ...(result?.saved || [])].find(Boolean)
+  const path = [...(result?.verified || []), ...(result?.saved || [])].find(
+    Boolean
+  )
   return path ? String(path).split('/', 1)[0] : ''
 }
 
@@ -1090,10 +1280,9 @@ function markJellyfinArtistImageFixed(item, result) {
       folder: folder || existing.folder,
       has_image: true,
       missing_image: false,
-      preview_url:
-        folder
-          ? `/api/metadata/artist-images/folder-preview?folder=${encodeURIComponent(folder)}`
-          : existing.preview_url,
+      preview_url: folder
+        ? `/api/metadata/artist-images/folder-preview?folder=${encodeURIComponent(folder)}`
+        : existing.preview_url,
     }
   }
   const current = artistReconciliation.value || {}
@@ -1102,10 +1291,7 @@ function markJellyfinArtistImageFixed(item, result) {
     ...current,
     counts: {
       ...counts,
-      missing_local_images: Math.max(
-        0,
-        (counts.missing_local_images || 0) - 1
-      ),
+      missing_local_images: Math.max(0, (counts.missing_local_images || 0) - 1),
       local_images: (counts.local_images || 0) + 1,
     },
     matched: (current.matched || []).map(updateItem),
@@ -1162,8 +1348,7 @@ function applyArtistImageStatus(data) {
     matched: artistImageItems.value.length,
   }
   cleanArtistImageItems.value = data.clean || cleanArtistImageItems.value
-  completedArtistImages.value =
-    data.completed || completedArtistImages.value
+  completedArtistImages.value = data.completed || completedArtistImages.value
   if (Array.isArray(data.failed) && data.failed.length > 0) {
     failedArtistImages.value = data.failed
   }
@@ -1325,7 +1510,9 @@ async function apply(item) {
     if (remainingChanges.length === 0) {
       fixed.value = { ...fixed.value, [item.file]: true }
       completedItems.value = [res.data, ...completedItems.value]
-      items.value = items.value.filter((existing) => existing.file !== item.file)
+      items.value = items.value.filter(
+        (existing) => existing.file !== item.file
+      )
       summary.value = {
         ...summary.value,
         matched: Math.max(0, summary.value.matched - 1),
@@ -1477,7 +1664,9 @@ async function applyJellyfinArtistImage(item) {
     jellyfinMessage.value = t('metadata.artistImageRepairOk')
   } catch (err) {
     const detail =
-      err?.response?.data?.detail || err?.message || t('metadata.failedArtistImageApply')
+      err?.response?.data?.detail ||
+      err?.message ||
+      t('metadata.failedArtistImageApply')
     jellyfinError.value = true
     jellyfinMessage.value = `${t('metadata.failedArtistImageApply')} ${detail}`
   } finally {
@@ -1522,5 +1711,32 @@ async function repairAllJellyfinArtistImages() {
     jellyfinMessage.value = `${t('metadata.failedArtistImageApply')} (${succeeded}/${targets.length})`
   }
   repairingAllJellyfin.value = false
+}
+
+async function repairJellyfinBucket(bucketKey) {
+  const targets = [...jellyfinRepairableBucketItems(bucketKey)]
+  if (targets.length === 0) return
+
+  repairingJellyfinBucket.value = bucketKey
+  jellyfinMessage.value = ''
+  jellyfinError.value = false
+
+  let succeeded = 0
+  for (const item of targets) {
+    // eslint-disable-next-line no-await-in-loop
+    await applyJellyfinArtistImage(item)
+    if (fixedArtistImages.value[jellyfinRepairKey(item)]) {
+      succeeded += 1
+    }
+  }
+
+  if (succeeded === targets.length) {
+    jellyfinError.value = false
+    jellyfinMessage.value = t('metadata.artistImageRepairOk')
+  } else {
+    jellyfinError.value = true
+    jellyfinMessage.value = `${t('metadata.failedArtistImageApply')} (${succeeded}/${targets.length})`
+  }
+  repairingJellyfinBucket.value = ''
 }
 </script>

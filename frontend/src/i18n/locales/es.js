@@ -192,8 +192,7 @@ export default {
       'Todavia no se completaron correcciones de imagenes de artistas.',
     emptyArtistImageClean:
       'Todavia no hay resultados de imagenes de artistas sin correccion.',
-    emptyArtistImageFailed:
-      'No fallo ninguna correccion de imagen de artista.',
+    emptyArtistImageFailed: 'No fallo ninguna correccion de imagen de artista.',
     before: 'Antes',
     after: 'Despues',
     blank: 'Vacio',
@@ -225,6 +224,9 @@ export default {
     localImageReady: 'Arte local listo',
     missingLocalImage: 'Falta arte local',
     applyImage: 'Aplicar imagen',
+    bulkFixGroup: 'Reparar este grupo',
+    bulkFixAvailable: '{count} se pueden reparar',
+    bulkFixReady: '{count} candidatos de imagen reparables en este grupo.',
     noRepairFile:
       'Ejecuta el escaneo de imagenes de artistas para encontrar una fuente de reparacion.',
     jellyfinOnly: 'Solo en Jellyfin',
@@ -351,7 +353,8 @@ export default {
     checking: 'Revisando...',
     checkUpdates: 'Buscar actualizaciones',
     checkingUpdates: 'Buscando actualizaciones',
-    checkingUpdatesHint: 'Downtify esta consultando la ultima version en GitHub.',
+    checkingUpdatesHint:
+      'Downtify esta consultando la ultima version en GitHub.',
     updateAvailable: 'Actualizacion disponible',
     updateAvailableHint:
       'La version {version} esta disponible en el repositorio GitHub de Downtify.',
@@ -404,7 +407,8 @@ export default {
     jellyfinMusicLibraryHint:
       'Nombre o ruta de la biblioteca de musica de Jellyfin que Downtify debe escanear/sincronizar.',
     jellyfinLibraryLoading: 'Cargando bibliotecas...',
-    jellyfinNoLibraries: 'No se encontraron bibliotecas de musica. Verifica tu URL de Jellyfin y clave API.',
+    jellyfinNoLibraries:
+      'No se encontraron bibliotecas de musica. Verifica tu URL de Jellyfin y clave API.',
     jellyfinLibraryError: 'Error al cargar las bibliotecas',
     playlistsSection: 'Listas',
     generateM3u: 'Generar archivo M3U para las listas',

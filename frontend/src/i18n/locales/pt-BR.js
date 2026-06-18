@@ -191,8 +191,7 @@ export default {
       'Nenhum reparo de imagem de artista foi concluido ainda.',
     emptyArtistImageClean:
       'Ainda nao ha resultados de imagem de artista sem reparo.',
-    emptyArtistImageFailed:
-      'Nenhum reparo de imagem de artista falhou.',
+    emptyArtistImageFailed: 'Nenhum reparo de imagem de artista falhou.',
     before: 'Antes',
     after: 'Depois',
     blank: 'Vazio',
@@ -224,6 +223,9 @@ export default {
     localImageReady: 'Arte local pronta',
     missingLocalImage: 'Falta arte local',
     applyImage: 'Aplicar imagem',
+    bulkFixGroup: 'Reparar este grupo',
+    bulkFixAvailable: '{count} podem ser reparados',
+    bulkFixReady: '{count} candidatos de imagem reparaveis neste grupo.',
     noRepairFile:
       'Execute a busca de imagens de artistas para encontrar uma fonte de reparo.',
     jellyfinOnly: 'So no Jellyfin',
@@ -303,11 +305,11 @@ export default {
     logsTab: 'Registros',
     aboutTab: 'Sobre',
     helpTab: 'Ajuda',
-    logsHint: 'Tentativas recentes de reparo de metadados e imagens de artistas.',
+    logsHint:
+      'Tentativas recentes de reparo de metadados e imagens de artistas.',
     logsError: 'Falha ao carregar os registros.',
     aboutTitle: 'Sobre o Downtify',
-    aboutSubtitle:
-      'Guia rapido de cada pagina e secao de manutencao do app.',
+    aboutSubtitle: 'Guia rapido de cada pagina e secao de manutencao do app.',
     aboutSearchTitle: 'Busca',
     aboutSearchText:
       'Busque musicas, albuns, playlists ou cole links do Spotify e YouTube Music. Revise resultados e envie downloads para a fila.',
@@ -350,7 +352,8 @@ export default {
     checking: 'Verificando...',
     checkUpdates: 'Verificar atualizacoes',
     checkingUpdates: 'Verificando atualizacoes',
-    checkingUpdatesHint: 'O Downtify esta consultando a versao mais recente no GitHub.',
+    checkingUpdatesHint:
+      'O Downtify esta consultando a versao mais recente no GitHub.',
     updateAvailable: 'Atualizacao disponivel',
     updateAvailableHint:
       'A versao {version} esta disponivel no repositorio GitHub do Downtify.',
@@ -403,7 +406,8 @@ export default {
     jellyfinMusicLibraryHint:
       'Nome ou caminho da biblioteca de musica Jellyfin que o Downtify deve escanear/sincronizar.',
     jellyfinLibraryLoading: 'Carregando bibliotecas...',
-    jellyfinNoLibraries: 'Nenhuma biblioteca de musica encontrada. Verifique sua URL e chave API do Jellyfin.',
+    jellyfinNoLibraries:
+      'Nenhuma biblioteca de musica encontrada. Verifique sua URL e chave API do Jellyfin.',
     jellyfinLibraryError: 'Falha ao carregar as bibliotecas',
     playlistsSection: 'Playlists',
     generateM3u: 'Gerar arquivo M3U para playlists',

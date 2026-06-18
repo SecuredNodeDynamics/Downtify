@@ -218,6 +218,9 @@ export default {
     localImageReady: 'Local art ready',
     missingLocalImage: 'Missing local art',
     applyImage: 'Apply image',
+    bulkFixGroup: 'Fix this group',
+    bulkFixAvailable: '{count} can be fixed',
+    bulkFixReady: '{count} repairable image candidates in this group.',
     noRepairFile: 'Run Artist Images scan to find a repair source.',
     jellyfinOnly: 'In Jellyfin only',
     folderOnly: 'Folder only',
@@ -226,7 +229,8 @@ export default {
     lastChecked: 'Last checked',
     notCheckedYet: 'Not checked yet',
     noArtistsInBucket: 'No artists here.',
-    emptyReconciliation: 'Run reconciliation to compare Jellyfin and local artists.',
+    emptyReconciliation:
+      'Run reconciliation to compare Jellyfin and local artists.',
     repairLog: 'Repair log',
     emptyRepairLog: 'No repairs logged yet.',
   },
@@ -341,7 +345,8 @@ export default {
     checking: 'Checking...',
     checkUpdates: 'Check updates',
     checkingUpdates: 'Checking for updates',
-    checkingUpdatesHint: 'Downtify is contacting GitHub for the latest release.',
+    checkingUpdatesHint:
+      'Downtify is contacting GitHub for the latest release.',
     updateAvailable: 'Update available',
     updateAvailableHint:
       'Version {version} is available from the Downtify GitHub repository.',
@@ -394,7 +399,8 @@ export default {
     jellyfinMusicLibraryHint:
       'Name or path of the Jellyfin music library Downtify should scan/sync.',
     jellyfinLibraryLoading: 'Loading libraries...',
-    jellyfinNoLibraries: 'No music libraries found. Check your Jellyfin URL and API key.',
+    jellyfinNoLibraries:
+      'No music libraries found. Check your Jellyfin URL and API key.',
     jellyfinLibraryError: 'Failed to load libraries',
     playlistsSection: 'Playlists',
     generateM3u: 'Generate M3U file for playlists',
