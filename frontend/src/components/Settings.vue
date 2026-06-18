@@ -938,7 +938,35 @@
         </div>
 
         <div
-          v-if="updateResult"
+          v-if="updateCompleted"
+          class="surface rounded-2xl border border-success/30 bg-success/10 p-5"
+        >
+          <div class="flex items-start gap-3">
+            <Icon
+              icon="clarity:success-standard-line"
+              class="mt-0.5 h-6 w-6 shrink-0 text-success"
+            />
+            <div>
+              <p class="font-semibold text-success">
+                {{ t('settings.updateFinished') }}
+              </p>
+              <p class="mt-1 text-sm text-base-content/70">
+                {{ t('settings.refreshAfterUpdate') }}
+              </p>
+              <button
+                type="button"
+                class="btn btn-success btn-sm mt-4 h-10 rounded-full px-5"
+                @click="refreshPage"
+              >
+                <Icon icon="clarity:refresh-line" class="mr-2 h-4 w-4" />
+                {{ t('settings.refreshPage') }}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div
+          v-if="updateResult && !updateCompleted"
           class="surface rounded-2xl p-4"
           :class="updateResult.success ? 'text-base-content' : 'text-error'"
         >
@@ -1038,6 +1066,8 @@ const helpLoading = ref(false)
 const helpError = ref('')
 const updateRunning = ref(false)
 const updateResult = ref(null)
+const updateCompleted = ref(false)
+let updateCompletionTimer = null
 
 function openSettingsTab(event) {
   const tab = event?.detail?.tab
@@ -1052,6 +1082,7 @@ onMounted(() =>
 onBeforeUnmount(() =>
   window.removeEventListener('downtify:open-settings', openSettingsTab)
 )
+onBeforeUnmount(() => clearTimeout(updateCompletionTimer))
 function normalizedJellyfinLibraryName(value) {
   return String(value || '')
     .normalize('NFKC')
@@ -1265,15 +1296,47 @@ async function runUpdate() {
   updateRunning.value = true
   helpError.value = ''
   updateResult.value = null
+  updateCompleted.value = false
   try {
     const res = await API.updateApp()
     updateResult.value = res.data || null
     if (res.data?.current_version) updateStatus.value = res.data
+    if (res.data?.restart_scheduled) {
+      waitForUpdatedApp(res.data.latest_version)
+    }
   } catch (err) {
     helpError.value = err?.response?.data?.detail || t('settings.updateError')
   } finally {
     updateRunning.value = false
   }
+}
+
+async function waitForUpdatedApp(expectedVersion, attempts = 0) {
+  if (attempts >= 60) return
+  try {
+    const response = await API.getAppVersion()
+    const version = String(response.data || '').trim()
+    if (version && (!expectedVersion || version === expectedVersion)) {
+      updateCompleted.value = true
+      updateStatus.value = {
+        ...(updateStatus.value || {}),
+        current_version: version,
+        latest_version: version,
+        update_available: false,
+      }
+      return
+    }
+  } catch {
+    // A short connection failure is expected while Docker recreates the app.
+  }
+  updateCompletionTimer = setTimeout(
+    () => waitForUpdatedApp(expectedVersion, attempts + 1),
+    1500
+  )
+}
+
+function refreshPage() {
+  window.location.reload()
 }
 
 async function selectLocalDestination() {

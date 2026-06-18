@@ -369,6 +369,9 @@ export default {
       'Instalacoes Docker atualizam pelo app quando o socket Docker esta montado; o app sera reiniciado.',
     updateError: 'Nao foi possivel atualizar o Downtify.',
     updateFinished: 'Atualizacao concluida',
+    refreshAfterUpdate:
+      'A nova versao esta em execucao. Atualize esta pagina para carregar o app atualizado.',
+    refreshPage: 'Atualizar esta pagina',
     restartRequired: 'Reinicie o Downtify para usar a versao atualizada.',
     restartScheduled:
       'A reinicializacao do Docker foi agendada. O conteiner sera recriado em instantes.',

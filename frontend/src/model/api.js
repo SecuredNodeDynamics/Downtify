@@ -105,6 +105,10 @@ function updateApp() {
   return API.post('/api/update')
 }
 
+function getAppVersion() {
+  return API.get('/api/version')
+}
+
 function getHealth() {
   return API.get('/api/health')
 }
@@ -263,6 +267,7 @@ export default {
   refreshJellyfinLibrary,
   check_for_update,
   updateApp,
+  getAppVersion,
   getHealth,
   startMetadataScan,
   getMetadataScanStatus,

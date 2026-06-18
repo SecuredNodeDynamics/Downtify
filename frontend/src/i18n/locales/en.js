@@ -362,6 +362,9 @@ export default {
       'Docker installs update in place when the Docker socket is mounted; the app will restart.',
     updateError: 'Could not update Downtify.',
     updateFinished: 'Update finished',
+    refreshAfterUpdate:
+      'The new version is running. Please refresh this page to load the updated app.',
+    refreshPage: 'Refresh this page',
     restartRequired: 'Restart Downtify to use the updated version.',
     restartScheduled:
       'Docker restart has been scheduled. The container will recreate itself shortly.',

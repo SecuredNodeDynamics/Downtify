@@ -370,6 +370,9 @@ export default {
       'Las instalaciones Docker se actualizan desde la app si el socket Docker esta montado; la app se reiniciara.',
     updateError: 'No se pudo actualizar Downtify.',
     updateFinished: 'Actualizacion finalizada',
+    refreshAfterUpdate:
+      'La nueva version esta funcionando. Actualiza esta pagina para cargar la app actualizada.',
+    refreshPage: 'Actualizar esta pagina',
     restartRequired: 'Reinicia Downtify para usar la version actualizada.',
     restartScheduled:
       'El reinicio de Docker fue programado. El contenedor se recreara en breve.',
