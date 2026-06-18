@@ -405,6 +405,10 @@ export default {
     jellyfinApiKeyPlaceholder: 'Pega la clave API',
     jellyfinApiKeyHint:
       'Se usara luego para sincronizar la biblioteca Jellyfin y actualizar imagenes de artistas.',
+    jellyfinTest: 'Probar',
+    jellyfinTesting: 'Probando...',
+    jellyfinTestSuccess: 'Conexion correcta. La clave API es valida.',
+    jellyfinTestFailed: 'Fallo la prueba de conexion',
     jellyfinMusicLibrary: 'Biblioteca o carpeta de musica',
     jellyfinMusicLibraryPlaceholder: 'Music',
     jellyfinMusicLibraryHint:

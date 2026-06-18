@@ -397,6 +397,10 @@ export default {
     jellyfinApiKeyPlaceholder: 'Paste API key',
     jellyfinApiKeyHint:
       'Used later for Jellyfin library sync and direct artist image updates.',
+    jellyfinTest: 'Test',
+    jellyfinTesting: 'Testing...',
+    jellyfinTestSuccess: 'Connection successful. The API key is valid.',
+    jellyfinTestFailed: 'Connection test failed',
     jellyfinMusicLibrary: 'Music library or folder',
     jellyfinMusicLibraryPlaceholder: 'Music',
     jellyfinMusicLibraryHint:

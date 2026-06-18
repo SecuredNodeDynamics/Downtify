@@ -210,10 +210,7 @@
                 {{ t('settings.changeLocalFolder') }}
               </button>
             </div>
-            <p
-              v-if="!localFolderReady"
-              class="text-[11px] text-warning"
-            >
+            <p v-if="!localFolderReady" class="text-[11px] text-warning">
               {{ t('settings.localFolderPermissionNeeded') }}
             </p>
           </div>
@@ -534,7 +531,9 @@
                 v-model="sm.settings.value.enable_jellyfin_tools"
               />
               <span class="flex-1 text-sm">
-                <span class="block">{{ t('settings.enableJellyfinTools') }}</span>
+                <span class="block">{{
+                  t('settings.enableJellyfinTools')
+                }}</span>
                 <span class="block text-[11px] text-base-content/50">
                   {{ t('settings.enableJellyfinToolsHint') }}
                 </span>
@@ -559,25 +558,61 @@
               <label class="block text-xs text-base-content/50 mb-1.5">
                 {{ t('settings.jellyfinApiKey') }}
               </label>
-              <input
-                v-model="sm.settings.value.jellyfin_api_key"
-                type="password"
-                autocomplete="off"
-                class="input-modern h-10 w-full text-sm"
-                :placeholder="t('settings.jellyfinApiKeyPlaceholder')"
-                @change="onJellyfinConfigChange"
-              />
+              <div class="flex gap-2">
+                <input
+                  v-model="sm.settings.value.jellyfin_api_key"
+                  type="password"
+                  autocomplete="off"
+                  class="input-modern h-10 min-w-0 flex-1 text-sm"
+                  :placeholder="t('settings.jellyfinApiKeyPlaceholder')"
+                  @change="onJellyfinConfigChange"
+                />
+                <button
+                  type="button"
+                  class="btn btn-sm h-10 px-3 rounded-lg border-white/10 bg-base-100/85 hover:bg-base-100"
+                  :disabled="
+                    jellyfinTestLoading ||
+                    !sm.settings.value.jellyfin_url?.trim() ||
+                    !sm.settings.value.jellyfin_api_key?.trim()
+                  "
+                  @click="testJellyfinApi"
+                >
+                  <span
+                    v-if="jellyfinTestLoading"
+                    class="loading loading-spinner loading-xs"
+                  ></span>
+                  {{
+                    jellyfinTestLoading
+                      ? t('settings.jellyfinTesting')
+                      : t('settings.jellyfinTest')
+                  }}
+                </button>
+              </div>
               <p class="text-[11px] text-base-content/40 mt-1.5">
                 {{ t('settings.jellyfinApiKeyHint') }}
+              </p>
+              <p
+                v-if="jellyfinTestMessage"
+                class="text-[11px] mt-1.5"
+                :class="jellyfinTestError ? 'text-error' : 'text-primary'"
+              >
+                {{ jellyfinTestMessage }}
               </p>
             </div>
             <div>
               <label class="block text-xs text-base-content/50 mb-1.5">
                 {{ t('settings.jellyfinMusicLibrary') }}
               </label>
-              <div v-if="jellyfinLibraryLoading" class="flex items-center gap-2">
-                <div class="h-10 w-full rounded-xl bg-base-100/85 border border-white/10 flex items-center px-3">
-                  <span class="text-sm text-base-content/60">{{ t('settings.jellyfinLibraryLoading') }}</span>
+              <div
+                v-if="jellyfinLibraryLoading"
+                class="flex items-center gap-2"
+              >
+                <div
+                  class="h-10 w-full rounded-xl bg-base-100/85 border border-white/10 flex items-center px-3"
+                >
+                  <span class="text-sm text-base-content/60">{{
+                    t('settings.jellyfinLibraryLoading')
+                  }}</span>
                 </div>
               </div>
               <div v-else-if="jellyfinLibraryError" class="space-y-1.5">
@@ -587,7 +622,9 @@
                     class="input-modern h-10 flex-1 text-sm opacity-50"
                     disabled
                   >
-                    <option value="">{{ t('settings.jellyfinMusicLibraryPlaceholder') }}</option>
+                    <option value="">
+                      {{ t('settings.jellyfinMusicLibraryPlaceholder') }}
+                    </option>
                   </select>
                   <button
                     type="button"
@@ -606,7 +643,9 @@
                   class="input-modern h-10 flex-1 text-sm"
                   :disabled="uniqueJellyfinLibraries.length === 0"
                 >
-                  <option value="">{{ t('settings.jellyfinMusicLibraryPlaceholder') }}</option>
+                  <option value="">
+                    {{ t('settings.jellyfinMusicLibraryPlaceholder') }}
+                  </option>
                   <option
                     v-for="lib in uniqueJellyfinLibraries"
                     :key="lib.id"
@@ -720,7 +759,8 @@
                   {{ entry.target }}
                 </p>
                 <p class="mt-1 text-xs text-base-content/45">
-                  {{ logKindLabel(entry.kind) }} · {{ entry.detail || entry.created_at }}
+                  {{ logKindLabel(entry.kind) }} ·
+                  {{ entry.detail || entry.created_at }}
                 </p>
               </div>
               <span
@@ -885,7 +925,11 @@
               v-if="updateRunning"
               class="loading loading-spinner loading-xs mr-2"
             />
-            <Icon v-else icon="clarity:download-cloud-line" class="h-4 w-4 mr-2" />
+            <Icon
+              v-else
+              icon="clarity:download-cloud-line"
+              class="h-4 w-4 mr-2"
+            />
             {{ t('settings.updateApp') }}
           </button>
           <p class="text-xs text-base-content/45">
@@ -913,10 +957,7 @@
           >
             {{ t('settings.restartScheduled') }}
           </p>
-          <div
-            v-if="updateResult.commands?.length"
-            class="mt-3 space-y-2"
-          >
+          <div v-if="updateResult.commands?.length" class="mt-3 space-y-2">
             <p class="text-xs text-base-content/55">
               {{ t('settings.manualUpdateCommands') }}
             </p>
@@ -931,7 +972,8 @@
           <pre
             v-if="updateResult.terminal_output || updateResult.pull_output"
             class="mt-3 max-h-40 overflow-auto rounded-xl border border-white/10 bg-black/30 p-3 text-xs text-base-content/70"
-          >{{ updateResult.terminal_output || updateResult.pull_output }}</pre>
+            >{{ updateResult.terminal_output || updateResult.pull_output }}</pre
+          >
         </div>
       </div>
 
@@ -985,6 +1027,9 @@ const activeTab = ref('general')
 const jellyfinLibraries = ref([])
 const jellyfinLibraryLoading = ref(false)
 const jellyfinLibraryError = ref('')
+const jellyfinTestLoading = ref(false)
+const jellyfinTestMessage = ref('')
+const jellyfinTestError = ref(false)
 const repairLog = ref([])
 const repairLogLoading = ref(false)
 const repairLogError = ref('')
@@ -996,7 +1041,10 @@ const updateResult = ref(null)
 function normalizedJellyfinLibraryName(value) {
   return String(value || '')
     .normalize('NFKC')
-    .replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2060-\u206f\ufeff]/g, '')
+    .replace(
+      /[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2060-\u206f\ufeff]/g,
+      ''
+    )
     .replace(/\s+/g, ' ')
     .trim()
     .toLowerCase()
@@ -1120,7 +1168,12 @@ watch(activeTab, (newTab) => {
     // Fetch libraries if we have URL and API key, but libraries haven't been fetched yet
     const hasUrl = sm.settings.value.jellyfin_url?.trim()
     const hasApiKey = sm.settings.value.jellyfin_api_key?.trim()
-    if (hasUrl && hasApiKey && jellyfinLibraries.value.length === 0 && !jellyfinLibraryError.value) {
+    if (
+      hasUrl &&
+      hasApiKey &&
+      jellyfinLibraries.value.length === 0 &&
+      !jellyfinLibraryError.value
+    ) {
       onJellyfinConfigChange()
     }
   }
@@ -1203,8 +1256,7 @@ async function runUpdate() {
     updateResult.value = res.data || null
     if (res.data?.current_version) updateStatus.value = res.data
   } catch (err) {
-    helpError.value =
-      err?.response?.data?.detail || t('settings.updateError')
+    helpError.value = err?.response?.data?.detail || t('settings.updateError')
   } finally {
     updateRunning.value = false
   }
@@ -1218,7 +1270,11 @@ async function selectLocalDestination() {
     await activateLocalDestination()
   } catch (err) {
     if (err?.name === 'AbortError') return
-    if (['insecure', 'browser', 'unsupported', 'unavailable'].includes(err?.message)) {
+    if (
+      ['insecure', 'browser', 'unsupported', 'unavailable'].includes(
+        err?.message
+      )
+    ) {
       folderPickerError.value = localFolderErrorMessage(err.message)
       return
     }
@@ -1233,7 +1289,11 @@ async function changeLocalFolder() {
     setDestination('local')
   } catch (err) {
     if (err?.name === 'AbortError') return
-    if (['insecure', 'browser', 'unsupported', 'unavailable'].includes(err?.message)) {
+    if (
+      ['insecure', 'browser', 'unsupported', 'unavailable'].includes(
+        err?.message
+      )
+    ) {
       folderPickerError.value = localFolderErrorMessage(err.message)
       return
     }
@@ -1245,7 +1305,10 @@ async function onJellyfinConfigChange() {
   const url = sm.settings.value.jellyfin_url?.trim()
   const apiKey = sm.settings.value.jellyfin_api_key?.trim()
 
-  console.log('Jellyfin config changed:', { url: url ? '***' : '', hasApiKey: !!apiKey })
+  console.log('Jellyfin config changed:', {
+    url: url ? '***' : '',
+    hasApiKey: !!apiKey,
+  })
 
   jellyfinLibraryError.value = ''
   jellyfinLibraries.value = []
@@ -1260,7 +1323,7 @@ async function onJellyfinConfigChange() {
     console.log('Fetching Jellyfin libraries from:', url)
     const response = await API.getJellyfinLibraries(url, apiKey)
     console.log('Jellyfin libraries response:', response)
-    
+
     if (response.status === 200 && response.data.success) {
       jellyfinLibraries.value = uniqueLibrariesByName(response.data.libraries)
       console.log('Successfully loaded libraries:', jellyfinLibraries.value)
@@ -1271,25 +1334,60 @@ async function onJellyfinConfigChange() {
       )
       console.log(
         'Library normalized keys:',
-        jellyfinLibraries.value.map((lib) => normalizedJellyfinLibraryName(lib.name))
+        jellyfinLibraries.value.map((lib) =>
+          normalizedJellyfinLibraryName(lib.name)
+        )
       )
       console.log(
         'Displayed library names:',
-        uniqueJellyfinLibraries.value.map((lib) => `${lib.name} (id: ${lib.id})`)
+        uniqueJellyfinLibraries.value.map(
+          (lib) => `${lib.name} (id: ${lib.id})`
+        )
       )
-      
+
       if (jellyfinLibraries.value.length === 0) {
         jellyfinLibraryError.value = t('settings.jellyfinNoLibraries')
       }
     } else {
-      jellyfinLibraryError.value = t('settings.jellyfinLibraryError') + ': Invalid response'
+      jellyfinLibraryError.value =
+        t('settings.jellyfinLibraryError') + ': Invalid response'
     }
   } catch (err) {
     console.error('Failed to fetch Jellyfin libraries:', err)
-    const errorDetail = err.response?.data?.detail || err.message || 'Unknown error'
+    const errorDetail =
+      err.response?.data?.detail || err.message || 'Unknown error'
     jellyfinLibraryError.value = `${t('settings.jellyfinLibraryError')}: ${errorDetail}`
   } finally {
     jellyfinLibraryLoading.value = false
+  }
+}
+
+async function testJellyfinApi() {
+  const url = sm.settings.value.jellyfin_url?.trim()
+  const apiKey = sm.settings.value.jellyfin_api_key?.trim()
+  if (!url || !apiKey) return
+
+  jellyfinTestLoading.value = true
+  jellyfinTestMessage.value = ''
+  jellyfinTestError.value = false
+  try {
+    const response = await API.getJellyfinLibraries(url, apiKey)
+    if (response.status !== 200 || !response.data.success) {
+      throw new Error(t('settings.jellyfinTestFailed'))
+    }
+    jellyfinLibraries.value = uniqueLibrariesByName(response.data.libraries)
+    jellyfinLibraryError.value = jellyfinLibraries.value.length
+      ? ''
+      : t('settings.jellyfinNoLibraries')
+    jellyfinTestMessage.value = t('settings.jellyfinTestSuccess')
+  } catch (err) {
+    jellyfinTestError.value = true
+    const detail = err.response?.data?.detail || err.message
+    jellyfinTestMessage.value = detail
+      ? `${t('settings.jellyfinTestFailed')}: ${detail}`
+      : t('settings.jellyfinTestFailed')
+  } finally {
+    jellyfinTestLoading.value = false
   }
 }
 </script>
