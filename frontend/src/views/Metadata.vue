@@ -375,7 +375,6 @@
             <button
               class="btn btn-sm h-11 rounded-full border-white/10 bg-base-100/85 hover:bg-base-100"
               :disabled="
-                activeArtistImageTab !== 'needs' ||
                 artistImageItems.length === 0 ||
                 repairingAllImages
               "
@@ -390,7 +389,7 @@
                 icon="clarity:check-circle-line"
                 class="h-4 w-4 mr-2"
               />
-              {{ t('metadata.repairAll') }}
+              {{ t('metadata.fixAllArtistImages') }}
             </button>
           </div>
         </div>
@@ -419,6 +418,22 @@
             <p class="mt-1 text-2xl font-semibold text-primary">
               {{ artistImageItems.length }}
             </p>
+            <button
+              class="btn btn-primary btn-xs mt-3 h-8 rounded-full"
+              :disabled="artistImageItems.length === 0 || repairingAllImages"
+              @click="repairAllArtistImages"
+            >
+              <span
+                v-if="repairingAllImages"
+                class="loading loading-spinner loading-xs mr-2"
+              />
+              <Icon
+                v-else
+                icon="clarity:magic-wand-line"
+                class="h-4 w-4 mr-2"
+              />
+              {{ t('metadata.fixAllArtistImages') }}
+            </button>
           </div>
           <div class="surface rounded-2xl p-4">
             <p class="text-xs uppercase text-base-content/40">
@@ -682,7 +697,7 @@
               :disabled="
                 repairingAllJellyfin ||
                 reconcilingArtists ||
-                jellyfinRepairableItems.length === 0
+                allJellyfinRepairableItems.length === 0
               "
               @click="repairAllJellyfinArtistImages"
             >
@@ -695,7 +710,7 @@
                 icon="clarity:image-gallery-line"
                 class="h-4 w-4 mr-2"
               />
-              {{ t('metadata.repairAll') }}
+              {{ t('metadata.fixAllArtistImages') }}
             </button>
           </div>
         </div>
@@ -713,7 +728,7 @@
               :disabled="
                 repairingAllJellyfin ||
                 reconcilingArtists ||
-                jellyfinRepairableItems.length === 0
+                allJellyfinRepairableItems.length === 0
               "
               @click="repairAllJellyfinArtistImages"
             >
@@ -726,7 +741,7 @@
                 icon="clarity:magic-wand-line"
                 class="h-4 w-4 mr-2"
               />
-              {{ t('metadata.bulkFixGroup') }}
+              {{ t('metadata.fixAllArtistImages') }}
             </button>
           </div>
           <div class="surface rounded-2xl p-4">
@@ -1213,6 +1228,16 @@ const jellyfinRepairableItems = computed(() =>
   jellyfinRepairableBucketItems('missing_images')
 )
 
+const allJellyfinRepairableItems = computed(() => {
+  const itemsByKey = new Map()
+  for (const bucket of reconciliationBuckets.value) {
+    for (const item of jellyfinRepairableBucketItems(bucket.key)) {
+      itemsByKey.set(jellyfinRepairKey(item), item)
+    }
+  }
+  return [...itemsByKey.values()]
+})
+
 const activeReconciliationBucketMeta = computed(() =>
   reconciliationBuckets.value.find(
     (bucket) => bucket.key === activeReconciliationBucket.value
@@ -1687,7 +1712,7 @@ async function repairAllArtistImages() {
 }
 
 async function repairAllJellyfinArtistImages() {
-  const targets = [...jellyfinRepairableItems.value]
+  const targets = [...allJellyfinRepairableItems.value]
   if (targets.length === 0) return
 
   repairingAllJellyfin.value = true

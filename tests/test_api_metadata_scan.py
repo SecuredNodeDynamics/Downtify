@@ -282,6 +282,97 @@ def test_apply_artist_image_allows_name_only_artist(tmp_path, monkeypatch):
         api.state.repair_log = old_repair_log
 
 
+def test_apply_metadata_uses_mapped_server_media_location(tmp_path, monkeypatch):
+    old_downloader = api.state.downloader
+    old_settings = api.state.settings
+    old_default = api.state.default_download_dir
+    old_scan = dict(api.state.metadata_scan)
+    old_repair_log = list(api.state.repair_log)
+    host_media = tmp_path / 'host' / 'Music'
+    container_media = tmp_path / 'container' / 'downloads'
+    api.state.downloader = FakeDownloader(container_media)
+    api.state.default_download_dir = container_media
+    api.state.settings = {'server_media_location': str(host_media)}
+    api.state.metadata_scan = {**old_scan, 'completed': [], 'items': []}
+
+    captured = {}
+
+    def fake_repair(root, file, **_kwargs):
+        captured['root'] = root
+        captured['file'] = file
+        return {
+            'file': file,
+            'current': {},
+            'candidate': {},
+            'matched': True,
+            'changes': [],
+        }
+
+    monkeypatch.setenv('DOWNTIFY_MEDIA_SAVE_LOCATION', str(host_media))
+    monkeypatch.setattr(api.metadata_repair, 'repair_file', fake_repair)
+    try:
+        asyncio.run(api.apply_metadata(FakeRequest({'file': 'song.mp3'})))
+
+        assert captured == {
+            'root': container_media,
+            'file': 'song.mp3',
+        }
+    finally:
+        api.state.downloader = old_downloader
+        api.state.settings = old_settings
+        api.state.default_download_dir = old_default
+        api.state.metadata_scan = old_scan
+        api.state.repair_log = old_repair_log
+
+
+def test_apply_artist_image_passes_requested_folder(tmp_path, monkeypatch):
+    old_downloader = api.state.downloader
+    old_scan = dict(api.state.artist_image_scan)
+    old_repair_log = list(api.state.repair_log)
+    api.state.downloader = FakeDownloader(tmp_path)
+    api.state.artist_image_scan = {
+        **old_scan,
+        'completed': [],
+        'items': [],
+        'matched': 0,
+    }
+
+    captured = {}
+
+    def fake_repair(root, file, artist, **kwargs):
+        captured['root'] = root
+        captured['file'] = file
+        captured['artist'] = artist
+        captured['target_folder'] = kwargs.get('target_folder')
+        return {
+            'artist': artist['name'],
+            'artist_id': artist['id'],
+            'file': file,
+            'saved': ['Local Folder/Jellyfin Artist.jpg'],
+            'verified': ['Local Folder/Jellyfin Artist.jpg'],
+        }
+
+    monkeypatch.setattr(api.metadata_repair, 'repair_artist_image', fake_repair)
+    try:
+        result = asyncio.run(
+            api.apply_artist_image(
+                FakeRequest({
+                    'file': 'song.mp3',
+                    'artist': 'Jellyfin Artist',
+                    'artist_id': '',
+                    'folder': 'Local Folder',
+                })
+            )
+        )
+
+        assert captured['target_folder'] == 'Local Folder'
+        assert result['verified'] == ['Local Folder/Jellyfin Artist.jpg']
+    finally:
+        api.state.downloader = old_downloader
+        api.state.artist_image_scan = old_scan
+        api.state.repair_log = old_repair_log
+
+
 def test_artist_folder_image_preview_serves_local_artist_art(tmp_path):
     old_downloader = api.state.downloader
     old_settings = api.state.settings

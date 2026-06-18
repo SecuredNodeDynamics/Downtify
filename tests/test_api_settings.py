@@ -168,11 +168,52 @@ def test_effective_download_dir_prefers_saved_path_even_when_env_matches(
     try:
         media = tmp_path / 'media'
         downloads = tmp_path / 'downloads'
+        media.mkdir()
         monkeypatch.setenv('DOWNTIFY_MEDIA_SAVE_LOCATION', str(media))
         api.state.settings = {'server_media_location': str(media)}
         api.state.default_download_dir = downloads
 
         assert _effective_download_dir(tmp_path / 'fallback') == media
+    finally:
+        api.state.settings = old_settings
+        api.state.default_download_dir = old_default
+
+
+def test_effective_download_dir_maps_env_host_path_to_container_mount(
+    tmp_path,
+    monkeypatch,
+):
+    old_settings = api.state.settings
+    old_default = api.state.default_download_dir
+    try:
+        host_media = tmp_path / 'host' / 'Music'
+        container_media = tmp_path / 'container' / 'downloads'
+        monkeypatch.setenv('DOWNTIFY_MEDIA_SAVE_LOCATION', str(host_media))
+        api.state.settings = {'server_media_location': str(host_media)}
+        api.state.default_download_dir = container_media
+
+        assert _effective_download_dir() == container_media
+    finally:
+        api.state.settings = old_settings
+        api.state.default_download_dir = old_default
+
+
+def test_effective_download_dir_maps_nested_env_host_path_to_container_mount(
+    tmp_path,
+    monkeypatch,
+):
+    old_settings = api.state.settings
+    old_default = api.state.default_download_dir
+    try:
+        host_media = tmp_path / 'host' / 'Music'
+        container_media = tmp_path / 'container' / 'downloads'
+        monkeypatch.setenv('DOWNTIFY_MEDIA_SAVE_LOCATION', str(host_media))
+        api.state.settings = {
+            'server_media_location': str(host_media / 'Playlists')
+        }
+        api.state.default_download_dir = container_media
+
+        assert _effective_download_dir() == container_media / 'Playlists'
     finally:
         api.state.settings = old_settings
         api.state.default_download_dir = old_default

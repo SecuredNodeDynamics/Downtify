@@ -852,6 +852,48 @@ def test_repair_artist_image_writes_for_requested_artist(
     assert result['verified'] == ['Artist/Artist.jpg']
 
 
+def test_repair_artist_image_writes_to_requested_folder(
+    tmp_path,
+    monkeypatch,
+):
+    album = tmp_path / 'Compilation' / 'Album'
+    album.mkdir(parents=True)
+    track = album / 'song.mp3'
+    track.write_bytes(b'not really audio')
+
+    monkeypatch.setattr(
+        metadata_repair,
+        'artist_or_fallback_image',
+        lambda *_args: (b'image', 'Album cover fallback'),
+    )
+
+    result = metadata_repair.repair_artist_image(
+        tmp_path,
+        'Compilation/Album/song.mp3',
+        {'id': '', 'name': 'Jellyfin Artist'},
+        target_folder='Local Artist Folder',
+    )
+
+    assert result['saved'] == ['Local Artist Folder/Jellyfin Artist.jpg']
+    assert result['verified'] == ['Local Artist Folder/Jellyfin Artist.jpg']
+    assert (
+        tmp_path / 'Local Artist Folder' / 'Jellyfin Artist.jpg'
+    ).read_bytes() == b'image'
+
+
+def test_repair_artist_image_rejects_unsafe_requested_folder(tmp_path):
+    track = tmp_path / 'song.mp3'
+    track.write_bytes(b'not really audio')
+
+    with pytest.raises(ValueError, match='Invalid artist folder'):
+        metadata_repair.repair_artist_image(
+            tmp_path,
+            'song.mp3',
+            {'id': '', 'name': 'Artist'},
+            target_folder='../outside',
+        )
+
+
 def test_repair_artist_image_fails_when_image_not_written(
     tmp_path,
     monkeypatch,

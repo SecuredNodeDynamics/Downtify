@@ -138,6 +138,7 @@ function applyArtistImage(item) {
     file: item.file,
     artist: item.artist,
     artist_id: item.artist_id,
+    folder: item.folder,
   })
 }
 

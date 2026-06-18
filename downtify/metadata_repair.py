@@ -9,7 +9,9 @@ from loguru import logger
 from mutagen import File as MutagenFile
 
 from .artist_art import (
+    artist_image_target_path,
     artist_folders_for_file,
+    artist_or_fallback_image,
     artist_image_paths,
     missing_artist_image_items,
     save_missing_artist_images,
@@ -439,18 +441,23 @@ def repair_artist_image(
     relative_file: str,
     artist: dict[str, str],
     artist_folder_policy: str = 'artwork_available',
+    target_folder: str = '',
 ):
     path = safe_library_path(root, relative_file)
     if not path.exists() or not path.is_file():
         raise FileNotFoundError(relative_file)
     root = root.resolve()
-    saved = save_missing_artist_images(
-        root,
-        path,
-        [artist],
-        artist_folder_policy=artist_folder_policy,
-    )
-    verified = _verified_artist_image_paths(root, path, artist)
+    folder = _safe_artist_image_folder(root, target_folder)
+    if folder is not None:
+        saved = _save_artist_image_to_folder(root, path, artist, folder)
+    else:
+        saved = save_missing_artist_images(
+            root,
+            path,
+            [artist],
+            artist_folder_policy=artist_folder_policy,
+        )
+    verified = _verified_artist_image_paths(root, path, artist, folder)
     if not verified:
         raise ValueError('Artist image was not written')
     return {
@@ -462,10 +469,42 @@ def repair_artist_image(
     }
 
 
+def _safe_artist_image_folder(root: Path, folder: str) -> Path | None:
+    folder = str(folder or '').strip()
+    if not folder:
+        return None
+    target = (root / folder).resolve()
+    try:
+        target.relative_to(root)
+    except ValueError as exc:
+        raise ValueError('Invalid artist folder') from exc
+    return target
+
+
+def _save_artist_image_to_folder(
+    root: Path,
+    path: Path,
+    artist: dict[str, str],
+    folder: Path,
+) -> list[str]:
+    if folder.exists() and artist_image_paths(folder):
+        return []
+    image, _source = artist_or_fallback_image(artist.get('id', ''), path)
+    if not image:
+        return []
+    folder.mkdir(parents=True, exist_ok=True)
+    target = artist_image_target_path(folder, artist.get('name', ''), image)
+    if target.exists():
+        return []
+    target.write_bytes(image)
+    return [target.relative_to(root).as_posix()]
+
+
 def _verified_artist_image_paths(
     root: Path,
     path: Path,
     artist: dict[str, str],
+    target_folder: Path | None = None,
 ) -> list[str]:
     verified: list[str] = []
     folders = artist_folders_for_file(
@@ -474,6 +513,8 @@ def _verified_artist_image_paths(
         [artist],
         include_missing=False,
     )
+    if target_folder is not None and target_folder.is_dir():
+        folders.append(target_folder)
     for folder in folders:
         for image_path in artist_image_paths(folder):
             try:

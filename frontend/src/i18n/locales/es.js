@@ -175,6 +175,7 @@ export default {
     noMatch: 'Sin coincidencia',
     apply: 'Aplicar correccion',
     repairAll: 'Corregir todo',
+    fixAllArtistImages: 'Corregir todas las imagenes de artistas',
     fixing: 'Corrigiendo...',
     fixed: 'Corregido',
     completed: 'Completado',
@@ -436,7 +437,7 @@ export default {
     serverMediaLocation: 'Ubicación de medios del servidor',
     serverMediaLocationPlaceholder: '/mnt/media/Music',
     serverMediaLocationHint:
-      'Ruta del servidor donde Downtify escribe nuevas descargas. En Docker, monta esta ruta o usa la ubicacion de medios de compose.',
+      'Ruta del servidor que se muestra para tu biblioteca. En Docker, usa la ruta del host montada en /downloads; Downtify escribe mediante el montaje del contenedor.',
     downloadDestinationLocalHint:
       'Cuando termine una descarga, Downtify guardará una copia en la carpeta que elijas en este dispositivo.',
     downloadDestinationBrowserHint:

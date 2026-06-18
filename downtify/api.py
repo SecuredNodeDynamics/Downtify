@@ -367,13 +367,41 @@ def _compose_host_media_location() -> str:
     return os.getenv('DOWNTIFY_MEDIA_SAVE_LOCATION', '').strip()
 
 
+def _path_within_root(path: Path, root: Path) -> Optional[Path]:
+    try:
+        return path.relative_to(root)
+    except ValueError:
+        return None
+
+
+def _container_media_path_for(saved: str, container_root: Path) -> Path:
+    requested = Path(saved).expanduser()
+    if requested.exists():
+        return requested
+
+    roots = [
+        _compose_host_media_location(),
+        _mount_source_for(container_root),
+    ]
+    for root_value in roots:
+        if not root_value:
+            continue
+        root = Path(root_value).expanduser()
+        relative = _path_within_root(requested, root)
+        if relative is not None:
+            return container_root / relative
+
+    return requested
+
+
 def _effective_download_dir(fallback: Path | str | None = None) -> Path:
     saved = _server_media_location()
+    container_root = (
+        Path(fallback) if fallback is not None else state.default_download_dir
+    )
     if saved:
-        return Path(saved).expanduser()
-    if fallback is not None:
-        return Path(fallback)
-    return state.default_download_dir
+        return _container_media_path_for(saved, container_root)
+    return container_root
 
 
 def _apply_download_dir_from_settings() -> Path:
@@ -1486,6 +1514,7 @@ async def apply_artist_image(request: Request) -> dict[str, Any]:
         'id': str(payload.get('artist_id') or '').strip(),
         'name': str(payload.get('artist') or '').strip(),
     }
+    folder = str(payload.get('folder') or '').strip()
     if not file or not artist['name']:
         raise HTTPException(
             status_code=400,
@@ -1497,6 +1526,7 @@ async def apply_artist_image(request: Request) -> dict[str, Any]:
             file,
             artist,
             artist_folder_policy=_artist_folder_policy(),
+            target_folder=folder,
         )
         completed = list(state.artist_image_scan.get('completed') or [])
         completed.append(result)
