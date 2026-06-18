@@ -274,39 +274,100 @@ def test_docker_self_update_reports_missing_capabilities(monkeypatch):
 
     assert result['success'] is False
     assert result['requires_manual'] is True
-    assert 'docker run --rm' in result['commands'][0]
+    assert result['commands'][0].startswith('docker pull ')
+    assert 'docker run --rm' in result['commands'][1]
 
 
-def test_docker_self_update_starts_watchtower_helper(monkeypatch):
-    captured = {}
+def test_docker_self_update_pulls_image_and_starts_watchtower_helper(
+    monkeypatch,
+):
+    captured = {'commands': []}
 
     class FakeResult:
+        def __init__(self, stdout=''):
+            self.stdout = stdout
+
         returncode = 0
-        stdout = 'helper-container-id\n'
         stderr = ''
 
     def fake_run(command, **_kwargs):
-        captured['command'] = command
-        return FakeResult()
+        captured['commands'].append(command)
+        if command[1:3] == ['inspect', '--format']:
+            return FakeResult('ghcr.io/securednodedynamics/downtify:latest\n')
+        if command[1] == 'pull':
+            return FakeResult(
+                'latest: Pulling from securednodedynamics/downtify\n'
+            )
+        return FakeResult('helper-container-id\n')
 
     monkeypatch.setattr(api.shutil, 'which', lambda _name: '/usr/bin/docker')
     monkeypatch.setattr(api.Path, 'exists', lambda _self: True)
     monkeypatch.setenv('DOWNTIFY_SELF_UPDATE_CONTAINER', 'downtify')
-    monkeypatch.setattr(api.subprocess, 'run', fake_run)
+    monkeypatch.setattr(api, '_run_docker_command', fake_run)
 
     result = _start_docker_self_update()
 
     assert result['success'] is True
+    assert result['updated'] is True
     assert result['requires_manual'] is False
     assert result['helper_container'] == 'helper-container-id'
-    assert captured['command'][:4] == [
+    assert (
+        result['target_image'] == 'ghcr.io/securednodedynamics/downtify:latest'
+    )
+    assert captured['commands'][0] == [
+        '/usr/bin/docker',
+        'inspect',
+        '--format',
+        '{{.Config.Image}}',
+        'downtify',
+    ]
+    assert captured['commands'][1] == [
+        '/usr/bin/docker',
+        'pull',
+        'ghcr.io/securednodedynamics/downtify:latest',
+    ]
+    assert captured['commands'][2][:4] == [
         '/usr/bin/docker',
         'run',
         '-d',
         '--name',
     ]
-    assert 'containrrr/watchtower:latest' in captured['command']
-    assert captured['command'][-1] == 'downtify'
+    assert 'containrrr/watchtower:latest' in captured['commands'][2]
+    assert '--include-restarting' in captured['commands'][2]
+    assert captured['commands'][2][-1] == 'downtify'
+
+
+def test_docker_self_update_fails_when_image_pull_fails(monkeypatch):
+    class FakeResult:
+        stderr = ''
+
+        def __init__(self, returncode=0, stdout=''):
+            self.returncode = returncode
+            self.stdout = stdout
+
+    def fake_run(command, **_kwargs):
+        if command[1:3] == ['inspect', '--format']:
+            return FakeResult(
+                stdout='ghcr.io/securednodedynamics/downtify:latest\n'
+            )
+        if command[1] == 'pull':
+            return FakeResult(returncode=1, stdout='manifest unknown\n')
+        return FakeResult(stdout='helper-container-id\n')
+
+    monkeypatch.setattr(api.shutil, 'which', lambda _name: '/usr/bin/docker')
+    monkeypatch.setattr(api.Path, 'exists', lambda _self: True)
+    monkeypatch.setenv('DOWNTIFY_SELF_UPDATE_CONTAINER', 'downtify')
+    monkeypatch.setattr(api, '_run_docker_command', fake_run)
+
+    result = _start_docker_self_update()
+
+    assert result['success'] is False
+    assert result['updated'] is False
+    assert result['requires_manual'] is True
+    assert (
+        result['message'] == 'Could not pull the latest Downtify Docker image.'
+    )
+    assert result['pull_output'] == 'manifest unknown'
 
 
 def test_load_settings_empty_object_returns_defaults(tmp_path):
@@ -368,15 +429,31 @@ def test_jellyfin_libraries_returns_music_libraries_only(monkeypatch):
 
         def json(self):
             return [
-                {'ItemId': 'music-view', 'Name': 'Music', 'CollectionType': 'music'},
-                {'ItemId': 'music-copy', 'Name': '\ufeff Music\u200b ', 'CollectionType': 'music'},
+                {
+                    'ItemId': 'music-view',
+                    'Name': 'Music',
+                    'CollectionType': 'music',
+                },
+                {
+                    'ItemId': 'music-copy',
+                    'Name': '\ufeff Music\u200b ',
+                    'CollectionType': 'music',
+                },
                 {
                     'ItemId': 'music-playlists-view',
                     'Name': 'Music Playlists',
                     'CollectionType': 'music',
                 },
-                {'ItemId': 'tv-view', 'Name': 'TV', 'CollectionType': 'tvshows'},
-                {'ItemId': 'movie-view', 'Name': 'Movies', 'CollectionType': 'movies'},
+                {
+                    'ItemId': 'tv-view',
+                    'Name': 'TV',
+                    'CollectionType': 'tvshows',
+                },
+                {
+                    'ItemId': 'movie-view',
+                    'Name': 'Movies',
+                    'CollectionType': 'movies',
+                },
             ]
 
     def fake_get(url, headers=None, params=None, timeout=None):

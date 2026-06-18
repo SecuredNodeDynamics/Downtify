@@ -92,7 +92,9 @@ def _effective_lyrics_providers(settings: dict[str, Any]) -> list[str]:
 def _normalized_jellyfin_library_name(value: Any) -> str:
     normalized = unicodedata.normalize('NFKC', str(value or ''))
     normalized = ''.join(
-        char for char in normalized if unicodedata.category(char) not in {'Cc', 'Cf'}
+        char
+        for char in normalized
+        if unicodedata.category(char) not in {'Cc', 'Cf'}
     )
     return re.sub(r'\s+', ' ', normalized).strip().casefold()
 
@@ -113,13 +115,17 @@ def _jellyfin_base_url(value: str) -> str:
 
 def _configured_jellyfin() -> tuple[str, dict[str, str]]:
     jellyfin_url = str(state.settings.get('jellyfin_url') or '').strip()
-    jellyfin_api_key = str(state.settings.get('jellyfin_api_key') or '').strip()
+    jellyfin_api_key = str(
+        state.settings.get('jellyfin_api_key') or ''
+    ).strip()
     if not jellyfin_url or not jellyfin_api_key:
         raise HTTPException(
             status_code=400,
             detail='Jellyfin URL and API key are required',
         )
-    return _jellyfin_base_url(jellyfin_url), _jellyfin_auth_headers(jellyfin_api_key)
+    return _jellyfin_base_url(jellyfin_url), _jellyfin_auth_headers(
+        jellyfin_api_key
+    )
 
 
 def _matching_jellyfin_library(
@@ -165,7 +171,9 @@ def _matching_jellyfin_library(
     return libraries[0] if libraries else None
 
 
-def _dedupe_jellyfin_libraries(candidates: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _dedupe_jellyfin_libraries(
+    candidates: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
     libraries = []
     seen_names = set()
     for library in candidates:
@@ -182,7 +190,9 @@ def _dedupe_jellyfin_libraries(candidates: list[dict[str, Any]]) -> list[dict[st
     return libraries
 
 
-def _prefer_music_libraries(candidates: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _prefer_music_libraries(
+    candidates: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
     music = [
         library
         for library in candidates
@@ -199,19 +209,19 @@ def _libraries_from_virtual_folders(data: Any) -> list[dict[str, Any]]:
             continue
         name = str(item.get('Name') or '')
         item_id = item.get('ItemId') or item.get('Id') or name
-        collection_type = item.get('CollectionType') or item.get('collectionType') or ''
+        collection_type = (
+            item.get('CollectionType') or item.get('collectionType') or ''
+        )
         logger.info(
             f'Virtual folder: {name} - CollectionType: {collection_type} '
             f'- ItemId: {item_id}'
         )
-        candidates.append(
-            {
-                'id': item_id,
-                'name': name,
-                'type': 'VirtualFolder',
-                'collection_type': collection_type,
-            }
-        )
+        candidates.append({
+            'id': item_id,
+            'name': name,
+            'type': 'VirtualFolder',
+            'collection_type': collection_type,
+        })
     return _dedupe_jellyfin_libraries(_prefer_music_libraries(candidates))
 
 
@@ -227,17 +237,18 @@ def _libraries_from_items(data: dict[str, Any]) -> list[dict[str, Any]]:
 
         logger.info(f'Item: {name} - Type: {item_type}, IsFolder: {is_folder}')
 
-        is_library_folder = is_folder and item_type in {'Folder', 'CollectionFolder'}
+        is_library_folder = is_folder and item_type in {
+            'Folder',
+            'CollectionFolder',
+        }
         if is_library_folder and item_id not in seen_ids:
             seen_ids.add(item_id)
-            candidates.append(
-                {
-                    'id': item_id,
-                    'name': name,
-                    'type': item_type,
-                    'collection_type': item.get('CollectionType', ''),
-                }
-            )
+            candidates.append({
+                'id': item_id,
+                'name': name,
+                'type': item_type,
+                'collection_type': item.get('CollectionType', ''),
+            })
 
     return _dedupe_jellyfin_libraries(_prefer_music_libraries(candidates))
 
@@ -367,7 +378,9 @@ def _effective_download_dir(fallback: Path | str | None = None) -> Path:
 
 def _apply_download_dir_from_settings() -> Path:
     target = _effective_download_dir(
-        state.downloader.download_dir if state.downloader else state.default_download_dir
+        state.downloader.download_dir
+        if state.downloader
+        else state.default_download_dir
     )
     target.mkdir(parents=True, exist_ok=True)
     if state.downloader is not None:
@@ -440,7 +453,8 @@ def _directory_summary(
 
 def _decode_mountinfo_path(value: str) -> str:
     return (
-        value.replace('\\040', ' ')
+        value
+        .replace('\\040', ' ')
         .replace('\\011', '\t')
         .replace('\\012', '\n')
         .replace('\\134', '\\')
@@ -576,7 +590,9 @@ def _latest_github_version(timeout: int = 8) -> dict[str, Any]:
             and (version := _clean_version(tag.get('name')))
         ]
         if versions:
-            latest = max(versions, key=lambda item: parse_version(item) or (0, 0, 0))
+            latest = max(
+                versions, key=lambda item: parse_version(item) or (0, 0, 0)
+            )
             return {
                 'latest_version': latest,
                 'release_url': f'{GITHUB_RELEASES_URL}/tag/v{latest}',
@@ -618,13 +634,27 @@ def _is_docker_runtime() -> bool:
     )
 
 
-def _run_update_command(args: list[str], cwd: Path) -> subprocess.CompletedProcess:
+def _run_update_command(
+    args: list[str], cwd: Path
+) -> subprocess.CompletedProcess:
     return subprocess.run(
         args,
         cwd=cwd,
         capture_output=True,
         text=True,
         timeout=120,
+        check=False,
+    )
+
+
+def _run_docker_command(
+    args: list[str], timeout: int = 120
+) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        args,
+        capture_output=True,
+        text=True,
+        timeout=timeout,
         check=False,
     )
 
@@ -644,15 +674,36 @@ def _docker_self_update_image() -> str:
     ).strip()
 
 
+def _docker_container_image(docker: str, container: str) -> str:
+    configured = os.getenv('DOWNTIFY_SELF_UPDATE_TARGET_IMAGE', '').strip()
+    if configured:
+        return configured
+
+    result = _run_docker_command(
+        [docker, 'inspect', '--format', '{{.Config.Image}}', container],
+        timeout=15,
+    )
+    if result.returncode != 0:
+        output = (result.stdout or result.stderr or '').strip()
+        raise RuntimeError(
+            output or f'Could not inspect Docker container {container}'
+        )
+    return result.stdout.strip()
+
+
 def _start_docker_self_update() -> dict[str, Any]:
     docker = shutil.which('docker')
     socket_path = Path('/var/run/docker.sock')
     container = _docker_self_update_container()
-    helper_name = f'downtify-self-update-{int(datetime.now(timezone.utc).timestamp())}'
+    helper_name = (
+        f'downtify-self-update-{int(datetime.now(timezone.utc).timestamp())}'
+    )
     image = _docker_self_update_image()
+    target_image = os.getenv('DOWNTIFY_SELF_UPDATE_TARGET_IMAGE', '').strip()
     commands = [
+        f'docker pull {target_image or "<current Downtify image>"}',
         'docker run --rm -v /var/run/docker.sock:/var/run/docker.sock '
-        f'{image} --run-once --cleanup {container}'
+        f'{image} --run-once --cleanup --include-restarting {container}',
     ]
     if not docker or not socket_path.exists():
         return {
@@ -669,6 +720,40 @@ def _start_docker_self_update() -> dict[str, Any]:
             'commands': commands,
         }
 
+    try:
+        target_image = _docker_container_image(docker, container)
+    except RuntimeError as exc:
+        return {
+            'success': False,
+            'updated': False,
+            'mode': 'docker',
+            'requires_restart': True,
+            'requires_manual': True,
+            'message': 'Could not inspect the running Downtify container.',
+            'commands': commands,
+            'pull_output': str(exc),
+        }
+
+    commands = [
+        f'docker pull {target_image}',
+        'docker run --rm -v /var/run/docker.sock:/var/run/docker.sock '
+        f'{image} --run-once --cleanup --include-restarting {container}',
+    ]
+
+    pull = _run_docker_command([docker, 'pull', target_image], timeout=300)
+    pull_output = (pull.stdout or pull.stderr or '').strip()
+    if pull.returncode != 0:
+        return {
+            'success': False,
+            'updated': False,
+            'mode': 'docker',
+            'requires_restart': True,
+            'requires_manual': True,
+            'message': 'Could not pull the latest Downtify Docker image.',
+            'commands': commands,
+            'pull_output': pull_output,
+        }
+
     command = [
         docker,
         'run',
@@ -680,15 +765,10 @@ def _start_docker_self_update() -> dict[str, Any]:
         image,
         '--run-once',
         '--cleanup',
+        '--include-restarting',
         container,
     ]
-    result = subprocess.run(
-        command,
-        capture_output=True,
-        text=True,
-        timeout=30,
-        check=False,
-    )
+    result = _run_docker_command(command, timeout=30)
     output = (result.stdout or result.stderr or '').strip()
     if result.returncode != 0:
         return {
@@ -699,20 +779,24 @@ def _start_docker_self_update() -> dict[str, Any]:
             'requires_manual': True,
             'message': 'Could not start Docker self-update helper.',
             'commands': commands,
-            'pull_output': output,
+            'pull_output': '\n'.join(
+                part for part in [pull_output, output] if part
+            ),
         }
 
     return {
         'success': True,
-        'updated': False,
+        'updated': True,
         'mode': 'docker',
         'requires_restart': True,
         'requires_manual': False,
         'message': (
-            'Docker self-update started. Downtify will restart after the new '
-            'image is pulled and the container is recreated.'
+            'Latest Docker image pulled. Downtify is recreating the container '
+            'and will restart shortly.'
         ),
         'helper_container': output,
+        'target_image': target_image,
+        'pull_output': pull_output,
     }
 
 
@@ -777,7 +861,9 @@ def update_app() -> dict[str, Any]:
         raise HTTPException(status_code=500, detail='git is not installed')
 
     try:
-        remote = _run_update_command([git, 'remote', 'get-url', 'origin'], root)
+        remote = _run_update_command(
+            [git, 'remote', 'get-url', 'origin'], root
+        )
         fetch = _run_update_command([git, 'fetch', '--tags', 'origin'], root)
         pull = _run_update_command([git, 'pull', '--ff-only'], root)
     except subprocess.TimeoutExpired as exc:
@@ -969,9 +1055,7 @@ def _exclude_completed_metadata_items(
     if not completed:
         return items
     return [
-        item
-        for item in items
-        if str(item.get('file') or '') not in completed
+        item for item in items if str(item.get('file') or '') not in completed
     ]
 
 
@@ -1028,13 +1112,13 @@ def _exclude_completed_artist_images(
     if not completed:
         return items
     return [
-        item
-        for item in items
-        if _artist_image_item_key(item) not in completed
+        item for item in items if _artist_image_item_key(item) not in completed
     ]
 
 
-async def _run_metadata_scan(limit: int, start: int, scan_all: bool = False) -> None:
+async def _run_metadata_scan(
+    limit: int, start: int, scan_all: bool = False
+) -> None:
     if state.downloader is None:
         state.metadata_scan = {
             **state.metadata_scan,
@@ -1312,11 +1396,14 @@ def _artist_folder_preview_url(folder: str) -> str:
     return f'/api/metadata/artist-images/folder-preview?folder={quote(folder)}'
 
 
-def _with_artist_image_preview(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _with_artist_image_preview(
+    items: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
     return [
         {
             **item,
-            'preview_url': item.get('preview_url') or _artist_image_preview_url(item),
+            'preview_url': item.get('preview_url')
+            or _artist_image_preview_url(item),
         }
         for item in items
     ]
@@ -1341,7 +1428,9 @@ def artist_folder_image_preview(folder: str = Query(...)) -> Response:
     try:
         data = image.read_bytes()
     except OSError as exc:
-        raise HTTPException(status_code=404, detail='Artist image not found') from exc
+        raise HTTPException(
+            status_code=404, detail='Artist image not found'
+        ) from exc
     return Response(
         content=data,
         media_type=artist_art.media_type_for_image(data),
@@ -1494,7 +1583,9 @@ def metadata_repair_log(limit: int = Query(50)) -> list[dict[str, Any]]:
 
 
 @router.get('/api/album/youtube')
-def youtube_album_endpoint(browse_id: str = Query(...)) -> list[dict[str, Any]]:
+def youtube_album_endpoint(
+    browse_id: str = Query(...),
+) -> list[dict[str, Any]]:
     tracks = providers.album_tracks_from_browse_id(browse_id)
     if not tracks:
         raise HTTPException(
@@ -1525,7 +1616,9 @@ def preview_endpoint(url: str = Query(...)) -> dict[str, Any]:
 
 
 @router.post('/api/preview/youtube')
-def youtube_preview_endpoint(song: dict[str, Any] = Body(...)) -> dict[str, Any]:
+def youtube_preview_endpoint(
+    song: dict[str, Any] = Body(...),
+) -> dict[str, Any]:
     video_id, match = providers.find_match(song)
     if not video_id:
         raise HTTPException(
@@ -2198,7 +2291,9 @@ def jellyfin_libraries_endpoint(
             url = 'http://' + url
 
         headers = _jellyfin_auth_headers(jellyfin_api_key)
-        logger.info(f'Fetching Jellyfin virtual folders from {url}/Library/VirtualFolders')
+        logger.info(
+            f'Fetching Jellyfin virtual folders from {url}/Library/VirtualFolders'
+        )
 
         try:
             response = requests.get(
@@ -2231,7 +2326,9 @@ def jellyfin_libraries_endpoint(
         )
         response.raise_for_status()
         data = response.json()
-        logger.info(f'Jellyfin response items count: {len(data.get("Items", []))}')
+        logger.info(
+            f'Jellyfin response items count: {len(data.get("Items", []))}'
+        )
 
         return {
             'success': True,
@@ -2240,7 +2337,8 @@ def jellyfin_libraries_endpoint(
         }
     except requests.exceptions.Timeout:
         raise HTTPException(
-            status_code=504, detail='Jellyfin server timeout - server took too long to respond'
+            status_code=504,
+            detail='Jellyfin server timeout - server took too long to respond',
         )
     except requests.exceptions.ConnectionError as e:
         logger.error(f'Connection error to Jellyfin: {e}')
@@ -2251,7 +2349,8 @@ def jellyfin_libraries_endpoint(
     except requests.exceptions.HTTPError as e:
         if e.response.status_code == 401:
             raise HTTPException(
-                status_code=401, detail='Jellyfin API key is invalid or expired'
+                status_code=401,
+                detail='Jellyfin API key is invalid or expired',
             )
         raise HTTPException(
             status_code=e.response.status_code,
@@ -2260,14 +2359,17 @@ def jellyfin_libraries_endpoint(
     except Exception as e:
         logger.error(f'Error fetching Jellyfin libraries: {e}')
         raise HTTPException(
-            status_code=500, detail=f'Failed to fetch Jellyfin libraries: {str(e)}'
+            status_code=500,
+            detail=f'Failed to fetch Jellyfin libraries: {str(e)}',
         )
 
 
 def _artist_compare_key(value: Any) -> str:
     normalized = unicodedata.normalize('NFKC', str(value or ''))
     normalized = ''.join(
-        char for char in normalized if unicodedata.category(char) not in {'Cc', 'Cf'}
+        char
+        for char in normalized
+        if unicodedata.category(char) not in {'Cc', 'Cf'}
     )
     return re.sub(r'\s+', ' ', normalized).strip().casefold()
 
@@ -2295,11 +2397,7 @@ def _named_items(
                 if (folder := (folders or {}).get(key))
                 else {}
             ),
-            **(
-                {'file': file}
-                if (file := (files or {}).get(key))
-                else {}
-            ),
+            **({'file': file} if (file := (files or {}).get(key)) else {}),
         }
         for key, name in sorted(
             names.items(),
@@ -2320,9 +2418,14 @@ def _local_artist_inventory(root: Path) -> dict[str, dict[str, Any]]:
                 key = _artist_compare_key(item.name)
                 if key:
                     folders.setdefault(key, item.name)
-                    folder_images[key] = bool(artist_art.artist_image_paths(item))
+                    folder_images[key] = bool(
+                        artist_art.artist_image_paths(item)
+                    )
         for path in root.rglob('*'):
-            if not path.is_file() or path.suffix.lower() not in AUDIO_EXTENSIONS:
+            if (
+                not path.is_file()
+                or path.suffix.lower() not in AUDIO_EXTENSIONS
+            ):
                 continue
             try:
                 song = metadata_repair._song_from_file(path)
@@ -2337,7 +2440,9 @@ def _local_artist_inventory(root: Path) -> dict[str, dict[str, Any]]:
                 if key:
                     tag_artists.setdefault(key, str(artist))
                     try:
-                        tag_files.setdefault(key, path.relative_to(root).as_posix())
+                        tag_files.setdefault(
+                            key, path.relative_to(root).as_posix()
+                        )
                     except ValueError:
                         tag_files.setdefault(key, path.name)
 
@@ -2349,7 +2454,9 @@ def _local_artist_inventory(root: Path) -> dict[str, dict[str, Any]]:
     }
 
 
-def _artist_names_from_jellyfin_items(items: list[dict[str, Any]]) -> dict[str, str]:
+def _artist_names_from_jellyfin_items(
+    items: list[dict[str, Any]],
+) -> dict[str, str]:
     artists: dict[str, str] = {}
     for item in items:
         names: list[Any] = []
@@ -2449,31 +2556,53 @@ def reconcile_jellyfin_artists() -> dict[str, Any]:
                 ),
                 'missing_local_images': len(missing_image_keys),
             },
-            'jellyfin_only': _named_items({
-                key: jellyfin_artists[key] for key in jellyfin_keys - folder_keys
-            }, files=tag_files),
-            'folder_only': _named_items({
-                key: folders[key] for key in folder_keys - jellyfin_keys
-            }, folders, folder_images, tag_files),
-            'tag_only': _named_items({
-                key: tags[key] for key in tag_keys - jellyfin_keys
-            }, files=tag_files),
-            'matched': _named_items({
-                key: folders[key] for key in matched_keys
-            }, folders, folder_images, tag_files),
-            'missing_images': _named_items({
-                key: jellyfin_artists[key] for key in missing_image_keys
-            }, folders, folder_images, tag_files),
+            'jellyfin_only': _named_items(
+                {
+                    key: jellyfin_artists[key]
+                    for key in jellyfin_keys - folder_keys
+                },
+                files=tag_files,
+            ),
+            'folder_only': _named_items(
+                {key: folders[key] for key in folder_keys - jellyfin_keys},
+                folders,
+                folder_images,
+                tag_files,
+            ),
+            'tag_only': _named_items(
+                {key: tags[key] for key in tag_keys - jellyfin_keys},
+                files=tag_files,
+            ),
+            'matched': _named_items(
+                {key: folders[key] for key in matched_keys},
+                folders,
+                folder_images,
+                tag_files,
+            ),
+            'missing_images': _named_items(
+                {key: jellyfin_artists[key] for key in missing_image_keys},
+                folders,
+                folder_images,
+                tag_files,
+            ),
         }
     except HTTPException:
         raise
     except requests.exceptions.Timeout as exc:
-        raise HTTPException(status_code=504, detail='Jellyfin server timeout') from exc
+        raise HTTPException(
+            status_code=504, detail='Jellyfin server timeout'
+        ) from exc
     except requests.exceptions.ConnectionError as exc:
-        raise HTTPException(status_code=503, detail='Cannot connect to Jellyfin') from exc
+        raise HTTPException(
+            status_code=503, detail='Cannot connect to Jellyfin'
+        ) from exc
     except requests.exceptions.HTTPError as exc:
-        status_code = exc.response.status_code if exc.response is not None else 502
-        raise HTTPException(status_code=status_code, detail='Jellyfin request failed') from exc
+        status_code = (
+            exc.response.status_code if exc.response is not None else 502
+        )
+        raise HTTPException(
+            status_code=status_code, detail='Jellyfin request failed'
+        ) from exc
     except Exception as exc:
         logger.exception('Jellyfin artist reconciliation failed')
         raise HTTPException(status_code=500, detail=str(exc)) from exc
@@ -2514,12 +2643,20 @@ def refresh_jellyfin_library() -> dict[str, Any]:
     except HTTPException:
         raise
     except requests.exceptions.Timeout as exc:
-        raise HTTPException(status_code=504, detail='Jellyfin server timeout') from exc
+        raise HTTPException(
+            status_code=504, detail='Jellyfin server timeout'
+        ) from exc
     except requests.exceptions.ConnectionError as exc:
-        raise HTTPException(status_code=503, detail='Cannot connect to Jellyfin') from exc
+        raise HTTPException(
+            status_code=503, detail='Cannot connect to Jellyfin'
+        ) from exc
     except requests.exceptions.HTTPError as exc:
-        status_code = exc.response.status_code if exc.response is not None else 502
-        raise HTTPException(status_code=status_code, detail='Jellyfin refresh failed') from exc
+        status_code = (
+            exc.response.status_code if exc.response is not None else 502
+        )
+        raise HTTPException(
+            status_code=status_code, detail='Jellyfin refresh failed'
+        ) from exc
     except Exception as exc:
         logger.exception('Jellyfin library refresh failed')
         raise HTTPException(status_code=500, detail=str(exc)) from exc
