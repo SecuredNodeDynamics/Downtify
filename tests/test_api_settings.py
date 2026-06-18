@@ -405,9 +405,9 @@ def test_docker_self_update_pulls_image_and_starts_watchtower_helper(
     assert (
         result['target_image'] == 'ghcr.io/securednodedynamics/downtify:latest'
     )
-    assert 'container restart/recreate is scheduled' in result[
-        'terminal_output'
-    ]
+    assert (
+        'container restart/recreate is scheduled' in result['terminal_output']
+    )
     assert captured['commands'][0] == [
         '/usr/bin/docker',
         'inspect',
@@ -427,6 +427,7 @@ def test_docker_self_update_pulls_image_and_starts_watchtower_helper(
         '--name',
     ]
     assert 'containrrr/watchtower:latest' in captured['commands'][2]
+    assert 'DOCKER_API_VERSION=1.44' in captured['commands'][2]
     assert '--include-restarting' in captured['commands'][2]
     assert captured['commands'][2][-1] == 'downtify'
 
@@ -462,6 +463,34 @@ def test_docker_self_update_fails_when_image_pull_fails(monkeypatch):
         result['message'] == 'Could not pull the latest Downtify Docker image.'
     )
     assert result['pull_output'] == 'manifest unknown'
+
+
+def test_docker_self_update_rejects_version_pinned_container(monkeypatch):
+    class FakeResult:
+        returncode = 0
+        stderr = ''
+
+        def __init__(self, stdout=''):
+            self.stdout = stdout
+
+    monkeypatch.setattr(api.shutil, 'which', lambda _name: '/usr/bin/docker')
+    monkeypatch.setattr(api.Path, 'exists', lambda _self: True)
+    monkeypatch.setattr(
+        api,
+        '_run_docker_command',
+        lambda *_args, **_kwargs: FakeResult(
+            'ghcr.io/securednodedynamics/downtify:2.10.11\n'
+        ),
+    )
+
+    result = _start_docker_self_update()
+
+    assert result['success'] is False
+    assert result['requires_manual'] is True
+    assert 'pinned to' in result['message']
+    assert (
+        'docker compose up -d --force-recreate downtify' in result['commands']
+    )
 
 
 def test_load_settings_empty_object_returns_defaults(tmp_path):

@@ -719,6 +719,18 @@ def _docker_self_update_image() -> str:
     ).strip()
 
 
+def _docker_self_update_api_version() -> str:
+    return os.getenv('DOWNTIFY_DOCKER_API_VERSION', '1.44').strip() or '1.44'
+
+
+def _docker_image_uses_mutable_tag(image: str) -> bool:
+    reference = image.rsplit('@', 1)[0]
+    final_segment = reference.rsplit('/', 1)[-1]
+    if ':' not in final_segment:
+        return True
+    return final_segment.rsplit(':', 1)[-1] == 'latest'
+
+
 def _docker_container_image(docker: str, container: str) -> str:
     configured = os.getenv('DOWNTIFY_SELF_UPDATE_TARGET_IMAGE', '').strip()
     if configured:
@@ -744,11 +756,13 @@ def _start_docker_self_update() -> dict[str, Any]:
         f'downtify-self-update-{int(datetime.now(timezone.utc).timestamp())}'
     )
     image = _docker_self_update_image()
+    docker_api_version = _docker_self_update_api_version()
     target_image = os.getenv('DOWNTIFY_SELF_UPDATE_TARGET_IMAGE', '').strip()
     commands = [
         f'docker pull {target_image or "<current Downtify image>"}',
         'docker run --rm -v /var/run/docker.sock:/var/run/docker.sock '
-        f'{image} --run-once --cleanup --include-restarting {container}',
+        f'-e DOCKER_API_VERSION={docker_api_version} {image} '
+        f'--run-once --cleanup --include-restarting {container}',
     ]
     if not docker or not socket_path.exists():
         return {
@@ -782,8 +796,28 @@ def _start_docker_self_update() -> dict[str, Any]:
     commands = [
         f'docker pull {target_image}',
         'docker run --rm -v /var/run/docker.sock:/var/run/docker.sock '
-        f'{image} --run-once --cleanup --include-restarting {container}',
+        f'-e DOCKER_API_VERSION={docker_api_version} {image} '
+        f'--run-once --cleanup --include-restarting {container}',
     ]
+
+    if not _docker_image_uses_mutable_tag(target_image):
+        return {
+            'success': False,
+            'updated': False,
+            'mode': 'docker',
+            'requires_restart': True,
+            'requires_manual': True,
+            'message': (
+                f'The running container is pinned to {target_image}. '
+                'Automatic updates require the latest image tag.'
+            ),
+            'commands': [
+                'Set the Downtify image to '
+                'ghcr.io/securednodedynamics/downtify:latest in Compose',
+                'docker compose pull downtify',
+                'docker compose up -d --force-recreate downtify',
+            ],
+        }
 
     pull = _run_docker_command([docker, 'pull', target_image], timeout=300)
     pull_output = (pull.stdout or pull.stderr or '').strip()
@@ -807,6 +841,8 @@ def _start_docker_self_update() -> dict[str, Any]:
         helper_name,
         '-v',
         '/var/run/docker.sock:/var/run/docker.sock',
+        '-e',
+        f'DOCKER_API_VERSION={docker_api_version}',
         image,
         '--run-once',
         '--cleanup',
@@ -841,7 +877,8 @@ def _start_docker_self_update() -> dict[str, Any]:
             pull_output,
             (
                 '$ docker run --rm -v /var/run/docker.sock:/var/run/docker.sock '
-                f'{image} --run-once --cleanup --include-restarting {container}'
+                f'-e DOCKER_API_VERSION={docker_api_version} {image} '
+                f'--run-once --cleanup --include-restarting {container}'
             ),
             helper_message,
         ]
