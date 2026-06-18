@@ -374,10 +374,7 @@
             </button>
             <button
               class="btn btn-sm h-11 rounded-full border-white/10 bg-base-100/85 hover:bg-base-100"
-              :disabled="
-                artistImageItems.length === 0 ||
-                repairingAllImages
-              "
+              :disabled="artistImageItems.length === 0 || repairingAllImages"
               @click="repairAllArtistImages"
             >
               <span
@@ -1728,10 +1725,12 @@ async function repairAllJellyfinArtistImages() {
     }
   }
 
-  if (succeeded === targets.length) {
+  const synced = await syncJellyfinAfterImageRepairs(succeeded)
+
+  if (succeeded === targets.length && synced) {
     jellyfinError.value = false
     jellyfinMessage.value = t('metadata.artistImageRepairOk')
-  } else {
+  } else if (succeeded !== targets.length) {
     jellyfinError.value = true
     jellyfinMessage.value = `${t('metadata.failedArtistImageApply')} (${succeeded}/${targets.length})`
   }
@@ -1755,13 +1754,33 @@ async function repairJellyfinBucket(bucketKey) {
     }
   }
 
-  if (succeeded === targets.length) {
+  const synced = await syncJellyfinAfterImageRepairs(succeeded)
+
+  if (succeeded === targets.length && synced) {
     jellyfinError.value = false
     jellyfinMessage.value = t('metadata.artistImageRepairOk')
-  } else {
+  } else if (succeeded !== targets.length) {
     jellyfinError.value = true
     jellyfinMessage.value = `${t('metadata.failedArtistImageApply')} (${succeeded}/${targets.length})`
   }
   repairingJellyfinBucket.value = ''
+}
+
+async function syncJellyfinAfterImageRepairs(repairedCount) {
+  if (repairedCount === 0) return false
+  try {
+    await API.refreshJellyfinLibrary()
+    const response = await API.reconcileJellyfinArtists()
+    artistReconciliation.value = response.data
+    lastReconciled.value = new Date().toLocaleString()
+    return true
+  } catch (err) {
+    const detail = err?.response?.data?.detail
+    jellyfinError.value = true
+    jellyfinMessage.value = detail
+      ? `${t('metadata.jellyfinRepairSyncFailed')} ${detail}`
+      : t('metadata.jellyfinRepairSyncFailed')
+    return false
+  }
 }
 </script>

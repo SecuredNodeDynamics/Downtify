@@ -7,7 +7,11 @@ from downtify import artist_art, metadata_repair
 
 def test_artists_reads_multi_value_tags():
     artists = metadata_repair._artists({
-        'artist': ['Alexandre Desplat', 'Lang Lang', 'Prague Symphony Orchestra']
+        'artist': [
+            'Alexandre Desplat',
+            'Lang Lang',
+            'Prague Symphony Orchestra',
+        ]
     })
 
     assert artists == [
@@ -45,7 +49,9 @@ def test_artist_image_target_uses_artist_name(tmp_path):
     assert target.name == 'AC DC Live.png'
 
 
-def test_missing_artist_image_items_include_named_target(tmp_path, monkeypatch):
+def test_missing_artist_image_items_include_named_target(
+    tmp_path, monkeypatch
+):
     album = tmp_path / 'Artist' / 'Album'
     album.mkdir(parents=True)
     track = album / 'song.mp3'
@@ -164,7 +170,9 @@ def test_save_missing_artist_images_creates_missing_artist_folder(
     )
 
     assert saved == ['Guest Artist/Guest Artist.jpg']
-    assert (tmp_path / 'Guest Artist' / 'Guest Artist.jpg').read_bytes() == b'image'
+    assert (
+        tmp_path / 'Guest Artist' / 'Guest Artist.jpg'
+    ).read_bytes() == b'image'
 
 
 def test_save_missing_artist_images_does_not_create_empty_folder_without_image(
@@ -332,8 +340,8 @@ def test_scan_library_scans_batch_and_returns_only_fixable_items(
         'enrich_song_metadata',
         lambda song: {
             **song,
-            'name': f"{song['name']} fixed",
-            'musicbrainz_recording_id': f"mbid-{song['name']}",
+            'name': f'{song["name"]} fixed',
+            'musicbrainz_recording_id': f'mbid-{song["name"]}',
         },
     )
 
@@ -361,8 +369,8 @@ def test_scan_library_uses_start_offset_for_next_batch(tmp_path, monkeypatch):
         'enrich_song_metadata',
         lambda song: {
             **song,
-            'name': f"{song['name']} fixed",
-            'musicbrainz_recording_id': f"mbid-{song['name']}",
+            'name': f'{song["name"]} fixed',
+            'musicbrainz_recording_id': f'mbid-{song["name"]}',
         },
     )
 
@@ -388,8 +396,8 @@ def test_scan_library_reports_progress(tmp_path, monkeypatch):
         'enrich_song_metadata',
         lambda song: {
             **song,
-            'name': f"{song['name']} fixed",
-            'musicbrainz_recording_id': f"mbid-{song['name']}",
+            'name': f'{song["name"]} fixed',
+            'musicbrainz_recording_id': f'mbid-{song["name"]}',
         },
     )
     updates = []
@@ -452,7 +460,9 @@ def test_repair_file_applies_high_confidence_metadata(tmp_path, monkeypatch):
             'release_date': '2020-01-01',
         },
     ])
-    monkeypatch.setattr(metadata_repair, '_song_from_file', lambda _path: next(reads))
+    monkeypatch.setattr(
+        metadata_repair, '_song_from_file', lambda _path: next(reads)
+    )
     monkeypatch.setattr(
         metadata_repair,
         'enrich_song_metadata',
@@ -501,7 +511,9 @@ def test_repair_file_saves_missing_artist_images(tmp_path, monkeypatch):
             ],
         },
     ])
-    monkeypatch.setattr(metadata_repair, '_song_from_file', lambda _path: next(reads))
+    monkeypatch.setattr(
+        metadata_repair, '_song_from_file', lambda _path: next(reads)
+    )
     monkeypatch.setattr(
         metadata_repair,
         'enrich_song_metadata',
@@ -514,7 +526,9 @@ def test_repair_file_saves_missing_artist_images(tmp_path, monkeypatch):
             ],
         },
     )
-    monkeypatch.setattr(metadata_repair, 'apply_text_tags', lambda *_args: None)
+    monkeypatch.setattr(
+        metadata_repair, 'apply_text_tags', lambda *_args: None
+    )
 
     saved = {}
 
@@ -524,7 +538,9 @@ def test_repair_file_saves_missing_artist_images(tmp_path, monkeypatch):
         saved['artists'] = artists
         return ['Artist/Artist.jpg']
 
-    monkeypatch.setattr(metadata_repair, 'save_missing_artist_images', fake_save)
+    monkeypatch.setattr(
+        metadata_repair, 'save_missing_artist_images', fake_save
+    )
 
     metadata_repair.repair_file(tmp_path, 'Artist/Album/song.mp3')
 
@@ -649,7 +665,9 @@ def test_artist_image_scan_includes_featured_musicbrainz_artists(
             for artist in artists
         ]
 
-    monkeypatch.setattr(metadata_repair, 'missing_artist_image_items', fake_missing)
+    monkeypatch.setattr(
+        metadata_repair, 'missing_artist_image_items', fake_missing
+    )
 
     result = metadata_repair.scan_artist_images(tmp_path, limit=10)
 
@@ -678,7 +696,9 @@ def test_artist_image_scan_includes_name_only_side_artists(
             'artists': ['Primary', 'No Id Guest'],
         },
     )
-    monkeypatch.setattr(metadata_repair, 'enrich_song_metadata', lambda song: song)
+    monkeypatch.setattr(
+        metadata_repair, 'enrich_song_metadata', lambda song: song
+    )
     seen_artists = []
 
     def fake_missing(_root, _path, artists, **_kwargs):
@@ -694,7 +714,9 @@ def test_artist_image_scan_includes_name_only_side_artists(
             for artist in artists
         ]
 
-    monkeypatch.setattr(metadata_repair, 'missing_artist_image_items', fake_missing)
+    monkeypatch.setattr(
+        metadata_repair, 'missing_artist_image_items', fake_missing
+    )
 
     result = metadata_repair.scan_artist_images(tmp_path, limit=10)
 
@@ -837,7 +859,9 @@ def test_repair_artist_image_writes_for_requested_artist(
         (root / 'Artist' / 'Artist.jpg').write_bytes(b'image')
         return ['Artist/Artist.jpg']
 
-    monkeypatch.setattr(metadata_repair, 'save_missing_artist_images', fake_save)
+    monkeypatch.setattr(
+        metadata_repair, 'save_missing_artist_images', fake_save
+    )
 
     result = metadata_repair.repair_artist_image(
         tmp_path,
@@ -917,6 +941,30 @@ def test_repair_artist_image_fails_when_image_not_written(
         )
 
 
+def test_repair_artist_image_verifies_only_requested_folder(
+    tmp_path,
+    monkeypatch,
+):
+    album = tmp_path / 'Artist' / 'Album'
+    album.mkdir(parents=True)
+    (album / 'song.mp3').write_bytes(b'not really audio')
+    (tmp_path / 'Artist' / 'existing.jpg').write_bytes(b'existing')
+
+    monkeypatch.setattr(
+        metadata_repair,
+        'artist_or_fallback_image',
+        lambda *_args: (None, ''),
+    )
+
+    with pytest.raises(ValueError, match='Artist image was not written'):
+        metadata_repair.repair_artist_image(
+            tmp_path,
+            'Artist/Album/song.mp3',
+            {'id': '', 'name': 'Different Artist'},
+            target_folder='Different Artist',
+        )
+
+
 def test_repair_file_fails_when_metadata_does_not_persist(
     tmp_path,
     monkeypatch,
@@ -938,7 +986,9 @@ def test_repair_file_fails_when_metadata_does_not_persist(
             'musicbrainz_recording_id': 'mbid-recording',
         },
     )
-    monkeypatch.setattr(metadata_repair, 'apply_text_tags', lambda *_args: None)
+    monkeypatch.setattr(
+        metadata_repair, 'apply_text_tags', lambda *_args: None
+    )
 
     with pytest.raises(ValueError, match='Metadata write did not persist'):
         metadata_repair.repair_file(tmp_path, 'song.mp3')

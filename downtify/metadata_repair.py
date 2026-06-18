@@ -39,9 +39,7 @@ def _artists(tags: Any) -> list[str]:
             value = tags.get(key)
             if isinstance(value, list) and value:
                 artists = [
-                    str(item).strip()
-                    for item in value
-                    if str(item).strip()
+                    str(item).strip() for item in value if str(item).strip()
                 ]
                 if artists:
                     return artists
@@ -55,7 +53,9 @@ def _artists(tags: Any) -> list[str]:
         return []
     for separator in (' / ', ';', ','):
         if separator in value:
-            return [part.strip() for part in value.split(separator) if part.strip()]
+            return [
+                part.strip() for part in value.split(separator) if part.strip()
+            ]
     return [value.strip()]
 
 
@@ -97,7 +97,11 @@ def _song_from_file(path: Path) -> dict[str, Any]:
 def _artists_from_ids(tags: Any) -> list[str]:
     if not tags:
         return []
-    for key in ['musicbrainz_artistid', 'MusicBrainz Artist Id', 'TXXX:MusicBrainz Artist Id']:
+    for key in [
+        'musicbrainz_artistid',
+        'MusicBrainz Artist Id',
+        'TXXX:MusicBrainz Artist Id',
+    ]:
         value = tags.get(key)
         if isinstance(value, list) and value:
             return [str(item).strip() for item in value if str(item).strip()]
@@ -507,14 +511,15 @@ def _verified_artist_image_paths(
     target_folder: Path | None = None,
 ) -> list[str]:
     verified: list[str] = []
-    folders = artist_folders_for_file(
-        root,
-        path,
-        [artist],
-        include_missing=False,
-    )
-    if target_folder is not None and target_folder.is_dir():
-        folders.append(target_folder)
+    if target_folder is not None:
+        folders = [target_folder] if target_folder.is_dir() else []
+    else:
+        folders = artist_folders_for_file(
+            root,
+            path,
+            [artist],
+            include_missing=False,
+        )
     for folder in folders:
         for image_path in artist_image_paths(folder):
             try:

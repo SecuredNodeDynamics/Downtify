@@ -215,6 +215,8 @@ export default {
     jellyfinReconcileOk: 'Comparacao de artistas concluida.',
     jellyfinRefreshOk: 'Atualizacao do Jellyfin iniciada.',
     jellyfinRefreshFailed: 'Falha ao atualizar Jellyfin.',
+    jellyfinRepairSyncFailed:
+      'As imagens locais foram reparadas, mas a atualizacao ou verificacao do Jellyfin falhou.',
     artistImageRepairOk: 'Imagem do artista reparada.',
     artistReconciliation: 'Comparacao de artistas',
     jellyfinLibrary: 'Biblioteca',

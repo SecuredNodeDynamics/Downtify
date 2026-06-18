@@ -210,6 +210,8 @@ export default {
     jellyfinReconcileOk: 'Artist reconciliation completed.',
     jellyfinRefreshOk: 'Jellyfin refresh started.',
     jellyfinRefreshFailed: 'Failed to refresh Jellyfin.',
+    jellyfinRepairSyncFailed:
+      'Local images were repaired, but Jellyfin refresh or verification failed.',
     artistImageRepairOk: 'Artist image repaired.',
     artistReconciliation: 'Artist reconciliation',
     jellyfinLibrary: 'Library',
