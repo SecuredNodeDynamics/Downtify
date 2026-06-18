@@ -1002,7 +1002,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useSettingsManager } from '../model/settings'
 import { useDownloadDestination } from '../model/downloadDestination'
@@ -1038,6 +1038,20 @@ const helpLoading = ref(false)
 const helpError = ref('')
 const updateRunning = ref(false)
 const updateResult = ref(null)
+
+function openSettingsTab(event) {
+  const tab = event?.detail?.tab
+  if (['general', 'api', 'logs', 'about', 'help'].includes(tab)) {
+    activeTab.value = tab
+  }
+}
+
+onMounted(() =>
+  window.addEventListener('downtify:open-settings', openSettingsTab)
+)
+onBeforeUnmount(() =>
+  window.removeEventListener('downtify:open-settings', openSettingsTab)
+)
 function normalizedJellyfinLibraryName(value) {
   return String(value || '')
     .normalize('NFKC')
