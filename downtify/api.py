@@ -2804,7 +2804,9 @@ def _build_jellyfin_reconcile_payload(
         ),
         'tag_only': _named_items(
             {key: tags[key] for key in tag_keys - jellyfin_keys},
+            folders=tags,
             files=repair_files,
+            propose_folder_from_name=True,
         ),
         'matched': _named_items(
             {key: folders[key] for key in matched_keys},

@@ -215,6 +215,12 @@ export default {
     jellyfinRepairSyncFailed:
       'Local images were repaired, but Jellyfin refresh or verification failed.',
     artistImageRepairOk: 'Artist image repaired.',
+    artistImageRepairPartial:
+      'Repaired {succeeded} of {total} artist images. Jellyfin refresh or verification may still be pending.',
+    artistImageRepairProgress:
+      'Repairing artist images ({current}/{total}): {name}',
+    artistImageRepairSyncWarning:
+      'Local image saved, but Jellyfin upload did not complete.',
     artistReconciliation: 'Artist reconciliation',
     jellyfinLibrary: 'Library',
     jellyfinArtists: 'Jellyfin artists',

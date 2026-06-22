@@ -805,23 +805,15 @@
             </p>
             <button
               class="btn btn-primary btn-xs mt-3 h-8 rounded-full"
-              :disabled="
-                repairingAllJellyfin ||
-                reconcilingArtists ||
-                allJellyfinRepairableItems.length === 0
-              "
-              @click="repairAllJellyfinArtistImages"
+              :disabled="refreshingJellyfin || reconcilingArtists"
+              @click="refreshJellyfin"
             >
               <span
-                v-if="repairingAllJellyfin"
+                v-if="refreshingJellyfin"
                 class="loading loading-spinner loading-xs mr-2"
               />
-              <Icon
-                v-else
-                icon="clarity:magic-wand-line"
-                class="h-4 w-4 mr-2"
-              />
-              {{ t('metadata.fixAllArtistImages') }}
+              <Icon v-else icon="clarity:sync-line" class="h-4 w-4 mr-2" />
+              {{ t('metadata.refreshJellyfin') }}
             </button>
           </div>
           <div class="surface rounded-2xl p-4">
@@ -831,27 +823,13 @@
             <p class="mt-1 text-2xl font-semibold text-primary">
               {{ jellyfinCounts.jellyfin }}
             </p>
-            <button
-              class="btn btn-primary btn-xs mt-3 h-8 rounded-full"
-              :disabled="
-                repairingJellyfinBucket === 'jellyfin_only' ||
-                repairingAllJellyfin ||
-                reconcilingArtists ||
-                jellyfinRepairableBucketItems('jellyfin_only').length === 0
-              "
-              @click="repairJellyfinBucket('jellyfin_only')"
-            >
-              <span
-                v-if="repairingJellyfinBucket === 'jellyfin_only'"
-                class="loading loading-spinner loading-xs mr-2"
-              />
-              <Icon
-                v-else
-                icon="clarity:magic-wand-line"
-                class="h-4 w-4 mr-2"
-              />
-              {{ t('metadata.bulkFixGroup') }}
-            </button>
+            <p class="mt-3 text-[11px] leading-snug text-base-content/45">
+              {{
+                t('metadata.bulkFixAvailable', {
+                  count: jellyfinRepairableBucketItems('missing_images').length,
+                })
+              }}
+            </p>
           </div>
           <div class="surface rounded-2xl p-4">
             <p class="text-xs uppercase text-base-content/40">
@@ -1089,7 +1067,7 @@
                     />
                   </div>
                   <button
-                    v-if="item.missing_image && item.file"
+                    v-if="isJellyfinRepairableItem(item)"
                     class="btn btn-primary btn-xs mt-3 h-8 w-full rounded-full"
                     :disabled="
                       applyingArtistImages[jellyfinRepairKey(item)] ||
@@ -1164,6 +1142,12 @@ import { useI18n } from '/src/i18n'
 
 const { t } = useI18n()
 const sm = useSettingsManager()
+const JELLYFIN_IMAGE_REPAIR_BUCKETS = [
+  'missing_images',
+  'jellyfin_only',
+  'folder_only',
+  'tag_only',
+]
 const activeToolTab = ref('metadata')
 const loading = ref(false)
 const error = ref('')
@@ -1281,12 +1265,14 @@ const reconciliationGridItems = computed(() =>
   reconciliationBuckets.value
     .filter((bucket) => bucket.key === activeReconciliationBucket.value)
     .flatMap((bucket) =>
-      (bucket.items || []).map((item) => ({
-        ...item,
-        bucketKey: bucket.key,
-        bucketLabel: bucket.label,
-        icon: bucket.icon,
-      }))
+      (bucket.items || [])
+        .filter((item) => item.missing_image)
+        .map((item) => ({
+          ...item,
+          bucketKey: bucket.key,
+          bucketLabel: bucket.label,
+          icon: bucket.icon,
+        }))
     )
 )
 
@@ -1296,6 +1282,7 @@ const jellyfinCounts = computed(() => {
     jellyfin: counts.jellyfin || 0,
     folders: counts.folders || 0,
     tags: counts.tags || 0,
+    jellyfinOnly: counts.jellyfin_only || 0,
     missingImages: counts.missing_local_images || 0,
   }
 })
@@ -1311,8 +1298,8 @@ const jellyfinRepairableItems = computed(() =>
 
 const allJellyfinRepairableItems = computed(() => {
   const itemsByKey = new Map()
-  for (const bucket of reconciliationBuckets.value) {
-    for (const item of jellyfinRepairableBucketItems(bucket.key)) {
+  for (const bucketKey of JELLYFIN_IMAGE_REPAIR_BUCKETS) {
+    for (const item of jellyfinRepairableBucketItems(bucketKey)) {
       itemsByKey.set(jellyfinRepairKey(item), item)
     }
   }
@@ -1741,14 +1728,17 @@ async function applyArtistImage(item) {
   }
 }
 
-async function applyJellyfinArtistImage(item) {
+async function applyJellyfinArtistImage(item, options = {}) {
+  const { quiet = false } = options
   const key = jellyfinRepairKey(item)
   applyingArtistImages.value = {
     ...applyingArtistImages.value,
     [key]: true,
   }
-  jellyfinMessage.value = ''
-  jellyfinError.value = false
+  if (!quiet) {
+    jellyfinMessage.value = ''
+    jellyfinError.value = false
+  }
   try {
     const repairItem = {
       file: item.file || '',
@@ -1767,19 +1757,77 @@ async function applyJellyfinArtistImage(item) {
     fixedArtistImages.value = { ...fixedArtistImages.value, [key]: true }
     completedArtistImages.value = [res.data, ...completedArtistImages.value]
     markJellyfinArtistImageFixed(item, res.data)
-    jellyfinMessage.value = t('metadata.artistImageRepairOk')
+    if (!quiet) {
+      const sync = res.data?.jellyfin_sync
+      if (sync && sync.synced === false) {
+        jellyfinError.value = false
+        jellyfinMessage.value = `${t('metadata.artistImageRepairOk')} ${t('metadata.artistImageRepairSyncWarning')}`
+      } else {
+        jellyfinMessage.value = t('metadata.artistImageRepairOk')
+      }
+    }
+    return true
   } catch (err) {
-    const detail =
-      err?.response?.data?.detail ||
-      err?.message ||
-      t('metadata.failedArtistImageApply')
-    jellyfinError.value = true
-    jellyfinMessage.value = `${t('metadata.failedArtistImageApply')} ${detail}`
+    if (!quiet) {
+      const detail =
+        err?.response?.data?.detail ||
+        err?.message ||
+        t('metadata.failedArtistImageApply')
+      jellyfinError.value = true
+      jellyfinMessage.value = `${t('metadata.failedArtistImageApply')} ${detail}`
+    }
+    return false
   } finally {
     applyingArtistImages.value = {
       ...applyingArtistImages.value,
       [key]: false,
     }
+  }
+}
+
+function finishJellyfinBulkRepair(succeeded, total, synced) {
+  if (succeeded === 0) {
+    jellyfinError.value = true
+    jellyfinMessage.value = t('metadata.failedArtistImageApply')
+    return
+  }
+  if (succeeded === total && synced) {
+    jellyfinError.value = false
+    jellyfinMessage.value = t('metadata.artistImageRepairOk')
+    return
+  }
+  jellyfinError.value = succeeded < total
+  jellyfinMessage.value = t('metadata.artistImageRepairPartial', {
+    succeeded,
+    total,
+  })
+}
+
+async function runJellyfinBulkRepair(targets, bucketKey = '') {
+  if (targets.length === 0) return
+
+  jellyfinMessage.value = ''
+  jellyfinError.value = false
+
+  let succeeded = 0
+  for (let index = 0; index < targets.length; index += 1) {
+    const item = targets[index]
+    jellyfinMessage.value = t('metadata.artistImageRepairProgress', {
+      current: index + 1,
+      total: targets.length,
+      name: item.name,
+    })
+    // eslint-disable-next-line no-await-in-loop
+    const ok = await applyJellyfinArtistImage(item, { quiet: true })
+    if (ok) succeeded += 1
+  }
+
+  const synced = await syncJellyfinAfterImageRepairs(succeeded)
+  finishJellyfinBulkRepair(succeeded, targets.length, synced)
+  if (bucketKey) {
+    repairingJellyfinBucket.value = ''
+  } else {
+    repairingAllJellyfin.value = false
   }
 }
 
@@ -1797,28 +1845,7 @@ async function repairAllJellyfinArtistImages() {
   if (targets.length === 0) return
 
   repairingAllJellyfin.value = true
-  jellyfinMessage.value = ''
-  jellyfinError.value = false
-
-  let succeeded = 0
-  for (const item of targets) {
-    // eslint-disable-next-line no-await-in-loop
-    await applyJellyfinArtistImage(item)
-    if (fixedArtistImages.value[jellyfinRepairKey(item)]) {
-      succeeded += 1
-    }
-  }
-
-  const synced = await syncJellyfinAfterImageRepairs(succeeded)
-
-  if (succeeded === targets.length && synced) {
-    jellyfinError.value = false
-    jellyfinMessage.value = t('metadata.artistImageRepairOk')
-  } else if (succeeded !== targets.length) {
-    jellyfinError.value = true
-    jellyfinMessage.value = `${t('metadata.failedArtistImageApply')} (${succeeded}/${targets.length})`
-  }
-  repairingAllJellyfin.value = false
+  await runJellyfinBulkRepair(targets)
 }
 
 async function repairJellyfinBucket(bucketKey) {
@@ -1826,28 +1853,7 @@ async function repairJellyfinBucket(bucketKey) {
   if (targets.length === 0) return
 
   repairingJellyfinBucket.value = bucketKey
-  jellyfinMessage.value = ''
-  jellyfinError.value = false
-
-  let succeeded = 0
-  for (const item of targets) {
-    // eslint-disable-next-line no-await-in-loop
-    await applyJellyfinArtistImage(item)
-    if (fixedArtistImages.value[jellyfinRepairKey(item)]) {
-      succeeded += 1
-    }
-  }
-
-  const synced = await syncJellyfinAfterImageRepairs(succeeded)
-
-  if (succeeded === targets.length && synced) {
-    jellyfinError.value = false
-    jellyfinMessage.value = t('metadata.artistImageRepairOk')
-  } else if (succeeded !== targets.length) {
-    jellyfinError.value = true
-    jellyfinMessage.value = `${t('metadata.failedArtistImageApply')} (${succeeded}/${targets.length})`
-  }
-  repairingJellyfinBucket.value = ''
+  await runJellyfinBulkRepair(targets, bucketKey)
 }
 
 async function syncJellyfinAfterImageRepairs(repairedCount) {
