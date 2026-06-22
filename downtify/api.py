@@ -1615,6 +1615,12 @@ async def apply_artist_image(request: Request) -> dict[str, Any]:
     folder = str(payload.get('folder') or '').strip()
     if not artist['name']:
         raise HTTPException(status_code=400, detail='artist is required')
+    file, folder = _resolve_artist_image_repair_paths(
+        download_dir,
+        artist['name'],
+        file,
+        folder,
+    )
     if not file and not folder:
         raise HTTPException(
             status_code=400,
@@ -1627,6 +1633,7 @@ async def apply_artist_image(request: Request) -> dict[str, Any]:
             artist,
             artist_folder_policy=_artist_folder_policy(),
             target_folder=folder,
+            image_fetchers=_artist_image_fetchers(),
         )
         image_path = next(
             (
@@ -2713,6 +2720,71 @@ def _jellyfin_artist_id_for_name(
         if _artist_compare_key(item.get('Name')) == target_key:
             return str(item.get('Id') or '').strip()
     return ''
+
+
+def _resolve_artist_image_repair_paths(
+    download_dir: Path,
+    artist_name: str,
+    file: str,
+    folder: str,
+) -> tuple[str, str]:
+    key = _artist_compare_key(artist_name)
+    local = _local_artist_inventory(download_dir)
+    if not file:
+        file = (
+            local.get('tag_files', {}).get(key)
+            or local.get('folder_files', {}).get(key)
+            or ''
+        )
+    if not folder:
+        folder = local.get('folders', {}).get(key) or artist_name
+    return file, folder
+
+
+def _fetch_jellyfin_artist_image_bytes(artist_name: str) -> bytes | None:
+    try:
+        url, headers = _configured_jellyfin()
+    except HTTPException:
+        return None
+
+    artist_id = _jellyfin_artist_id_for_name(url, headers, artist_name)
+    if not artist_id:
+        return None
+
+    response = requests.get(
+        f'{url}/Items/{artist_id}/Images/Primary',
+        headers=headers,
+        params={'MaxWidth': 2000},
+        timeout=20,
+    )
+    if response.status_code == 404:
+        return None
+    try:
+        response.raise_for_status()
+    except requests.exceptions.HTTPError:
+        return None
+    content_type = response.headers.get('content-type', '')
+    if content_type and not content_type.casefold().startswith('image/'):
+        return None
+    return response.content or None
+
+
+def _jellyfin_artist_image_fetcher(
+    artist_name: str,
+    _artist: dict[str, str],
+) -> tuple[bytes | None, str]:
+    image = _fetch_jellyfin_artist_image_bytes(artist_name)
+    if image:
+        return image, 'Jellyfin'
+    return None, ''
+
+
+def _artist_image_fetchers() -> list[metadata_repair.ArtistImageFetcher]:
+    try:
+        _configured_jellyfin()
+    except HTTPException:
+        return []
+    return [_jellyfin_artist_image_fetcher]
 
 
 def _sync_artist_image_to_jellyfin(

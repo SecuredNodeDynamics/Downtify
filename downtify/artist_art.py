@@ -16,6 +16,7 @@ from mutagen import File as MutagenFile
 from .musicbrainz import USER_AGENT, lookup_artist_id
 
 MUSICBRAINZ_ARTIST_URL = 'https://musicbrainz.org/ws/2/artist/{mbid}'
+COVERART_ARCHIVE_ARTIST_URL = 'https://coverartarchive.org/artist/{mbid}/front'
 WIKIDATA_API_URL = 'https://www.wikidata.org/w/api.php'
 WIKIDATA_IMAGE_PROPERTY = 'P18'
 
@@ -260,15 +261,27 @@ def artist_image_bytes(mbid: str) -> bytes | None:
     if mbid in _IMAGE_CACHE:
         return _IMAGE_CACHE[mbid]
 
+    data: bytes | None = None
     try:
         url = _wikimedia_artist_image_url(mbid)
         data = _download_image(url) if url else None
     except Exception:
         logger.opt(exception=True).warning(
-            'Failed to fetch artist image for MusicBrainz artist {}',
+            'Failed to fetch Wikimedia artist image for MusicBrainz artist {}',
             mbid,
         )
         data = None
+    if not data:
+        try:
+            data = _download_image(
+                COVERART_ARCHIVE_ARTIST_URL.format(mbid=mbid)
+            )
+        except Exception:
+            logger.opt(exception=True).warning(
+                'Failed to fetch Cover Art Archive image for MusicBrainz artist {}',
+                mbid,
+            )
+            data = None
     if data:
         _IMAGE_CACHE[mbid] = data
         return data

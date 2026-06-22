@@ -486,12 +486,16 @@ def apply_text_tags(path: Path, metadata: dict[str, Any]) -> None:
     audio.save()
 
 
+ArtistImageFetcher = Callable[[str, dict[str, str]], tuple[bytes | None, str]]
+
+
 def repair_artist_image(
     root: Path,
     relative_file: str,
     artist: dict[str, str],
     artist_folder_policy: str = 'artwork_available',
     target_folder: str = '',
+    image_fetchers: list[ArtistImageFetcher] | None = None,
 ):
     root = root.resolve()
     artist_name = str(artist.get('name') or '').strip()
@@ -510,7 +514,13 @@ def repair_artist_image(
             raise FileNotFoundError(relative_file)
 
     if folder is not None:
-        saved = _save_artist_image_to_folder(root, path, artist, folder)
+        saved = _save_artist_image_to_folder(
+            root,
+            path,
+            artist,
+            folder,
+            image_fetchers=image_fetchers,
+        )
     elif path is not None:
         saved = save_missing_artist_images(
             root,
@@ -523,7 +533,9 @@ def repair_artist_image(
 
     verified = _verified_artist_image_paths(root, path, artist, folder)
     if not verified:
-        raise ValueError('Artist image was not written')
+        raise ValueError(
+            'No artist image source found (MusicBrainz, album art, or Jellyfin)'
+        )
     return {
         'artist': artist_name,
         'artist_id': artist.get('id', ''),
@@ -550,13 +562,21 @@ def _save_artist_image_to_folder(
     path: Path | None,
     artist: dict[str, str],
     folder: Path,
+    *,
+    image_fetchers: list[ArtistImageFetcher] | None = None,
 ) -> list[str]:
     if folder.exists() and has_jellyfin_sidecar_image(folder):
         return ensure_jellyfin_sidecar_image(folder, root)
 
+    artist_name = str(artist.get('name') or '').strip()
     fallback_path = path
     mbid = resolve_artist_mbid(artist, fallback_path)
     image, _source = artist_or_fallback_image(mbid, fallback_path)
+    if not image and image_fetchers:
+        for fetch in image_fetchers:
+            image, _source = fetch(artist_name, artist)
+            if image:
+                break
     if not image:
         return []
     folder.mkdir(parents=True, exist_ok=True)

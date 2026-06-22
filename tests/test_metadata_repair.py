@@ -953,7 +953,7 @@ def test_repair_artist_image_fails_when_image_not_written(
         lambda *_args, **_kwargs: ['Artist/Artist.jpg'],
     )
 
-    with pytest.raises(ValueError, match='Artist image was not written'):
+    with pytest.raises(ValueError, match='No artist image source found'):
         metadata_repair.repair_artist_image(
             tmp_path,
             'Artist/Album/song.mp3',
@@ -976,13 +976,40 @@ def test_repair_artist_image_verifies_only_requested_folder(
         lambda *_args: (None, ''),
     )
 
-    with pytest.raises(ValueError, match='Artist image was not written'):
+    with pytest.raises(ValueError, match='No artist image source found'):
         metadata_repair.repair_artist_image(
             tmp_path,
             'Artist/Album/song.mp3',
             {'id': '', 'name': 'Different Artist'},
             target_folder='Different Artist',
         )
+
+
+def test_repair_artist_image_uses_custom_image_fetchers(
+    tmp_path,
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        metadata_repair,
+        'artist_or_fallback_image',
+        lambda *_args: (None, ''),
+    )
+
+    def fetch(_name: str, _artist: dict[str, str]):
+        return b'jellyfin-image', 'Jellyfin'
+
+    result = metadata_repair.repair_artist_image(
+        tmp_path,
+        '',
+        {'id': '', 'name': 'Remote Artist'},
+        target_folder='Remote Artist',
+        image_fetchers=[fetch],
+    )
+
+    assert result['saved'] == ['Remote Artist/folder.jpg']
+    assert (
+        tmp_path / 'Remote Artist' / 'folder.jpg'
+    ).read_bytes() == b'jellyfin-image'
 
 
 def test_repair_file_fails_when_metadata_does_not_persist(

@@ -581,3 +581,59 @@ def test_sync_artist_image_to_jellyfin_posts_base64(monkeypatch):
     assert captured['headers']['Content-Type'] == 'image/png'
     assert captured['data'] == base64.b64encode(image)
     assert captured['params'] == {'Replace': 'true'}
+
+
+def test_resolve_artist_image_repair_paths_uses_local_inventory(tmp_path, monkeypatch):
+    root = tmp_path / 'downloads'
+    artist_dir = root / 'Nas'
+    artist_dir.mkdir(parents=True)
+    track = artist_dir / 'song.mp3'
+    track.write_bytes(b'audio')
+
+    monkeypatch.setattr(api, '_active_download_dir', lambda: root)
+
+    file, folder = api._resolve_artist_image_repair_paths(
+        root,
+        'Nas',
+        '',
+        '',
+    )
+
+    assert file == 'Nas/song.mp3'
+    assert folder == 'Nas'
+
+
+def test_fetch_jellyfin_artist_image_bytes_downloads_primary(monkeypatch):
+    captured: dict[str, Any] = {}
+
+    class FakeResponse:
+        status_code = 200
+        content = b'\xff\xd8\xffimage'
+        headers = {'content-type': 'image/jpeg'}
+
+        @staticmethod
+        def raise_for_status():
+            return None
+
+    def fake_get(url, headers=None, params=None, timeout=0):
+        captured['url'] = url
+        captured['params'] = params
+        return FakeResponse()
+
+    monkeypatch.setattr(
+        api,
+        '_configured_jellyfin',
+        lambda: ('http://jellyfin.test', {'X-Emby-Token': 'secret'}),
+    )
+    monkeypatch.setattr(
+        api,
+        '_jellyfin_artist_id_for_name',
+        lambda *_args, **_kwargs: 'artist-id',
+    )
+    monkeypatch.setattr(api.requests, 'get', fake_get)
+
+    image = api._fetch_jellyfin_artist_image_bytes('Nas')
+
+    assert image == b'\xff\xd8\xffimage'
+    assert captured['url'] == 'http://jellyfin.test/Items/artist-id/Images/Primary'
+    assert captured['params'] == {'MaxWidth': 2000}
