@@ -48,7 +48,14 @@ from fastapi import (
 )
 from loguru import logger
 
-from . import artist_art, m3u, metadata_repair, providers, spotify
+from . import (
+    artist_art,
+    artist_image_sources,
+    m3u,
+    metadata_repair,
+    providers,
+    spotify,
+)
 from .downloader import Downloader, preview_audio_for_song
 from .history import DownloadHistoryDB
 from .monitor import PlaylistMonitorDB, check_playlist
@@ -72,6 +79,7 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     'jellyfin_music_library': '',
     'enable_jellyfin_tools': True,
     'artist_folder_policy': 'artwork_available',
+    'discogs_token': '',
 }
 
 AUDIO_EXTENSIONS = {'.mp3', '.m4a', '.flac', '.ogg', '.wav', '.aac', '.opus'}
@@ -2780,11 +2788,17 @@ def _jellyfin_artist_image_fetcher(
 
 
 def _artist_image_fetchers() -> list[metadata_repair.ArtistImageFetcher]:
+    fetchers: list[metadata_repair.ArtistImageFetcher] = []
     try:
         _configured_jellyfin()
     except HTTPException:
-        return []
-    return [_jellyfin_artist_image_fetcher]
+        pass
+    else:
+        fetchers.append(_jellyfin_artist_image_fetcher)
+
+    discogs_token = str(state.settings.get('discogs_token') or '').strip()
+    fetchers.append(artist_image_sources.online_artist_image_fetcher(discogs_token))
+    return fetchers
 
 
 def _sync_artist_image_to_jellyfin(

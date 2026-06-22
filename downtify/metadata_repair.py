@@ -534,7 +534,8 @@ def repair_artist_image(
     verified = _verified_artist_image_paths(root, path, artist, folder)
     if not verified:
         raise ValueError(
-            'No artist image source found (MusicBrainz, album art, or Jellyfin)'
+            'No artist image source found (MusicBrainz, album art, Jellyfin, '
+            'Spotify, Apple Music, or Discogs)'
         )
     return {
         'artist': artist_name,
