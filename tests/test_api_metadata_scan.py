@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 from pathlib import Path
+from typing import Any
 
 from downtify import api
 from downtify.api import artist_folder_image_preview
@@ -542,3 +544,40 @@ def test_clean_artist_image_items_include_existing_art_preview():
 
     assert result[0]['preview_url'].endswith('folder=Artist')
     assert '/api/metadata/artist-images/preview?' in result[1]['preview_url']
+
+
+def test_sync_artist_image_to_jellyfin_posts_base64(monkeypatch):
+    image = b'\x89PNG\r\n\x1a\nimage'
+    captured: dict[str, Any] = {}
+
+    class FakeResponse:
+        @staticmethod
+        def raise_for_status():
+            return None
+
+    def fake_post(url, headers=None, params=None, data=None, timeout=0):
+        captured['url'] = url
+        captured['headers'] = headers
+        captured['params'] = params
+        captured['data'] = data
+        return FakeResponse()
+
+    monkeypatch.setattr(
+        api,
+        '_configured_jellyfin',
+        lambda: ('http://jellyfin.test', {'X-Emby-Token': 'secret'}),
+    )
+    monkeypatch.setattr(
+        api,
+        '_jellyfin_artist_id_for_name',
+        lambda *_args, **_kwargs: 'artist-id',
+    )
+    monkeypatch.setattr(api.requests, 'post', fake_post)
+
+    result = api._sync_artist_image_to_jellyfin('Nas', image)
+
+    assert result == {'synced': True, 'artist_id': 'artist-id'}
+    assert captured['url'] == 'http://jellyfin.test/Items/artist-id/Images/Primary'
+    assert captured['headers']['Content-Type'] == 'image/png'
+    assert captured['data'] == base64.b64encode(image)
+    assert captured['params'] == {'Replace': 'true'}

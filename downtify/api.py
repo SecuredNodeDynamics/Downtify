@@ -20,6 +20,7 @@ working without changes:
 from __future__ import annotations
 
 import asyncio
+import base64
 import contextlib
 import json
 import os
@@ -1642,8 +1643,7 @@ async def apply_artist_image(request: Request) -> dict[str, Any]:
                 artist['name'],
                 image_path.read_bytes(),
             )
-            if sync.get('synced'):
-                result['jellyfin_sync'] = sync
+            result['jellyfin_sync'] = sync
         completed = list(state.artist_image_scan.get('completed') or [])
         completed.append(result)
         result_keys = _completed_artist_image_keys()
@@ -2737,10 +2737,19 @@ def _sync_artist_image_to_jellyfin(
             'Content-Type': artist_art.media_type_for_image(image_data),
         },
         params={'Replace': 'true'},
-        data=image_data,
+        data=base64.b64encode(image_data),
         timeout=30,
     )
-    response.raise_for_status()
+    try:
+        response.raise_for_status()
+    except requests.exceptions.HTTPError as exc:
+        detail = response.text.strip() or str(exc)
+        logger.warning(
+            'Jellyfin artist image upload failed for {}: {}',
+            artist_name,
+            detail,
+        )
+        return {'synced': False, 'reason': detail, 'artist_id': artist_id}
     return {'synced': True, 'artist_id': artist_id}
 
 
