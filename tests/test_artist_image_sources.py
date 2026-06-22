@@ -27,7 +27,7 @@ def test_fetch_online_artist_image_uses_first_successful_source(monkeypatch):
 
     assert data == b'apple-image'
     assert source == 'Apple Music'
-    assert calls == ['spotify', 'apple']
+    assert calls == ['apple']
 
 
 def test_fetch_discogs_artist_image_downloads_primary_image(monkeypatch):
@@ -181,3 +181,19 @@ def test_fetch_spotify_artist_image_uses_search_results(monkeypatch):
 
     assert data == b'spotify-image'
     assert source == 'Spotify'
+
+
+def test_spotify_access_token_marks_blocked_on_forbidden(monkeypatch):
+    class FakeResponse:
+        status_code = 403
+
+        @staticmethod
+        def raise_for_status():
+            return None
+
+    monkeypatch.setattr(sources.requests, 'get', lambda *args, **kwargs: FakeResponse())
+    sources._SPOTIFY_TOKEN.clear()
+
+    assert sources._spotify_access_token() == ''
+    assert sources._spotify_access_token() == ''
+    assert sources._SPOTIFY_TOKEN.get('blocked') is True

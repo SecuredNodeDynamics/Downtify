@@ -1015,7 +1015,7 @@
                 :key="`${item.bucketKey}-${item.name}`"
                 class="overflow-hidden rounded-2xl border border-primary/20 bg-base-100/75 shadow-glow-sm"
               >
-                <div class="aspect-square bg-base-100/80">
+                <div class="relative aspect-square bg-base-100/80">
                   <img
                     v-if="item.preview_url"
                     :src="item.preview_url"
@@ -1031,6 +1031,15 @@
                       icon="clarity:image-gallery-line"
                       class="h-10 w-10 text-base-content/25"
                     />
+                  </div>
+                  <div
+                    v-if="applyingArtistImages[jellyfinRepairKey(item)]"
+                    class="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-base-100/80 px-3 text-center"
+                  >
+                    <span class="loading loading-spinner loading-md text-primary" />
+                    <p class="text-[11px] font-medium text-base-content/70">
+                      {{ t('metadata.fixing') }}
+                    </p>
                   </div>
                 </div>
                 <div class="p-3">
@@ -1806,16 +1815,20 @@ async function runJellyfinBulkRepair(targets, bucketKey = '') {
   jellyfinError.value = false
 
   let succeeded = 0
+  let failed = 0
   for (let index = 0; index < targets.length; index += 1) {
     const item = targets[index]
-    jellyfinMessage.value = t('metadata.artistImageRepairProgress', {
+    jellyfinMessage.value = t('metadata.artistImageRepairProgressDetail', {
       current: index + 1,
       total: targets.length,
       name: item.name,
+      succeeded,
+      failed,
     })
     // eslint-disable-next-line no-await-in-loop
     const ok = await applyJellyfinArtistImage(item, { quiet: true })
     if (ok) succeeded += 1
+    else failed += 1
   }
 
   const synced = await syncJellyfinAfterImageRepairs(succeeded)
@@ -1856,9 +1869,6 @@ async function syncJellyfinAfterImageRepairs(repairedCount) {
   if (repairedCount === 0) return false
   try {
     await API.refreshJellyfinLibrary()
-    const response = await API.reconcileJellyfinArtists()
-    artistReconciliation.value = response.data
-    lastReconciled.value = new Date().toLocaleString()
     return true
   } catch (err) {
     const detail = err?.response?.data?.detail

@@ -27,7 +27,7 @@ _APPLE_OG_IMAGE_RE = re.compile(
 )
 _MZSTATIC_SIZE_RE = re.compile(r'/\d+x\d+(?:bb|sr)?\.(?:jpg|jpeg|png|webp)\b', re.I)
 
-_SPOTIFY_TOKEN: dict[str, Any] = {}
+_SPOTIFY_TOKEN: dict[str, Any] = {'blocked': False}
 _NAME_IMAGE_CACHE: dict[str, tuple[bytes | None, str]] = {}
 
 
@@ -77,19 +77,37 @@ def _upgrade_mzstatic_url(url: str, size: int = 600) -> str:
 
 
 def _spotify_access_token() -> str:
+    if _SPOTIFY_TOKEN.get('blocked'):
+        return ''
+
     cached = str(_SPOTIFY_TOKEN.get('token') or '').strip()
     expires_at = float(_SPOTIFY_TOKEN.get('expires_at') or 0)
     if cached and expires_at > time.time() + 30:
         return cached
 
-    response = requests.get(
-        'https://open.spotify.com/get_access_token',
-        params={'reason': 'transport', 'productType': 'web_player'},
-        headers={'User-Agent': _SPOTIFY_UA},
-        timeout=12,
-    )
-    response.raise_for_status()
-    payload = response.json()
+    try:
+        response = requests.get(
+            'https://open.spotify.com/get_access_token',
+            params={'reason': 'transport', 'productType': 'web_player'},
+            headers={'User-Agent': _SPOTIFY_UA},
+            timeout=12,
+        )
+        if response.status_code in {401, 403, 429}:
+            _SPOTIFY_TOKEN['blocked'] = True
+            logger.info(
+                'Spotify artist image lookup unavailable (HTTP {})',
+                response.status_code,
+            )
+            return ''
+        response.raise_for_status()
+        payload = response.json()
+    except Exception:
+        logger.opt(exception=True).debug(
+            'Spotify access token request failed; skipping Spotify lookups'
+        )
+        _SPOTIFY_TOKEN['blocked'] = True
+        return ''
+
     token = str(payload.get('accessToken') or '').strip()
     if not token:
         return ''
@@ -265,7 +283,6 @@ def fetch_online_artist_image(
         return _NAME_IMAGE_CACHE[cache_key]
 
     sources: list[tuple[str, Callable[[str], tuple[bytes | None, str]]]] = [
-        ('Spotify', fetch_spotify_artist_image),
         ('Apple Music', fetch_apple_music_artist_image),
         (
             'Discogs',
@@ -274,12 +291,13 @@ def fetch_online_artist_image(
                 discogs_token=discogs_token,
             ),
         ),
+        ('Spotify', fetch_spotify_artist_image),
     ]
     for _label, fetch in sources:
         try:
             data, source = fetch(artist_name)
         except Exception:
-            logger.opt(exception=True).warning(
+            logger.debug(
                 'Online artist image lookup failed via {} for {!r}',
                 fetch.__name__ if hasattr(fetch, '__name__') else _label,
                 artist_name,

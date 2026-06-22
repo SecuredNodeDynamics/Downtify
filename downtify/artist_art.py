@@ -240,15 +240,20 @@ def _wikimedia_artist_image_url(mbid: str) -> str:
 
 
 def _download_image(url: str) -> bytes | None:
+    if not url:
+        return None
     response = requests.get(
         url,
         headers={'User-Agent': USER_AGENT},
         timeout=20,
         allow_redirects=True,
     )
-    if response.status_code == 404:
+    if response.status_code in {400, 404}:
         return None
-    response.raise_for_status()
+    try:
+        response.raise_for_status()
+    except requests.exceptions.HTTPError:
+        return None
     content_type = response.headers.get('content-type', '')
     if content_type and not content_type.casefold().startswith('image/'):
         return None
