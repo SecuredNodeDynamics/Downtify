@@ -31,22 +31,42 @@ def test_safe_library_path_rejects_non_audio(tmp_path):
         metadata_repair.safe_library_path(tmp_path, 'notes.txt')
 
 
-def test_has_artist_image_accepts_common_local_image_names(tmp_path):
+def test_expand_artist_names_splits_featured_artists():
+    names = metadata_repair.expand_artist_names(
+        ['Lana Del Rey feat. A$AP Rocky', 'Katy Perry, 21 Savage']
+    )
+
+    assert names == ['Lana Del Rey', 'A$AP Rocky', 'Katy Perry', '21 Savage']
+
+
+def test_ensure_jellyfin_sidecar_image_migrates_named_image(tmp_path):
+    folder = tmp_path / 'Nas'
+    folder.mkdir()
+    (folder / 'Nas.jpg').write_bytes(b'image-bytes')
+
+    migrated = artist_art.ensure_jellyfin_sidecar_image(folder, tmp_path)
+
+    assert migrated == ['Nas/folder.jpg']
+    assert (folder / 'folder.jpg').read_bytes() == b'image-bytes'
+    assert artist_art.has_jellyfin_sidecar_image(folder) is True
+
+
+def test_has_jellyfin_sidecar_image_accepts_common_local_image_names(tmp_path):
     artist = tmp_path / 'Aaron Copland'
     artist.mkdir()
     (artist / 'thumb.jpg').write_bytes(b'image')
 
+    assert artist_art.has_jellyfin_sidecar_image(artist) is True
     assert artist_art.has_artist_image(artist) is True
 
 
-def test_artist_image_target_uses_artist_name(tmp_path):
+def test_artist_image_target_uses_jellyfin_sidecar_name(tmp_path):
     target = artist_art.artist_image_target_path(
         tmp_path,
-        'AC/DC: Live',
         b'\x89PNG\r\n\x1a\nimage',
     )
 
-    assert target.name == 'AC DC Live.png'
+    assert target.name == 'folder.png'
 
 
 def test_missing_artist_image_items_include_named_target(
@@ -69,7 +89,7 @@ def test_missing_artist_image_items_include_named_target(
         [{'id': 'artist-mbid', 'name': 'Artist'}],
     )
 
-    assert items[0]['target'] == 'Artist/Artist.jpg'
+    assert items[0]['target'] == 'Artist/folder.jpg'
 
 
 def test_missing_artist_image_items_include_missing_artist_folder(
@@ -94,7 +114,7 @@ def test_missing_artist_image_items_include_missing_artist_folder(
     )
 
     assert items[0]['folder'] == 'Guest Artist'
-    assert items[0]['target'] == 'Guest Artist/Guest Artist.jpg'
+    assert items[0]['target'] == 'Guest Artist/folder.jpg'
     assert not (tmp_path / 'Guest Artist').exists()
 
 
@@ -169,9 +189,9 @@ def test_save_missing_artist_images_creates_missing_artist_folder(
         [{'id': 'guest-mbid', 'name': 'Guest Artist'}],
     )
 
-    assert saved == ['Guest Artist/Guest Artist.jpg']
+    assert saved == ['Guest Artist/folder.jpg']
     assert (
-        tmp_path / 'Guest Artist' / 'Guest Artist.jpg'
+        tmp_path / 'Guest Artist' / 'folder.jpg'
     ).read_bytes() == b'image'
 
 
@@ -898,10 +918,10 @@ def test_repair_artist_image_writes_to_requested_folder(
         target_folder='Local Artist Folder',
     )
 
-    assert result['saved'] == ['Local Artist Folder/Jellyfin Artist.jpg']
-    assert result['verified'] == ['Local Artist Folder/Jellyfin Artist.jpg']
+    assert result['saved'] == ['Local Artist Folder/folder.jpg']
+    assert result['verified'] == ['Local Artist Folder/folder.jpg']
     assert (
-        tmp_path / 'Local Artist Folder' / 'Jellyfin Artist.jpg'
+        tmp_path / 'Local Artist Folder' / 'folder.jpg'
     ).read_bytes() == b'image'
 
 

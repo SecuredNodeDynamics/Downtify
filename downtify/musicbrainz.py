@@ -10,9 +10,11 @@ import requests
 from loguru import logger
 
 MUSICBRAINZ_RECORDING_URL = 'https://musicbrainz.org/ws/2/recording/'
+MUSICBRAINZ_ARTIST_URL = 'https://musicbrainz.org/ws/2/artist/'
 USER_AGENT = 'Downtify/1.0 (https://github.com/JanzenMediaGroup/Downtify)'
 
 _CACHE: dict[str, Optional[dict[str, Any]]] = {}
+_ARTIST_ID_CACHE: dict[str, str | None] = {}
 _LAST_REQUEST_AT = 0.0
 
 
@@ -142,6 +144,65 @@ def _candidate_score(
     return title_score + min(45, artist_score) + album_score + duration_score
 
 
+def _throttle_musicbrainz() -> None:
+    elapsed = time.monotonic() - _LAST_REQUEST_AT
+    if elapsed < 1.0:
+        time.sleep(1.0 - elapsed)
+
+
+def lookup_artist_id(name: str) -> Optional[str]:
+    """Return the best MusicBrainz artist MBID for *name*."""
+
+    artist_name = str(name or '').strip()
+    if not artist_name:
+        return None
+
+    cache_key = _norm(artist_name)
+    if cache_key in _ARTIST_ID_CACHE:
+        return _ARTIST_ID_CACHE[cache_key]
+
+    global _LAST_REQUEST_AT
+
+    try:
+        _throttle_musicbrainz()
+        response = requests.get(
+            MUSICBRAINZ_ARTIST_URL,
+            params={'query': f'artist:"{artist_name}"', 'fmt': 'json', 'limit': 5},
+            headers={'User-Agent': USER_AGENT},
+            timeout=8,
+        )
+        _LAST_REQUEST_AT = time.monotonic()
+        response.raise_for_status()
+        artists = [
+            item
+            for item in response.json().get('artists') or []
+            if isinstance(item, dict)
+        ]
+    except Exception:
+        logger.opt(exception=True).warning(
+            'MusicBrainz artist lookup failed for {!r}',
+            artist_name,
+        )
+        _ARTIST_ID_CACHE[cache_key] = None
+        return None
+
+    if not artists:
+        _ARTIST_ID_CACHE[cache_key] = None
+        return None
+
+    best = max(
+        artists,
+        key=lambda item: _ratio(item.get('name'), artist_name),
+    )
+    if _ratio(best.get('name'), artist_name) < 0.82:
+        _ARTIST_ID_CACHE[cache_key] = None
+        return None
+
+    artist_id = str(best.get('id') or '').strip() or None
+    _ARTIST_ID_CACHE[cache_key] = artist_id
+    return artist_id
+
+
 def _musicbrainz_queries(
     title: str,
     artists: list[str],
@@ -190,9 +251,7 @@ def _query(song: dict[str, Any]) -> Optional[dict[str, Any]]:
         for index, query in enumerate(queries):
             if recordings and index >= multi_query_count:
                 break
-            elapsed = time.monotonic() - _LAST_REQUEST_AT
-            if elapsed < 1.0:
-                time.sleep(1.0 - elapsed)
+            _throttle_musicbrainz()
             response = requests.get(
                 MUSICBRAINZ_RECORDING_URL,
                 params={'query': query, 'fmt': 'json', 'limit': 8},

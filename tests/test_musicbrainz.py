@@ -15,6 +15,23 @@ class _Response:
         return self.payload
 
 
+def test_lookup_artist_id_returns_best_match(monkeypatch):
+    musicbrainz._ARTIST_ID_CACHE.clear()
+    musicbrainz._LAST_REQUEST_AT = 0
+
+    def fake_get(*_args, **_kwargs):
+        return _Response({
+            'artists': [
+                {'id': 'wrong-id', 'name': 'Other Artist'},
+                {'id': 'artist-id', 'name': 'Nas'},
+            ]
+        })
+
+    monkeypatch.setattr(musicbrainz.requests, 'get', fake_get)
+
+    assert musicbrainz.lookup_artist_id('Nas') == 'artist-id'
+
+
 def test_musicbrainz_enriches_high_confidence_match(monkeypatch):
     musicbrainz._CACHE.clear()
     musicbrainz._LAST_REQUEST_AT = 0

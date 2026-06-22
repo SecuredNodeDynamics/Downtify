@@ -1612,10 +1612,12 @@ async def apply_artist_image(request: Request) -> dict[str, Any]:
         'name': str(payload.get('artist') or '').strip(),
     }
     folder = str(payload.get('folder') or '').strip()
-    if not file or not artist['name']:
+    if not artist['name']:
+        raise HTTPException(status_code=400, detail='artist is required')
+    if not file and not folder:
         raise HTTPException(
             status_code=400,
-            detail='file and artist are required',
+            detail='file or folder is required',
         )
     try:
         result = metadata_repair.repair_artist_image(
@@ -1625,6 +1627,23 @@ async def apply_artist_image(request: Request) -> dict[str, Any]:
             artist_folder_policy=_artist_folder_policy(),
             target_folder=folder,
         )
+        image_path = next(
+            (
+                download_dir / relative
+                for relative in (
+                    result.get('verified') or result.get('saved') or []
+                )
+                if relative
+            ),
+            None,
+        )
+        if image_path is not None and image_path.is_file():
+            sync = _sync_artist_image_to_jellyfin(
+                artist['name'],
+                image_path.read_bytes(),
+            )
+            if sync.get('synced'):
+                result['jellyfin_sync'] = sync
         completed = list(state.artist_image_scan.get('completed') or [])
         completed.append(result)
         result_keys = _completed_artist_image_keys()
@@ -2506,31 +2525,50 @@ def _named_items(
     folders: dict[str, str] | None = None,
     folder_images: dict[str, bool] | None = None,
     files: dict[str, str] | None = None,
+    *,
+    propose_folder_from_name: bool = False,
 ) -> list[dict[str, Any]]:
-    return [
-        {
+    items: list[dict[str, Any]] = []
+    for key, name in sorted(
+        names.items(),
+        key=lambda item: item[1].casefold(),
+    ):
+        folder = (folders or {}).get(key)
+        if not folder and propose_folder_from_name:
+            folder = name
+        item: dict[str, Any] = {
             'name': name,
             'has_image': bool((folder_images or {}).get(key)),
             'missing_image': not bool((folder_images or {}).get(key)),
-            **(
-                {
-                    'folder': folder,
-                    **(
-                        {'preview_url': _artist_folder_preview_url(folder)}
-                        if (folder_images or {}).get(key)
-                        else {}
-                    ),
-                }
-                if (folder := (folders or {}).get(key))
-                else {}
-            ),
-            **({'file': file} if (file := (files or {}).get(key)) else {}),
         }
-        for key, name in sorted(
-            names.items(),
-            key=lambda item: item[1].casefold(),
+        if folder:
+            item['folder'] = folder
+            if (folder_images or {}).get(key):
+                item['preview_url'] = _artist_folder_preview_url(folder)
+        file = (files or {}).get(key)
+        if file:
+            item['file'] = file
+        items.append(item)
+    return items
+
+
+def _track_artists_for_inventory(
+    path: Path,
+    song: dict[str, Any] | None,
+) -> list[str]:
+    artist_names: list[str] = []
+    if isinstance(song, dict):
+        artist_names.extend(
+            metadata_repair.expand_artist_names(song.get('artists') or [])
         )
-    ]
+        for artist in song.get('musicbrainz_artist_ids') or []:
+            if isinstance(artist, dict):
+                name = str(artist.get('name') or '').strip()
+                if name:
+                    artist_names.append(name)
+    if not artist_names and ' - ' in path.stem:
+        artist_names.append(path.stem.split(' - ', 1)[0].strip())
+    return metadata_repair.expand_artist_names(artist_names)
 
 
 def _local_artist_inventory(root: Path) -> dict[str, dict[str, Any]]:
@@ -2546,8 +2584,8 @@ def _local_artist_inventory(root: Path) -> dict[str, dict[str, Any]]:
                 key = _artist_compare_key(item.name)
                 if key:
                     folders.setdefault(key, item.name)
-                    folder_images[key] = bool(
-                        artist_art.artist_image_paths(item)
+                    folder_images[key] = artist_art.has_jellyfin_sidecar_image(
+                        item
                     )
         for path in root.rglob('*'):
             if (
@@ -2572,8 +2610,9 @@ def _local_artist_inventory(root: Path) -> dict[str, dict[str, Any]]:
                     'Could not read artists from {} for reconciliation',
                     path,
                 )
-                continue
-            for artist in song.get('artists') or []:
+                song = None
+
+            for artist in _track_artists_for_inventory(path, song):
                 key = _artist_compare_key(artist)
                 if key:
                     tag_artists.setdefault(key, str(artist))
@@ -2657,6 +2696,123 @@ def _jellyfin_artist_inventory(
     return _artist_names_from_jellyfin_items(response.json().get('Items', []))
 
 
+def _jellyfin_artist_id_for_name(
+    url: str,
+    headers: dict[str, str],
+    artist_name: str,
+) -> str:
+    response = requests.get(
+        f'{url}/Artists',
+        headers=headers,
+        params={'SearchTerm': artist_name, 'Limit': 10},
+        timeout=20,
+    )
+    response.raise_for_status()
+    target_key = _artist_compare_key(artist_name)
+    for item in response.json().get('Items', []):
+        if _artist_compare_key(item.get('Name')) == target_key:
+            return str(item.get('Id') or '').strip()
+    return ''
+
+
+def _sync_artist_image_to_jellyfin(
+    artist_name: str,
+    image_data: bytes,
+) -> dict[str, Any]:
+    if not image_data:
+        return {'synced': False, 'reason': 'empty_image'}
+    try:
+        url, headers = _configured_jellyfin()
+    except HTTPException as exc:
+        return {'synced': False, 'reason': str(exc.detail)}
+
+    artist_id = _jellyfin_artist_id_for_name(url, headers, artist_name)
+    if not artist_id:
+        return {'synced': False, 'reason': 'artist_not_found'}
+
+    response = requests.post(
+        f'{url}/Items/{artist_id}/Images/Primary',
+        headers={
+            **headers,
+            'Content-Type': artist_art.media_type_for_image(image_data),
+        },
+        params={'Replace': 'true'},
+        data=image_data,
+        timeout=30,
+    )
+    response.raise_for_status()
+    return {'synced': True, 'artist_id': artist_id}
+
+
+def _build_jellyfin_reconcile_payload(
+    library: dict[str, Any] | None,
+    jellyfin_artists: dict[str, str],
+    local: dict[str, dict[str, Any]],
+) -> dict[str, Any]:
+    folders = local['folders']
+    folder_images = local.get('folder_images', {})
+    folder_files = local.get('folder_files', {})
+    tags = local['tags']
+    tag_files = local.get('tag_files', {})
+    repair_files = {**folder_files, **tag_files}
+
+    jellyfin_keys = set(jellyfin_artists)
+    folder_keys = set(folders)
+    tag_keys = set(tags)
+    matched_keys = jellyfin_keys & folder_keys
+    missing_image_keys = {
+        key for key in jellyfin_keys if not folder_images.get(key)
+    }
+    return {
+        'success': True,
+        'library': library or {},
+        'counts': {
+            'jellyfin': len(jellyfin_keys),
+            'folders': len(folder_keys),
+            'tags': len(tag_keys),
+            'jellyfin_only': len(jellyfin_keys - folder_keys),
+            'folder_only': len(folder_keys - jellyfin_keys),
+            'tag_only': len(tag_keys - jellyfin_keys),
+            'matched': len(matched_keys),
+            'local_images': sum(
+                1 for key in jellyfin_keys if folder_images.get(key)
+            ),
+            'missing_local_images': len(missing_image_keys),
+        },
+        'jellyfin_only': _named_items(
+            {
+                key: jellyfin_artists[key]
+                for key in jellyfin_keys - folder_keys
+            },
+            files=tag_files,
+            propose_folder_from_name=True,
+        ),
+        'folder_only': _named_items(
+            {key: folders[key] for key in folder_keys - jellyfin_keys},
+            folders,
+            folder_images,
+            repair_files,
+        ),
+        'tag_only': _named_items(
+            {key: tags[key] for key in tag_keys - jellyfin_keys},
+            files=repair_files,
+        ),
+        'matched': _named_items(
+            {key: folders[key] for key in matched_keys},
+            folders,
+            folder_images,
+            repair_files,
+        ),
+        'missing_images': _named_items(
+            {key: jellyfin_artists[key] for key in missing_image_keys},
+            folders,
+            folder_images,
+            repair_files,
+            propose_folder_from_name=True,
+        ),
+    }
+
+
 @router.get('/api/jellyfin/artists/reconcile')
 def reconcile_jellyfin_artists() -> dict[str, Any]:
     if state.downloader is None:
@@ -2667,66 +2823,11 @@ def reconcile_jellyfin_artists() -> dict[str, Any]:
         library = _matching_jellyfin_library(url, headers)
         jellyfin_artists = _jellyfin_artist_inventory(url, headers, library)
         local = _local_artist_inventory(download_dir)
-        folders = local['folders']
-        folder_images = local.get('folder_images', {})
-        folder_files = local.get('folder_files', {})
-        tags = local['tags']
-        tag_files = local.get('tag_files', {})
-        repair_files = {**folder_files, **tag_files}
-
-        jellyfin_keys = set(jellyfin_artists)
-        folder_keys = set(folders)
-        tag_keys = set(tags)
-        matched_keys = jellyfin_keys & folder_keys
-        missing_image_keys = {
-            key for key in jellyfin_keys if not folder_images.get(key)
-        }
-        return {
-            'success': True,
-            'library': library or {},
-            'counts': {
-                'jellyfin': len(jellyfin_keys),
-                'folders': len(folder_keys),
-                'tags': len(tag_keys),
-                'jellyfin_only': len(jellyfin_keys - folder_keys),
-                'folder_only': len(folder_keys - jellyfin_keys),
-                'tag_only': len(tag_keys - jellyfin_keys),
-                'matched': len(matched_keys),
-                'local_images': sum(
-                    1 for key in jellyfin_keys if folder_images.get(key)
-                ),
-                'missing_local_images': len(missing_image_keys),
-            },
-            'jellyfin_only': _named_items(
-                {
-                    key: jellyfin_artists[key]
-                    for key in jellyfin_keys - folder_keys
-                },
-                files=tag_files,
-            ),
-            'folder_only': _named_items(
-                {key: folders[key] for key in folder_keys - jellyfin_keys},
-                folders,
-                folder_images,
-                repair_files,
-            ),
-            'tag_only': _named_items(
-                {key: tags[key] for key in tag_keys - jellyfin_keys},
-                files=repair_files,
-            ),
-            'matched': _named_items(
-                {key: folders[key] for key in matched_keys},
-                folders,
-                folder_images,
-                repair_files,
-            ),
-            'missing_images': _named_items(
-                {key: jellyfin_artists[key] for key in missing_image_keys},
-                folders,
-                folder_images,
-                repair_files,
-            ),
-        }
+        return _build_jellyfin_reconcile_payload(
+            library,
+            jellyfin_artists,
+            local,
+        )
     except HTTPException:
         raise
     except requests.exceptions.Timeout as exc:
@@ -2761,7 +2862,7 @@ def refresh_jellyfin_library() -> dict[str, Any]:
                 params={
                     'Recursive': True,
                     'MetadataRefreshMode': 'Default',
-                    'ImageRefreshMode': 'Default',
+                    'ImageRefreshMode': 'FullRefresh',
                     'ReplaceAllMetadata': False,
                     'ReplaceAllImages': False,
                 },

@@ -13,7 +13,7 @@ import requests
 from loguru import logger
 from mutagen import File as MutagenFile
 
-from .musicbrainz import USER_AGENT
+from .musicbrainz import USER_AGENT, lookup_artist_id
 
 MUSICBRAINZ_ARTIST_URL = 'https://musicbrainz.org/ws/2/artist/{mbid}'
 WIKIDATA_API_URL = 'https://www.wikidata.org/w/api.php'
@@ -137,8 +137,12 @@ def _artists_for_policy(
     return artists
 
 
+def has_jellyfin_sidecar_image(folder: Path) -> bool:
+    return any((folder / name).is_file() for name in IMAGE_NAMES)
+
+
 def has_artist_image(folder: Path) -> bool:
-    if any((folder / name).exists() for name in IMAGE_NAMES):
+    if has_jellyfin_sidecar_image(folder):
         return True
     return any(
         path.is_file() and path.suffix.casefold() in IMAGE_EXTENSIONS
@@ -320,6 +324,21 @@ def embedded_cover_bytes(path: Path) -> bytes | None:
     return None
 
 
+def resolve_artist_mbid(
+    artist: dict[str, str],
+    fallback_path: Path | None = None,
+) -> str:
+    artist_id = str(artist.get('id') or '').strip()
+    if artist_id:
+        return artist_id
+
+    artist_name = str(artist.get('name') or '').strip()
+    if not artist_name:
+        return ''
+
+    return lookup_artist_id(artist_name) or ''
+
+
 def artist_or_fallback_image(
     mbid: str,
     fallback_path: Path | None = None,
@@ -344,10 +363,41 @@ def _extension_for_image(data: bytes) -> str:
 
 def artist_image_target_path(
     folder: Path,
-    artist_name: str,
     image_data: bytes,
 ) -> Path:
-    return folder / f'{_safe_image_stem(artist_name)}{_extension_for_image(image_data)}'
+    extension = _extension_for_image(image_data)
+    return folder / f'folder{extension}'
+
+
+def ensure_jellyfin_sidecar_image(
+    folder: Path,
+    root: Path | None = None,
+) -> list[str]:
+    """Ensure a Jellyfin-compatible ``folder.*`` sidecar exists."""
+
+    if has_jellyfin_sidecar_image(folder):
+        return []
+
+    migrated: list[str] = []
+    for path in artist_image_paths(folder):
+        if path.name.casefold() in {name.casefold() for name in IMAGE_NAMES}:
+            continue
+        extension = path.suffix.casefold() or _extension_for_image(
+            path.read_bytes()
+        )
+        target = folder / f'folder{extension}'
+        if target.exists():
+            continue
+        target.write_bytes(path.read_bytes())
+        if root is not None:
+            try:
+                migrated.append(target.relative_to(root.resolve()).as_posix())
+            except ValueError:
+                migrated.append(target.name)
+        else:
+            migrated.append(target.name)
+        break
+    return migrated
 
 
 def media_type_for_image(data: bytes) -> str:
@@ -386,20 +436,20 @@ def save_missing_artist_images(
             folders = [planned_folder]
         if not folders:
             continue
-        image, _source = artist_or_fallback_image(artist.get('id', ''), path)
+        image, _source = artist_or_fallback_image(
+            resolve_artist_mbid(artist, path),
+            path,
+        )
         if not image:
             continue
         for folder in folders:
             folder.mkdir(parents=True, exist_ok=True)
-            target = artist_image_target_path(
-                folder,
-                artist.get('name', ''),
-                image,
-            )
+            target = artist_image_target_path(folder, image)
             if target.exists():
                 continue
             target.write_bytes(image)
             saved.append(unquote(target.relative_to(root.resolve()).as_posix()))
+            saved.extend(ensure_jellyfin_sidecar_image(folder, root.resolve()))
     return saved
 
 
@@ -429,15 +479,14 @@ def missing_artist_image_items(
             and _allows_missing_artist_folder(artist_folder_policy)
         ):
             folders = [planned_folder]
-        image, source = artist_or_fallback_image(artist.get('id', ''), path)
+        image, source = artist_or_fallback_image(
+            resolve_artist_mbid(artist, path),
+            path,
+        )
         if not image:
             continue
         for folder in folders:
-            target = artist_image_target_path(
-                folder,
-                artist.get('name', ''),
-                image,
-            )
+            target = artist_image_target_path(folder, image)
             items.append({
                 'artist': artist.get('name', ''),
                 'artist_id': artist.get('id', ''),

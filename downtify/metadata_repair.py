@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Any, Callable
 
@@ -9,23 +10,68 @@ from loguru import logger
 from mutagen import File as MutagenFile
 
 from .artist_art import (
-    artist_image_target_path,
     artist_folders_for_file,
-    artist_or_fallback_image,
     artist_image_paths,
+    artist_image_target_path,
+    artist_or_fallback_image,
+    ensure_jellyfin_sidecar_image,
+    has_jellyfin_sidecar_image,
     missing_artist_image_items,
+    resolve_artist_mbid,
     save_missing_artist_images,
 )
 from .musicbrainz import enrich_song_metadata
 
 AUDIO_EXTENSIONS = {'.mp3', '.m4a', '.mp4', '.aac', '.flac', '.ogg', '.opus'}
 
+_FEATURED_ARTIST_SPLIT = re.compile(
+    r'\s+(?:feat\.?|ft\.?|featuring|with)\s+',
+    re.IGNORECASE,
+)
+
+
+def expand_artist_names(names: list[str]) -> list[str]:
+    """Split compound artist tags such as ``Artist A feat. Artist B``."""
+
+    expanded: list[str] = []
+    seen: set[str] = set()
+    for name in names:
+        text = str(name or '').strip()
+        if not text:
+            continue
+        parts = [text]
+        for separator in (' / ', ';', ','):
+            if separator in text:
+                parts = [
+                    segment.strip()
+                    for segment in text.split(separator)
+                    if segment.strip()
+                ]
+                break
+        split_parts: list[str] = []
+        for part in parts:
+            split_parts.extend(
+                segment.strip()
+                for segment in _FEATURED_ARTIST_SPLIT.split(part)
+                if segment.strip()
+            )
+        for artist in split_parts or [text]:
+            key = artist.casefold()
+            if key in seen:
+                continue
+            seen.add(key)
+            expanded.append(artist)
+    return expanded
+
 
 def _first(tags: Any, keys: list[str]) -> str:
     if not tags:
         return ''
     for key in keys:
-        value = tags.get(key)
+        try:
+            value = tags.get(key)
+        except (ValueError, KeyError):
+            continue
         if isinstance(value, list) and value:
             return str(value[0])
         if value:
@@ -288,7 +334,7 @@ def _combined_artist_refs(
         for artist in source.get('musicbrainz_artist_ids') or []:
             if isinstance(artist, dict):
                 add(artist.get('id'), artist.get('name'))
-        for name in source.get('artists') or []:
+        for name in expand_artist_names(source.get('artists') or []):
             add('', name)
 
     return artists
@@ -447,27 +493,41 @@ def repair_artist_image(
     artist_folder_policy: str = 'artwork_available',
     target_folder: str = '',
 ):
-    path = safe_library_path(root, relative_file)
-    if not path.exists() or not path.is_file():
-        raise FileNotFoundError(relative_file)
     root = root.resolve()
+    artist_name = str(artist.get('name') or '').strip()
+    if not artist_name:
+        raise ValueError('Artist name is required')
+
     folder = _safe_artist_image_folder(root, target_folder)
+    if folder is None and artist_name and not relative_file:
+        folder = _safe_artist_image_folder(root, artist_name)
+
+    path: Path | None = None
+    relative_file = str(relative_file or '').strip()
+    if relative_file:
+        path = safe_library_path(root, relative_file)
+        if not path.exists() or not path.is_file():
+            raise FileNotFoundError(relative_file)
+
     if folder is not None:
         saved = _save_artist_image_to_folder(root, path, artist, folder)
-    else:
+    elif path is not None:
         saved = save_missing_artist_images(
             root,
             path,
             [artist],
             artist_folder_policy=artist_folder_policy,
         )
+    else:
+        raise ValueError('A library file or artist folder is required')
+
     verified = _verified_artist_image_paths(root, path, artist, folder)
     if not verified:
         raise ValueError('Artist image was not written')
     return {
-        'artist': artist.get('name', ''),
+        'artist': artist_name,
         'artist_id': artist.get('id', ''),
-        'file': path.relative_to(root).as_posix(),
+        'file': path.relative_to(root).as_posix() if path is not None else '',
         'saved': saved,
         'verified': verified,
     }
@@ -487,39 +547,45 @@ def _safe_artist_image_folder(root: Path, folder: str) -> Path | None:
 
 def _save_artist_image_to_folder(
     root: Path,
-    path: Path,
+    path: Path | None,
     artist: dict[str, str],
     folder: Path,
 ) -> list[str]:
-    if folder.exists() and artist_image_paths(folder):
-        return []
-    image, _source = artist_or_fallback_image(artist.get('id', ''), path)
+    if folder.exists() and has_jellyfin_sidecar_image(folder):
+        return ensure_jellyfin_sidecar_image(folder, root)
+
+    fallback_path = path
+    mbid = resolve_artist_mbid(artist, fallback_path)
+    image, _source = artist_or_fallback_image(mbid, fallback_path)
     if not image:
         return []
     folder.mkdir(parents=True, exist_ok=True)
-    target = artist_image_target_path(folder, artist.get('name', ''), image)
-    if target.exists():
-        return []
-    target.write_bytes(image)
-    return [target.relative_to(root).as_posix()]
+    target = artist_image_target_path(folder, image)
+    if not target.exists():
+        target.write_bytes(image)
+    saved = [target.relative_to(root).as_posix()]
+    saved.extend(ensure_jellyfin_sidecar_image(folder, root))
+    return sorted(set(saved))
 
 
 def _verified_artist_image_paths(
     root: Path,
-    path: Path,
+    path: Path | None,
     artist: dict[str, str],
     target_folder: Path | None = None,
 ) -> list[str]:
     verified: list[str] = []
     if target_folder is not None:
         folders = [target_folder] if target_folder.is_dir() else []
-    else:
+    elif path is not None:
         folders = artist_folders_for_file(
             root,
             path,
             [artist],
             include_missing=False,
         )
+    else:
+        folders = []
     for folder in folders:
         for image_path in artist_image_paths(folder):
             try:

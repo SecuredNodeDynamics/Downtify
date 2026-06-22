@@ -1357,7 +1357,7 @@ function jellyfinBucketItems(bucketKey) {
 function isJellyfinRepairableItem(item) {
   return (
     item?.missing_image &&
-    item?.file &&
+    (item?.file || item?.folder || item?.name) &&
     !fixedArtistImages.value[jellyfinRepairKey(item)]
   )
 }
@@ -1751,7 +1751,7 @@ async function applyJellyfinArtistImage(item) {
   jellyfinError.value = false
   try {
     const repairItem = {
-      file: item.file,
+      file: item.file || '',
       artist: item.name,
       artist_id: item.artist_id || '',
       folder: item.folder || item.name,
