@@ -15,7 +15,7 @@
         </div>
       </div>
 
-      <div class="metadata-tab-shell">
+      <div class="metadata-tab-shell tab-glow-shell">
         <button
           class="metadata-tab-btn"
           :class="
@@ -155,7 +155,7 @@
           {{ t('metadata.serverOnly') }}
         </p>
 
-        <div class="metadata-tab-shell">
+        <div class="metadata-tab-shell tab-glow-shell">
           <button
             class="metadata-tab-btn"
             :class="
@@ -441,7 +441,7 @@
           </div>
         </section>
 
-        <div class="metadata-tab-shell">
+        <div class="metadata-tab-shell tab-glow-shell">
           <button
             class="metadata-tab-btn"
             :class="
@@ -1877,7 +1877,7 @@ async function syncJellyfinAfterImageRepairs(repairedCount) {
 }
 
 .metadata-tab-shell {
-  @apply tab-glow-shell mb-5 flex w-full max-w-full min-w-0 gap-1 overflow-x-auto rounded-2xl border bg-base-100/75 p-1 sm:mb-6 sm:inline-flex sm:w-auto sm:overflow-visible sm:rounded-full;
+  @apply mb-5 flex w-full max-w-full min-w-0 gap-1 overflow-x-auto rounded-2xl border bg-base-100/75 p-1 sm:mb-6 sm:inline-flex sm:w-auto sm:overflow-visible sm:rounded-full;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
 }
