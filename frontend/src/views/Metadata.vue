@@ -1,9 +1,9 @@
 <template>
-  <div class="min-h-screen">
+  <div class="min-h-screen overflow-x-hidden">
     <Navbar />
     <Settings />
 
-    <main class="mx-auto max-w-5xl px-4 py-8 sm:px-6">
+    <main class="mx-auto max-w-5xl overflow-x-hidden px-3 py-6 sm:px-6 sm:py-8">
       <div class="mb-5">
         <div>
           <h1 class="text-2xl font-bold tracking-tight">
@@ -15,11 +15,9 @@
         </div>
       </div>
 
-      <div
-        class="tab-glow-shell mb-6 inline-flex rounded-full border bg-base-100/75 p-1"
-      >
+      <div class="metadata-tab-shell">
         <button
-          class="rounded-full px-4 py-2 text-sm font-medium transition-colors"
+          class="metadata-tab-btn"
           :class="
             activeToolTab === 'metadata'
               ? 'bg-primary text-primary-content shadow-glow-sm'
@@ -31,7 +29,7 @@
           {{ t('metadata.metadataTab') }}
         </button>
         <button
-          class="rounded-full px-4 py-2 text-sm font-medium transition-colors"
+          class="metadata-tab-btn"
           :class="
             activeToolTab === 'images'
               ? 'bg-primary text-primary-content shadow-glow-sm'
@@ -44,7 +42,7 @@
         </button>
         <button
           v-if="sm.settings.value.enable_jellyfin_tools"
-          class="rounded-full px-4 py-2 text-sm font-medium transition-colors"
+          class="metadata-tab-btn"
           :class="
             activeToolTab === 'jellyfin'
               ? 'bg-primary text-primary-content shadow-glow-sm'
@@ -57,9 +55,9 @@
         </button>
       </div>
 
-      <section v-if="activeToolTab === 'metadata'">
-        <div class="mb-5 flex flex-wrap items-end justify-between gap-4">
-          <div>
+      <section v-if="activeToolTab === 'metadata'" class="metadata-section">
+        <div class="metadata-header">
+          <div class="min-w-0">
             <h2 class="text-xl font-bold tracking-tight">
               {{ t('metadata.metadataTab') }}
             </h2>
@@ -67,10 +65,10 @@
               {{ t('metadata.subtitle') }}
             </p>
           </div>
-          <div class="flex items-center gap-2">
+          <div class="metadata-toolbar">
             <select
               v-model.number="scanLimit"
-              class="select h-11 rounded-full border-white/10 bg-base-100/85 text-sm"
+              class="metadata-select"
               :disabled="loading"
               :title="t('metadata.resultLimit')"
             >
@@ -79,7 +77,7 @@
               <option :value="100">100</option>
             </select>
             <button
-              class="btn btn-primary btn-sm h-11 rounded-full px-5"
+              class="btn btn-primary btn-sm metadata-btn px-5"
               :disabled="loading"
               @click="scan"
             >
@@ -91,7 +89,7 @@
               {{ t('metadata.scan') }}
             </button>
             <button
-              class="btn btn-sm h-11 rounded-full border-white/10 bg-base-100/85 hover:bg-base-100"
+              class="btn btn-sm metadata-btn border-white/10 bg-base-100/85 hover:bg-base-100"
               :disabled="loading"
               @click="scanAll"
             >
@@ -99,7 +97,7 @@
               {{ t('metadata.scanAll') }}
             </button>
             <button
-              class="btn btn-sm h-11 rounded-full border-white/10 bg-base-100/85 hover:bg-base-100"
+              class="btn btn-sm metadata-btn border-white/10 bg-base-100/85 hover:bg-base-100"
               :disabled="
                 loading ||
                 activeTab !== 'needs' ||
@@ -130,7 +128,7 @@
           <span>{{ error }}</span>
         </div>
 
-        <section class="mb-5 grid gap-3 sm:grid-cols-3">
+        <section class="metadata-stat-grid">
           <div class="surface rounded-2xl p-4">
             <p class="text-xs uppercase text-base-content/40">
               {{ t('metadata.scanned') }}
@@ -157,11 +155,9 @@
           {{ t('metadata.serverOnly') }}
         </p>
 
-        <div
-          class="tab-glow-shell mb-5 inline-flex rounded-full border bg-base-100/75 p-1"
-        >
+        <div class="metadata-tab-shell">
           <button
-            class="rounded-full px-4 py-2 text-sm font-medium transition-colors"
+            class="metadata-tab-btn"
             :class="
               activeTab === 'needs'
                 ? 'bg-primary text-primary-content shadow-glow-sm'
@@ -177,7 +173,7 @@
             </span>
           </button>
           <button
-            class="rounded-full px-4 py-2 text-sm font-medium transition-colors"
+            class="metadata-tab-btn"
             :class="
               activeTab === 'completed'
                 ? 'bg-primary text-primary-content shadow-glow-sm'
@@ -193,7 +189,7 @@
             </span>
           </button>
           <button
-            class="rounded-full px-4 py-2 text-sm font-medium transition-colors"
+            class="metadata-tab-btn"
             :class="
               activeTab === 'clean'
                 ? 'bg-primary text-primary-content shadow-glow-sm'
@@ -210,7 +206,7 @@
           </button>
         </div>
 
-        <div class="max-h-[45rem] overflow-y-auto pr-2">
+        <div class="max-h-[45rem] overflow-x-hidden overflow-y-auto pr-1 sm:pr-2">
           <div v-if="loading && visibleItems.length === 0" class="space-y-3">
             <div
               v-for="n in 5"
@@ -239,7 +235,7 @@
               class="surface rounded-2xl p-4 transition-all duration-300"
               :class="
                 applying[item.file]
-                  ? 'scale-[1.01] border-primary/40 shadow-glow-sm'
+                  ? 'max-md:scale-100 scale-[1.01] border-primary/40 shadow-glow-sm'
                   : ''
               "
             >
@@ -301,9 +297,9 @@
                 </p>
               </div>
 
-              <div v-if="activeTab === 'needs'" class="mt-4 flex justify-end">
+              <div v-if="activeTab === 'needs'" class="mt-4 flex w-full sm:justify-end">
                 <button
-                  class="btn btn-sm h-10 rounded-full border-white/10 bg-base-100/85 hover:bg-base-100"
+                  class="btn btn-sm metadata-btn h-10 border-white/10 bg-base-100/85 hover:bg-base-100"
                   :class="fixed[item.file] ? 'text-primary' : ''"
                   :disabled="applying[item.file] || fixed[item.file]"
                   @click="apply(item)"
@@ -327,8 +323,8 @@
         </div>
       </section>
 
-      <section v-if="activeToolTab === 'images'">
-        <div class="mb-5 flex flex-wrap items-end justify-between gap-4">
+      <section v-if="activeToolTab === 'images'" class="metadata-section">
+        <div class="metadata-header">
           <div class="min-w-0 flex-1">
             <h2 class="text-xl font-bold tracking-tight">
               {{ t('metadata.artistImages') }}
@@ -337,10 +333,10 @@
               {{ t('metadata.artistImagesSubtitle') }}
             </p>
           </div>
-          <div class="flex shrink-0 items-center gap-2">
+          <div class="metadata-toolbar">
             <select
               v-model.number="artistImageLimit"
-              class="select h-11 rounded-full border-white/10 bg-base-100/85 text-sm"
+              class="metadata-select"
               :disabled="artistImageLoading"
               :title="t('metadata.artistImageLimit')"
             >
@@ -349,7 +345,7 @@
               <option :value="100">100</option>
             </select>
             <button
-              class="btn btn-primary btn-sm h-11 rounded-full px-5"
+              class="btn btn-primary btn-sm metadata-btn px-5"
               :disabled="artistImageLoading"
               @click="scanArtistImages"
             >
@@ -365,7 +361,7 @@
               {{ t('metadata.scanArtistImages') }}
             </button>
             <button
-              class="btn btn-sm h-11 rounded-full border-white/10 bg-base-100/85 hover:bg-base-100"
+              class="btn btn-sm metadata-btn border-white/10 bg-base-100/85 hover:bg-base-100"
               :disabled="artistImageLoading"
               @click="scanAllArtistImages"
             >
@@ -373,7 +369,7 @@
               {{ t('metadata.scanAll') }}
             </button>
             <button
-              class="btn btn-sm h-11 rounded-full border-white/10 bg-base-100/85 hover:bg-base-100"
+              class="btn btn-sm metadata-btn border-white/10 bg-base-100/85 hover:bg-base-100"
               :disabled="artistImageItems.length === 0 || repairingAllImages"
               @click="repairAllArtistImages"
             >
@@ -393,13 +389,16 @@
 
         <div
           v-if="artistImageError"
-          class="surface mb-4 flex items-center gap-3 rounded-2xl p-4 text-sm text-error"
+          class="surface mb-4 flex items-start gap-3 rounded-2xl p-4 text-sm text-error"
         >
-          <Icon icon="clarity:exclamation-circle-line" class="h-5 w-5" />
-          <span>{{ artistImageError }}</span>
+          <Icon
+            icon="clarity:exclamation-circle-line"
+            class="h-5 w-5 shrink-0"
+          />
+          <span class="min-w-0 break-words">{{ artistImageError }}</span>
         </div>
 
-        <section class="mb-5 grid gap-3 sm:grid-cols-3">
+        <section class="metadata-stat-grid">
           <div class="surface rounded-2xl p-4">
             <p class="text-xs uppercase text-base-content/40">
               {{ t('metadata.scanned') }}
@@ -416,7 +415,7 @@
               {{ artistImageItems.length }}
             </p>
             <button
-              class="btn btn-primary btn-xs mt-3 h-8 rounded-full"
+              class="btn btn-primary btn-xs metadata-card-btn"
               :disabled="artistImageItems.length === 0 || repairingAllImages"
               @click="repairAllArtistImages"
             >
@@ -442,11 +441,9 @@
           </div>
         </section>
 
-        <div
-          class="tab-glow-shell mb-5 inline-flex rounded-full border bg-base-100/75 p-1"
-        >
+        <div class="metadata-tab-shell">
           <button
-            class="rounded-full px-4 py-2 text-sm font-medium transition-colors"
+            class="metadata-tab-btn"
             :class="
               activeArtistImageTab === 'needs'
                 ? 'bg-primary text-primary-content shadow-glow-sm'
@@ -462,7 +459,7 @@
             </span>
           </button>
           <button
-            class="rounded-full px-4 py-2 text-sm font-medium transition-colors"
+            class="metadata-tab-btn"
             :class="
               activeArtistImageTab === 'completed'
                 ? 'bg-primary text-primary-content shadow-glow-sm'
@@ -478,7 +475,7 @@
             </span>
           </button>
           <button
-            class="rounded-full px-4 py-2 text-sm font-medium transition-colors"
+            class="metadata-tab-btn"
             :class="
               activeArtistImageTab === 'clean'
                 ? 'bg-primary text-primary-content shadow-glow-sm'
@@ -494,7 +491,7 @@
             </span>
           </button>
           <button
-            class="rounded-full px-4 py-2 text-sm font-medium transition-colors"
+            class="metadata-tab-btn"
             :class="
               activeArtistImageTab === 'failed'
                 ? 'bg-primary text-primary-content shadow-glow-sm'
@@ -547,7 +544,7 @@
           </div>
         </div>
 
-        <div class="max-h-[34rem] overflow-y-auto pr-2">
+        <div class="max-h-[34rem] overflow-x-hidden overflow-y-auto pr-1 sm:pr-2">
           <div
             v-if="artistImageLoading && visibleArtistImageItems.length === 0"
             class="space-y-3"
@@ -581,7 +578,7 @@
               activeArtistImageTab === 'clean' &&
               cleanArtistImageView === 'grid'
             "
-            class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
+            class="grid gap-4 grid-cols-1 min-[420px]:grid-cols-2 lg:grid-cols-3"
           >
             <article
               v-for="item in visibleArtistImageItems"
@@ -630,13 +627,11 @@
               class="surface rounded-2xl p-4"
               :class="
                 applyingArtistImages[itemKey(item)]
-                  ? 'scale-[1.01] border-primary/40 shadow-glow-sm'
+                  ? 'max-md:scale-100 scale-[1.01] border-primary/40 shadow-glow-sm'
                   : ''
               "
             >
-              <div
-                class="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto_auto] md:items-center"
-              >
+              <div class="metadata-artist-row">
                 <div class="min-w-0">
                   <p class="truncate text-sm font-semibold">
                     {{ item.artist }}
@@ -656,7 +651,7 @@
                 </div>
                 <div
                   v-if="activeArtistImageTab === 'needs'"
-                  class="grid grid-cols-[5rem_5rem] items-center gap-3 justify-self-center"
+                  class="metadata-preview-pair"
                 >
                   <div>
                     <p
@@ -703,7 +698,7 @@
                 </div>
                 <button
                   v-if="activeArtistImageTab === 'needs'"
-                  class="btn btn-sm h-10 rounded-full border-white/10 bg-base-100/85 hover:bg-base-100"
+                  class="btn btn-sm metadata-btn h-10 w-full border-white/10 bg-base-100/85 hover:bg-base-100 md:w-auto"
                   :class="
                     fixedArtistImages[itemKey(item)] ? 'text-primary' : ''
                   "
@@ -737,8 +732,9 @@
           activeToolTab === 'jellyfin' &&
           sm.settings.value.enable_jellyfin_tools
         "
+        class="metadata-section"
       >
-        <div class="mb-5 flex flex-wrap items-end justify-between gap-4">
+        <div class="metadata-header">
           <div class="min-w-0 flex-1">
             <h2 class="text-xl font-bold tracking-tight">
               {{ t('metadata.jellyfinTools') }}
@@ -747,9 +743,9 @@
               {{ t('metadata.jellyfinToolsSubtitle') }}
             </p>
           </div>
-          <div class="flex shrink-0 flex-wrap items-center gap-2">
+          <div class="metadata-toolbar">
             <button
-              class="btn btn-primary btn-sm h-11 rounded-full px-5"
+              class="btn btn-primary btn-sm metadata-btn px-5"
               :disabled="reconcilingArtists"
               @click="reconcileArtists"
             >
@@ -761,7 +757,7 @@
               {{ t('metadata.reconcileArtists') }}
             </button>
             <button
-              class="btn btn-sm h-11 rounded-full border-white/10 bg-base-100/85 hover:bg-base-100"
+              class="btn btn-sm metadata-btn border-white/10 bg-base-100/85 hover:bg-base-100"
               :disabled="refreshingJellyfin"
               @click="refreshJellyfin"
             >
@@ -773,7 +769,7 @@
               {{ t('metadata.refreshJellyfin') }}
             </button>
             <button
-              class="btn btn-sm h-11 rounded-full border-white/10 bg-base-100/85 hover:bg-base-100"
+              class="btn btn-sm metadata-btn border-white/10 bg-base-100/85 hover:bg-base-100"
               :disabled="
                 repairingAllJellyfin ||
                 reconcilingArtists ||
@@ -795,7 +791,7 @@
           </div>
         </div>
 
-        <div class="mb-5 grid gap-3 sm:grid-cols-4">
+        <div class="metadata-stat-grid-4">
           <div class="surface rounded-2xl p-4">
             <p class="text-xs uppercase text-base-content/40">
               {{ t('metadata.jellyfinLibrary') }}
@@ -804,7 +800,7 @@
               {{ jellyfinLibraryName }}
             </p>
             <button
-              class="btn btn-primary btn-xs mt-3 h-8 rounded-full"
+              class="btn btn-primary btn-xs metadata-card-btn"
               :disabled="refreshingJellyfin || reconcilingArtists"
               @click="refreshJellyfin"
             >
@@ -839,7 +835,7 @@
               {{ jellyfinCounts.folders }}
             </p>
             <button
-              class="btn btn-primary btn-xs mt-3 h-8 rounded-full"
+              class="btn btn-primary btn-xs metadata-card-btn"
               :disabled="
                 repairingJellyfinBucket === 'folder_only' ||
                 repairingAllJellyfin ||
@@ -868,7 +864,7 @@
               {{ jellyfinCounts.missingImages }}
             </p>
             <button
-              class="btn btn-primary btn-xs mt-3 h-8 rounded-full"
+              class="btn btn-primary btn-xs metadata-card-btn"
               :disabled="
                 repairingJellyfinBucket === 'missing_images' ||
                 repairingAllJellyfin ||
@@ -893,7 +889,7 @@
 
         <div
           v-if="jellyfinMessage"
-          class="surface mb-5 flex items-center gap-3 rounded-2xl p-4 text-sm"
+          class="surface mb-5 flex items-start gap-3 rounded-2xl p-4 text-sm"
           :class="jellyfinError ? 'text-error' : 'text-primary'"
         >
           <Icon
@@ -904,12 +900,12 @@
             "
             class="h-5 w-5 shrink-0"
           />
-          <span>{{ jellyfinMessage }}</span>
+          <span class="min-w-0 break-words">{{ jellyfinMessage }}</span>
         </div>
 
         <div
           v-if="artistReconciliation"
-          class="mb-5 flex flex-wrap items-center justify-between gap-3"
+          class="metadata-header mb-5 sm:items-center"
         >
           <h3 class="text-sm font-semibold text-base-content/80">
             {{ t('metadata.artistReconciliation') }}
@@ -932,13 +928,13 @@
           </p>
         </div>
 
-        <div v-else-if="artistReconciliation" class="surface rounded-2xl p-4">
-          <div class="mb-4 grid gap-3 md:grid-cols-4">
+        <div v-else-if="artistReconciliation" class="surface min-w-0 rounded-2xl p-3 sm:p-4">
+          <div class="metadata-bucket-grid">
             <button
               v-for="bucket in reconciliationBuckets"
               :key="bucket.key"
               type="button"
-              class="rounded-2xl border border-primary/20 bg-base-100/70 p-3 text-left transition-colors hover:border-primary/45 hover:bg-base-100/90"
+              class="metadata-bucket-btn rounded-2xl border border-primary/20 bg-base-100/70 p-3 text-left transition-colors hover:border-primary/45 hover:bg-base-100/90"
               :class="
                 activeReconciliationBucket === bucket.key
                   ? 'border-primary/60 shadow-glow-sm'
@@ -972,7 +968,7 @@
 
           <div
             v-if="activeReconciliationBucketMeta"
-            class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/10 bg-base-100/60 p-3"
+            class="metadata-bulk-bar"
           >
             <div class="min-w-0">
               <p class="text-sm font-semibold">
@@ -987,7 +983,7 @@
               </p>
             </div>
             <button
-              class="btn btn-primary btn-sm h-9 rounded-full px-4"
+              class="btn btn-primary btn-sm metadata-btn h-9 px-4 sm:w-auto"
               :disabled="
                 repairingJellyfinBucket === activeReconciliationBucket ||
                 repairingAllJellyfin ||
@@ -1011,9 +1007,9 @@
 
           <div
             v-if="reconciliationGridItems.length > 0"
-            class="max-h-[34rem] overflow-y-auto pr-1"
+            class="max-h-[34rem] overflow-x-hidden overflow-y-auto pr-1"
           >
-            <div class="grid grid-cols-2 gap-3 md:grid-cols-4">
+            <div class="metadata-artist-grid">
               <article
                 v-for="item in reconciliationGridItems"
                 :key="`${item.bucketKey}-${item.name}`"
@@ -1068,7 +1064,7 @@
                   </div>
                   <button
                     v-if="isJellyfinRepairableItem(item)"
-                    class="btn btn-primary btn-xs mt-3 h-8 w-full rounded-full"
+                    class="btn btn-primary btn-xs metadata-card-btn"
                     :disabled="
                       applyingArtistImages[jellyfinRepairKey(item)] ||
                       fixedArtistImages[jellyfinRepairKey(item)]
@@ -1874,3 +1870,107 @@ async function syncJellyfinAfterImageRepairs(repairedCount) {
   }
 }
 </script>
+
+<style scoped>
+.metadata-section {
+  @apply min-w-0 max-w-full;
+}
+
+.metadata-tab-shell {
+  @apply tab-glow-shell mb-5 flex w-full max-w-full min-w-0 gap-1 overflow-x-auto rounded-2xl border bg-base-100/75 p-1 sm:mb-6 sm:inline-flex sm:w-auto sm:overflow-visible sm:rounded-full;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.metadata-tab-shell::-webkit-scrollbar {
+  display: none;
+}
+
+.metadata-tab-btn {
+  @apply max-w-full shrink-0 whitespace-nowrap rounded-full px-3 py-2 text-sm font-medium transition-colors sm:px-4;
+}
+
+.metadata-header {
+  @apply mb-5 flex min-w-0 max-w-full flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between;
+}
+
+.metadata-toolbar {
+  @apply flex w-full min-w-0 max-w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center;
+}
+
+.metadata-btn {
+  @apply h-auto min-h-10 max-w-full min-w-0 w-full rounded-full px-3 py-2 text-xs leading-snug sm:h-11 sm:w-auto sm:px-4 sm:text-sm sm:leading-normal;
+  white-space: normal;
+}
+
+.metadata-btn.btn {
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+@media (min-width: 640px) {
+  .metadata-btn {
+    white-space: nowrap;
+  }
+
+  .metadata-btn.btn {
+    flex-wrap: nowrap;
+  }
+}
+
+.metadata-select {
+  @apply select h-10 max-w-full min-w-0 w-full rounded-full border-white/10 bg-base-100/85 text-sm sm:h-11 sm:w-auto sm:min-w-[4.5rem];
+}
+
+.metadata-card-btn {
+  @apply mt-3 h-auto min-h-9 max-w-full min-w-0 w-full rounded-full px-3 py-2 text-[0.7rem] leading-tight sm:h-8 sm:px-4 sm:text-xs sm:leading-normal;
+  white-space: normal;
+}
+
+@media (min-width: 640px) {
+  .metadata-card-btn {
+    white-space: nowrap;
+  }
+}
+
+.metadata-stat-grid {
+  @apply mb-5 grid min-w-0 max-w-full grid-cols-1 gap-3 min-[420px]:grid-cols-2 sm:grid-cols-3;
+}
+
+.metadata-stat-grid-4 {
+  @apply mb-5 grid min-w-0 max-w-full grid-cols-1 gap-3 min-[420px]:grid-cols-2 xl:grid-cols-4;
+}
+
+.metadata-stat-grid > *,
+.metadata-stat-grid-4 > * {
+  @apply min-w-0 max-w-full;
+}
+
+.metadata-bucket-grid {
+  @apply mb-4 grid min-w-0 max-w-full grid-cols-1 gap-3 min-[420px]:grid-cols-2 lg:grid-cols-4;
+}
+
+.metadata-bucket-btn {
+  @apply min-w-0 max-w-full;
+}
+
+.metadata-artist-grid {
+  @apply grid min-w-0 max-w-full grid-cols-1 gap-3 min-[400px]:grid-cols-2 md:grid-cols-3 xl:grid-cols-4;
+}
+
+.metadata-artist-grid > * {
+  @apply min-w-0 max-w-full;
+}
+
+.metadata-artist-row {
+  @apply flex min-w-0 max-w-full flex-col gap-4 md:grid md:grid-cols-[minmax(0,1fr)_auto_auto] md:items-center;
+}
+
+.metadata-preview-pair {
+  @apply mx-auto grid w-full min-w-0 max-w-[11rem] grid-cols-2 items-center gap-2 sm:gap-3 md:mx-0 md:justify-self-center;
+}
+
+.metadata-bulk-bar {
+  @apply mb-4 flex min-w-0 max-w-full flex-col gap-3 rounded-2xl border border-white/10 bg-base-100/60 p-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between;
+}
+</style>
