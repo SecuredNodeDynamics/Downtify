@@ -10,6 +10,13 @@ def test_artist_search_names_splits_collaboration():
     assert 'French Montana' in names
 
 
+def test_artist_search_names_strips_ensemble_suffix():
+    names = artist_search_names('Darkest Hour Orchestra')
+
+    assert 'Darkest Hour Orchestra' in names
+    assert 'Darkest Hour' in names
+
+
 def test_collect_artist_image_options_includes_jellyfin_and_sources(
     monkeypatch,
 ):

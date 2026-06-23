@@ -29,6 +29,31 @@ _FEATURED_ARTIST_SPLIT = re.compile(
     r'\s+(?:feat\.?|ft\.?|featuring|with)\s+',
     re.IGNORECASE,
 )
+_ENSEMBLE_SUFFIXES = (
+    ' orchestra',
+    ' ensemble',
+    ' symphony',
+    ' philharmonic',
+    ' choir',
+    ' quartet',
+    ' quintet',
+    ' sextet',
+    ' octet',
+    ' band',
+    ' singers',
+    ' vocalists',
+)
+
+
+def _strip_ensemble_suffix(name: str) -> str:
+    text = str(name or '').strip()
+    if not text:
+        return ''
+    lowered = text.casefold()
+    for suffix in _ENSEMBLE_SUFFIXES:
+        if lowered.endswith(suffix) and len(text) > len(suffix) + 2:
+            return text[: -len(suffix)].strip()
+    return ''
 
 
 def expand_artist_names(names: list[str]) -> list[str]:
@@ -84,6 +109,10 @@ def artist_search_names(artist_name: str) -> list[str]:
                 names.insert(0, part)
                 seen.add(part.casefold())
         break
+    variant = _strip_ensemble_suffix(artist_name)
+    if variant and variant.casefold() not in seen:
+        names.append(variant)
+        seen.add(variant.casefold())
     return names
 
 

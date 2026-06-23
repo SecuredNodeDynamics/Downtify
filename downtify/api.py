@@ -1942,7 +1942,9 @@ async def apply_artist_image(request: Request) -> dict[str, Any]:
                 discogs_token=discogs_token,
             )
             if not image_data:
-                raise ValueError('Could not download the selected artist image')
+                raise ValueError(
+                    'No artist image found from Jellyfin or online sources'
+                )
             result = metadata_repair.repair_artist_image_bytes(
                 download_dir,
                 file,
