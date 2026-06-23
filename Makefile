@@ -47,6 +47,9 @@ test:
 android-apk:
 	bash scripts/build-android-apk.sh
 
+publish:
+	bash scripts/publish.sh $(word 2,$(MAKECMDGOALS))
+
 version:
 	@VERSION=$(word 2,$(MAKECMDGOALS)); \
 	if [ -z "$$VERSION" ]; then VERSION=patch; fi; \
@@ -63,4 +66,4 @@ doc:
 %:
 	@:
 
-.PHONY: all build latest clean up down run format lint export changelog version doc android-apk
+.PHONY: all build latest clean up down run format lint export changelog version doc android-apk publish
