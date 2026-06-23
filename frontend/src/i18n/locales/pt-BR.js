@@ -200,6 +200,7 @@ export default {
     blank: 'Vazio',
     idsOnly:
       'IDs do MusicBrainz podem ser adicionados; as tags visiveis ja coincidem.',
+    moreChanges: 'mais alteracoes de campo',
     failedScan: 'Falha ao escanear metadados.',
     failedApply: 'Falha ao aplicar correcao de metadados.',
     failedArtistImageScan: 'Falha ao escanear imagens de artistas.',
@@ -241,8 +242,11 @@ export default {
     chooseCover: 'Escolher capa',
     chooseCoverTitle: 'Escolher capa do artista',
     chooseCoverHint:
-      'Escolha uma imagem do Spotify, Discogs, MusicBrainz ou Jellyfin.',
+      'Escolha uma imagem do YouTube Music, Deezer, Spotify, Discogs, MusicBrainz ou Jellyfin.',
     chooseCoverLoading: 'Carregando opções de capa…',
+    chooseCoverLoadingSlow:
+      'Ainda buscando no YouTube Music, Discogs e MusicBrainz — pode levar até um minuto.',
+    chooseCoverPreviewUnavailable: 'Prévia indisponível',
     chooseCoverEmpty: 'Nenhuma opção de capa foi encontrada para este artista.',
     chooseCoverFailed: 'Falha ao carregar opções de capa.',
     applySelectedCover: 'Aplicar capa selecionada',

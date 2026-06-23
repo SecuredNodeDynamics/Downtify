@@ -207,12 +207,21 @@
         </div>
 
         <div class="max-h-[45rem] overflow-x-hidden overflow-y-auto pr-1 sm:pr-2">
-          <div v-if="loading && visibleItems.length === 0" class="space-y-3">
+          <div
+            v-if="loading && visibleItems.length === 0"
+            class="metadata-artist-grid"
+          >
             <div
-              v-for="n in 5"
+              v-for="n in 8"
               :key="n"
-              class="skeleton scan-skeleton-glow h-24 rounded-2xl"
-            />
+              class="overflow-hidden rounded-2xl border border-white/10 bg-base-100/60"
+            >
+              <div class="skeleton scan-skeleton-glow aspect-square w-full" />
+              <div class="space-y-2 p-3">
+                <div class="skeleton h-4 w-2/3 rounded-full" />
+                <div class="skeleton h-3 w-full rounded-full" />
+              </div>
+            </div>
           </div>
 
           <div
@@ -228,58 +237,57 @@
             </p>
           </div>
 
-          <ul v-else class="space-y-3">
-            <li
+          <div v-else class="metadata-artist-grid">
+            <article
               v-for="item in visibleItems"
               :key="item.file"
-              class="surface rounded-2xl p-4 transition-all duration-300"
+              class="overflow-hidden rounded-2xl border border-primary/20 bg-base-100/75 shadow-glow-sm"
               :class="
                 applying[item.file]
-                  ? 'max-md:scale-100 scale-[1.01] border-primary/40 shadow-glow-sm'
+                  ? 'border-primary/40 ring-2 ring-primary/30'
                   : ''
               "
             >
-              <div class="flex flex-wrap items-start justify-between gap-3">
-                <div class="min-w-0">
-                  <p class="truncate text-sm font-semibold">{{ item.file }}</p>
-                  <p class="mt-1 text-xs text-base-content/45">
-                    {{ displaySong(item.current) }}
-                  </p>
+              <div class="relative aspect-square bg-base-100/80">
+                <img
+                  v-if="metadataCoverUrl(item)"
+                  :src="metadataCoverUrl(item)"
+                  :alt="displaySong(item.current)"
+                  class="h-full w-full object-cover"
+                  loading="lazy"
+                  @error="markMetadataCoverFailed(item.file)"
+                />
+                <div
+                  v-else
+                  class="flex h-full w-full items-center justify-center text-base-content/25"
+                >
+                  <Icon icon="clarity:music-note-line" class="h-12 w-12" />
                 </div>
                 <span
-                  class="pill shrink-0"
-                  :class="
-                    activeTab === 'completed'
-                      ? 'badge-soft'
-                      : activeTab === 'clean'
-                        ? 'bg-white/5 text-base-content/50'
-                        : 'bg-warning/10 text-warning'
-                  "
+                  class="pill absolute left-2 top-2 max-w-[calc(100%-1rem)] truncate text-[0.65rem]"
+                  :class="metadataStatusBadgeClass()"
                 >
-                  {{
-                    activeTab === 'completed'
-                      ? t('metadata.fixed')
-                      : activeTab === 'clean'
-                        ? t('metadata.clean')
-                        : t('metadata.needsFix')
-                  }}
+                  {{ metadataStatusBadge() }}
                 </span>
               </div>
-
-              <div
-                class="mt-4 rounded-xl border border-white/10 bg-base-100/70 p-3"
-              >
-                <p class="text-xs font-semibold text-primary">
+              <div class="space-y-2 p-3">
+                <p class="line-clamp-2 text-sm font-semibold leading-snug">
+                  {{ displaySong(item.current) }}
+                </p>
+                <p class="truncate text-xs text-base-content/45">
+                  {{ item.file }}
+                </p>
+                <p class="line-clamp-2 text-xs text-primary">
                   {{ displaySong(item.candidate) }}
                 </p>
                 <div
                   v-if="item.changes.length"
-                  class="mt-3 grid gap-2 text-xs sm:grid-cols-2"
+                  class="space-y-1 rounded-xl border border-white/10 bg-base-100/70 p-2"
                 >
                   <div
-                    v-for="change in item.changes"
+                    v-for="change in item.changes.slice(0, 2)"
                     :key="`${item.file}-${change.field}`"
-                    class="rounded-lg bg-white/5 p-2"
+                    class="text-[0.7rem] leading-snug"
                   >
                     <p class="font-semibold text-base-content/70">
                       {{ change.label }}
@@ -291,15 +299,21 @@
                       {{ change.after || t('metadata.blank') }}
                     </p>
                   </div>
+                  <p
+                    v-if="item.changes.length > 2"
+                    class="text-[0.65rem] text-base-content/45"
+                  >
+                    +{{ item.changes.length - 2 }}
+                    {{ t('metadata.moreChanges') }}
+                  </p>
                 </div>
-                <p v-else class="mt-2 text-xs text-base-content/45">
+                <p v-else class="text-xs text-base-content/45">
                   {{ t('metadata.idsOnly') }}
                 </p>
-              </div>
-
-              <div v-if="activeTab === 'needs'" class="mt-4 flex w-full sm:justify-end">
                 <button
-                  class="btn btn-sm metadata-btn h-10 border-white/10 bg-base-100/85 hover:bg-base-100"
+                  v-if="activeTab === 'needs'"
+                  type="button"
+                  class="btn btn-sm metadata-card-btn w-full border-white/10 bg-base-100/85 hover:bg-base-100"
                   :class="fixed[item.file] ? 'text-primary' : ''"
                   :disabled="applying[item.file] || fixed[item.file]"
                   @click="apply(item)"
@@ -308,7 +322,11 @@
                     v-if="applying[item.file]"
                     class="loading loading-spinner loading-xs mr-2"
                   />
-                  <Icon v-else icon="clarity:check-line" class="h-4 w-4 mr-2" />
+                  <Icon
+                    v-else
+                    icon="clarity:check-line"
+                    class="mr-2 h-4 w-4"
+                  />
                   {{
                     applying[item.file]
                       ? t('metadata.fixing')
@@ -318,8 +336,8 @@
                   }}
                 </button>
               </div>
-            </li>
-          </ul>
+            </article>
+          </div>
         </div>
       </section>
 
@@ -508,52 +526,22 @@
           </button>
         </div>
 
-        <div
-          v-if="activeArtistImageTab === 'clean'"
-          class="mb-5 flex justify-end"
-        >
-          <div
-            class="inline-flex rounded-full border border-white/10 bg-base-100/75 p-1"
-          >
-            <button
-              type="button"
-              class="rounded-full p-2 transition-colors"
-              :class="
-                cleanArtistImageView === 'list'
-                  ? 'bg-primary text-primary-content'
-                  : 'text-base-content/55 hover:text-base-content'
-              "
-              :title="t('metadata.listView')"
-              @click="cleanArtistImageView = 'list'"
-            >
-              <Icon icon="clarity:view-list-line" class="h-4 w-4" />
-            </button>
-            <button
-              type="button"
-              class="rounded-full p-2 transition-colors"
-              :class="
-                cleanArtistImageView === 'grid'
-                  ? 'bg-primary text-primary-content'
-                  : 'text-base-content/55 hover:text-base-content'
-              "
-              :title="t('metadata.gridView')"
-              @click="cleanArtistImageView = 'grid'"
-            >
-              <Icon icon="clarity:grid-view-line" class="h-4 w-4" />
-            </button>
-          </div>
-        </div>
-
         <div class="max-h-[34rem] overflow-x-hidden overflow-y-auto pr-1 sm:pr-2">
           <div
             v-if="artistImageLoading && visibleArtistImageItems.length === 0"
-            class="space-y-3"
+            class="metadata-artist-grid"
           >
             <div
-              v-for="n in 4"
+              v-for="n in 8"
               :key="n"
-              class="skeleton scan-skeleton-glow h-20 rounded-2xl"
-            />
+              class="overflow-hidden rounded-2xl border border-white/10 bg-base-100/60"
+            >
+              <div class="skeleton scan-skeleton-glow aspect-square w-full" />
+              <div class="space-y-2 p-3">
+                <div class="skeleton h-4 w-2/3 rounded-full" />
+                <div class="skeleton h-3 w-full rounded-full" />
+              </div>
+            </div>
           </div>
 
           <div
@@ -573,132 +561,71 @@
             </p>
           </div>
 
-          <div
-            v-else-if="
-              activeArtistImageTab === 'clean' &&
-              cleanArtistImageView === 'grid'
-            "
-            class="grid gap-4 grid-cols-1 min-[420px]:grid-cols-2 lg:grid-cols-3"
-          >
+          <div v-else class="metadata-artist-grid">
             <article
               v-for="item in visibleArtistImageItems"
               :key="itemKey(item)"
-              class="surface overflow-hidden rounded-2xl"
-            >
-              <div
-                class="flex aspect-square items-center justify-center overflow-hidden bg-base-100/80"
-              >
-                <img
-                  v-if="item.preview_url"
-                  :src="apiPreviewSrc(item.preview_url)"
-                  :alt="item.artist"
-                  class="h-full w-full object-cover"
-                  loading="lazy"
-                />
-                <Icon
-                  v-else
-                  icon="clarity:user-line"
-                  class="h-14 w-14 text-base-content/25"
-                />
-              </div>
-              <div class="p-4">
-                <div class="flex items-start justify-between gap-3">
-                  <p class="min-w-0 truncate text-sm font-semibold">
-                    {{ item.artist || t('common.unknownArtist') }}
-                  </p>
-                  <span class="pill badge-soft shrink-0">
-                    {{ t('metadata.clean') }}
-                  </span>
-                </div>
-                <p class="mt-2 truncate text-xs text-base-content/45">
-                  {{ item.folder || item.file }}
-                </p>
-                <p class="mt-1 truncate text-xs text-primary">
-                  {{ item.file }}
-                </p>
-              </div>
-            </article>
-          </div>
-
-          <ul v-else class="space-y-3">
-            <li
-              v-for="item in visibleArtistImageItems"
-              :key="itemKey(item)"
-              class="surface rounded-2xl p-4"
+              class="overflow-hidden rounded-2xl border border-primary/20 bg-base-100/75 shadow-glow-sm"
               :class="
                 applyingArtistImages[itemKey(item)]
-                  ? 'max-md:scale-100 scale-[1.01] border-primary/40 shadow-glow-sm'
+                  ? 'border-primary/40 ring-2 ring-primary/30'
                   : ''
               "
             >
-              <div class="metadata-artist-row">
-                <div class="min-w-0">
-                  <p class="truncate text-sm font-semibold">
-                    {{ item.artist }}
-                  </p>
-                  <p class="mt-1 text-xs text-base-content/45">
-                    {{ item.target || item.folder }}
-                  </p>
-                  <p class="mt-1 text-xs text-primary">
-                    {{ artistImageItemMeta(item) }}
-                  </p>
-                  <p
-                    v-if="activeArtistImageTab === 'failed'"
-                    class="mt-2 text-xs text-error"
-                  >
-                    {{ item.error }}
-                  </p>
-                </div>
+              <div class="relative aspect-square bg-base-100/80">
+                <img
+                  v-if="artistImagePreviewUrl(item)"
+                  :src="artistImagePreviewUrl(item)"
+                  :alt="artistImageItemArtist(item)"
+                  class="h-full w-full object-cover"
+                  loading="lazy"
+                />
                 <div
-                  v-if="activeArtistImageTab === 'needs'"
-                  class="metadata-preview-pair"
+                  v-else
+                  class="flex h-full w-full flex-col items-center justify-center gap-2 text-base-content/30"
                 >
-                  <div>
-                    <p
-                      class="mb-1 text-center text-[0.65rem] uppercase text-base-content/40"
-                    >
-                      {{ t('metadata.before') }}
-                    </p>
-                    <div
-                      class="flex aspect-square w-20 items-center justify-center rounded-xl border border-white/10 bg-base-100/80"
-                    >
-                      <Icon
-                        icon="clarity:user-line"
-                        class="h-9 w-9 text-base-content/35"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <p
-                      class="mb-1 text-center text-[0.65rem] uppercase text-base-content/40"
-                    >
-                      {{ t('metadata.after') }}
-                    </p>
-                    <div
-                      class="aspect-square w-20 overflow-hidden rounded-xl border border-primary/30 bg-base-100/80"
-                    >
-                      <img
-                        v-if="item.preview_url"
-                        :src="apiPreviewSrc(item.preview_url)"
-                        :alt="item.artist"
-                        class="h-full w-full object-cover"
-                        loading="lazy"
-                      />
-                      <div
-                        v-else
-                        class="flex h-full w-full items-center justify-center"
-                      >
-                        <Icon
-                          icon="clarity:image-gallery-line"
-                          class="h-9 w-9 text-base-content/35"
-                        />
-                      </div>
-                    </div>
-                  </div>
+                  <Icon
+                    :icon="
+                      activeArtistImageTab === 'needs'
+                        ? 'clarity:user-line'
+                        : 'clarity:image-gallery-line'
+                    "
+                    class="h-12 w-12"
+                  />
+                  <span
+                    v-if="activeArtistImageTab === 'needs'"
+                    class="text-[0.65rem] uppercase tracking-wide"
+                  >
+                    {{ t('metadata.missingLocalImage') }}
+                  </span>
                 </div>
+                <span
+                  class="pill absolute left-2 top-2 max-w-[calc(100%-1rem)] truncate text-[0.65rem]"
+                  :class="artistImageStatusBadgeClass(item)"
+                >
+                  {{ artistImageStatusBadge(item) }}
+                </span>
+              </div>
+              <div class="space-y-2 p-3">
+                <p class="truncate text-sm font-semibold">
+                  {{ artistImageItemArtist(item) }}
+                </p>
+                <p class="truncate text-xs text-base-content/45">
+                  {{ item.target || item.folder || item.file || '' }}
+                </p>
+                <p class="truncate text-xs text-primary">
+                  {{ artistImageItemMeta(item) }}
+                </p>
+                <p
+                  v-if="activeArtistImageTab === 'failed' && item.error"
+                  class="line-clamp-3 text-xs text-error"
+                >
+                  {{ item.error }}
+                </p>
                 <button
                   v-if="activeArtistImageTab === 'needs'"
-                  class="btn btn-sm metadata-btn h-10 w-full border-white/10 bg-base-100/85 hover:bg-base-100 md:w-auto"
+                  type="button"
+                  class="btn btn-sm metadata-card-btn w-full border-white/10 bg-base-100/85 hover:bg-base-100"
                   :class="
                     fixedArtistImages[itemKey(item)] ? 'text-primary' : ''
                   "
@@ -712,7 +639,11 @@
                     v-if="applyingArtistImages[itemKey(item)]"
                     class="loading loading-spinner loading-xs mr-2"
                   />
-                  <Icon v-else icon="clarity:check-line" class="h-4 w-4 mr-2" />
+                  <Icon
+                    v-else
+                    icon="clarity:check-line"
+                    class="mr-2 h-4 w-4"
+                  />
                   {{
                     applyingArtistImages[itemKey(item)]
                       ? t('metadata.fixing')
@@ -724,8 +655,8 @@
                   }}
                 </button>
               </div>
-            </li>
-          </ul>
+            </article>
+          </div>
         </div>
       </section>
 
@@ -1299,6 +1230,7 @@ const items = ref([])
 const cleanItems = ref([])
 const applying = ref({})
 const fixed = ref({})
+const metadataCoverFailed = ref({})
 const completedItems = ref([])
 const activeTab = ref('needs')
 const repairingAll = ref(false)
@@ -1312,7 +1244,6 @@ const cleanArtistImageItems = ref([])
 const completedArtistImages = ref([])
 const failedArtistImages = ref([])
 const activeArtistImageTab = ref('needs')
-const cleanArtistImageView = ref('grid')
 const applyingArtistImages = ref({})
 const fixedArtistImages = ref({})
 const failedArtistRepairKeys = ref({})
@@ -1485,6 +1416,41 @@ function displaySong(song) {
   return `${artists || t('common.unknownArtist')} - ${title}${album}`
 }
 
+function metadataCoverUrl(item) {
+  const file = String(item?.file || '').trim()
+  if (!file || metadataCoverFailed.value[file]) {
+    return ''
+  }
+  return apiPreviewSrc(API.coverFileURL(file))
+}
+
+function markMetadataCoverFailed(file) {
+  metadataCoverFailed.value = {
+    ...metadataCoverFailed.value,
+    [file]: true,
+  }
+}
+
+function metadataStatusBadge() {
+  if (activeTab.value === 'completed') {
+    return t('metadata.fixed')
+  }
+  if (activeTab.value === 'clean') {
+    return t('metadata.clean')
+  }
+  return t('metadata.needsFix')
+}
+
+function metadataStatusBadgeClass() {
+  if (activeTab.value === 'completed') {
+    return 'badge-success text-success-content'
+  }
+  if (activeTab.value === 'clean') {
+    return 'badge-soft'
+  }
+  return 'badge-warning text-warning-content'
+}
+
 function itemKey(item) {
   return `${item.artist_id || item.artist}-${item.folder}`
 }
@@ -1519,6 +1485,26 @@ function firstSavedFolder(result) {
     Boolean
   )
   return path ? String(path).split('/', 1)[0] : ''
+}
+
+function folderPreviewUrl(folder) {
+  const value = String(folder || '').trim()
+  if (!value) return ''
+  return `/api/metadata/artist-images/folder-preview?folder=${encodeURIComponent(value)}`
+}
+
+function enrichArtistImageItem(item) {
+  if (!item || item.preview_url) {
+    return item
+  }
+  const folder = item.folder || firstSavedFolder(item) || item.target || ''
+  if (!folder) {
+    return item
+  }
+  return {
+    ...item,
+    preview_url: folderPreviewUrl(folder),
+  }
 }
 
 function artistImageRepairSucceeded(data) {
@@ -1565,6 +1551,78 @@ function syncFailedRepairKeysFromReconciliation() {
 
 function apiPreviewSrc(path) {
   return API.apiAssetUrl(path)
+}
+
+function artistImageItemArtist(item) {
+  return String(item?.artist || item?.name || '').trim() || t('common.unknownArtist')
+}
+
+function artistImagePreviewUrl(item) {
+  if (!item) return ''
+  if (item.preview_url) {
+    return apiPreviewSrc(item.preview_url)
+  }
+  const folder = item.folder || firstSavedFolder(item) || item.target || ''
+  if (folder) {
+    return apiPreviewSrc(
+      `/api/metadata/artist-images/folder-preview?folder=${encodeURIComponent(folder)}`
+    )
+  }
+  const file = String(item.file || '').trim()
+  const artist = artistImageItemArtist(item)
+  if (file && artist) {
+    const artistId = String(item.artist_id || '').trim()
+    const params = new URLSearchParams({
+      file,
+      artist,
+      artist_id: artistId,
+    })
+    return apiPreviewSrc(`/api/metadata/artist-images/preview?${params}`)
+  }
+  return ''
+}
+
+function artistImageStatusBadge(item) {
+  if (activeArtistImageTab.value === 'completed') {
+    return t('metadata.completed')
+  }
+  if (activeArtistImageTab.value === 'clean') {
+    return t('metadata.clean')
+  }
+  if (activeArtistImageTab.value === 'failed') {
+    return failedArtistRepairKeys.value[itemKey(item)]
+      ? t('metadata.fixFailed')
+      : t('metadata.repairFailed')
+  }
+  if (fixedArtistImages.value[itemKey(item)]) {
+    return t('metadata.fixed')
+  }
+  if (failedArtistRepairKeys.value[itemKey(item)]) {
+    return t('metadata.fixFailed')
+  }
+  return t('metadata.needsFix')
+}
+
+function artistImageStatusBadgeClass(item) {
+  if (activeArtistImageTab.value === 'failed') {
+    return 'badge-error text-error-content'
+  }
+  if (
+    activeArtistImageTab.value === 'needs' &&
+    failedArtistRepairKeys.value[itemKey(item)]
+  ) {
+    return 'badge-error text-error-content'
+  }
+  if (
+    activeArtistImageTab.value === 'completed' ||
+    fixedArtistImages.value[itemKey(item)]
+  ) {
+    return 'badge-success text-success-content'
+  }
+  if (activeArtistImageTab.value === 'clean') {
+    return 'badge-soft'
+  }
+  return 'badge-warning text-warning-content'
 }
 
 function isArtistImagePickerPreviewFailed(optionId) {
@@ -1685,8 +1743,12 @@ function applyArtistImageStatus(data) {
     ...artistImageSummary.value,
     matched: artistImageItems.value.length,
   }
-  cleanArtistImageItems.value = data.clean || cleanArtistImageItems.value
-  completedArtistImages.value = data.completed || completedArtistImages.value
+  cleanArtistImageItems.value = (data.clean || cleanArtistImageItems.value).map(
+    enrichArtistImageItem
+  )
+  completedArtistImages.value = (
+    data.completed || completedArtistImages.value
+  ).map(enrichArtistImageItem)
   if (Array.isArray(data.failed) && data.failed.length > 0) {
     failedArtistImages.value = data.failed
   }
@@ -2018,7 +2080,13 @@ async function applyArtistImageWithSelection(item, selection = {}) {
       return false
     }
     markArtistRepairSucceeded(key)
-    completedArtistImages.value = [res.data, ...completedArtistImages.value]
+    const completedItem = {
+      ...res.data,
+      preview_url: folderPreviewUrl(
+        res.data?.folder || firstSavedFolder(res.data) || item.folder || ''
+      ),
+    }
+    completedArtistImages.value = [completedItem, ...completedArtistImages.value]
     failedArtistImages.value = failedArtistImages.value.filter(
       (existing) => itemKey(existing) !== key
     )
@@ -2079,7 +2147,13 @@ async function applyJellyfinArtistImage(item, options = {}) {
       throw new Error(t('metadata.failedArtistImageApply'))
     }
     markArtistRepairSucceeded(key)
-    completedArtistImages.value = [res.data, ...completedArtistImages.value]
+    const completedItem = {
+      ...res.data,
+      preview_url: folderPreviewUrl(
+        res.data?.folder || firstSavedFolder(res.data) || item.folder || ''
+      ),
+    }
+    completedArtistImages.value = [completedItem, ...completedArtistImages.value]
     markJellyfinArtistImageFixed(item, res.data)
     if (!quiet) {
       const sync = res.data?.jellyfin_sync
@@ -2302,14 +2376,6 @@ async function syncJellyfinAfterImageRepairs(repairedCount) {
 
 .metadata-artist-grid > * {
   @apply min-w-0 max-w-full;
-}
-
-.metadata-artist-row {
-  @apply flex min-w-0 max-w-full flex-col gap-4 md:grid md:grid-cols-[minmax(0,1fr)_auto_auto] md:items-center;
-}
-
-.metadata-preview-pair {
-  @apply mx-auto grid w-full min-w-0 max-w-[11rem] grid-cols-2 items-center gap-2 sm:gap-3 md:mx-0 md:justify-self-center;
 }
 
 .metadata-bulk-bar {

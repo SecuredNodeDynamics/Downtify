@@ -195,6 +195,7 @@ export default {
     after: 'After',
     blank: 'Blank',
     idsOnly: 'MusicBrainz IDs can be added; visible tags already match.',
+    moreChanges: 'more field changes',
     failedScan: 'Failed to scan metadata.',
     failedApply: 'Failed to apply metadata fix.',
     failedArtistImageScan: 'Failed to scan artist images.',
