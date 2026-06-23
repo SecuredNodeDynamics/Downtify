@@ -241,6 +241,7 @@ export default {
     missingLocalImage: 'Falta arte local',
     applyImage: 'Aplicar imagen',
     chooseCover: 'Elegir portada',
+    updateCover: 'Actualizar portada',
     chooseCoverTitle: 'Elegir portada del artista',
     chooseCoverHint:
       'Elige una imagen de YouTube Music, Deezer, Spotify, Discogs, MusicBrainz o Jellyfin.',

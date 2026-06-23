@@ -235,6 +235,7 @@ export default {
     missingLocalImage: 'Missing local art',
     applyImage: 'Apply image',
     chooseCover: 'Choose cover',
+    updateCover: 'Update cover',
     chooseCoverTitle: 'Choose artist cover',
     chooseCoverHint:
       'Pick an image from YouTube Music, Deezer, Spotify, Discogs, MusicBrainz, or Jellyfin.',

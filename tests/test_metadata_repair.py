@@ -1044,6 +1044,25 @@ def test_repair_artist_image_reuses_existing_named_sidecar(
     assert result['verified']
 
 
+def test_repair_artist_image_bytes_overwrites_existing_named_image(tmp_path):
+    folder = tmp_path / 'Cached Artist'
+    folder.mkdir()
+    existing = folder / 'Cached Artist.jpg'
+    existing.write_bytes(b'existing-image')
+
+    result = metadata_repair.repair_artist_image_bytes(
+        tmp_path,
+        '',
+        {'id': '', 'name': 'Cached Artist'},
+        b'replacement-image',
+        target_folder='Cached Artist',
+    )
+
+    assert existing.read_bytes() == b'replacement-image'
+    assert 'Cached Artist/Cached Artist.jpg' in result['verified']
+    assert result['verified_on_disk'] is True
+
+
 def test_repair_artist_image_verified_falls_back_to_saved_paths(
     tmp_path,
     monkeypatch,

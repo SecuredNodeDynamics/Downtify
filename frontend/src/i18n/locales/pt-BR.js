@@ -240,6 +240,7 @@ export default {
     missingLocalImage: 'Falta arte local',
     applyImage: 'Aplicar imagem',
     chooseCover: 'Escolher capa',
+    updateCover: 'Atualizar capa',
     chooseCoverTitle: 'Escolher capa do artista',
     chooseCoverHint:
       'Escolha uma imagem do YouTube Music, Deezer, Spotify, Discogs, MusicBrainz ou Jellyfin.',

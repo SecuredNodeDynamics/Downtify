@@ -623,17 +623,22 @@
                   {{ item.error }}
                 </p>
                 <button
-                  v-if="activeArtistImageTab === 'needs'"
+                  v-if="showArtistImageActionButton(item)"
                   type="button"
                   class="btn btn-sm metadata-card-btn w-full border-white/10 bg-base-100/85 hover:bg-base-100"
                   :class="
-                    fixedArtistImages[itemKey(item)] ? 'text-primary' : ''
+                    isArtistImageUpdateTab
+                      ? ''
+                      : fixedArtistImages[itemKey(item)]
+                        ? 'text-primary'
+                        : ''
                   "
-                  :disabled="
-                    applyingArtistImages[itemKey(item)] ||
-                    fixedArtistImages[itemKey(item)]
+                  :disabled="applyingArtistImages[itemKey(item)]"
+                  @click="
+                    openArtistImagePicker(artistImageActionItem(item), {
+                      context: 'artist',
+                    })
                   "
-                  @click="openArtistImagePicker(item, { context: 'artist' })"
                 >
                   <span
                     v-if="applyingArtistImages[itemKey(item)]"
@@ -641,18 +646,14 @@
                   />
                   <Icon
                     v-else
-                    icon="clarity:check-line"
+                    :icon="
+                      isArtistImageUpdateTab
+                        ? 'clarity:image-gallery-line'
+                        : 'clarity:check-line'
+                    "
                     class="mr-2 h-4 w-4"
                   />
-                  {{
-                    applyingArtistImages[itemKey(item)]
-                      ? t('metadata.fixing')
-                      : fixedArtistImages[itemKey(item)]
-                        ? t('metadata.fixed')
-                        : failedArtistRepairKeys[itemKey(item)]
-                          ? t('metadata.fixFailed')
-                          : t('metadata.chooseCover')
-                  }}
+                  {{ artistImageActionLabel(item) }}
                 </button>
               </div>
             </article>
@@ -1037,6 +1038,27 @@
                           : t('metadata.chooseCover')
                     }}
                   </button>
+                  <button
+                    v-else-if="canUpdateJellyfinArtistImage(item)"
+                    class="btn btn-sm metadata-card-btn w-full border-white/10 bg-base-100/85 hover:bg-base-100"
+                    :disabled="applyingArtistImages[jellyfinRepairKey(item)]"
+                    @click="openArtistImagePicker(item, { context: 'jellyfin' })"
+                  >
+                    <span
+                      v-if="applyingArtistImages[jellyfinRepairKey(item)]"
+                      class="loading loading-spinner loading-xs mr-2"
+                    />
+                    <Icon
+                      v-else
+                      icon="clarity:refresh-line"
+                      class="mr-2 h-4 w-4"
+                    />
+                    {{
+                      applyingArtistImages[jellyfinRepairKey(item)]
+                        ? t('metadata.fixing')
+                        : t('metadata.updateCover')
+                    }}
+                  </button>
                   <p
                     v-else-if="item.missing_image"
                     class="mt-3 text-[11px] leading-snug text-base-content/45"
@@ -1291,6 +1313,10 @@ const visibleArtistImageItems = computed(() =>
         : artistImageItems.value
 )
 
+const isArtistImageUpdateTab = computed(() =>
+  ['clean', 'completed'].includes(activeArtistImageTab.value)
+)
+
 const emptyArtistImageMessage = computed(() => {
   if (activeArtistImageTab.value === 'completed') {
     return t('metadata.emptyArtistImageCompleted')
@@ -1353,14 +1379,12 @@ const reconciliationGridItems = computed(() =>
   reconciliationBuckets.value
     .filter((bucket) => bucket.key === activeReconciliationBucket.value)
     .flatMap((bucket) =>
-      (bucket.items || [])
-        .filter((item) => item.missing_image)
-        .map((item) => ({
-          ...item,
-          bucketKey: bucket.key,
-          bucketLabel: bucket.label,
-          icon: bucket.icon,
-        }))
+      (bucket.items || []).map((item) => ({
+        ...item,
+        bucketKey: bucket.key,
+        bucketLabel: bucket.label,
+        icon: bucket.icon,
+      }))
     )
 )
 
@@ -1469,6 +1493,79 @@ function isJellyfinRepairableItem(item) {
     item?.missing_image &&
     (item?.file || item?.folder || item?.name) &&
     !fixedArtistImages.value[jellyfinRepairKey(item)]
+  )
+}
+
+function canUpdateJellyfinArtistImage(item) {
+  return (
+    !!item?.has_image &&
+    !!(item?.folder || item?.file || item?.name) &&
+    !isJellyfinRepairableItem(item)
+  )
+}
+
+function artistImageActionItem(item) {
+  const folder = String(item?.folder || item?.target || '').trim()
+  const artist = folder || artistImageItemArtist(item)
+  return {
+    ...item,
+    artist,
+    name: artist,
+    folder: folder || item?.folder || artist,
+  }
+}
+
+function showArtistImageActionButton(item) {
+  if (activeArtistImageTab.value === 'needs') {
+    return true
+  }
+  if (isArtistImageUpdateTab.value) {
+    return !!(item?.folder || item?.file || item?.artist)
+  }
+  if (activeArtistImageTab.value === 'failed') {
+    return true
+  }
+  return false
+}
+
+function artistImageActionLabel(item) {
+  const key = itemKey(item)
+  if (applyingArtistImages.value[key]) {
+    return t('metadata.fixing')
+  }
+  if (isArtistImageUpdateTab.value) {
+    return t('metadata.updateCover')
+  }
+  if (activeArtistImageTab.value === 'failed') {
+    return failedArtistRepairKeys.value[key]
+      ? t('metadata.fixFailed')
+      : t('metadata.chooseCover')
+  }
+  if (fixedArtistImages.value[key]) {
+    return t('metadata.fixed')
+  }
+  if (failedArtistRepairKeys.value[key]) {
+    return t('metadata.fixFailed')
+  }
+  return t('metadata.chooseCover')
+}
+
+function refreshArtistImageItemPreview(item, result) {
+  const key = itemKey(item)
+  const folder =
+    result?.folder || firstSavedFolder(result) || item.folder || item.target || ''
+  const preview_url = folder
+    ? `${folderPreviewUrl(folder)}&t=${Date.now()}`
+    : item.preview_url
+  const updateList = (list) =>
+    list.map((existing) =>
+      itemKey(existing) === key ? { ...existing, ...result, preview_url } : existing
+    )
+  cleanArtistImageItems.value = updateList(cleanArtistImageItems.value)
+  completedArtistImages.value = updateList(completedArtistImages.value)
+  artistImageItems.value = updateList(artistImageItems.value)
+  failedArtistImages.value = failedArtistImages.value.filter(
+    (existing) => itemKey(existing) !== key
   )
 }
 
@@ -2086,6 +2183,11 @@ async function applyArtistImageWithSelection(item, selection = {}) {
         res.data?.folder || firstSavedFolder(res.data) || item.folder || ''
       ),
     }
+    if (isArtistImageUpdateTab.value || activeArtistImageTab.value === 'failed') {
+      refreshArtistImageItemPreview(item, completedItem)
+      artistImageError.value = ''
+      return true
+    }
     completedArtistImages.value = [completedItem, ...completedArtistImages.value]
     failedArtistImages.value = failedArtistImages.value.filter(
       (existing) => itemKey(existing) !== key
@@ -2155,6 +2257,27 @@ async function applyJellyfinArtistImage(item, options = {}) {
     }
     completedArtistImages.value = [completedItem, ...completedArtistImages.value]
     markJellyfinArtistImageFixed(item, res.data)
+    if (item.has_image) {
+      const key = jellyfinRepairKey(item)
+      const folder = item.folder || res.data?.folder || firstSavedFolder(res.data)
+      if (folder) {
+        const preview_url = `${folderPreviewUrl(folder)}&t=${Date.now()}`
+        const updateBucket = (bucketKey) => {
+          const data = artistReconciliation.value || {}
+          const items = (data[bucketKey] || []).map((existing) =>
+            jellyfinRepairKey(existing) === key
+              ? { ...existing, preview_url, has_image: true, missing_image: false }
+              : existing
+          )
+          artistReconciliation.value = { ...data, [bucketKey]: items }
+        }
+        ;['matched', 'missing_images', 'folder_only', 'jellyfin_only', 'tag_only'].forEach(
+          updateBucket
+        )
+        jellyfinPreviewFailed.value = { ...jellyfinPreviewFailed.value }
+        delete jellyfinPreviewFailed.value[key]
+      }
+    }
     if (!quiet) {
       const sync = res.data?.jellyfin_sync
       if (sync && sync.synced === false) {
