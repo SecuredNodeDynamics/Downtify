@@ -139,8 +139,9 @@
                 class="relative h-12 w-12 overflow-hidden rounded-xl border border-base-100 bg-base-200/80"
               >
                 <CoverImage
-                  :src="coverUrlFor(file)"
-                  :fallbacks="coverFallbacksFor(file)"
+                  :key="file"
+                  :src="coverSourcesFor(file).src"
+                  :fallbacks="coverSourcesFor(file).fallbacks"
                   :alt="displayName(file)"
                   img-class="absolute inset-0 h-full w-full object-cover"
                 >
@@ -260,8 +261,9 @@
               class="relative mb-4 aspect-square overflow-hidden rounded-xl bg-base-200/80"
             >
               <CoverImage
-                :src="coverUrlFor(album.coverFile)"
-                :fallbacks="coverFallbacksFor(album.coverFile)"
+                :key="album.coverFile"
+                :src="coverSourcesFor(album.coverFile).src"
+                :fallbacks="coverSourcesFor(album.coverFile).fallbacks"
                 :alt="album.name"
                 img-class="absolute inset-0 h-full w-full object-cover"
               >
@@ -316,8 +318,9 @@
               class="relative h-11 w-11 shrink-0 overflow-hidden rounded-xl bg-base-200/80"
             >
               <CoverImage
-                :src="coverUrlFor(file)"
-                :fallbacks="coverFallbacksFor(file)"
+                :key="file"
+                :src="coverSourcesFor(file).src"
+                :fallbacks="coverSourcesFor(file).fallbacks"
                 :alt="file"
                 img-class="absolute inset-0 h-full w-full object-cover"
               >
@@ -638,12 +641,8 @@ watch(selectedAlbum, (album) => {
   }
 })
 
-function coverUrlFor(file) {
-  return API.coverFileURL(file)
-}
-
-function coverFallbacksFor(file) {
-  return API.coverFallbackUrls(file)
+function coverSourcesFor(file) {
+  return API.coverSourcesForFile(file)
 }
 
 async function refresh() {

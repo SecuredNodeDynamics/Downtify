@@ -715,14 +715,27 @@ def _update_cache_path() -> Path:
     return Path(os.getenv('DOWNTIFY_DATA_DIR', '/data')) / 'update_check_cache.json'
 
 
+def _update_cache_age_seconds(payload: dict[str, Any], path: Path) -> float:
+    cached_at = payload.get('cached_at')
+    if isinstance(cached_at, (int, float)):
+        return max(0.0, time.time() - float(cached_at))
+    try:
+        return max(0.0, time.time() - path.stat().st_mtime)
+    except OSError:
+        return float('inf')
+
+
 def _load_update_cache_from_disk() -> dict[str, Any]:
     path = _update_cache_path()
     if not path.exists():
         return {}
     try:
         payload = json.loads(path.read_text(encoding='utf-8'))
-        if isinstance(payload, dict) and payload.get('latest_version'):
-            return payload
+        if not isinstance(payload, dict) or not payload.get('latest_version'):
+            return {}
+        if _update_cache_age_seconds(payload, path) >= _UPDATE_CACHE_TTL_SECONDS:
+            return {}
+        return payload
     except Exception:
         logger.opt(exception=True).debug(
             'Could not read update cache from {}',
@@ -737,10 +750,27 @@ def _save_update_cache_to_disk(payload: dict[str, Any]) -> None:
     path = _update_cache_path()
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(payload, indent=2), encoding='utf-8')
+        to_save = dict(payload)
+        to_save['cached_at'] = time.time()
+        path.write_text(json.dumps(to_save, indent=2), encoding='utf-8')
     except Exception:
         logger.opt(exception=True).debug(
             'Could not write update cache to {}',
+            path,
+        )
+
+
+def _invalidate_update_cache() -> None:
+    global _UPDATE_CACHE_AT
+
+    _UPDATE_CACHE.clear()
+    _UPDATE_CACHE_AT = 0.0
+    path = _update_cache_path()
+    try:
+        path.unlink(missing_ok=True)
+    except Exception:
+        logger.opt(exception=True).debug(
+            'Could not remove update cache at {}',
             path,
         )
 
@@ -865,10 +895,13 @@ def _latest_tag_from_github_api(timeout: int = 8) -> dict[str, Any]:
     return {}
 
 
-def _latest_github_version(timeout: int = 8) -> dict[str, Any]:
-    cached = _read_cached_update_result()
-    if cached:
-        return cached
+def _latest_github_version(timeout: int = 8, *, refresh: bool = False) -> dict[str, Any]:
+    if refresh:
+        _invalidate_update_cache()
+    else:
+        cached = _read_cached_update_result()
+        if cached:
+            return cached
 
     errors: list[str] = []
     for fetcher in (
@@ -1134,8 +1167,8 @@ def get_version() -> str:
 
 
 @router.get('/api/check_update')
-def check_update() -> dict[str, Any]:
-    latest = _latest_github_version()
+def check_update(refresh: bool = Query(False)) -> dict[str, Any]:
+    latest = _latest_github_version(refresh=refresh)
     latest_version = latest.get('latest_version')
     update_available = bool(
         latest_version and _is_newer_version(latest_version, state.version)

@@ -151,8 +151,8 @@ function audioPreview(song) {
   return API.post('/api/preview/audio', song)
 }
 
-function check_for_update() {
-  return API.get('/api/check_update')
+function check_for_update(refresh = false) {
+  return API.get('/api/check_update', { params: { refresh } })
 }
 
 function updateApp() {
@@ -266,6 +266,56 @@ function coverUrlsForLibraryFile(fileName) {
 
 function coverFallbackUrls(fileName) {
   return coverUrlsForLibraryFile(fileName).slice(1)
+}
+
+const EMPTY_COVER_SOURCES = Object.freeze({
+  src: '',
+  fallbacks: Object.freeze([]),
+})
+
+const coverSourcesCache = new Map()
+
+function coverSourcesForFile(fileName) {
+  const file = String(fileName || '').trim()
+  if (!file) return EMPTY_COVER_SOURCES
+
+  const cached = coverSourcesCache.get(file)
+  if (cached) return cached
+
+  const urls = coverUrlsForLibraryFile(file)
+  const entry = Object.freeze({
+    src: urls[0] || '',
+    fallbacks: Object.freeze(urls.slice(1)),
+  })
+  coverSourcesCache.set(file, entry)
+  return entry
+}
+
+function coverSourcesForArtist(artistName, previewFiles = []) {
+  const name = String(artistName || '').trim()
+  const files = (previewFiles || [])
+    .map((file) => String(file || '').trim())
+    .filter(Boolean)
+  const cacheKey = `artist:${name}\0${files.join('\0')}`
+  const cached = coverSourcesCache.get(cacheKey)
+  if (cached) return cached
+
+  const urls = []
+  if (name) urls.push(coverFolderURL(name))
+  for (const file of files) {
+    urls.push(...coverUrlsForLibraryFile(file))
+  }
+  const deduped = [...new Set(urls.filter(Boolean))]
+  const entry = Object.freeze({
+    src: deduped[0] || '',
+    fallbacks: Object.freeze(deduped.slice(1)),
+  })
+  coverSourcesCache.set(cacheKey, entry)
+  return entry
+}
+
+function clearCoverSourcesCache() {
+  coverSourcesCache.clear()
 }
 
 const CDN_IMAGE_HOST_SUFFIXES = [
@@ -441,6 +491,9 @@ export default {
   coverFolderURL,
   coverUrlsForLibraryFile,
   coverFallbackUrls,
+  coverSourcesForFile,
+  coverSourcesForArtist,
+  clearCoverSourcesCache,
   apiAssetUrl,
   mediaUrl,
   listDownloads,

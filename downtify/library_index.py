@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Callable
 
+from .genres import browse_genre, canonical_genre
 from .metadata_repair import (
     AUDIO_EXTENSIONS,
     _genre_from_path,
@@ -45,7 +46,7 @@ def _load_album_genre_cache() -> None:
             payload = json.loads(path.read_text(encoding='utf-8'))
             if isinstance(payload, dict):
                 for key, value in payload.items():
-                    genre = normalize_genre_label(str(value or ''))
+                    genre = canonical_genre(str(value or ''))
                     if isinstance(key, str) and genre:
                         _ALBUM_GENRE_CACHE[key] = genre
         except Exception:
@@ -69,7 +70,7 @@ def _save_album_genre_cache() -> None:
 
 def _remember_album_genre(album_key: str, genre: str) -> None:
     key = str(album_key or '').strip()
-    label = normalize_genre_label(genre)
+    label = canonical_genre(genre)
     if not key or not label:
         return
     _load_album_genre_cache()
@@ -82,7 +83,7 @@ def _album_genre_from_cache(album_key: str) -> str:
     if not key:
         return ''
     _load_album_genre_cache()
-    return _ALBUM_GENRE_CACHE.get(key, '')
+    return canonical_genre(_ALBUM_GENRE_CACHE.get(key, ''))
 
 
 def _path_parts(file: str) -> list[str]:
@@ -132,20 +133,13 @@ def _album_folder_key(file: str) -> str:
     return ''
 
 
-def normalize_genre_label(value: str) -> str:
-    raw = str(value or '').strip()
-    if not raw:
-        return ''
-    for separator in (';', '/', '|'):
-        if separator in raw:
-            raw = raw.split(separator, 1)[0].strip()
-    if ',' in raw:
-        parts = [part.strip() for part in raw.split(',') if part.strip()]
-        if parts:
-            raw = parts[0]
-    if raw.islower() or raw.isupper():
-        return raw.title()
-    return raw
+def _library_genre_fields(genre: str) -> dict[str, str]:
+    canonical = canonical_genre(genre)
+    browse = browse_genre(canonical) if canonical else ''
+    return {
+        'genre': canonical,
+        'browse_genre': browse or canonical,
+    }
 
 
 def enrich_library_genres(items: list[dict[str, str]]) -> list[dict[str, str]]:
@@ -158,9 +152,10 @@ def enrich_library_genres(items: list[dict[str, str]]) -> list[dict[str, str]]:
     by_album: dict[str, str] = {}
 
     for item in items:
-        genre = normalize_genre_label(item.get('genre') or '')
+        genre = canonical_genre(item.get('genre') or '')
         if genre:
-            item['genre'] = genre
+            fields = _library_genre_fields(genre)
+            item.update(fields)
             artist = str(item.get('artist') or '').strip()
             if artist and artist not in by_artist:
                 by_artist[artist] = genre
@@ -169,18 +164,18 @@ def enrich_library_genres(items: list[dict[str, str]]) -> list[dict[str, str]]:
                 by_album[album_key] = genre
 
     for item in items:
-        if normalize_genre_label(item.get('genre') or ''):
+        if canonical_genre(item.get('genre') or ''):
             continue
         file = str(item.get('file') or '')
         artist = str(item.get('artist') or '').strip()
-        genre = (
+        genre = canonical_genre(
             by_album.get(_album_folder_key(file))
             or by_artist.get(artist)
             or _album_genre_from_cache(_album_folder_key(file))
-            or normalize_genre_label(lookup_artist_genre(artist, fetch=False))
+            or lookup_artist_genre(artist, fetch=False)
         )
         if genre:
-            item['genre'] = genre
+            item.update(_library_genre_fields(genre))
 
     return items
 
@@ -193,7 +188,7 @@ def _genre_for_entry(
     *,
     fetch_missing_genres: bool,
 ) -> str:
-    genre = normalize_genre_label(
+    genre = canonical_genre(
         str(song.get('genre') or '').strip() or _genre_from_path(path)
     )
     if genre or not artist or artist == 'Unknown Artist':
@@ -202,7 +197,7 @@ def _genre_for_entry(
     if artist in artist_genres:
         return artist_genres[artist]
 
-    genre = normalize_genre_label(
+    genre = canonical_genre(
         lookup_artist_genre(artist, fetch=fetch_missing_genres)
     )
     artist_genres[artist] = genre
@@ -233,7 +228,7 @@ def read_library_entry(
         'title': title,
         'artist': artist,
         'album': album,
-        'genre': normalize_genre_label(genre),
+        **_library_genre_fields(genre),
     }
 
 
@@ -254,6 +249,7 @@ def read_library_entry_fast(
         'artist': artist,
         'album': album,
         'genre': '',
+        'browse_genre': '',
     }
 
 
@@ -313,7 +309,7 @@ def _album_samples_without_genre(
     seen: set[str] = set()
     samples: list[tuple[str, str]] = []
     for item in items:
-        if normalize_genre_label(item.get('genre') or ''):
+        if canonical_genre(item.get('genre') or ''):
             continue
         album_key = _album_folder_key(str(item.get('file') or ''))
         if not album_key or album_key in seen:
@@ -337,7 +333,7 @@ def warm_library_genres(
             for item in items
             if item['artist']
             and item['artist'] != 'Unknown Artist'
-            and not normalize_genre_label(item.get('genre') or '')
+            and not canonical_genre(item.get('genre') or '')
         }
     )
     if missing_artists:
@@ -351,7 +347,7 @@ def warm_library_genres(
             path = safe_library_path(root, relative)
             song = _song_from_file_safe(path)
             enriched = enrich_song_metadata(song)
-            genre = normalize_genre_label(str(enriched.get('genre') or ''))
+            genre = canonical_genre(str(enriched.get('genre') or ''))
             if genre:
                 albums_warmed += 1
                 remember_artist_genre(_artist_name(relative, enriched), genre)
@@ -370,7 +366,7 @@ def warm_library_genres(
         list_library_files(root, fetch_missing_genres=False)
     )
     tagged = sum(
-        1 for item in final_items if normalize_genre_label(item.get('genre') or '')
+        1 for item in final_items if canonical_genre(item.get('genre') or '')
     )
     return {
         'artists_warmed': len(missing_artists),

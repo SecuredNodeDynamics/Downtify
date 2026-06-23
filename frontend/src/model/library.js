@@ -37,13 +37,17 @@ export function normalizeLibraryItem(item, options = {}) {
   const title =
     String(item?.title || '').trim() ||
     displayNameFromFile(file).replace(/\.[^/.]+$/, '')
+  const genre = String(item?.genre || '').trim()
+  const browseGenre =
+    String(item?.browse_genre || '').trim() || genre
   return {
     ...item,
     file,
     title,
     artist,
     album,
-    genre: String(item?.genre || '').trim(),
+    genre,
+    browse_genre: browseGenre,
   }
 }
 
@@ -120,26 +124,62 @@ export function groupAlbums(items, options = {}) {
     )
 }
 
+export function genreCoverFiles(files) {
+  const seen = new Set()
+  const covers = []
+
+  for (const file of files || []) {
+    const parts = pathParts(file)
+    const key =
+      parts.length > 2
+        ? `${parts[0]}\u0000${parts[1]}`
+        : parts.length > 1
+          ? parts[0]
+          : String(file || '')
+    if (!key || seen.has(key)) continue
+    seen.add(key)
+    covers.push(file)
+    if (covers.length >= 4) break
+  }
+
+  return covers
+}
+
 export function groupGenres(items, unknownLabel = 'Unknown', options = {}) {
   const grouped = new Map()
 
   for (const raw of items) {
     const item = normalizeLibraryItem(raw, options)
-    const name = String(item.genre || '').trim() || unknownLabel
+    const name =
+      String(item.browse_genre || item.genre || '').trim() || unknownLabel
     if (!grouped.has(name)) {
       grouped.set(name, {
         name,
         files: [],
+        subgenres: new Set(),
       })
     }
-    grouped.get(name).files.push(item.file)
+    const bucket = grouped.get(name)
+    bucket.files.push(item.file)
+    if (item.genre && item.genre !== name) {
+      bucket.subgenres.add(item.genre)
+    }
   }
 
-  return Array.from(grouped.values()).sort((a, b) => {
-    if (a.name === unknownLabel) return 1
-    if (b.name === unknownLabel) return -1
-    return a.name.localeCompare(b.name)
-  })
+  return Array.from(grouped.values())
+    .map((genre) => ({
+      name: genre.name,
+      files: genre.files,
+      coverFiles: genreCoverFiles(genre.files),
+      subgenres: Array.from(genre.subgenres).sort((a, b) =>
+        a.localeCompare(b)
+      ),
+    }))
+    .sort((a, b) => {
+      if (a.name === unknownLabel) return 1
+      if (b.name === unknownLabel) return -1
+      return a.name.localeCompare(b.name)
+    })
 }
 
 export function itemMap(items) {
@@ -151,7 +191,7 @@ export function matchesLibraryFilter(item, query) {
     .trim()
     .toLowerCase()
   if (!q) return true
-  return [item.title, item.artist, item.album, item.genre, item.file].some(
+  return [item.title, item.artist, item.album, item.genre, item.browse_genre, item.file].some(
     (part) =>
       String(part || '')
         .toLowerCase()

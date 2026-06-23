@@ -882,7 +882,7 @@
             type="button"
             class="btn btn-sm h-9 rounded-full border-white/10 bg-base-100/85 hover:bg-base-100"
             :disabled="helpLoading"
-            @click="loadUpdateStatus"
+            @click="loadUpdateStatus(true)"
           >
             <span
               v-if="helpLoading"
@@ -1434,11 +1434,11 @@ async function loadRepairLog() {
   }
 }
 
-async function loadUpdateStatus() {
+async function loadUpdateStatus(refresh = false) {
   helpLoading.value = true
   helpError.value = ''
   try {
-    const res = await API.check_for_update()
+    const res = await API.check_for_update(refresh)
     updateStatus.value = res.data || null
   } catch (err) {
     helpError.value =

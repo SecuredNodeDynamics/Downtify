@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import time
 
 import requests
 
@@ -383,6 +384,69 @@ def test_latest_github_version_falls_back_to_release_redirect(monkeypatch, tmp_p
 
     assert result['latest_version'] == '2.10.46'
     assert result['source'] == 'redirect'
+
+
+def test_load_update_cache_from_disk_respects_ttl(monkeypatch, tmp_path):
+    cache_path = tmp_path / 'update_check_cache.json'
+    monkeypatch.setattr(api, '_update_cache_path', lambda: cache_path)
+    cache_path.write_text(
+        json.dumps(
+            {
+                'latest_version': '2.10.47',
+                'cached_at': time.time() - api._UPDATE_CACHE_TTL_SECONDS - 1,
+            }
+        ),
+        encoding='utf-8',
+    )
+
+    assert api._load_update_cache_from_disk() == {}
+
+
+def test_latest_github_version_refresh_bypasses_disk_cache(monkeypatch, tmp_path):
+    api._UPDATE_CACHE.clear()
+    api._UPDATE_CACHE_AT = 0.0
+    cache_path = tmp_path / 'update_check_cache.json'
+    cache_path.write_text(
+        json.dumps({'latest_version': '2.10.47', 'cached_at': time.time()}),
+        encoding='utf-8',
+    )
+    monkeypatch.setattr(api, '_update_cache_path', lambda: cache_path)
+    monkeypatch.setattr(
+        api,
+        '_latest_release_from_github_api',
+        lambda *_args, **_kwargs: {
+            'latest_version': '2.10.49',
+            'release_url': 'https://github.com/example/release',
+            'source': 'release',
+            'name': 'v2.10.49',
+            'published_at': None,
+            'error': '',
+        },
+    )
+
+    cached = api._latest_github_version()
+    refreshed = api._latest_github_version(refresh=True)
+
+    assert cached['latest_version'] == '2.10.47'
+    assert refreshed['latest_version'] == '2.10.49'
+
+
+def test_check_update_refresh_forces_github_lookup(monkeypatch):
+    calls = {'count': 0}
+
+    def fake_latest(*_args, refresh=False, **_kwargs):
+        calls['count'] += 1
+        if refresh:
+            return {'latest_version': '2.10.49', 'release_url': '', 'source': 'release'}
+        return {'latest_version': '2.10.47', 'release_url': '', 'source': 'release'}
+
+    monkeypatch.setattr(api, '_latest_github_version', fake_latest)
+
+    check_update()
+    result = check_update(refresh=True)
+
+    assert calls['count'] == 2
+    assert result['latest_version'] == '2.10.49'
 
 
 def test_check_update_reports_available_update(monkeypatch):

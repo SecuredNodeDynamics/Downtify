@@ -115,10 +115,15 @@ def test_lookup_artist_genre_uses_musicbrainz_tags(monkeypatch, tmp_path):
         return _Response({'artists': [{'id': 'artist-id', 'name': 'Nas'}]})
 
     monkeypatch.setattr(musicbrainz, 'lookup_artist_id', lambda _name: 'artist-id')
+    monkeypatch.setattr(
+        musicbrainz,
+        'lookup_artist_genre_lastfm',
+        lambda _name, timeout=8: '',
+    )
     monkeypatch.setattr(musicbrainz.requests, 'get', fake_get)
 
-    assert musicbrainz.lookup_artist_genre('Nas') == 'jazz'
-    assert musicbrainz.lookup_artist_genre('Nas') == 'jazz'
+    assert musicbrainz.lookup_artist_genre('Nas') == 'Jazz'
+    assert musicbrainz.lookup_artist_genre('Nas') == 'Jazz'
     assert calls == [f'{musicbrainz.MUSICBRAINZ_ARTIST_URL}artist-id']
 
 

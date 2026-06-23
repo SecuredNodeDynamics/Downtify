@@ -1,18 +1,27 @@
 <template>
-  <img
-    v-if="displaySrc && !failed"
-    :src="displaySrc"
-    :alt="alt"
-    :class="imgClass"
-    referrerpolicy="no-referrer"
-    loading="lazy"
-    @error="onError"
-  />
-  <slot v-else name="fallback" />
+  <div class="contents">
+    <img
+      v-show="displaySrc && !failed"
+      :src="displaySrc"
+      :alt="alt"
+      :class="imgClass"
+      referrerpolicy="no-referrer"
+      loading="lazy"
+      decoding="async"
+      @error="onError"
+    />
+    <div
+      v-show="!displaySrc || failed"
+      :class="imgClass"
+      class="flex items-center justify-center"
+    >
+      <slot name="fallback" />
+    </div>
+  </div>
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 
 import { resolveNativeImageSrc } from '../model/imageLoader'
 
@@ -41,6 +50,13 @@ let requestId = 0
 let candidateUrls = []
 let candidateIndex = 0
 
+const sourceKey = computed(() =>
+  [props.src, ...(props.fallbacks || [])]
+    .map((url) => String(url || '').trim())
+    .filter(Boolean)
+    .join('\0')
+)
+
 function resetCandidates(primary, fallbacks = []) {
   candidateUrls = [primary, ...fallbacks]
     .map((url) => String(url || '').trim())
@@ -48,41 +64,55 @@ function resetCandidates(primary, fallbacks = []) {
   candidateIndex = 0
 }
 
-async function loadCandidate(url) {
+async function applyCandidate(url) {
+  if (!url) return false
   const current = ++requestId
   failed.value = false
-  displaySrc.value = ''
 
   const resolved = await resolveNativeImageSrc(url)
-  if (current !== requestId) return
+  if (current !== requestId) return true
+
   displaySrc.value = resolved || url
+  return true
 }
 
 async function loadCurrentCandidate() {
   const url = candidateUrls[candidateIndex]
   if (!url) {
     failed.value = true
-    displaySrc.value = ''
     return
   }
-  await loadCandidate(url)
+  await applyCandidate(url)
 }
 
 function onError() {
   if (candidateIndex < candidateUrls.length - 1) {
     candidateIndex += 1
-    loadCurrentCandidate()
+    const nextUrl = candidateUrls[candidateIndex]
+    displaySrc.value = nextUrl
+    void applyCandidate(nextUrl)
     return
   }
   failed.value = true
 }
 
 watch(
-  () => [props.src, props.fallbacks],
-  () => {
+  sourceKey,
+  (key, previousKey) => {
+    if (!key) {
+      failed.value = true
+      displaySrc.value = ''
+      candidateUrls = []
+      candidateIndex = 0
+      return
+    }
     resetCandidates(props.src, props.fallbacks)
-    loadCurrentCandidate()
+    if (previousKey && previousKey !== key) {
+      displaySrc.value = ''
+      failed.value = false
+    }
+    void loadCurrentCandidate()
   },
-  { immediate: true, deep: true }
+  { immediate: true }
 )
 </script>

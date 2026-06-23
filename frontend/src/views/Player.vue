@@ -53,9 +53,10 @@
             :class="{ 'pulse-glow': player.isPlaying.value }"
           >
             <CoverImage
-              v-if="player.currentTrack.value?.cover"
-              :src="player.currentTrack.value.cover"
-              :fallbacks="coverFallbacksFor(player.currentTrack.value?.file)"
+              v-if="currentCoverSources.src || currentCoverSources.fallbacks.length"
+              :key="player.currentTrack.value?.file || 'player-cover'"
+              :src="currentCoverSources.src"
+              :fallbacks="currentCoverSources.fallbacks"
               :alt="player.currentTrack.value.title"
               img-class="absolute inset-0 h-full w-full object-cover"
             >
@@ -318,9 +319,10 @@
                 >
                   <div class="player-browse-card-cover">
                     <CoverImage
-                      v-if="artistCoverSources(artist).length"
-                      :src="artistCoverSources(artist)[0]"
-                      :fallbacks="artistCoverSources(artist).slice(1)"
+                      v-if="artistCoverFor(artist).src || artistCoverFor(artist).fallbacks.length"
+                      :key="`artist:${artist.name}`"
+                      :src="artistCoverFor(artist).src"
+                      :fallbacks="artistCoverFor(artist).fallbacks"
                       :alt="artist.name"
                       img-class="absolute inset-0 h-full w-full object-cover"
                     >
@@ -378,8 +380,9 @@
                 >
                   <div class="player-browse-card-cover">
                     <CoverImage
-                      :src="coverUrlFor(album.coverFile)"
-                      :fallbacks="coverFallbacksFor(album.coverFile)"
+                      :key="album.coverFile"
+                      :src="coverSourcesFor(album.coverFile).src"
+                      :fallbacks="coverSourcesFor(album.coverFile).fallbacks"
                       :alt="album.name"
                       img-class="absolute inset-0 h-full w-full object-cover"
                     >
@@ -423,8 +426,8 @@
                   @keydown.enter="openGenre(genre.name)"
                   @keydown.space.prevent="openGenre(genre.name)"
                 >
-                  <div class="player-browse-card-cover player-browse-card-cover-icon">
-                    <Icon icon="clarity:tags-line" class="h-8 w-8 text-primary/80" />
+                  <div class="player-browse-card-cover">
+                    <GenreCover :name="genre.name" :files="genre.coverFiles" />
                     <button
                       type="button"
                       class="player-browse-card-play"
@@ -436,7 +439,13 @@
                   </div>
                   <div class="player-browse-card-body">
                     <p class="player-browse-card-title">{{ genre.name }}</p>
-                    <p class="player-browse-card-sub">
+                    <p
+                      v-if="genre.subgenres?.length"
+                      class="player-browse-card-sub truncate"
+                    >
+                      {{ genre.subgenres.slice(0, 3).join(' · ') }}
+                    </p>
+                    <p class="player-browse-card-meta">
                       {{ t('player.genreMeta', { count: genre.files.length }) }}
                     </p>
                   </div>
@@ -463,8 +472,9 @@
                     :class="{ 'ring-2 ring-primary/50': isCurrentFile(item.file) }"
                   >
                     <CoverImage
-                      :src="coverUrlFor(item.file)"
-                      :fallbacks="coverFallbacksFor(item.file)"
+                      :key="item.file"
+                      :src="coverSourcesFor(item.file).src"
+                      :fallbacks="coverSourcesFor(item.file).fallbacks"
                       :alt="item.title"
                       img-class="absolute inset-0 h-full w-full object-cover"
                     >
@@ -518,6 +528,7 @@ import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { Icon } from '@iconify/vue'
 import Navbar from '/src/components/Navbar.vue'
 import CoverImage from '/src/components/CoverImage.vue'
+import GenreCover from '/src/components/GenreCover.vue'
 import API from '/src/model/api'
 import {
   groupAlbums,
@@ -543,7 +554,6 @@ const selectedArtistName = ref('')
 const selectedAlbumKey = ref('')
 const selectedGenreName = ref('')
 const progressBar = ref(null)
-const coverFailed = ref({})
 let dragging = false
 let genreRefreshTimers = []
 
@@ -664,7 +674,8 @@ const visibleTrackItems = computed(() => {
     items = items.filter((item) => item.artist === selectedArtistName.value)
   } else if (selectedGenreName.value) {
     items = items.filter((item) => {
-      const genre = item.genre || unknownGenreLabel.value
+      const genre =
+        item.browse_genre || item.genre || unknownGenreLabel.value
       return genre === selectedGenreName.value
     })
   }
@@ -746,27 +757,29 @@ const browseCountText = computed(() => {
     : t('player.countMany', { count })
 })
 
-function coverUrlFor(file) {
-  return API.coverFileURL(file)
-}
+const currentCoverSources = computed(() => {
+  const file = player.currentTrack.value?.file || ''
+  if (!file) return API.coverSourcesForFile('')
+  return API.coverSourcesForFile(file)
+})
 
-function coverFallbacksFor(file) {
-  return API.coverFallbackUrls(file)
-}
-
-function artistCoverSources(artist) {
-  const urls = []
-  const name = String(artist?.name || '').trim()
-  if (name) urls.push(API.coverFolderURL(name))
-  for (const file of artist?.previewFiles || []) {
-    urls.push(coverUrlFor(file))
-    urls.push(...coverFallbacksFor(file))
+const artistCoverMap = computed(() => {
+  const map = new Map()
+  for (const artist of artists.value) {
+    map.set(
+      artist.name,
+      API.coverSourcesForArtist(artist.name, artist.previewFiles)
+    )
   }
-  return [...new Set(urls.filter(Boolean))]
+  return map
+})
+
+function artistCoverFor(artist) {
+  return artistCoverMap.value.get(artist?.name) || API.coverSourcesForArtist('')
 }
 
-function markCoverFailed(file) {
-  coverFailed.value = { ...coverFailed.value, [file]: true }
+function coverSourcesFor(file) {
+  return API.coverSourcesForFile(file)
 }
 
 function fallbackLibraryItems(paths) {
@@ -792,6 +805,22 @@ function applyLibraryItems(items) {
   files.value = libraryItems.value.map((item) => item.file)
 }
 
+function libraryItemsUnchanged(nextItems) {
+  const current = libraryItems.value
+  if (nextItems.length !== current.length) return false
+  return nextItems.every((item, index) => {
+    const existing = current[index]
+    return (
+      existing?.file === item.file &&
+      existing?.title === item.title &&
+      existing?.artist === item.artist &&
+      existing?.album === item.album &&
+      existing?.genre === item.genre &&
+      existing?.browse_genre === item.browse_genre
+    )
+  })
+}
+
 function countUnknownGenres(items) {
   const label = unknownGenreLabel.value
   return (items || []).filter((item) => {
@@ -811,7 +840,7 @@ async function refreshLibraryMetadata() {
   try {
     const res = await API.getLibraryFiles()
     const items = Array.isArray(res.data) ? res.data : []
-    if (items.length > 0) {
+    if (items.length > 0 && !libraryItemsUnchanged(items)) {
       applyLibraryItems(items)
       scheduleGenreRefresh(items)
     }
@@ -1162,10 +1191,6 @@ onUnmounted(() => {
 
 .player-browse-card-cover {
   @apply relative aspect-square w-full shrink-0 overflow-hidden bg-primary/10;
-}
-
-.player-browse-card-cover-icon {
-  @apply flex items-center justify-center;
 }
 
 .player-browse-card-play {

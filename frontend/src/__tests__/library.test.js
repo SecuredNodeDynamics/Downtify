@@ -7,6 +7,7 @@ import {
   libraryCoverFolders,
   normalizeLibraryItem,
 } from '../model/library.js'
+import { genreCoverIcon, genreCoverStyle } from '../model/genreArt.js'
 
 describe('library path helpers', () => {
   it('derives artist and album from nested paths', () => {
@@ -43,6 +44,29 @@ describe('library path helpers', () => {
     const genres = groupGenres([item], 'Unknown genre')
     expect(genres).toHaveLength(1)
     expect(genres[0].name).toBe('Unknown genre')
+  })
+
+  it('groups genre cover files from distinct albums', () => {
+    const items = [
+      { file: 'Artist/Album A/01.flac', browse_genre: 'Pop' },
+      { file: 'Artist/Album A/02.flac', browse_genre: 'Pop' },
+      { file: 'Artist/Album B/01.flac', browse_genre: 'Pop' },
+      { file: 'Other/Album C/01.flac', browse_genre: 'Pop' },
+    ]
+
+    const genres = groupGenres(items)
+    expect(genres).toHaveLength(1)
+    expect(genres[0].coverFiles).toEqual([
+      'Artist/Album A/01.flac',
+      'Artist/Album B/01.flac',
+      'Other/Album C/01.flac',
+    ])
+  })
+
+  it('provides genre art fallbacks for browse categories', () => {
+    expect(genreCoverStyle('Jazz').background).toContain('gradient')
+    expect(genreCoverIcon('Jazz')).toBeTruthy()
+    expect(genreCoverIcon('Unknown Genre')).toBeTruthy()
   })
 
   it('lists album and artist folders for cover fallbacks', () => {

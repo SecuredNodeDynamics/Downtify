@@ -12,6 +12,9 @@ from typing import Any, Optional
 import requests
 from loguru import logger
 
+from .genres import canonical_genre, pick_genre_from_tags
+from .lastfm import lookup_artist_genre as lookup_artist_genre_lastfm
+
 MUSICBRAINZ_RECORDING_URL = 'https://musicbrainz.org/ws/2/recording/'
 MUSICBRAINZ_ARTIST_URL = 'https://musicbrainz.org/ws/2/artist/'
 USER_AGENT = 'Downtify/1.0 (https://github.com/JanzenMediaGroup/Downtify)'
@@ -164,7 +167,7 @@ def _load_artist_genre_cache() -> None:
             payload = json.loads(path.read_text(encoding='utf-8'))
             if isinstance(payload, dict):
                 for key, value in payload.items():
-                    genre = str(value or '').strip()
+                    genre = canonical_genre(str(value or ''))
                     if isinstance(key, str) and genre:
                         _ARTIST_GENRE_CACHE[key] = genre
         except Exception:
@@ -191,21 +194,11 @@ def _save_artist_genre_cache() -> None:
 
 
 def _top_tag_name(tags: Any) -> str:
-    if not isinstance(tags, list):
-        return ''
-    ranked = [
-        item
-        for item in tags
-        if isinstance(item, dict) and str(item.get('name') or '').strip()
-    ]
-    if not ranked:
-        return ''
-    ranked.sort(key=lambda item: int(item.get('count') or 0), reverse=True)
-    return str(ranked[0]['name']).strip()
+    return pick_genre_from_tags(tags)
 
 
 def lookup_artist_genre(artist_name: str, *, fetch: bool = True) -> str:
-    """Return a genre label for *artist_name* using cached MusicBrainz tags."""
+    """Return a genre label for *artist_name* using cache, Last.fm, MusicBrainz."""
 
     name = str(artist_name or '').strip()
     if not name or _norm(name) == _norm('Unknown Artist'):
@@ -213,12 +206,21 @@ def lookup_artist_genre(artist_name: str, *, fetch: bool = True) -> str:
 
     _load_artist_genre_cache()
     cache_key = _norm(name)
-    if cache_key in _ARTIST_GENRE_CACHE:
-        return _ARTIST_GENRE_CACHE[cache_key]
+    cached = _ARTIST_GENRE_CACHE.get(cache_key, '')
+    if cached:
+        genre = canonical_genre(cached)
+        if genre:
+            if genre != cached:
+                _ARTIST_GENRE_CACHE[cache_key] = genre
+                _save_artist_genre_cache()
+            return genre
+        _ARTIST_GENRE_CACHE.pop(cache_key, None)
     if not fetch:
         return ''
 
-    genre = _fetch_artist_genre_from_musicbrainz(name)
+    genre = canonical_genre(lookup_artist_genre_lastfm(name))
+    if not genre:
+        genre = canonical_genre(_fetch_artist_genre_from_musicbrainz(name))
     if genre:
         _ARTIST_GENRE_CACHE[cache_key] = genre
         _save_artist_genre_cache()
@@ -227,7 +229,7 @@ def lookup_artist_genre(artist_name: str, *, fetch: bool = True) -> str:
 
 def remember_artist_genre(artist_name: str, genre: str) -> None:
     name = str(artist_name or '').strip()
-    label = str(genre or '').strip()
+    label = canonical_genre(genre)
     if not name or not label or _norm(name) == _norm('Unknown Artist'):
         return
     _load_artist_genre_cache()
@@ -462,7 +464,7 @@ def enrich_song_metadata(song: dict[str, Any]) -> dict[str, Any]:
         enriched['musicbrainz_release_id'] = release.get('id')
 
     if not str(enriched.get('genre') or '').strip():
-        genre = _top_tag_name(recording.get('tags'))
+        genre = pick_genre_from_tags(recording.get('tags'))
         if not genre and artists:
             genre = lookup_artist_genre(artists[0], fetch=True)
         if genre:

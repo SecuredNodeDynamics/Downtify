@@ -26,6 +26,7 @@ def test_list_library_files_reads_tags_and_paths(tmp_path):
     assert items[0]['artist'] == 'Artist One'
     assert items[0]['album'] == 'Album A'
     assert items[0]['genre'] == 'Jazz'
+    assert items[0]['browse_genre'] == 'Jazz'
 
 
 def test_list_library_files_falls_back_to_filename(tmp_path):
@@ -41,6 +42,7 @@ def test_list_library_files_falls_back_to_filename(tmp_path):
             'artist': 'Artist',
             'album': '',
             'genre': '',
+            'browse_genre': '',
         }
     ]
 

@@ -35,6 +35,7 @@ from mutagen.oggvorbis import OggVorbis
 from . import lyrics as lyrics_mod
 from .jellyfin_meta import format_for_jellyfin
 from .m3u import sanitize_playlist_name
+from .genres import canonical_genre
 from .musicbrainz import enrich_song_metadata
 from .providers import enrich_from_match, find_match, find_match_for_video
 
@@ -488,7 +489,7 @@ def embed_metadata(path: Path, song: dict[str, Any]) -> None:
     artists = song.get('artists') or []
     album = song.get('album_name', '') or ''
     recording_date = _recording_date_for_tags(song)
-    genre = (song.get('genre') or '').strip()
+    genre = canonical_genre((song.get('genre') or '').strip())
     cover_bytes = _download_cover(song.get('cover_url', ''))
     track_number, album_track_total = _album_track_index_for_tags(song)
     album_artist = song.get('album_artist')
