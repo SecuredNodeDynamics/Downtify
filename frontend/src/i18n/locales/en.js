@@ -221,6 +221,8 @@ export default {
       'Repairing artist images ({current}/{total}): {name}',
     artistImageRepairProgressDetail:
       'Repairing {current}/{total}: {name} · {succeeded} saved, {failed} failed',
+    artistImageRepairRefreshing:
+      'Local images saved. Refreshing artist reconciliation…',
     artistImageRepairSyncWarning:
       'Local image saved, but Jellyfin upload did not complete.',
     artistReconciliation: 'Artist reconciliation',

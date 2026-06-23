@@ -138,12 +138,16 @@ function getArtistImageScanStatus() {
 }
 
 function applyArtistImage(item) {
-  return API.post('/api/metadata/artist-images/apply', {
-    file: item.file,
-    artist: item.artist,
-    artist_id: item.artist_id,
-    folder: item.folder,
-  })
+  return API.post(
+    '/api/metadata/artist-images/apply',
+    {
+      file: item.file,
+      artist: item.artist,
+      artist_id: item.artist_id,
+      folder: item.folder,
+    },
+    { timeout: 120000 },
+  )
 }
 
 function getRepairLog(limit = 25) {

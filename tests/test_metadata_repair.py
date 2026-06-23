@@ -1012,6 +1012,60 @@ def test_repair_artist_image_uses_custom_image_fetchers(
     ).read_bytes() == b'jellyfin-image'
 
 
+def test_repair_artist_image_reuses_existing_named_sidecar(
+    tmp_path,
+    monkeypatch,
+):
+    folder = tmp_path / 'Cached Artist'
+    folder.mkdir()
+    (folder / 'Cached Artist.jpg').write_bytes(b'existing-image')
+
+    def should_not_run(*_args, **_kwargs):
+        raise AssertionError('online fetchers should not run for existing art')
+
+    monkeypatch.setattr(
+        metadata_repair,
+        'artist_or_fallback_image',
+        should_not_run,
+    )
+
+    result = metadata_repair.repair_artist_image(
+        tmp_path,
+        '',
+        {'id': '', 'name': 'Cached Artist'},
+        target_folder='Cached Artist',
+        image_fetchers=[should_not_run],
+    )
+
+    assert 'Cached Artist/folder.jpg' in result['saved']
+    assert result['verified']
+
+
+def test_repair_artist_image_verified_falls_back_to_saved_paths(
+    tmp_path,
+    monkeypatch,
+):
+    folder = tmp_path / 'Saved Only'
+    folder.mkdir()
+    (folder / 'folder.jpg').write_bytes(b'image')
+
+    monkeypatch.setattr(
+        metadata_repair,
+        '_verified_artist_image_paths',
+        lambda *_args, **_kwargs: [],
+    )
+
+    result = metadata_repair.repair_artist_image(
+        tmp_path,
+        '',
+        {'id': '', 'name': 'Saved Only'},
+        target_folder='Saved Only',
+        image_fetchers=[],
+    )
+
+    assert result['verified'] == ['Saved Only/folder.jpg']
+
+
 def test_repair_file_fails_when_metadata_does_not_persist(
     tmp_path,
     monkeypatch,

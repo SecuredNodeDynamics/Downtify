@@ -227,6 +227,8 @@ export default {
       'Reparando imágenes de artista ({current}/{total}): {name}',
     artistImageRepairProgressDetail:
       'Reparando {current}/{total}: {name} · {succeeded} guardadas, {failed} fallidas',
+    artistImageRepairRefreshing:
+      'Imágenes locales guardadas. Actualizando reconciliación de artistas…',
     artistImageRepairSyncWarning:
       'La imagen local se guardó, pero la carga a Jellyfin no se completó.',
     artistReconciliation: 'Comparacion de artistas',

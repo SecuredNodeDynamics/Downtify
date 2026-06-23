@@ -510,6 +510,38 @@ def test_local_artist_inventory_uses_folder_audio_when_tags_do_not_match(
     )
 
 
+def test_local_artist_inventory_counts_named_artist_jpg(tmp_path):
+    artist_dir = tmp_path / 'Named Sidecar'
+    artist_dir.mkdir()
+    (artist_dir / 'Named Sidecar.jpg').write_bytes(b'image')
+
+    inventory = api._local_artist_inventory(tmp_path)
+
+    assert inventory['folder_images']['named sidecar'] is True
+
+
+def test_jellyfin_reconcile_detects_existing_folder_by_jellyfin_name(tmp_path):
+    artist_dir = tmp_path / 'Jellyfin Match'
+    artist_dir.mkdir()
+    (artist_dir / 'folder.jpg').write_bytes(b'image')
+
+    payload = api._build_jellyfin_reconcile_payload(
+        {'name': 'Music'},
+        {'jellyfin match': 'Jellyfin Match'},
+        {
+            'folders': {},
+            'folder_images': {},
+            'folder_files': {},
+            'tags': {},
+            'tag_files': {},
+        },
+        root=tmp_path,
+    )
+
+    assert payload['counts']['missing_local_images'] == 0
+    assert payload['missing_images'] == []
+
+
 def test_named_items_include_image_state_and_repair_file():
     result = api._named_items(
         {'artist one': 'Artist One', 'guest artist': 'Guest Artist'},

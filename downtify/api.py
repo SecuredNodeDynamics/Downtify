@@ -2599,9 +2599,7 @@ def _local_artist_inventory(root: Path) -> dict[str, dict[str, Any]]:
                 key = _artist_compare_key(item.name)
                 if key:
                     folders.setdefault(key, item.name)
-                    folder_images[key] = artist_art.has_jellyfin_sidecar_image(
-                        item
-                    )
+                    folder_images[key] = artist_art.has_artist_image(item)
         for path in root.rglob('*'):
             if (
                 not path.is_file()
@@ -2839,17 +2837,45 @@ def _sync_artist_image_to_jellyfin(
     return {'synced': True, 'artist_id': artist_id}
 
 
+def _refresh_local_folder_image_flags(
+    root: Path,
+    jellyfin_artists: dict[str, str],
+    folders: dict[str, str],
+    folder_images: dict[str, bool],
+) -> None:
+    for key, name in jellyfin_artists.items():
+        if folder_images.get(key):
+            continue
+        folder_name = folders.get(key) or name
+        if not folder_name:
+            continue
+        folder_path = root / folder_name
+        if folder_path.is_dir() and artist_art.has_artist_image(folder_path):
+            folders.setdefault(key, folder_name)
+            folder_images[key] = True
+
+
 def _build_jellyfin_reconcile_payload(
     library: dict[str, Any] | None,
     jellyfin_artists: dict[str, str],
     local: dict[str, dict[str, Any]],
+    *,
+    root: Path | None = None,
 ) -> dict[str, Any]:
-    folders = local['folders']
-    folder_images = local.get('folder_images', {})
+    folders = dict(local['folders'])
+    folder_images = dict(local.get('folder_images', {}))
     folder_files = local.get('folder_files', {})
     tags = local['tags']
     tag_files = local.get('tag_files', {})
     repair_files = {**folder_files, **tag_files}
+
+    if root is not None:
+        _refresh_local_folder_image_flags(
+            root,
+            jellyfin_artists,
+            folders,
+            folder_images,
+        )
 
     jellyfin_keys = set(jellyfin_artists)
     folder_keys = set(folders)
@@ -2924,6 +2950,7 @@ def reconcile_jellyfin_artists() -> dict[str, Any]:
             library,
             jellyfin_artists,
             local,
+            root=download_dir,
         )
     except HTTPException:
         raise

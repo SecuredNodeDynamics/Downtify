@@ -14,7 +14,9 @@ from .artist_art import (
     artist_image_paths,
     artist_image_target_path,
     artist_or_fallback_image,
+    embedded_cover_bytes,
     ensure_jellyfin_sidecar_image,
+    has_artist_image,
     has_jellyfin_sidecar_image,
     missing_artist_image_items,
     resolve_artist_mbid,
@@ -532,6 +534,14 @@ def repair_artist_image(
         raise ValueError('A library file or artist folder is required')
 
     verified = _verified_artist_image_paths(root, path, artist, folder)
+    if not verified and saved:
+        verified = sorted(
+            {
+                relative
+                for relative in saved
+                if (root / relative).is_file()
+            }
+        )
     if not verified:
         raise ValueError(
             'No artist image source found (MusicBrainz, album art, Jellyfin, '
@@ -558,6 +568,19 @@ def _safe_artist_image_folder(root: Path, folder: str) -> Path | None:
     return target
 
 
+def _existing_folder_image_paths(root: Path, folder: Path) -> list[str]:
+    if not folder.is_dir() or not has_artist_image(folder):
+        return []
+    saved = ensure_jellyfin_sidecar_image(folder, root)
+    paths: list[str] = []
+    for image_path in artist_image_paths(folder):
+        try:
+            paths.append(image_path.resolve().relative_to(root.resolve()).as_posix())
+        except ValueError:
+            continue
+    return sorted(set(paths + saved))
+
+
 def _save_artist_image_to_folder(
     root: Path,
     path: Path | None,
@@ -566,18 +589,26 @@ def _save_artist_image_to_folder(
     *,
     image_fetchers: list[ArtistImageFetcher] | None = None,
 ) -> list[str]:
-    if folder.exists() and has_jellyfin_sidecar_image(folder):
-        return ensure_jellyfin_sidecar_image(folder, root)
+    existing = _existing_folder_image_paths(root, folder)
+    if existing:
+        return existing
 
     artist_name = str(artist.get('name') or '').strip()
     fallback_path = path
-    mbid = resolve_artist_mbid(artist, fallback_path)
-    image, _source = artist_or_fallback_image(mbid, fallback_path)
+    image: bytes | None = None
+    if fallback_path is not None:
+        try:
+            image = embedded_cover_bytes(fallback_path)
+        except Exception:
+            image = None
     if not image and image_fetchers:
         for fetch in image_fetchers:
             image, _source = fetch(artist_name, artist)
             if image:
                 break
+    if not image:
+        mbid = resolve_artist_mbid(artist, fallback_path)
+        image, _source = artist_or_fallback_image(mbid, fallback_path)
     if not image:
         return []
     folder.mkdir(parents=True, exist_ok=True)

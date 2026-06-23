@@ -1369,17 +1369,28 @@ function firstSavedFolder(result) {
   return path ? String(path).split('/', 1)[0] : ''
 }
 
+function jellyfinArtistName(item) {
+  return String(item?.name || item?.artist || '').trim()
+}
+
+function sameJellyfinArtist(left, right) {
+  return (
+    jellyfinArtistName(left).casefold() === jellyfinArtistName(right).casefold()
+  )
+}
+
 function markJellyfinArtistImageFixed(item, result) {
   const folder = item.folder || firstSavedFolder(result)
+  const previewStamp = Date.now()
   const updateItem = (existing) => {
-    if ((existing.name || existing.artist) !== item.name) return existing
+    if (!sameJellyfinArtist(existing, item)) return existing
     return {
       ...existing,
       folder: folder || existing.folder,
       has_image: true,
       missing_image: false,
       preview_url: folder
-        ? `/api/metadata/artist-images/folder-preview?folder=${encodeURIComponent(folder)}`
+        ? `/api/metadata/artist-images/folder-preview?folder=${encodeURIComponent(folder)}&t=${previewStamp}`
         : existing.preview_url,
     }
   }
@@ -1397,7 +1408,7 @@ function markJellyfinArtistImageFixed(item, result) {
     jellyfin_only: (current.jellyfin_only || []).map(updateItem),
     tag_only: (current.tag_only || []).map(updateItem),
     missing_images: (current.missing_images || []).filter(
-      (existing) => (existing.name || existing.artist) !== item.name
+      (existing) => !sameJellyfinArtist(existing, item),
     ),
   }
 }
@@ -1539,15 +1550,20 @@ async function scanAll() {
   }
 }
 
-async function reconcileArtists() {
+async function reconcileArtists(options = {}) {
+  const { preserveMessage = false } = options
   reconcilingArtists.value = true
-  jellyfinMessage.value = ''
-  jellyfinError.value = false
+  if (!preserveMessage) {
+    jellyfinMessage.value = ''
+    jellyfinError.value = false
+  }
   try {
     const res = await API.reconcileJellyfinArtists()
     artistReconciliation.value = res.data
     lastReconciled.value = new Date().toLocaleString()
-    jellyfinMessage.value = t('metadata.jellyfinReconcileOk')
+    if (!preserveMessage) {
+      jellyfinMessage.value = t('metadata.jellyfinReconcileOk')
+    }
   } catch (err) {
     jellyfinError.value = true
     jellyfinMessage.value =
@@ -1833,6 +1849,16 @@ async function runJellyfinBulkRepair(targets, bucketKey = '') {
 
   const synced = await syncJellyfinAfterImageRepairs(succeeded)
   finishJellyfinBulkRepair(succeeded, targets.length, synced)
+  if (succeeded > 0) {
+    jellyfinMessage.value = t('metadata.artistImageRepairRefreshing')
+    try {
+      await reconcileArtists({ preserveMessage: true })
+      finishJellyfinBulkRepair(succeeded, targets.length, synced)
+    } catch {
+      jellyfinError.value = true
+      jellyfinMessage.value = t('metadata.jellyfinRepairSyncFailed')
+    }
+  }
   if (bucketKey) {
     repairingJellyfinBucket.value = ''
   } else {
