@@ -11,7 +11,13 @@ export PATH="$JAVA_HOME/bin:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME
 
 cd "$FRONTEND"
 
-VERSION="$(node -p "require('./package.json').version")"
+VERSION="$(node "$ROOT/version.js" --sync-android)"
+PKG_VERSION="$(node -p "require('./package.json').version")"
+if [[ "$PKG_VERSION" != "$VERSION" ]]; then
+  echo "Version mismatch: package.json=$PKG_VERSION repo=$VERSION" >&2
+  exit 1
+fi
+
 cp "$ROOT/assets/icon-without-backgroud.svg" "$FRONTEND/assets/logo.svg"
 npm run android:icons
 npm run build:android
@@ -23,4 +29,11 @@ APK_DST="$FRONTEND/dist/downtify-${VERSION}-debug.apk"
 
 mkdir -p "$FRONTEND/dist"
 cp "$APK_SRC" "$APK_DST"
+
+GRADLE_VERSION="$(sed -n 's/.*versionName "\([^"]*\)".*/\1/p' "$FRONTEND/android/app/build.gradle" | head -1)"
+if [[ "$GRADLE_VERSION" != "$VERSION" ]]; then
+  echo "Android versionName ($GRADLE_VERSION) != release ($VERSION)" >&2
+  exit 1
+fi
+
 echo "Built $APK_DST"

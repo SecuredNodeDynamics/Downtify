@@ -46,10 +46,52 @@ function bump(version, part) {
   return `${major}.${minor}.${patch}`;
 }
 
+function semverToVersionCode(version) {
+  const m = version.match(/^(\d+)\.(\d+)\.(\d+)$/);
+  if (!m) throw new Error(`Invalid semver: ${version}`);
+  const major = Number(m[1]);
+  const minor = Number(m[2]);
+  const patch = Number(m[3]);
+  if (minor > 99 || patch > 99) {
+    throw new Error(
+      `Android versionCode supports minor/patch <= 99: ${version}`
+    );
+  }
+  return major * 10000 + minor * 100 + patch;
+}
+
+function syncAndroidGradle(version) {
+  const gradlePath = path.join(root, 'frontend/android/app/build.gradle');
+  if (!fs.existsSync(gradlePath)) {
+    console.log('skip android gradle sync (project not present)');
+    return false;
+  }
+  const versionCode = semverToVersionCode(version);
+  const text = fs.readFileSync(gradlePath, 'utf8');
+  const updated = text
+    .replace(/versionCode\s+\d+/, `versionCode ${versionCode}`)
+    .replace(/versionName\s+"[^"]+"/, `versionName "${version}"`);
+  if (updated === text) {
+    console.log('android build.gradle already up to date');
+    return false;
+  }
+  fs.writeFileSync(gradlePath, updated, 'utf8');
+  console.log(
+    `updated frontend/android/app/build.gradle (${version}, code ${versionCode})`
+  );
+  return true;
+}
+
 const arg = process.argv[2] || 'patch';
 const oldVersion = currentVersion();
 
 if (arg === '--current') {
+  console.log(oldVersion);
+  process.exit(0);
+}
+
+if (arg === '--sync-android') {
+  syncAndroidGradle(oldVersion);
   console.log(oldVersion);
   process.exit(0);
 }
@@ -102,5 +144,7 @@ if (fs.existsSync(dockerfile)) {
     console.log('updated Dockerfile');
   }
 }
+
+syncAndroidGradle(newVersion);
 
 console.log(newVersion);

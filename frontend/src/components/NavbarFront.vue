@@ -10,7 +10,10 @@
         />
         <span class="text-lg font-bold tracking-tight">Downtify</span>
       </div>
-      <div class="ml-auto flex items-center gap-1 sm:gap-2">
+      <div class="ml-auto flex items-center gap-2 sm:gap-3">
+        <DownloadCounterPill />
+
+        <div class="flex items-center gap-1 sm:gap-2">
         <button
           class="icon-btn"
           @click="router.push({ name: 'List' })"
@@ -52,17 +55,11 @@
         </button>
 
         <button
-          class="icon-btn relative"
+          class="icon-btn"
           @click="router.push({ name: 'Download' })"
           :title="t('nav.queue')"
         >
           <Icon icon="clarity:download-line" class="h-5 w-5" />
-          <span
-            v-if="pt.activeDownloadCount.value > 0"
-            class="absolute -top-1 -right-1 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-content shadow-glow-sm"
-          >
-            {{ pt.activeDownloadCount.value }}
-          </span>
         </button>
 
         <button
@@ -93,6 +90,7 @@
         >
           <Icon icon="clarity:cog-line" class="h-5 w-5" />
         </button>
+        </div>
       </div>
     </div>
   </header>
@@ -102,14 +100,13 @@
 import { Icon } from '@iconify/vue'
 import router from '../router'
 import { useBinaryThemeManager } from '../model/theme'
-import { useProgressTracker } from '../model/download'
 import { useI18n } from '../i18n'
 import { openSettingsModal } from '../model/settingsModal'
+import DownloadCounterPill from './DownloadCounterPill.vue'
 
 const themeMgr = useBinaryThemeManager({
   newLightAlias: 'downtify-light',
   newDarkAlias: 'downtify-dark',
 })
-const pt = useProgressTracker()
 const { t } = useI18n()
 </script>

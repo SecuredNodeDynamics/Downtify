@@ -1,0 +1,102 @@
+name: Build Android APK
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version to build, for example 2.10.48'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.release.tag_name || format('v{0}', inputs.version) }}
+
+      - name: Resolve release version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${{ inputs.version }}"
+          if [[ -z "$version" && "${{ github.event_name }}" == "release" ]]; then
+            version="${{ github.event.release.tag_name }}"
+          fi
+          if [[ -z "$version" ]]; then
+            version="$(./version.sh --current)"
+          fi
+          version="${version#v}"
+          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid APK version: $version" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install frontend dependencies
+        run: npm ci --prefix frontend
+
+      - name: Verify release versions match
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${{ steps.version.outputs.version }}"
+          pkg="$(node -p "require('./frontend/package.json').version")"
+          repo="$(./version.sh --current)"
+          gradle="$(sed -n 's/.*versionName "\([^"]*\)".*/\1/p' frontend/android/app/build.gradle | head -1)"
+          if [[ "$pkg" != "$version" || "$repo" != "$version" || "$gradle" != "$version" ]]; then
+            echo "Version mismatch for release $version:" >&2
+            echo "  package.json=$pkg" >&2
+            echo "  downtify/__init__.py=$repo" >&2
+            echo "  android build.gradle=$gradle" >&2
+            exit 1
+          fi
+
+      - name: Build debug APK
+        run: bash scripts/build-android-apk.sh
+
+      - name: Upload APK to GitHub release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk="frontend/dist/downtify-${{ steps.version.outputs.version }}-debug.apk"
+          test -f "$apk"
+          gh release upload "${{ steps.version.outputs.tag }}" "$apk" --clobber
+
+      - name: Upload APK artifact
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: downtify-${{ steps.version.outputs.version }}-debug-apk
+          path: frontend/dist/downtify-${{ steps.version.outputs.version }}-debug.apk
+          if-no-files-found: error

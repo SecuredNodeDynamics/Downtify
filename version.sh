@@ -132,6 +132,24 @@ if lockfile.exists():
             encoding="utf-8",
         )
         print(f"updated {lockfile.relative_to(root)}")
+
+gradle = root / "frontend/android/app/build.gradle"
+if gradle.exists():
+    major_s, minor_s, patch_s = new.split(".")
+    major = int(major_s)
+    minor = int(minor_s)
+    patch = int(patch_s)
+    if minor > 99 or patch > 99:
+        raise SystemExit(
+            f"Android versionCode supports minor/patch <= 99: {new}"
+        )
+    version_code = major * 10000 + minor * 100 + patch
+    text = gradle.read_text(encoding="utf-8")
+    updated = re.sub(r"versionCode\s+\d+", f"versionCode {version_code}", text)
+    updated = re.sub(r'versionName\s+"[^"]+"', f'versionName "{new}"', updated)
+    if updated != text:
+        gradle.write_text(updated, encoding="utf-8")
+        print(f"updated {gradle.relative_to(root)}")
 PY
 
 echo

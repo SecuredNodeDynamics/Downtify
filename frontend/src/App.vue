@@ -1,6 +1,6 @@
 <template>
   <StarField />
-  <div class="app-shell min-h-dvh flex flex-col text-base-content overflow-x-hidden">
+  <div class="app-shell flex min-h-dvh flex-col overflow-x-hidden text-base-content lg:min-h-dvh lg:overflow-visible">
     <MobileAppBar />
     <main class="mobile-main flex-1 overflow-x-hidden">
       <router-view v-slot="{ Component, route }">

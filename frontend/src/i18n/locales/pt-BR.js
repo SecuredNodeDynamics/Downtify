@@ -30,6 +30,7 @@ export default {
     back: 'Voltar',
     switchToLight: 'Mudar para claro',
     switchToDark: 'Mudar para escuro',
+    downloadCounter: '{count} downloads ativos — abrir fila',
   },
   hero: {
     noAccount: 'sem precisar de conta no Spotify',

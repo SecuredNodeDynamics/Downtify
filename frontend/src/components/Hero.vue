@@ -1,6 +1,6 @@
 <template>
   <section
-    class="relative flex min-h-[calc(100dvh-var(--app-bottom-nav-height)-var(--app-safe-bottom))] items-center justify-center px-4 pt-6 pb-8 sm:px-6 sm:pt-24 sm:pb-16 overflow-hidden lg:min-h-[calc(100dvh-4rem)]"
+    class="relative flex min-h-[calc(100dvh-var(--app-header-height)-var(--app-safe-top)-var(--app-bottom-nav-height)-var(--app-safe-bottom))] items-center justify-center overflow-hidden px-4 pb-8 pt-6 sm:px-6 sm:pb-16 sm:pt-24 lg:min-h-[calc(100dvh-4rem)]"
   >
     <div aria-hidden="true" class="pointer-events-none absolute inset-0 -z-10">
       <div

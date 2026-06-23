@@ -88,6 +88,7 @@ jobs:
             pyproject.toml \
             frontend/package.json \
             frontend/package-lock.json \
+            frontend/android/app/build.gradle \
             Makefile \
             Dockerfile \
             frontend/src/components/Hero.vue

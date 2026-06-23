@@ -30,6 +30,7 @@ export default {
     back: 'Back',
     switchToLight: 'Switch to light',
     switchToDark: 'Switch to dark',
+    downloadCounter: '{count} active downloads — open queue',
   },
   hero: {
     noAccount: 'no Spotify account needed',

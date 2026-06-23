@@ -21,7 +21,10 @@
         <SearchInput class="w-full max-w-md" :compact="true" />
       </div>
 
-      <div class="ml-auto flex items-center gap-1 sm:gap-2">
+      <div class="ml-auto flex items-center gap-2 sm:gap-3">
+        <DownloadCounterPill />
+
+        <div class="flex items-center gap-1 sm:gap-2">
         <button
           class="icon-btn"
           :class="{ 'icon-btn-active': route.name === 'List' }"
@@ -68,7 +71,7 @@
         </button>
 
         <button
-          class="icon-btn relative"
+          class="icon-btn"
           :class="{ 'icon-btn-active': route.name === 'Download' }"
           @click="
             route.name === 'Download'
@@ -81,12 +84,6 @@
           :title="t('nav.queue')"
         >
           <Icon icon="clarity:download-line" class="h-5 w-5" />
-          <span
-            v-if="pt.activeDownloadCount.value > 0"
-            class="absolute -top-1 -right-1 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-content shadow-glow-sm"
-          >
-            {{ pt.activeDownloadCount.value }}
-          </span>
         </button>
 
         <button
@@ -132,6 +129,7 @@
         >
           <Icon icon="clarity:cog-line" class="h-5 w-5" />
         </button>
+        </div>
       </div>
     </div>
   </header>
@@ -143,12 +141,12 @@ import { useRoute } from 'vue-router'
 
 import router from '../router'
 import { useBinaryThemeManager } from '../model/theme'
-import { useProgressTracker } from '../model/download'
 import { useSearchManager } from '../model/search'
 import { useHealthRefresh } from '../model/healthRefresh'
 import { useI18n } from '../i18n'
 
 import SearchInput from './SearchInput.vue'
+import DownloadCounterPill from './DownloadCounterPill.vue'
 import { openSettingsModal } from '../model/settingsModal'
 
 const route = useRoute()
@@ -156,7 +154,6 @@ const themeMgr = useBinaryThemeManager({
   newLightAlias: 'downtify-light',
   newDarkAlias: 'downtify-dark',
 })
-const pt = useProgressTracker()
 const sm = useSearchManager()
 const { t } = useI18n()
 const { loading: healthRefreshLoading, refresh: refreshHealth } = useHealthRefresh()

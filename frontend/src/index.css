@@ -42,6 +42,19 @@
   @media (max-width: 1023px) {
     body {
       background-attachment: scroll;
+      height: 100dvh;
+      overflow: hidden;
+    }
+
+    html {
+      height: 100dvh;
+      overflow: hidden;
+    }
+
+    .app-shell {
+      height: 100dvh;
+      max-height: 100dvh;
+      overflow: hidden;
     }
   }
 
@@ -343,7 +356,7 @@
 
   /* Android-style mobile shell */
   .mobile-app-bar {
-    @apply sticky top-0 z-40 border-b border-white/10 bg-base-100/95 backdrop-blur-md;
+    @apply fixed inset-x-0 top-0 z-40 border-b border-white/10 bg-base-100/95 backdrop-blur-md;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.28);
   }
   [data-theme='downtify-light'] .mobile-app-bar {
@@ -559,14 +572,22 @@
   }
 
   .mobile-main {
+    padding-top: calc(var(--app-header-height) + var(--app-safe-top));
     padding-bottom: calc(
       var(--app-bottom-nav-height) + var(--app-safe-bottom)
     );
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
   }
 
   @media (min-width: 1024px) {
     .mobile-main {
+      padding-top: 0;
       padding-bottom: 0;
+      overflow: visible;
     }
   }
 }

@@ -15,6 +15,9 @@ docker/
 .env
 .local-dev/
 
+# Built mobile packages (attached to GitHub releases instead)
+frontend/dist/*.apk
+
 # Created by https://www.toptal.com/developers/gitignore/api/python
 # Edit at https://www.toptal.com/developers/gitignore?templates=python
 

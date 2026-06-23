@@ -16,20 +16,23 @@
 
       <h1 class="mobile-app-bar-title truncate">{{ pageTitle }}</h1>
 
-      <button
-        v-if="showHealthRefresh"
-        type="button"
-        class="mobile-app-bar-icon ml-auto shrink-0"
-        :title="t('common.refresh')"
-        :disabled="healthRefreshLoading"
-        @click="refreshHealth()"
-      >
-        <span
-          v-if="healthRefreshLoading"
-          class="loading loading-spinner loading-sm text-primary"
-        />
-        <Icon v-else icon="clarity:refresh-line" class="h-5 w-5" />
-      </button>
+      <div class="ml-auto flex shrink-0 items-center gap-1">
+        <DownloadCounterPill compact />
+        <button
+          v-if="showHealthRefresh"
+          type="button"
+          class="mobile-app-bar-icon shrink-0"
+          :title="t('common.refresh')"
+          :disabled="healthRefreshLoading"
+          @click="refreshHealth()"
+        >
+          <span
+            v-if="healthRefreshLoading"
+            class="loading loading-spinner loading-sm text-primary"
+          />
+          <Icon v-else icon="clarity:refresh-line" class="h-5 w-5" />
+        </button>
+      </div>
     </div>
   </header>
 </template>
@@ -42,6 +45,7 @@ import { useRoute } from 'vue-router'
 import router from '../router'
 import { useHealthRefresh } from '../model/healthRefresh'
 import { useI18n } from '../i18n'
+import DownloadCounterPill from './DownloadCounterPill.vue'
 
 const route = useRoute()
 const { t } = useI18n()
