@@ -1,11 +1,10 @@
 <template>
-  <div class="min-h-screen">
+  <div class="min-h-0 overflow-x-hidden">
     <Navbar />
-    <Settings />
 
-    <div class="mx-auto max-w-5xl px-4 py-8 sm:px-6">
+    <div class="mx-auto max-w-5xl px-4 py-4 sm:py-8 sm:px-6">
       <!-- Header -->
-      <div class="mb-8">
+      <div class="mb-6 sm:mb-8 mobile-page-header">
         <h1 class="text-2xl font-bold tracking-tight">
           {{ t('player.title') }}
         </h1>
@@ -288,7 +287,6 @@
 import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { Icon } from '@iconify/vue'
 import Navbar from '/src/components/Navbar.vue'
-import Settings from '/src/components/Settings.vue'
 import API from '/src/model/api'
 import { usePlayer, formatTime, trackInfoFromFile } from '/src/model/player'
 import { useI18n } from '/src/i18n'

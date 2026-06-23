@@ -1,11 +1,10 @@
 <template>
-  <div class="min-h-screen">
+  <div class="min-h-0 overflow-x-hidden">
     <Navbar />
-    <Settings />
 
-    <div class="mx-auto max-w-4xl px-4 py-8 sm:px-6">
+    <div class="mx-auto max-w-4xl px-4 py-4 sm:py-8 sm:px-6">
       <!-- Header -->
-      <div class="mb-8 flex flex-wrap items-end justify-between gap-4">
+      <div class="mb-6 sm:mb-8 flex flex-wrap items-end justify-between gap-4 mobile-page-header">
         <div>
           <h1 class="text-2xl font-bold tracking-tight">
             {{ t('library.title') }}
@@ -71,7 +70,7 @@
       <div v-else>
         <div class="mb-5 flex flex-wrap items-center justify-between gap-3">
           <div
-            class="inline-flex rounded-full border border-white/10 bg-base-100/75 p-1"
+            class="inline-flex max-w-full overflow-x-auto rounded-full border border-white/10 bg-base-100/75 p-1"
           >
             <button
               class="rounded-full px-4 py-2 text-sm font-medium transition-colors"
@@ -436,7 +435,6 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useRouter } from 'vue-router'
 import Navbar from '/src/components/Navbar.vue'
-import Settings from '/src/components/Settings.vue'
 import API from '/src/model/api'
 import { useI18n } from '/src/i18n'
 import { usePlayer } from '/src/model/player'

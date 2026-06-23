@@ -1,10 +1,9 @@
 <template>
-  <div class="min-h-screen overflow-x-hidden">
+  <div class="min-h-0 overflow-x-hidden">
     <Navbar />
-    <Settings />
 
-    <main class="mx-auto max-w-5xl overflow-x-hidden px-3 py-6 sm:px-6 sm:py-8">
-      <div class="mb-5">
+    <main class="mx-auto max-w-5xl overflow-x-hidden px-3 py-4 sm:px-6 sm:py-8">
+      <div class="mb-4 sm:mb-5 mobile-page-header">
         <div>
           <h1 class="text-2xl font-bold tracking-tight">
             {{ t('metadata.title') }}
@@ -1232,7 +1231,6 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 
 import Navbar from '/src/components/Navbar.vue'
-import Settings from '/src/components/Settings.vue'
 import API from '/src/model/api'
 import { useSettingsManager } from '/src/model/settings'
 import { useI18n } from '/src/i18n'

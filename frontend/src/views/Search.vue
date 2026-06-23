@@ -1,7 +1,6 @@
 <template>
-  <div class="min-h-screen">
+  <div class="min-h-0 overflow-x-hidden">
     <Navbar />
-    <Settings />
     <SearchList
       :data="sm.results.value"
       :error="sm.error.value"
@@ -18,7 +17,6 @@ import { useSearchManager } from '../model/search'
 import { useDownloadManager } from '../model/download'
 
 import Navbar from '/src/components/Navbar.vue'
-import Settings from '/src/components/Settings.vue'
 import SearchList from '/src/components/SearchList.vue'
 
 onMounted(() => window.scroll(0, 0))

@@ -1,7 +1,7 @@
 <template>
-  <div class="mx-auto max-w-4xl px-4 py-8 sm:px-6">
+  <div class="mx-auto max-w-4xl px-4 py-4 sm:py-8 sm:px-6 overflow-x-hidden">
     <!-- Header -->
-    <div class="mb-8 flex flex-wrap items-end justify-between gap-4">
+    <div class="mb-6 sm:mb-8 flex flex-wrap items-end justify-between gap-4 mobile-page-header">
       <div>
         <h1 class="text-2xl font-bold tracking-tight">
           {{ t('queue.title') }}

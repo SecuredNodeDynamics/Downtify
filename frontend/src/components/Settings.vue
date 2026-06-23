@@ -2,7 +2,7 @@
   <input type="checkbox" id="settings-modal" class="modal-toggle" />
   <div class="modal modal-bottom sm:modal-middle">
     <div
-      class="modal-box surface-strong rounded-t-3xl sm:rounded-3xl p-0 max-w-3xl"
+      class="modal-box surface-strong rounded-t-3xl sm:rounded-3xl p-0 max-w-3xl max-h-[90dvh] overflow-y-auto"
     >
       <!-- Header -->
       <div

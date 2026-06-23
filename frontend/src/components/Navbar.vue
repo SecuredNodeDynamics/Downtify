@@ -1,5 +1,5 @@
 <template>
-  <header class="sticky top-0 z-30 glass-nav">
+  <header class="sticky top-0 z-30 glass-nav hidden lg:block">
     <div
       class="mx-auto flex h-16 w-full max-w-6xl items-center gap-3 px-4 sm:px-6"
     >
@@ -118,10 +118,6 @@
           <Icon icon="clarity:cog-line" class="h-5 w-5" />
         </label>
       </div>
-    </div>
-
-    <div class="md:hidden px-4 pb-3">
-      <SearchInput :compact="true" />
     </div>
   </header>
 </template>

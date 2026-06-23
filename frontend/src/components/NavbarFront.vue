@@ -1,5 +1,5 @@
 <template>
-  <header class="absolute top-0 inset-x-0 z-30">
+  <header class="absolute top-0 inset-x-0 z-30 hidden lg:block">
     <div
       class="mx-auto flex h-16 w-full max-w-6xl items-center gap-3 px-4 sm:px-6"
     >

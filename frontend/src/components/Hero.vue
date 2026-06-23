@@ -1,6 +1,6 @@
 <template>
   <section
-    class="relative flex min-h-[calc(100dvh-4rem)] items-center justify-center px-6 pt-24 pb-16 overflow-hidden"
+    class="relative flex min-h-[calc(100dvh-var(--app-bottom-nav-height)-var(--app-safe-bottom))] items-center justify-center px-4 pt-6 pb-8 sm:px-6 sm:pt-24 sm:pb-16 overflow-hidden lg:min-h-[calc(100dvh-4rem)]"
   >
     <div aria-hidden="true" class="pointer-events-none absolute inset-0 -z-10">
       <div
@@ -20,7 +20,7 @@
         </div>
       </div>
 
-      <h1 class="text-balance text-5xl sm:text-6xl font-bold tracking-tight">
+      <h1 class="text-balance text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight">
         Down<span class="text-primary">tify</span>
       </h1>
       <div class="mt-3 flex items-center justify-center gap-2">

@@ -1,10 +1,9 @@
 <template>
-  <div class="min-h-screen">
+  <div class="min-h-0 overflow-x-hidden">
     <Navbar />
-    <Settings />
 
-    <main class="mx-auto max-w-5xl px-4 py-8 sm:px-6">
-      <div class="mb-8 flex flex-wrap items-end justify-between gap-4">
+    <main class="mx-auto max-w-5xl px-4 py-4 sm:py-8 sm:px-6">
+      <div class="mb-6 sm:mb-8 flex flex-wrap items-end justify-between gap-4 mobile-page-header">
         <div>
           <h1 class="text-2xl font-bold tracking-tight">
             {{ t('health.title') }}
@@ -267,7 +266,6 @@ import { computed, onMounted, ref } from 'vue'
 import { Icon } from '@iconify/vue'
 import API from '../model/api'
 import Navbar from '../components/Navbar.vue'
-import Settings from '../components/Settings.vue'
 import { useDownloadDestination } from '../model/downloadDestination'
 import { useI18n } from '../i18n'
 

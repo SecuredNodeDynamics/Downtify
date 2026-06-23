@@ -1,7 +1,7 @@
 <template>
-  <div class="mx-auto max-w-4xl px-4 py-8 sm:px-6">
+  <div class="mx-auto max-w-4xl px-4 py-4 sm:py-8 sm:px-6 overflow-x-hidden">
     <!-- Header -->
-    <div class="mb-8">
+    <div class="mb-6 sm:mb-8 mobile-page-header">
       <h1 class="text-2xl font-bold tracking-tight">{{ t('search.title') }}</h1>
       <p class="mt-1 text-sm text-base-content/60">
         <template v-if="sm.searchTerm.value">
@@ -63,10 +63,11 @@
       <li
         v-for="(song, index) in paginatedData"
         :key="song.song_id || index"
-        class="surface rounded-2xl track-card"
+        class="surface rounded-2xl p-3 sm:p-4 flex flex-col gap-3 sm:flex-row sm:items-center"
       >
+        <div class="flex min-w-0 flex-1 items-center gap-3 sm:gap-4">
         <!-- Cover -->
-        <div class="track-cover">
+        <div class="track-cover w-14 sm:w-16">
           <img
             v-if="song.cover_url"
             :src="song.cover_url"
@@ -103,9 +104,12 @@
             </span>
           </p>
         </div>
+        </div>
 
         <!-- Actions -->
-        <div class="flex items-center gap-1 shrink-0">
+        <div
+          class="flex flex-wrap items-center justify-end gap-1 border-t border-white/6 pt-2 sm:border-0 sm:pt-0 shrink-0"
+        >
           <span
             class="media-type-pill"
             :class="mediaTypeClass(song)"

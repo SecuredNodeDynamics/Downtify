@@ -5,6 +5,13 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --app-header-height: 3.5rem;
+    --app-bottom-nav-height: 4rem;
+    --app-safe-top: env(safe-area-inset-top, 0px);
+    --app-safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
   html,
   body {
     @apply bg-base-300 text-base-content antialiased;
@@ -29,8 +36,13 @@
         rgba(26, 208, 92, 0.07),
         transparent 60%
       );
-    background-attachment: fixed;
     min-height: 100dvh;
+  }
+
+  @media (max-width: 1023px) {
+    body {
+      background-attachment: scroll;
+    }
   }
 
   [data-theme='downtify-light'] body {
@@ -270,6 +282,103 @@
       0 0 0 1px rgba(26, 208, 92, 0.08),
       0 0 18px rgba(26, 208, 92, 0.14);
   }
+
+  /* Android-style mobile shell */
+  .mobile-app-bar {
+    @apply sticky top-0 z-40 border-b border-white/10 bg-base-100/95 backdrop-blur-md;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.28);
+  }
+  [data-theme='downtify-light'] .mobile-app-bar {
+    @apply border-black/10 bg-white/95;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  }
+
+  .mobile-app-bar-inner {
+    @apply mx-auto flex h-14 max-w-6xl items-center gap-2 px-3;
+    padding-top: var(--app-safe-top);
+    min-height: calc(var(--app-header-height) + var(--app-safe-top));
+  }
+
+  .mobile-app-bar-search {
+    @apply border-t border-white/10 px-3 pb-3 pt-2;
+  }
+  [data-theme='downtify-light'] .mobile-app-bar-search {
+    @apply border-black/10;
+  }
+
+  .mobile-app-bar-title {
+    @apply min-w-0 flex-1 text-lg font-semibold tracking-tight;
+  }
+
+  .mobile-app-bar-icon,
+  .mobile-app-bar-logo {
+    @apply inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-base-content/90 transition-colors active:bg-white/10;
+  }
+
+  .bottom-nav {
+    @apply fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-white/10 bg-base-100/95 backdrop-blur-md;
+    height: calc(var(--app-bottom-nav-height) + var(--app-safe-bottom));
+    padding-bottom: var(--app-safe-bottom);
+    box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.24);
+  }
+  [data-theme='downtify-light'] .bottom-nav {
+    @apply border-black/10 bg-white/95;
+    box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.06);
+  }
+
+  .bottom-nav-item {
+    @apply flex min-w-0 flex-col items-center justify-center gap-0.5 px-1 pt-1 text-[10px] font-medium text-base-content/55 transition-colors active:bg-primary/10;
+  }
+
+  .bottom-nav-item-active {
+    @apply text-primary;
+  }
+
+  .bottom-nav-icon-wrap {
+    @apply relative inline-flex h-7 w-7 items-center justify-center;
+  }
+
+  .bottom-nav-label {
+    @apply max-w-full truncate leading-none;
+  }
+
+  .bottom-nav-badge {
+    @apply absolute -right-2 -top-1 inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-primary px-1 text-[9px] font-bold text-primary-content;
+  }
+
+  .mobile-more-sheet {
+    @apply w-full max-w-none rounded-t-3xl border-0 bg-base-100 px-4 pb-4 pt-3;
+    max-height: min(85dvh, calc(100dvh - var(--app-safe-top)));
+    overflow-y: auto;
+  }
+
+  .mobile-more-sheet-handle {
+    @apply mx-auto mb-3 h-1 w-10 rounded-full bg-base-content/20;
+  }
+
+  .mobile-more-sheet-title {
+    @apply mb-3 text-lg font-semibold;
+  }
+
+  .mobile-more-list {
+    @apply flex flex-col gap-1;
+  }
+
+  .mobile-more-item {
+    @apply flex min-h-12 items-center gap-3 rounded-2xl px-3 text-sm font-medium transition-colors active:bg-white/10;
+  }
+
+  .mobile-more-item-active {
+    @apply bg-primary/15 text-primary;
+  }
+
+  .mobile-more-cancel {
+    @apply mt-4 flex h-12 w-full items-center justify-center rounded-2xl bg-base-200/80 text-sm font-medium;
+  }
+
+  .mobile-page-header {
+    @apply hidden lg:block;
+  }
 }
 
 @layer utilities {
@@ -279,6 +388,26 @@
   .grid-fluid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  }
+
+  .safe-top {
+    padding-top: var(--app-safe-top);
+  }
+
+  .safe-bottom {
+    padding-bottom: var(--app-safe-bottom);
+  }
+
+  .mobile-main {
+    padding-bottom: calc(
+      var(--app-bottom-nav-height) + var(--app-safe-bottom)
+    );
+  }
+
+  @media (min-width: 1024px) {
+    .mobile-main {
+      padding-bottom: 0;
+    }
   }
 }
 

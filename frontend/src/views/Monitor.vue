@@ -1,11 +1,10 @@
 <template>
-  <div class="min-h-screen">
+  <div class="min-h-0 overflow-x-hidden">
     <Navbar />
-    <Settings />
 
-    <div class="mx-auto max-w-4xl px-4 py-8 sm:px-6">
+    <div class="mx-auto max-w-4xl px-4 py-4 sm:py-8 sm:px-6">
       <!-- Header -->
-      <div class="mb-8">
+      <div class="mb-6 sm:mb-8 mobile-page-header">
         <h1 class="text-2xl font-bold tracking-tight">
           {{ t('monitor.title') }}
         </h1>
@@ -133,7 +132,7 @@
           </div>
 
           <!-- Actions -->
-          <div class="flex items-center gap-2 shrink-0">
+          <div class="flex flex-wrap items-center justify-end gap-2 shrink-0 w-full sm:w-auto">
             <!-- Interval selector -->
             <select
               :value="pl.interval_minutes"
@@ -208,7 +207,6 @@
 import { ref, onMounted } from 'vue'
 import { Icon } from '@iconify/vue'
 import Navbar from '/src/components/Navbar.vue'
-import Settings from '/src/components/Settings.vue'
 import monitorAPI from '/src/model/monitor.js'
 import { useI18n } from '/src/i18n'
 

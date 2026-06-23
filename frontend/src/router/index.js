@@ -14,41 +14,49 @@ const routes = [
     path: '/',
     name: 'Home',
     component: Home,
+    meta: { mobileTitleKey: 'nav.home' },
   },
   {
     path: '/search/:query',
     name: 'Search',
     component: Search,
+    meta: { mobileTitleKey: 'nav.search' },
   },
   {
     path: '/download',
     name: 'Download',
     component: Download,
+    meta: { mobileTitleKey: 'nav.queue' },
   },
   {
     path: '/list',
     name: 'List',
     component: List,
+    meta: { mobileTitleKey: 'nav.library' },
   },
   {
     path: '/monitor',
     name: 'Monitor',
     component: Monitor,
+    meta: { mobileTitleKey: 'nav.monitor' },
   },
   {
     path: '/player',
     name: 'Player',
     component: Player,
+    meta: { mobileTitleKey: 'nav.player' },
   },
   {
     path: '/health',
     name: 'Health',
     component: Health,
+    meta: { mobileTitleKey: 'nav.health' },
   },
   {
     path: '/metadata',
     name: 'Metadata',
     component: Metadata,
+    meta: { mobileTitleKey: 'nav.metadata' },
   },
 ]
 
