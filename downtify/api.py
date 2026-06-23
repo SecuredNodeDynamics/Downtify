@@ -59,6 +59,7 @@ from . import (
 )
 from .downloader import Downloader, preview_audio_for_song
 from .history import DownloadHistoryDB
+from .library_index import list_library_files
 from .monitor import PlaylistMonitorDB, check_playlist
 from .versioning import parse_version
 
@@ -1081,6 +1082,16 @@ def get_health() -> dict[str, Any]:
             'completed_24h': completed_24h,
         },
     }
+
+
+@router.get('/api/library/files')
+def get_library_files() -> list[dict[str, str]]:
+    download_dir = (
+        _active_download_dir()
+        if state.downloader is not None
+        else state.default_download_dir
+    )
+    return list_library_files(download_dir)
 
 
 @router.get('/api/songs/search')

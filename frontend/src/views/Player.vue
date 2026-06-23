@@ -209,23 +209,36 @@
           </div>
         </section>
 
-        <!-- Queue list -->
+        <!-- Library browser -->
         <aside class="player-queue surface rounded-3xl p-3 sm:p-5 lg:max-h-[640px] lg:overflow-y-auto">
           <div class="mb-2 flex items-center justify-between gap-2 px-1 sm:mb-3">
-            <h2
-              class="text-xs font-semibold uppercase tracking-wider text-base-content/50"
-            >
-              <span class="lg:hidden">{{ t('player.upNext') }}</span>
-              <span class="hidden lg:inline">{{ t('player.queue') }}</span>
-            </h2>
-            <span class="text-[11px] text-base-content/40 shrink-0">
-              {{
-                visibleFiles.length === 1
-                  ? t('player.countOne', { count: visibleFiles.length })
-                  : t('player.countMany', { count: visibleFiles.length })
-              }}
+            <div class="min-w-0">
+              <h2
+                class="text-xs font-semibold uppercase tracking-wider text-base-content/50"
+              >
+                {{ browseHeading }}
+              </h2>
+              <p
+                v-if="browseSubtitle"
+                class="mt-0.5 truncate text-[11px] text-base-content/45"
+              >
+                {{ browseSubtitle }}
+              </p>
+            </div>
+            <span class="shrink-0 text-[11px] text-base-content/40">
+              {{ browseCountText }}
             </span>
           </div>
+
+          <button
+            v-if="canBrowseBack"
+            type="button"
+            class="mb-2 inline-flex max-w-full items-center gap-1 rounded-full bg-white/5 px-3 py-1.5 text-xs font-medium text-primary"
+            @click="browseBack"
+          >
+            <Icon icon="clarity:arrow-line" class="h-3.5 w-3.5 -scale-x-100" />
+            <span class="truncate">{{ browseBackLabel }}</span>
+          </button>
 
           <div
             v-if="libraryFilter"
@@ -244,66 +257,222 @@
             </button>
           </div>
 
-          <ul v-if="visibleFiles.length > 0" class="space-y-1">
-            <li
-              v-for="file in visibleFiles"
-              :key="file"
-              class="rounded-xl px-2 py-2 flex items-center gap-3 cursor-pointer transition-colors"
+          <div
+            v-if="!canBrowseBack"
+            class="metadata-tab-shell metadata-filter-tab-shell player-browse-tabs tab-glow-shell"
+          >
+            <button
+              v-for="tab in browseTabs"
+              :key="tab.id"
+              type="button"
+              class="metadata-tab-btn"
               :class="
-                isCurrentFile(file)
-                  ? 'bg-primary/10 text-primary'
-                  : 'hover:bg-white/5'
+                browseMode === tab.id
+                  ? 'bg-primary text-primary-content shadow-glow-sm'
+                  : 'text-base-content/60 hover:text-base-content'
               "
-              @click="onPickByFile(file)"
+              @click="setBrowseMode(tab.id)"
             >
-              <div
-                class="relative h-9 w-9 shrink-0 rounded-lg overflow-hidden flex items-center justify-center"
-                :class="
-                  isCurrentFile(file)
-                    ? 'bg-primary/15'
-                    : 'bg-base-100/60'
-                "
-              >
-                <img
-                  v-if="!coverFailed[file]"
-                  :src="coverUrlFor(file)"
-                  :alt="trackInfo(file).title"
-                  class="absolute inset-0 h-full w-full object-cover"
-                  loading="lazy"
-                  @error="markCoverFailed(file)"
-                />
-                <span
-                  v-if="isCurrentFile(file) && player.isPlaying.value"
-                  class="relative equalizer h-3"
-                  aria-hidden="true"
-                >
-                  <span></span><span></span><span></span>
-                </span>
-                <Icon
-                  v-else-if="coverFailed[file]"
-                  icon="clarity:music-note-line"
-                  class="h-4 w-4 text-base-content/50"
-                />
-              </div>
-              <div class="flex-1 min-w-0">
-                <p class="text-sm truncate font-medium">
-                  {{ trackInfo(file).title }}
-                </p>
-                <p class="text-[11px] truncate text-base-content/50">
-                  {{ trackInfo(file).artist || t('common.unknownArtist') }}
-                </p>
-              </div>
-            </li>
-          </ul>
-
-          <div v-else-if="libraryFilter" class="text-center py-10">
-            <p class="text-base-content/50 text-sm">
-              {{ t('player.noFilterResults') }}
-            </p>
+              <span class="sm:hidden">{{ tab.shortLabel }}</span>
+              <span class="hidden sm:inline">{{ tab.label }}</span>
+            </button>
           </div>
 
-          <div v-else class="text-center py-10">
-            <p class="text-base-content/50 text-sm">{{ t('player.empty') }}</p>
+          <div class="player-browse-body">
+            <ul
+              v-if="browseView === 'artists'"
+              class="player-browse-list"
+            >
+              <li v-for="artist in filteredArtists" :key="artist.name">
+                <button
+                  type="button"
+                  class="player-browse-row"
+                  @click="openArtist(artist.name)"
+                >
+                  <div class="player-browse-covers">
+                    <div
+                      v-for="file in artist.previewFiles"
+                      :key="file"
+                      class="player-browse-cover"
+                    >
+                      <img
+                        v-if="!coverFailed[file]"
+                        :src="coverUrlFor(file)"
+                        :alt="artist.name"
+                        class="absolute inset-0 h-full w-full object-cover"
+                        loading="lazy"
+                        @error="markCoverFailed(file)"
+                      />
+                      <Icon
+                        v-else
+                        icon="clarity:user-line"
+                        class="h-4 w-4 text-base-content/50"
+                      />
+                    </div>
+                  </div>
+                  <div class="min-w-0 flex-1 text-left">
+                    <p class="truncate text-sm font-medium">{{ artist.name }}</p>
+                    <p class="truncate text-[11px] text-base-content/50">
+                      {{
+                        t('library.artistMeta', {
+                          tracks: artist.files.length,
+                          albums: artist.albumCount,
+                        })
+                      }}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    class="player-browse-play icon-btn shrink-0"
+                    :title="t('library.playArtist')"
+                    @click.stop="playFiles(artist.files)"
+                  >
+                    <Icon icon="clarity:play-line" class="h-4 w-4" />
+                  </button>
+                </button>
+              </li>
+            </ul>
+
+            <ul
+              v-else-if="browseView === 'albums' || browseView === 'artist-albums'"
+              class="player-browse-list"
+            >
+              <li
+                v-for="album in visibleAlbums"
+                :key="album.key"
+              >
+                <button
+                  type="button"
+                  class="player-browse-row"
+                  @click="openAlbum(album.key)"
+                >
+                  <div class="player-browse-cover player-browse-cover-lg">
+                    <img
+                      v-if="!coverFailed[album.coverFile]"
+                      :src="coverUrlFor(album.coverFile)"
+                      :alt="album.name"
+                      class="absolute inset-0 h-full w-full object-cover"
+                      loading="lazy"
+                      @error="markCoverFailed(album.coverFile)"
+                    />
+                    <Icon
+                      v-else
+                      icon="clarity:album-line"
+                      class="h-5 w-5 text-base-content/50"
+                    />
+                  </div>
+                  <div class="min-w-0 flex-1 text-left">
+                    <p class="truncate text-sm font-medium">{{ album.name }}</p>
+                    <p class="truncate text-[11px] text-base-content/50">
+                      {{ album.artist }}
+                    </p>
+                    <p class="text-[11px] text-base-content/40">
+                      {{ t('library.albumMeta', { tracks: album.files.length }) }}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    class="player-browse-play icon-btn shrink-0"
+                    :title="t('library.playAlbum')"
+                    @click.stop="playFiles(album.files)"
+                  >
+                    <Icon icon="clarity:play-line" class="h-4 w-4" />
+                  </button>
+                </button>
+              </li>
+            </ul>
+
+            <ul
+              v-else-if="browseView === 'genres'"
+              class="player-browse-list"
+            >
+              <li v-for="genre in filteredGenres" :key="genre.name">
+                <button
+                  type="button"
+                  class="player-browse-row"
+                  @click="openGenre(genre.name)"
+                >
+                  <div class="player-browse-cover player-browse-cover-lg">
+                    <Icon icon="clarity:tags-line" class="h-5 w-5 text-primary/80" />
+                  </div>
+                  <div class="min-w-0 flex-1 text-left">
+                    <p class="truncate text-sm font-medium">{{ genre.name }}</p>
+                    <p class="text-[11px] text-base-content/50">
+                      {{
+                        t('player.genreMeta', { count: genre.files.length })
+                      }}
+                    </p>
+                  </div>
+                  <Icon
+                    icon="clarity:angle-line"
+                    class="h-4 w-4 shrink-0 text-base-content/35"
+                  />
+                </button>
+              </li>
+            </ul>
+
+            <ul
+              v-else-if="browseView === 'tracks' && visibleTrackItems.length > 0"
+              class="player-browse-list"
+            >
+              <li
+                v-for="item in visibleTrackItems"
+                :key="item.file"
+              >
+                <button
+                  type="button"
+                  class="player-browse-row"
+                  :class="{ 'player-browse-row-active': isCurrentFile(item.file) }"
+                  @click="playFiles(visibleTrackFiles, item.file)"
+                >
+                  <div
+                    class="player-browse-cover"
+                    :class="{ 'ring-2 ring-primary/40': isCurrentFile(item.file) }"
+                  >
+                    <img
+                      v-if="!coverFailed[item.file]"
+                      :src="coverUrlFor(item.file)"
+                      :alt="item.title"
+                      class="absolute inset-0 h-full w-full object-cover"
+                      loading="lazy"
+                      @error="markCoverFailed(item.file)"
+                    />
+                    <span
+                      v-if="isCurrentFile(item.file) && player.isPlaying.value"
+                      class="relative equalizer h-3"
+                      aria-hidden="true"
+                    >
+                      <span></span><span></span><span></span>
+                    </span>
+                    <Icon
+                      v-else-if="coverFailed[item.file]"
+                      icon="clarity:music-note-line"
+                      class="h-4 w-4 text-base-content/50"
+                    />
+                  </div>
+                  <div class="min-w-0 flex-1 text-left">
+                    <p class="truncate text-sm font-medium">{{ item.title }}</p>
+                    <p class="truncate text-[11px] text-base-content/50">
+                      {{ item.artist || t('common.unknownArtist') }}
+                      <span v-if="item.album"> · {{ item.album }}</span>
+                    </p>
+                  </div>
+                </button>
+              </li>
+            </ul>
+
+            <div
+              v-else-if="libraryFilter"
+              class="py-10 text-center"
+            >
+              <p class="text-sm text-base-content/50">
+                {{ t('player.noFilterResults') }}
+              </p>
+            </div>
+
+            <div v-else class="py-10 text-center">
+              <p class="text-sm text-base-content/50">{{ t('player.empty') }}</p>
+            </div>
           </div>
         </aside>
       </div>
@@ -316,6 +485,12 @@ import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { Icon } from '@iconify/vue'
 import Navbar from '/src/components/Navbar.vue'
 import API from '/src/model/api'
+import {
+  groupAlbums,
+  groupArtists,
+  groupGenres,
+  matchesLibraryFilter,
+} from '/src/model/library'
 import { usePlayer, formatTime, trackInfoFromFile } from '/src/model/player'
 import { useMobileSearch } from '/src/model/mobileSearch'
 import { useI18n } from '/src/i18n'
@@ -326,10 +501,194 @@ const mobileSearch = useMobileSearch()
 const libraryFilter = mobileSearch.libraryFilter
 
 const files = ref([])
+const libraryItems = ref([])
 const loading = ref(false)
+const browseMode = ref('artists')
+const selectedArtistName = ref('')
+const selectedAlbumKey = ref('')
+const selectedGenreName = ref('')
 const progressBar = ref(null)
 const coverFailed = ref({})
 let dragging = false
+
+const unknownGenreLabel = computed(() => t('player.unknownGenre'))
+
+const artists = computed(() => groupArtists(libraryItems.value))
+const albums = computed(() => groupAlbums(libraryItems.value))
+const genres = computed(() =>
+  groupGenres(libraryItems.value, unknownGenreLabel.value)
+)
+
+const browseTabs = computed(() => [
+  {
+    id: 'artists',
+    label: t('library.artists'),
+    shortLabel: t('library.artists'),
+  },
+  {
+    id: 'albums',
+    label: t('library.albums'),
+    shortLabel: t('library.albums'),
+  },
+  {
+    id: 'tracks',
+    label: t('library.tracks'),
+    shortLabel: t('library.tracks'),
+  },
+  {
+    id: 'genres',
+    label: t('player.genres'),
+    shortLabel: t('player.genresShort'),
+  },
+])
+
+const selectedArtist = computed(() =>
+  artists.value.find((artist) => artist.name === selectedArtistName.value)
+)
+
+const selectedAlbum = computed(() =>
+  albums.value.find((album) => album.key === selectedAlbumKey.value)
+)
+
+const artistAlbums = computed(() =>
+  albums.value.filter((album) => album.artist === selectedArtistName.value)
+)
+
+const browseView = computed(() => {
+  if (selectedAlbumKey.value) return 'tracks'
+  if (selectedGenreName.value) return 'tracks'
+  if (selectedArtistName.value) {
+    return artistAlbums.value.length > 0 ? 'artist-albums' : 'tracks'
+  }
+  if (browseMode.value === 'artists') return 'artists'
+  if (browseMode.value === 'albums') return 'albums'
+  if (browseMode.value === 'genres') return 'genres'
+  return 'tracks'
+})
+
+const filteredArtists = computed(() => {
+  const q = libraryFilter.value
+  if (!q) return artists.value
+  return artists.value.filter((artist) =>
+    artist.files.some((file) => {
+      const item = libraryItems.value.find((entry) => entry.file === file)
+      return item ? matchesLibraryFilter(item, q) : false
+    })
+  )
+})
+
+const visibleAlbums = computed(() => {
+  const source =
+    browseView.value === 'artist-albums'
+      ? artistAlbums.value
+      : albums.value
+  const q = libraryFilter.value
+  if (!q) return source
+  return source.filter((album) =>
+    album.files.some((file) => {
+      const item = libraryItems.value.find((entry) => entry.file === file)
+      return item ? matchesLibraryFilter(item, q) : false
+    })
+  )
+})
+
+const filteredGenres = computed(() => {
+  const q = libraryFilter.value
+  if (!q) return genres.value
+  return genres.value.filter((genre) =>
+    genre.files.some((file) => {
+      const item = libraryItems.value.find((entry) => entry.file === file)
+      return item ? matchesLibraryFilter(item, q) : false
+    })
+  )
+})
+
+const visibleTrackItems = computed(() => {
+  let items = libraryItems.value
+
+  if (selectedAlbum.value) {
+    const allowed = new Set(selectedAlbum.value.files)
+    items = items.filter((item) => allowed.has(item.file))
+  } else if (selectedArtistName.value) {
+    items = items.filter((item) => item.artist === selectedArtistName.value)
+  } else if (selectedGenreName.value) {
+    items = items.filter((item) => {
+      const genre = item.genre || unknownGenreLabel.value
+      return genre === selectedGenreName.value
+    })
+  }
+
+  const q = libraryFilter.value
+  if (q) {
+    items = items.filter((item) => matchesLibraryFilter(item, q))
+  }
+
+  return items
+})
+
+const visibleTrackFiles = computed(() =>
+  visibleTrackItems.value.map((item) => item.file)
+)
+
+const canBrowseBack = computed(
+  () =>
+    Boolean(
+      selectedAlbumKey.value ||
+        selectedArtistName.value ||
+        selectedGenreName.value
+    )
+)
+
+const browseHeading = computed(() => {
+  if (selectedAlbum.value) return selectedAlbum.value.name
+  if (selectedGenreName.value) return selectedGenreName.value
+  if (selectedArtistName.value) return selectedArtistName.value
+  return t('player.browse')
+})
+
+const browseSubtitle = computed(() => {
+  if (selectedAlbum.value) return selectedAlbum.value.artist
+  if (selectedGenreName.value) {
+    return t('player.genreMeta', {
+      count: visibleTrackItems.value.length,
+    })
+  }
+  if (selectedArtistName.value && artistAlbums.value.length > 0) {
+    return t('library.artistMeta', {
+      tracks: selectedArtist.value?.files.length || 0,
+      albums: artistAlbums.value.length,
+    })
+  }
+  return ''
+})
+
+const browseBackLabel = computed(() => {
+  if (selectedAlbumKey.value) return selectedArtistName.value || t('library.albums')
+  if (selectedGenreName.value) return t('player.genres')
+  return t('library.backToArtists')
+})
+
+const browseCountText = computed(() => {
+  if (browseView.value === 'artists') {
+    return t('player.artistBrowseCount', {
+      count: filteredArtists.value.length,
+    })
+  }
+  if (browseView.value === 'albums' || browseView.value === 'artist-albums') {
+    return t('player.albumBrowseCount', {
+      count: visibleAlbums.value.length,
+    })
+  }
+  if (browseView.value === 'genres') {
+    return t('player.genreBrowseCount', {
+      count: filteredGenres.value.length,
+    })
+  }
+  const count = visibleTrackItems.value.length
+  return count === 1
+    ? t('player.countOne', { count })
+    : t('player.countMany', { count })
+})
 
 function coverUrlFor(file) {
   return API.coverFileURL(file)
@@ -339,54 +698,82 @@ function markCoverFailed(file) {
   coverFailed.value = { ...coverFailed.value, [file]: true }
 }
 
+function fallbackLibraryItems(paths) {
+  return (paths || []).map((file) => {
+    const info = trackInfoFromFile(file)
+    return {
+      file,
+      title: info.title,
+      artist: info.artist || t('common.unknownArtist'),
+      album: '',
+      genre: '',
+    }
+  })
+}
+
 async function load() {
   loading.value = true
   try {
+    const res = await API.getLibraryFiles()
+    libraryItems.value = res.data || []
+    files.value = libraryItems.value.map((item) => item.file)
+  } catch {
     const res = await API.listDownloads()
-    files.value = res.data || []
-    // If the player was empty (direct nav to /player), seed the queue
-    // with the library so the user has something to play.
+    const paths = res.data || []
+    libraryItems.value = fallbackLibraryItems(paths)
+    files.value = paths
+  } finally {
+    loading.value = false
     if (player.playlist.value.length === 0 && files.value.length > 0) {
       player.setPlaylist(files.value)
     }
-  } finally {
-    loading.value = false
   }
 }
 
-function onPick(idx) {
-  if (
-    player.playlist.value.length !== files.value.length ||
-    player.playlist.value[idx]?.file !== files.value[idx]
-  ) {
-    player.setPlaylist(files.value, { startIndex: idx })
-  } else {
-    player.playAt(idx)
+function setBrowseMode(mode) {
+  browseMode.value = mode
+  selectedArtistName.value = ''
+  selectedAlbumKey.value = ''
+  selectedGenreName.value = ''
+}
+
+function openArtist(name) {
+  selectedArtistName.value = name
+  selectedAlbumKey.value = ''
+  selectedGenreName.value = ''
+}
+
+function openAlbum(key) {
+  const album = albums.value.find((entry) => entry.key === key)
+  selectedAlbumKey.value = key
+  selectedArtistName.value = album?.artist || ''
+  selectedGenreName.value = ''
+}
+
+function openGenre(name) {
+  selectedGenreName.value = name
+  selectedArtistName.value = ''
+  selectedAlbumKey.value = ''
+}
+
+function browseBack() {
+  if (selectedAlbumKey.value) {
+    selectedAlbumKey.value = ''
+    return
   }
+  if (selectedGenreName.value) {
+    selectedGenreName.value = ''
+    return
+  }
+  selectedArtistName.value = ''
 }
 
-function trackInfo(file) {
-  return trackInfoFromFile(file)
+function playFiles(fileList, startFile = null) {
+  const list = fileList || []
+  if (!list.length) return
+  const startIndex = startFile ? Math.max(0, list.indexOf(startFile)) : 0
+  player.setPlaylist(list, { startIndex })
 }
-
-function fileMatchesFilter(file, query) {
-  const q = String(query || '')
-    .trim()
-    .toLowerCase()
-  if (!q) return true
-  const info = trackInfo(file)
-  return [info.title, info.artist, file].some((part) =>
-    String(part || '')
-      .toLowerCase()
-      .includes(q)
-  )
-}
-
-const visibleFiles = computed(() => {
-  const q = libraryFilter.value
-  if (!q) return files.value
-  return files.value.filter((file) => fileMatchesFilter(file, q))
-})
 
 function isCurrentFile(file) {
   return player.currentTrack.value?.file === file
@@ -394,12 +781,6 @@ function isCurrentFile(file) {
 
 function clearLibraryFilter() {
   mobileSearch.clearLibraryFilter()
-}
-
-function onPickByFile(file) {
-  const idx = files.value.indexOf(file)
-  if (idx < 0) return
-  onPick(idx)
 }
 
 const trackTitle = computed(() => {
@@ -607,5 +988,45 @@ onUnmounted(() => {
   50% {
     box-shadow: 0 0 60px rgba(26, 208, 92, 0.55);
   }
+}
+
+.player-browse-tabs {
+  @apply mb-3 w-full max-w-full grid grid-cols-2 gap-1 rounded-2xl border border-white/10 bg-base-100/75 p-1 sm:mx-auto sm:mb-4 sm:flex sm:w-max sm:max-w-full sm:rounded-full;
+}
+
+.player-browse-tabs .metadata-tab-btn {
+  @apply inline-flex w-full items-center justify-center gap-1 whitespace-normal px-2 py-2.5 text-center text-[11px] font-medium leading-tight transition-colors sm:w-auto sm:gap-0 sm:whitespace-nowrap sm:rounded-full sm:px-4 sm:py-2 sm:text-sm sm:leading-normal;
+}
+
+.player-browse-body {
+  @apply min-h-0;
+}
+
+.player-browse-list {
+  @apply space-y-1;
+}
+
+.player-browse-row {
+  @apply flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition-colors hover:bg-white/5 active:bg-white/10;
+}
+
+.player-browse-row-active {
+  @apply bg-primary/10 text-primary;
+}
+
+.player-browse-covers {
+  @apply flex shrink-0 -space-x-2;
+}
+
+.player-browse-cover {
+  @apply relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-base-100/60;
+}
+
+.player-browse-cover-lg {
+  @apply h-11 w-11 rounded-xl;
+}
+
+.player-browse-play {
+  @apply h-9 w-9 text-primary hover:bg-primary/10;
 }
 </style>

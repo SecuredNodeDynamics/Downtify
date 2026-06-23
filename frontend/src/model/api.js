@@ -201,6 +201,10 @@ function listDownloads() {
   return API.get('/list')
 }
 
+function getLibraryFiles() {
+  return API.get('/api/library/files')
+}
+
 function deleteDownload(file) {
   return API.delete('/delete', { params: { file } })
 }
@@ -281,6 +285,7 @@ export default {
   coverFileURL,
   apiAssetUrl,
   listDownloads,
+  getLibraryFiles,
   deleteDownload,
   writePlaylistM3u,
   getQueue,
