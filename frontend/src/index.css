@@ -213,6 +213,59 @@
     @apply rounded-2xl pr-5;
   }
 
+  .select-modern {
+    @apply w-full min-w-0 appearance-none rounded-xl border border-white/10 bg-base-100/85 bg-no-repeat pl-3 pr-10 text-sm text-base-content shadow-glow-sm outline-none transition focus:border-primary/60 disabled:cursor-not-allowed disabled:opacity-50;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none'%3E%3Cpath stroke='%239ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.75' d='m6 8 4 4 4-4'/%3E%3C/svg%3E");
+    background-position: right 0.75rem center;
+    background-size: 1rem;
+    box-shadow:
+      0 0 0 1px rgba(26, 208, 92, 0.04),
+      0 0 18px rgba(26, 208, 92, 0.10);
+  }
+
+  .select-modern:focus {
+    box-shadow:
+      0 0 0 1px rgba(26, 208, 92, 0.14),
+      0 0 26px rgba(26, 208, 92, 0.20);
+  }
+
+  [data-theme='downtify-light'] .select-modern {
+    @apply bg-white border-black/10;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none'%3E%3Cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.75' d='m6 8 4 4 4-4'/%3E%3C/svg%3E");
+  }
+
+  .themed-select-menu {
+    @apply overflow-hidden rounded-xl border border-white/10 bg-base-100 p-0;
+    box-shadow:
+      0 0 0 1px rgba(26, 208, 92, 0.08),
+      0 0 24px rgba(26, 208, 92, 0.16),
+      0 12px 32px rgba(0, 0, 0, 0.35);
+  }
+
+  [data-theme='downtify-light'] .themed-select-menu {
+    @apply border-black/10 bg-white;
+    box-shadow:
+      0 0 0 1px rgba(26, 208, 92, 0.06),
+      0 0 20px rgba(26, 208, 92, 0.10),
+      0 12px 28px rgba(0, 0, 0, 0.12);
+  }
+
+  .themed-select-option {
+    @apply flex w-full items-center px-3 py-2.5 text-left text-sm text-base-content transition-colors hover:bg-white/5 active:bg-white/10;
+  }
+
+  .themed-select-option-active {
+    @apply font-medium text-primary hover:bg-white/5;
+  }
+
+  [data-theme='downtify-light'] .themed-select-option {
+    @apply hover:bg-black/5 active:bg-black/10;
+  }
+
+  [data-theme='downtify-light'] .themed-select-option-active {
+    @apply text-primary hover:bg-black/5;
+  }
+
   [data-theme='downtify-light'] .input-modern {
     @apply bg-white border-black/10;
   }

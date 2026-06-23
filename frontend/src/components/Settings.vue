@@ -599,7 +599,7 @@
                 :placeholder="t('settings.jellyfinUrlPlaceholder')"
                 @change="onJellyfinConfigChange"
               />
-              <p class="text-[11px] text-base-content/40 mt-1.5">
+              <p class="mt-1.5 text-center text-[11px] leading-snug text-base-content/40">
                 {{ t('settings.jellyfinUrlHint') }}
               </p>
             </div>
@@ -607,18 +607,25 @@
               <label class="block text-xs text-base-content/50 mb-1.5">
                 {{ t('settings.jellyfinApiKey') }}
               </label>
-              <div class="flex gap-2">
-                <input
-                  v-model="sm.settings.value.jellyfin_api_key"
-                  type="password"
-                  autocomplete="off"
-                  class="input-modern h-10 min-w-0 flex-1 text-sm"
-                  :placeholder="t('settings.jellyfinApiKeyPlaceholder')"
-                  @change="onJellyfinConfigChange"
-                />
+              <div class="flex items-start gap-2">
+                <div class="flex min-w-0 flex-1 flex-col">
+                  <input
+                    v-model="sm.settings.value.jellyfin_api_key"
+                    type="password"
+                    autocomplete="off"
+                    class="input-modern h-10 w-full text-sm"
+                    :placeholder="t('settings.jellyfinApiKeyPlaceholder')"
+                    @change="onJellyfinConfigChange"
+                  />
+                  <p
+                    class="mt-1.5 text-center text-[11px] leading-snug text-base-content/40"
+                  >
+                    {{ t('settings.jellyfinApiKeyHint') }}
+                  </p>
+                </div>
                 <button
                   type="button"
-                  class="btn btn-sm h-10 px-3 rounded-lg border-white/10 bg-base-100/85 hover:bg-base-100"
+                  class="btn btn-sm h-10 shrink-0 px-3 rounded-lg border-white/10 bg-base-100/85 hover:bg-base-100"
                   :disabled="
                     jellyfinTestLoading ||
                     !sm.settings.value.jellyfin_url?.trim() ||
@@ -637,12 +644,9 @@
                   }}
                 </button>
               </div>
-              <p class="text-[11px] text-base-content/40 mt-1.5">
-                {{ t('settings.jellyfinApiKeyHint') }}
-              </p>
               <p
                 v-if="jellyfinTestMessage"
-                class="text-[11px] mt-1.5"
+                class="mt-1.5 text-center text-[11px]"
                 :class="jellyfinTestError ? 'text-error' : 'text-primary'"
               >
                 {{ jellyfinTestMessage }}
@@ -654,7 +658,7 @@
               </label>
               <div
                 v-if="jellyfinLibraryLoading"
-                class="flex items-center gap-2"
+                class="flex flex-col"
               >
                 <div
                   class="h-10 w-full rounded-xl bg-base-100/85 border border-white/10 flex items-center px-3"
@@ -663,21 +667,28 @@
                     t('settings.jellyfinLibraryLoading')
                   }}</span>
                 </div>
+                <p class="mt-1.5 text-center text-[11px] leading-snug text-base-content/40">
+                  {{ t('settings.jellyfinMusicLibraryHint') }}
+                </p>
               </div>
               <div v-else-if="jellyfinLibraryError" class="space-y-1.5">
-                <div class="flex gap-2">
-                  <select
-                    v-model="sm.settings.value.jellyfin_music_library"
-                    class="input-modern h-10 flex-1 text-sm opacity-50"
-                    disabled
-                  >
-                    <option value="">
-                      {{ t('settings.jellyfinMusicLibraryPlaceholder') }}
-                    </option>
-                  </select>
+                <div class="flex items-start gap-2">
+                  <div class="flex min-w-0 flex-1 flex-col">
+                    <ThemedSelect
+                      v-model="sm.settings.value.jellyfin_music_library"
+                      :options="jellyfinLibraryOptions"
+                      :placeholder="t('settings.jellyfinMusicLibraryPlaceholder')"
+                      disabled
+                    />
+                    <p
+                      class="mt-1.5 text-center text-[11px] leading-snug text-base-content/40"
+                    >
+                      {{ t('settings.jellyfinMusicLibraryHint') }}
+                    </p>
+                  </div>
                   <button
                     type="button"
-                    class="btn btn-sm h-10 px-3 rounded-lg border-white/10 bg-base-100/85 hover:bg-base-100"
+                    class="btn btn-sm h-10 shrink-0 px-3 rounded-lg border-white/10 bg-base-100/85 hover:bg-base-100"
                     @click="onJellyfinConfigChange"
                     :disabled="jellyfinLibraryLoading"
                   >
@@ -686,35 +697,29 @@
                 </div>
                 <p class="text-[11px] text-error">{{ jellyfinLibraryError }}</p>
               </div>
-              <div v-else class="flex gap-2">
-                <select
-                  v-model="sm.settings.value.jellyfin_music_library"
-                  class="input-modern h-10 flex-1 text-sm"
-                  :disabled="uniqueJellyfinLibraries.length === 0"
-                >
-                  <option value="">
-                    {{ t('settings.jellyfinMusicLibraryPlaceholder') }}
-                  </option>
-                  <option
-                    v-for="lib in uniqueJellyfinLibraries"
-                    :key="lib.id"
-                    :value="lib.name"
+              <div v-else class="flex items-start gap-2">
+                <div class="flex min-w-0 flex-1 flex-col">
+                  <ThemedSelect
+                    v-model="sm.settings.value.jellyfin_music_library"
+                    :options="jellyfinLibraryOptions"
+                    :placeholder="t('settings.jellyfinMusicLibraryPlaceholder')"
+                    :disabled="uniqueJellyfinLibraries.length === 0"
+                  />
+                  <p
+                    class="mt-1.5 text-center text-[11px] leading-snug text-base-content/40"
                   >
-                    {{ lib.display_name || lib.name }}
-                  </option>
-                </select>
+                    {{ t('settings.jellyfinMusicLibraryHint') }}
+                  </p>
+                </div>
                 <button
                   type="button"
-                  class="btn btn-sm h-10 px-3 rounded-lg border-white/10 bg-base-100/85 hover:bg-base-100"
+                  class="btn btn-sm h-10 shrink-0 px-3 rounded-lg border-white/10 bg-base-100/85 hover:bg-base-100"
                   @click="onJellyfinConfigChange"
                   :disabled="jellyfinLibraryLoading"
                 >
                   {{ t('common.refresh') }}
                 </button>
               </div>
-              <p class="text-[11px] text-base-content/40 mt-1.5">
-                {{ t('settings.jellyfinMusicLibraryHint') }}
-              </p>
             </div>
           </div>
         </div>
@@ -1133,6 +1138,7 @@ import {
 } from '../model/serverConnection'
 import { useI18n } from '../i18n'
 import API from '../model/api'
+import ThemedSelect from './ThemedSelect.vue'
 
 const sm = useSettingsManager()
 const {
@@ -1251,6 +1257,13 @@ function normalizedJellyfinLibraryName(value) {
 const uniqueJellyfinLibraries = computed(() => {
   return uniqueLibrariesByName(jellyfinLibraries.value)
 })
+
+const jellyfinLibraryOptions = computed(() =>
+  uniqueJellyfinLibraries.value.map((lib) => ({
+    value: lib.name,
+    label: lib.display_name || lib.name,
+  }))
+)
 
 const aboutSections = computed(() => [
   {

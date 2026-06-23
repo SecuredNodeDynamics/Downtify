@@ -602,15 +602,41 @@ def test_jellyfin_libraries_returns_music_libraries_only(monkeypatch):
                 'name': 'Music',
                 'type': 'VirtualFolder',
                 'collection_type': 'music',
-            },
-            {
-                'id': 'music-playlists-view',
-                'name': 'Music Playlists',
-                'type': 'VirtualFolder',
-                'collection_type': 'music',
+                'locations': [],
             },
         ],
     }
+
+
+def test_jellyfin_libraries_excludes_music_playlists_view(monkeypatch):
+    class FakeVirtualFoldersResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return [
+                {
+                    'ItemId': 'music-view',
+                    'Name': 'Music',
+                    'CollectionType': 'music',
+                    'Locations': ['/media/music'],
+                },
+                {
+                    'ItemId': 'music-playlists-view',
+                    'Name': 'Music Playlists',
+                    'CollectionType': 'music',
+                    'Locations': [],
+                },
+            ]
+
+    monkeypatch.setattr(
+        'downtify.api.requests.get',
+        lambda *args, **kwargs: FakeVirtualFoldersResponse(),
+    )
+
+    result = jellyfin_libraries_endpoint('jellyfin.test', 'secret')
+
+    assert [library['name'] for library in result['libraries']] == ['Music']
 
 
 def test_jellyfin_libraries_falls_back_to_items(monkeypatch):
@@ -684,6 +710,7 @@ def test_jellyfin_libraries_falls_back_to_items(monkeypatch):
                 'name': 'Music',
                 'type': 'Folder',
                 'collection_type': 'music',
+                'locations': [],
             },
         ],
     }
@@ -716,12 +743,14 @@ def test_jellyfin_libraries_keeps_untyped_virtual_folders(monkeypatch):
                 'name': 'Music',
                 'type': 'VirtualFolder',
                 'collection_type': '',
+                'locations': [],
             },
             {
                 'id': 'tv-view',
                 'name': 'TV',
                 'type': 'VirtualFolder',
                 'collection_type': '',
+                'locations': [],
             },
         ],
     }

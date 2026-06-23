@@ -471,7 +471,7 @@ export default {
     jellyfinTestSuccess: 'Connection successful. The API key is valid.',
     jellyfinTestFailed: 'Connection test failed',
     jellyfinMusicLibrary: 'Music library or folder',
-    jellyfinMusicLibraryPlaceholder: 'Music',
+    jellyfinMusicLibraryPlaceholder: 'Select library',
     jellyfinMusicLibraryHint:
       'Name or path of the Jellyfin music library Downtify should scan/sync.',
     jellyfinLibraryLoading: 'Loading libraries...',

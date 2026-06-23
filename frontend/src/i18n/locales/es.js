@@ -480,7 +480,7 @@ export default {
     jellyfinTestSuccess: 'Conexion correcta. La clave API es valida.',
     jellyfinTestFailed: 'Fallo la prueba de conexion',
     jellyfinMusicLibrary: 'Biblioteca o carpeta de musica',
-    jellyfinMusicLibraryPlaceholder: 'Music',
+    jellyfinMusicLibraryPlaceholder: 'Seleccionar biblioteca',
     jellyfinMusicLibraryHint:
       'Nombre o ruta de la biblioteca de musica de Jellyfin que Downtify debe escanear/sincronizar.',
     jellyfinLibraryLoading: 'Cargando bibliotecas...',

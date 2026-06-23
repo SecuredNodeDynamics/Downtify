@@ -212,6 +212,53 @@ def _prefer_music_libraries(
     return music or candidates
 
 
+def _jellyfin_virtual_playlist_view(name: Any) -> bool:
+    normalized = _normalized_jellyfin_library_name(name)
+    if not normalized:
+        return False
+    if normalized in {'music playlists', 'playlists'}:
+        return True
+    return normalized.endswith(' playlists')
+
+
+def _filter_selectable_jellyfin_libraries(
+    candidates: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    filtered = [
+        library
+        for library in candidates
+        if not _jellyfin_virtual_playlist_view(library.get('name'))
+    ]
+    located_music = [
+        library
+        for library in filtered
+        if str(library.get('collection_type') or '').casefold() == 'music'
+        and library.get('locations')
+    ]
+    if not located_music:
+        return filtered
+
+    located_names = {
+        _normalized_jellyfin_library_name(library.get('name'))
+        for library in located_music
+    }
+    trimmed: list[dict[str, Any]] = []
+    for library in filtered:
+        if (
+            str(library.get('collection_type') or '').casefold() == 'music'
+            and not library.get('locations')
+            and _normalized_jellyfin_library_name(library.get('name'))
+            in located_names
+        ):
+            logger.info(
+                'Skipping Jellyfin music view without locations: '
+                f'{library.get("name")} (id: {library.get("id")})'
+            )
+            continue
+        trimmed.append(library)
+    return trimmed
+
+
 def _libraries_from_virtual_folders(data: Any) -> list[dict[str, Any]]:
     items = data if isinstance(data, list) else data.get('Items', [])
     candidates = []
@@ -219,10 +266,16 @@ def _libraries_from_virtual_folders(data: Any) -> list[dict[str, Any]]:
         if not isinstance(item, dict):
             continue
         name = str(item.get('Name') or '')
+        if _jellyfin_virtual_playlist_view(name):
+            logger.info(f'Skipping Jellyfin playlist view: {name}')
+            continue
         item_id = item.get('ItemId') or item.get('Id') or name
         collection_type = (
             item.get('CollectionType') or item.get('collectionType') or ''
         )
+        locations = item.get('Locations') or []
+        if not isinstance(locations, list):
+            locations = []
         logger.info(
             f'Virtual folder: {name} - CollectionType: {collection_type} '
             f'- ItemId: {item_id}'
@@ -232,8 +285,13 @@ def _libraries_from_virtual_folders(data: Any) -> list[dict[str, Any]]:
             'name': name,
             'type': 'VirtualFolder',
             'collection_type': collection_type,
+            'locations': locations,
         })
-    return _dedupe_jellyfin_libraries(_prefer_music_libraries(candidates))
+    return _dedupe_jellyfin_libraries(
+        _filter_selectable_jellyfin_libraries(
+            _prefer_music_libraries(candidates)
+        )
+    )
 
 
 def _libraries_from_items(data: dict[str, Any]) -> list[dict[str, Any]]:
@@ -254,14 +312,24 @@ def _libraries_from_items(data: dict[str, Any]) -> list[dict[str, Any]]:
         }
         if is_library_folder and item_id not in seen_ids:
             seen_ids.add(item_id)
+            locations = item.get('Path') or item.get('Locations') or []
+            if isinstance(locations, str):
+                locations = [locations]
+            elif not isinstance(locations, list):
+                locations = []
             candidates.append({
                 'id': item_id,
                 'name': name,
                 'type': item_type,
                 'collection_type': item.get('CollectionType', ''),
+                'locations': locations,
             })
 
-    return _dedupe_jellyfin_libraries(_prefer_music_libraries(candidates))
+    return _dedupe_jellyfin_libraries(
+        _filter_selectable_jellyfin_libraries(
+            _prefer_music_libraries(candidates)
+        )
+    )
 
 
 class ConnectionManager:
