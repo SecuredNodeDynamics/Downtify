@@ -285,6 +285,74 @@ def list_discogs_artist_image_options(
     return options
 
 
+def list_deezer_artist_image_options(
+    artist_name: str,
+    *,
+    limit: int = 3,
+    minimum_score: float = 0.72,
+) -> list[ArtistImageOption]:
+    options: list[ArtistImageOption] = []
+    seen: set[str] = set()
+    for item in artist_image_sources._deezer_artist_items(
+        artist_name,
+        limit=limit,
+    ):
+        label = str(item.get('name') or '').strip()
+        if not label:
+            continue
+        score = artist_image_sources._name_ratio(label, artist_name)
+        if score < minimum_score:
+            continue
+        image_url = artist_image_sources._best_deezer_picture(item)
+        if not image_url:
+            continue
+        artist_id = str(item.get('id') or '').strip() or label
+        _append_option(
+            options,
+            seen,
+            option_id=f'deezer:{artist_id}',
+            source='Deezer',
+            label=label,
+            subtitle=f'{int(score * 100)}% name match',
+            image_url=image_url,
+        )
+    return options
+
+
+def list_youtube_music_artist_image_options(
+    artist_name: str,
+    *,
+    limit: int = 3,
+    minimum_score: float = 0.72,
+) -> list[ArtistImageOption]:
+    options: list[ArtistImageOption] = []
+    seen: set[str] = set()
+    for item in artist_image_sources._youtube_music_artist_items(
+        artist_name,
+        limit=limit,
+    ):
+        label = str(item.get('artist') or '').strip()
+        if not label:
+            continue
+        score = artist_image_sources._name_ratio(label, artist_name)
+        if score < minimum_score:
+            continue
+        image_url = artist_image_sources._best_youtube_music_image_url(item)
+        if not image_url:
+            continue
+        browse_id = str(item.get('browseId') or '').strip() or label
+        _append_option(
+            options,
+            seen,
+            option_id=f'youtube-music:{browse_id}',
+            source='YouTube Music',
+            label=label,
+            subtitle=f'{int(score * 100)}% name match',
+            image_url=image_url,
+        )
+    return options
+
+
 def _musicbrainz_search_artists(
     artist_name: str,
     *,
@@ -370,6 +438,14 @@ def _collect_for_search_name(
     per_source_limit: int = 3,
 ) -> list[ArtistImageOption]:
     tasks = {
+        'youtube': lambda: list_youtube_music_artist_image_options(
+            artist_name,
+            limit=per_source_limit,
+        ),
+        'deezer': lambda: list_deezer_artist_image_options(
+            artist_name,
+            limit=per_source_limit,
+        ),
         'spotify': lambda: list_spotify_artist_image_options(
             artist_name,
             limit=per_source_limit,

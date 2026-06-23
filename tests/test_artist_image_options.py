@@ -126,3 +126,25 @@ def test_list_spotify_artist_image_options_filters_low_matches(monkeypatch):
     assert len(result) == 1
     assert result[0]['id'] == 'spotify:good'
     assert result[0]['image_url'] == 'https://i.scdn.co/image/good.jpg'
+
+
+def test_list_youtube_music_artist_image_options(monkeypatch):
+    monkeypatch.setattr(
+        options.artist_image_sources,
+        '_youtube_music_artist_items',
+        lambda *_args, **_kwargs: [
+            {
+                'artist': 'Jane Murdoch',
+                'browseId': 'browse-1',
+                'thumbnails': [
+                    {'url': 'https://yt3.googleusercontent.com/large', 'width': 600},
+                ],
+            }
+        ],
+    )
+
+    result = options.list_youtube_music_artist_image_options('Jane Murdoch')
+
+    assert len(result) == 1
+    assert result[0]['source'] == 'YouTube Music'
+    assert result[0]['id'] == 'youtube-music:browse-1'

@@ -1555,7 +1555,12 @@ _ALLOWED_REMOTE_IMAGE_HOST_SUFFIXES = (
     'spotifycdn.com',
     'mzstatic.com',
     'discogs.com',
+    'dzcdn.net',
     'wikimedia.org',
+    'wikipedia.org',
+    'googleusercontent.com',
+    'ggpht.com',
+    'ytimg.com',
     'coverartarchive.org',
     'archive.org',
 )
@@ -1601,7 +1606,18 @@ def _resolve_manual_artist_image_bytes(
     *,
     image_url: str = '',
     selected_option_id: str = '',
+    discogs_token: str = '',
 ) -> tuple[bytes | None, str]:
+    selected_option_id = str(selected_option_id or '').strip()
+    if selected_option_id:
+        data, source = artist_image_sources.resolve_artist_image_by_option_id(
+            selected_option_id,
+            artist['name'],
+            discogs_token=discogs_token,
+        )
+        if data:
+            return data, source
+
     image_url = str(image_url or '').strip()
     if image_url:
         if not _is_allowed_remote_image_url(image_url):
@@ -1621,7 +1637,6 @@ def _resolve_manual_artist_image_bytes(
         return (data, 'Jellyfin') if data else (None, '')
 
     mbid = ''
-    selected_option_id = str(selected_option_id or '').strip()
     if selected_option_id.startswith('musicbrainz:'):
         mbid = selected_option_id.split(':', 1)[1].split(':', 1)[0].strip()
     if mbid:
@@ -1919,10 +1934,12 @@ async def apply_artist_image(request: Request) -> dict[str, Any]:
         )
     try:
         if image_url or selected_option_id:
+            discogs_token = str(state.settings.get('discogs_token') or '').strip()
             image_data, _source = _resolve_manual_artist_image_bytes(
                 artist,
                 image_url=image_url,
                 selected_option_id=selected_option_id,
+                discogs_token=discogs_token,
             )
             if not image_data:
                 raise ValueError('Could not download the selected artist image')

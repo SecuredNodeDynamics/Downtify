@@ -6,6 +6,14 @@ from downtify import artist_image_sources as sources
 def test_fetch_online_artist_image_uses_first_successful_source(monkeypatch):
     calls: list[str] = []
 
+    def fake_youtube(name: str):
+        calls.append('youtube')
+        return None, ''
+
+    def fake_deezer(name: str):
+        calls.append('deezer')
+        return None, ''
+
     def fake_spotify(name: str):
         calls.append('spotify')
         return None, ''
@@ -18,6 +26,8 @@ def test_fetch_online_artist_image_uses_first_successful_source(monkeypatch):
         calls.append('discogs')
         return b'discogs-image', 'Discogs'
 
+    monkeypatch.setattr(sources, 'fetch_youtube_music_artist_image', fake_youtube)
+    monkeypatch.setattr(sources, 'fetch_deezer_artist_image', fake_deezer)
     monkeypatch.setattr(sources, 'fetch_spotify_artist_image', fake_spotify)
     monkeypatch.setattr(sources, 'fetch_apple_music_artist_image', fake_apple)
     monkeypatch.setattr(sources, 'fetch_discogs_artist_image', fake_discogs)
@@ -27,7 +37,7 @@ def test_fetch_online_artist_image_uses_first_successful_source(monkeypatch):
 
     assert data == b'apple-image'
     assert source == 'Apple Music'
-    assert calls == ['apple']
+    assert calls == ['youtube', 'deezer', 'apple']
 
 
 def test_fetch_discogs_artist_image_downloads_primary_image(monkeypatch):
@@ -197,3 +207,54 @@ def test_spotify_access_token_marks_blocked_on_forbidden(monkeypatch):
     assert sources._spotify_access_token() == ''
     assert sources._spotify_access_token() == ''
     assert sources._SPOTIFY_TOKEN.get('blocked') is True
+
+
+def test_fetch_youtube_music_artist_image_uses_search_results(monkeypatch):
+    monkeypatch.setattr(
+        sources,
+        '_youtube_music_artist_items',
+        lambda *_args, **_kwargs: [
+            {
+                'artist': 'Jane Murdoch',
+                'browseId': 'browse-1',
+                'thumbnails': [
+                    {'url': 'https://yt3.googleusercontent.com/small', 'width': 60},
+                    {'url': 'https://yt3.googleusercontent.com/large', 'width': 600},
+                ],
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        sources,
+        '_download_image',
+        lambda url: b'yt-image' if url.endswith('/large') else None,
+    )
+    sources._NAME_IMAGE_CACHE.clear()
+
+    data, source = sources.fetch_youtube_music_artist_image('Jane Murdoch')
+
+    assert data == b'yt-image'
+    assert source == 'YouTube Music'
+
+
+def test_resolve_artist_image_by_option_id_prefers_source_fetch(monkeypatch):
+    monkeypatch.setattr(
+        sources,
+        'fetch_youtube_music_artist_image',
+        lambda name: (b'yt-image', 'YouTube Music'),
+    )
+    monkeypatch.setattr(
+        sources,
+        '_download_image',
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError('direct download should not run')
+        ),
+    )
+
+    data, source = sources.resolve_artist_image_by_option_id(
+        'youtube-music:browse-1',
+        'Jane Murdoch',
+    )
+
+    assert data == b'yt-image'
+    assert source == 'YouTube Music'

@@ -236,7 +236,7 @@ export default {
     chooseCover: 'Choose cover',
     chooseCoverTitle: 'Choose artist cover',
     chooseCoverHint:
-      'Pick an image from Spotify, Discogs, MusicBrainz, or Jellyfin.',
+      'Pick an image from YouTube Music, Deezer, Spotify, Discogs, MusicBrainz, or Jellyfin.',
     chooseCoverLoading: 'Loading cover options…',
     chooseCoverLoadingSlow:
       'Still searching Spotify, Discogs, and MusicBrainz — this can take up to a minute.',
