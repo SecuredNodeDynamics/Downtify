@@ -1,10 +1,12 @@
 <template>
-  <div class="min-h-0 overflow-x-hidden">
+  <div class="player-view min-h-0 overflow-x-hidden">
     <Navbar />
 
-    <div class="mx-auto max-w-5xl px-4 py-4 sm:py-8 sm:px-6">
+    <div
+      class="player-page mx-auto flex w-full max-w-5xl flex-1 flex-col px-4 py-2 sm:px-6 sm:py-8 min-h-0"
+    >
       <!-- Header -->
-      <div class="mb-6 sm:mb-8 mobile-page-header">
+      <div class="mb-4 sm:mb-8 mobile-page-header shrink-0">
         <h1 class="text-2xl font-bold tracking-tight">
           {{ t('player.title') }}
         </h1>
@@ -30,20 +32,24 @@
 
       <!-- Skeleton -->
       <div v-else-if="loading && !player.currentTrack.value" class="space-y-3">
-        <div class="skeleton h-72 rounded-3xl" />
+        <div class="skeleton h-52 rounded-3xl lg:h-72" />
         <div class="skeleton h-16 rounded-2xl" />
         <div class="skeleton h-16 rounded-2xl" />
       </div>
 
       <!-- Player + queue -->
-      <div v-else class="grid gap-6 lg:grid-cols-[1fr_360px]">
-        <!-- Player card -->
-        <section
-          class="surface rounded-3xl p-6 sm:p-8 flex flex-col items-center text-center"
-        >
+      <div v-else class="player-shell min-h-0 flex-1">
+        <!-- Now playing -->
+        <section class="player-now surface rounded-3xl p-4 sm:p-8 flex flex-col items-center text-center">
+          <p
+            class="mb-3 w-full text-left text-xs font-semibold uppercase tracking-wider text-base-content/50 lg:hidden"
+          >
+            {{ t('player.nowPlaying') }}
+          </p>
+
           <!-- Cover -->
           <div
-            class="relative h-56 w-56 sm:h-64 sm:w-64 rounded-3xl bg-primary/10 text-primary flex items-center justify-center overflow-hidden shadow-glow"
+            class="player-cover relative flex items-center justify-center overflow-hidden rounded-2xl bg-primary/10 text-primary shadow-glow sm:rounded-3xl"
             :class="{ 'pulse-glow': player.isPlaying.value }"
           >
             <img
@@ -57,10 +63,10 @@
               class="absolute inset-0 h-full w-full object-cover"
               @error="markCoverFailed(player.currentTrack.value.file)"
             />
-            <Icon v-else icon="clarity:music-note-line" class="h-24 w-24" />
+            <Icon v-else icon="clarity:music-note-line" class="h-16 w-16 sm:h-24 sm:w-24" />
             <div
               v-if="player.isPlaying.value"
-              class="absolute bottom-3 right-3 equalizer h-5"
+              class="absolute bottom-2 right-2 equalizer h-5 sm:bottom-3 sm:right-3"
               aria-hidden="true"
             >
               <span></span><span></span><span></span>
@@ -68,34 +74,36 @@
           </div>
 
           <!-- Title / artist -->
-          <div class="mt-6 w-full">
-            <p class="text-xl font-bold tracking-tight truncate">
+          <div class="mt-4 w-full sm:mt-6">
+            <p class="text-lg font-bold tracking-tight truncate sm:text-xl">
               {{ trackTitle }}
             </p>
-            <p class="text-sm text-base-content/60 truncate mt-0.5">
+            <p class="mt-0.5 text-sm text-base-content/60 truncate">
               {{ trackArtist }}
             </p>
           </div>
 
           <!-- Progress -->
-          <div class="mt-6 w-full">
+          <div class="mt-4 w-full sm:mt-6">
             <div
-              class="relative h-2 rounded-full bg-white/10 overflow-hidden cursor-pointer group"
+              class="player-progress group relative cursor-pointer overflow-hidden rounded-full bg-white/10 py-2"
               ref="progressBar"
               @click="onSeekClick"
               @pointerdown="onSeekStart"
             >
-              <div
-                class="h-full bg-primary transition-[width] duration-150"
-                :style="`width: ${player.progressPct.value}%`"
-              />
-              <div
-                class="absolute top-1/2 -translate-y-1/2 h-3.5 w-3.5 rounded-full bg-primary shadow-glow-sm transition-all duration-150 opacity-0 group-hover:opacity-100"
-                :style="`left: calc(${player.progressPct.value}% - 7px)`"
-              />
+              <div class="relative h-1.5 rounded-full bg-white/10 sm:h-2">
+                <div
+                  class="h-full rounded-full bg-primary transition-[width] duration-150"
+                  :style="`width: ${player.progressPct.value}%`"
+                />
+                <div
+                  class="player-progress-thumb absolute top-1/2 h-4 w-4 -translate-y-1/2 rounded-full bg-primary shadow-glow-sm transition-all duration-150 sm:h-3.5 sm:w-3.5"
+                  :style="`left: calc(${player.progressPct.value}% - 8px)`"
+                />
+              </div>
             </div>
             <div
-              class="mt-2 flex items-center justify-between text-xs text-base-content/50 tabular-nums"
+              class="mt-1 flex items-center justify-between text-xs text-base-content/50 tabular-nums sm:mt-2"
             >
               <span>{{ formatTime(player.currentTime.value) }}</span>
               <span>{{ formatTime(player.duration.value) }}</span>
@@ -103,9 +111,9 @@
           </div>
 
           <!-- Transport -->
-          <div class="mt-5 flex items-center justify-center gap-3">
+          <div class="mt-4 flex items-center justify-center gap-2 sm:mt-5 sm:gap-3">
             <button
-              class="icon-btn"
+              class="icon-btn h-9 w-9 sm:h-10 sm:w-10"
               :class="{ 'icon-btn-active': player.shuffle.value }"
               @click="player.toggleShuffle()"
               :title="
@@ -114,10 +122,10 @@
                   : t('player.shuffleOff')
               "
             >
-              <Icon icon="clarity:shuffle-line" class="h-5 w-5" />
+              <Icon icon="clarity:shuffle-line" class="h-4 w-4 sm:h-5 sm:w-5" />
             </button>
             <button
-              class="icon-btn"
+              class="icon-btn h-10 w-10 sm:h-10 sm:w-10"
               @click="player.prev()"
               :title="t('player.previous')"
               :disabled="files.length === 0"
@@ -128,7 +136,7 @@
               />
             </button>
             <button
-              class="inline-flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-content shadow-glow-sm hover:scale-105 active:scale-95 transition disabled:opacity-50"
+              class="player-play-btn inline-flex items-center justify-center rounded-full bg-primary text-primary-content shadow-glow-sm transition hover:scale-105 active:scale-95 disabled:opacity-50"
               @click="player.toggle()"
               :disabled="files.length === 0"
               :title="
@@ -141,11 +149,11 @@
                     ? 'clarity:pause-solid'
                     : 'clarity:play-solid'
                 "
-                class="h-6 w-6"
+                class="h-7 w-7 sm:h-6 sm:w-6"
               />
             </button>
             <button
-              class="icon-btn"
+              class="icon-btn h-10 w-10 sm:h-10 sm:w-10"
               @click="player.next()"
               :title="t('player.next')"
               :disabled="files.length === 0"
@@ -153,23 +161,23 @@
               <Icon icon="clarity:step-forward-2-line" class="h-5 w-5" />
             </button>
             <button
-              class="icon-btn relative"
+              class="icon-btn relative h-9 w-9 sm:h-10 sm:w-10"
               :class="{ 'icon-btn-active': player.repeatMode.value !== 'off' }"
               @click="player.cycleRepeat()"
               :title="repeatTitle"
             >
-              <Icon icon="clarity:refresh-line" class="h-5 w-5" />
+              <Icon icon="clarity:refresh-line" class="h-4 w-4 sm:h-5 sm:w-5" />
               <span
                 v-if="player.repeatMode.value === 'one'"
-                class="absolute -bottom-0.5 -right-0.5 h-4 min-w-[1rem] px-1 rounded-full bg-primary text-primary-content text-[9px] font-bold flex items-center justify-center"
+                class="absolute -bottom-0.5 -right-0.5 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-primary px-1 text-[9px] font-bold text-primary-content"
               >
                 1
               </span>
             </button>
           </div>
 
-          <!-- Volume -->
-          <div class="mt-6 w-full max-w-xs flex items-center gap-3">
+          <!-- Volume (desktop only — mobile uses device volume) -->
+          <div class="mt-6 hidden w-full max-w-xs items-center gap-3 lg:flex">
             <button
               class="icon-btn"
               @click="player.toggleMute()"
@@ -202,14 +210,13 @@
         </section>
 
         <!-- Queue list -->
-        <aside
-          class="surface rounded-3xl p-4 sm:p-5 lg:max-h-[640px] lg:overflow-y-auto"
-        >
-          <div class="flex items-center justify-between mb-3 px-1">
+        <aside class="player-queue surface rounded-3xl p-3 sm:p-5 lg:max-h-[640px] lg:overflow-y-auto">
+          <div class="mb-2 flex items-center justify-between px-1 sm:mb-3">
             <h2
               class="text-xs font-semibold uppercase tracking-wider text-base-content/50"
             >
-              {{ t('player.queue') }}
+              <span class="lg:hidden">{{ t('player.upNext') }}</span>
+              <span class="hidden lg:inline">{{ t('player.queue') }}</span>
             </h2>
             <span class="text-[11px] text-base-content/40">
               {{
@@ -401,6 +408,76 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+@media (max-width: 1023px) {
+  .player-view {
+    display: flex;
+    flex-direction: column;
+    height: calc(
+      100dvh - var(--app-header-height) - var(--app-safe-top) -
+        var(--app-bottom-nav-height) - var(--app-safe-bottom)
+    );
+    overflow: hidden;
+  }
+
+  .player-page {
+    min-height: 0;
+  }
+
+  .player-shell {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    min-height: 0;
+  }
+
+  .player-now {
+    flex-shrink: 0;
+  }
+
+  .player-cover {
+    width: min(42vw, 11rem);
+    aspect-ratio: 1;
+  }
+
+  .player-play-btn {
+    height: 3.75rem;
+    width: 3.75rem;
+  }
+
+  .player-queue {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+@media (min-width: 1024px) {
+  .player-shell {
+    display: grid;
+    grid-template-columns: 1fr 360px;
+    gap: 1.5rem;
+  }
+
+  .player-cover {
+    height: 16rem;
+    width: 16rem;
+  }
+
+  .player-play-btn {
+    height: 3.5rem;
+    width: 3.5rem;
+  }
+
+  .player-progress-thumb {
+    opacity: 0;
+  }
+
+  .player-progress:hover .player-progress-thumb {
+    opacity: 1;
+  }
+}
+
 .player-range {
   -webkit-appearance: none;
   appearance: none;
