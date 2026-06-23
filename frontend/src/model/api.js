@@ -137,7 +137,19 @@ function getArtistImageScanStatus() {
   return API.get('/api/metadata/artist-images/status')
 }
 
-function applyArtistImage(item) {
+function getArtistImageOptions(item) {
+  return API.get('/api/metadata/artist-images/options', {
+    params: {
+      artist: item.artist || item.name,
+      file: item.file || '',
+      folder: item.folder || '',
+      jellyfin_artist_id: item.jellyfin_artist_id || '',
+    },
+    timeout: 120000,
+  })
+}
+
+function applyArtistImage(item, selection = {}) {
   return API.post(
     '/api/metadata/artist-images/apply',
     {
@@ -145,7 +157,10 @@ function applyArtistImage(item) {
       artist: item.artist || item.name,
       artist_id: item.artist_id,
       folder: item.folder,
-      jellyfin_artist_id: item.jellyfin_artist_id,
+      jellyfin_artist_id:
+        selection.jellyfin_artist_id || item.jellyfin_artist_id || '',
+      image_url: selection.image_url || '',
+      selected_option_id: selection.id || '',
     },
     { timeout: 120000 },
   )
@@ -279,6 +294,7 @@ export default {
   applyMetadata,
   scanArtistImages,
   getArtistImageScanStatus,
+  getArtistImageOptions,
   applyArtistImage,
   getRepairLog,
   ws_onmessage,

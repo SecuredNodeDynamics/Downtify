@@ -706,7 +706,7 @@
                     applyingArtistImages[itemKey(item)] ||
                     fixedArtistImages[itemKey(item)]
                   "
-                  @click="applyArtistImage(item)"
+                  @click="openArtistImagePicker(item, { context: 'artist' })"
                 >
                   <span
                     v-if="applyingArtistImages[itemKey(item)]"
@@ -718,7 +718,9 @@
                       ? t('metadata.fixing')
                       : fixedArtistImages[itemKey(item)]
                         ? t('metadata.fixed')
-                        : t('metadata.apply')
+                        : failedArtistRepairKeys[itemKey(item)]
+                          ? t('metadata.fixFailed')
+                          : t('metadata.chooseCover')
                   }}
                 </button>
               </div>
@@ -1047,7 +1049,7 @@
                   <p class="truncate text-sm font-semibold">
                     {{ item.name }}
                   </p>
-                  <div class="mt-2 flex items-center gap-2">
+                  <div class="mt-2 flex flex-wrap items-center gap-2">
                     <span
                       class="pill truncate text-[11px]"
                       :class="
@@ -1061,6 +1063,12 @@
                           ? t('metadata.localImageReady')
                           : t('metadata.missingLocalImage')
                       }}
+                    </span>
+                    <span
+                      v-if="failedArtistRepairKeys[jellyfinRepairKey(item)]"
+                      class="pill truncate text-[11px] bg-error/10 text-error"
+                    >
+                      {{ t('metadata.fixFailed') }}
                     </span>
                   </div>
                   <div class="mt-2 flex items-center justify-between gap-2">
@@ -1079,7 +1087,7 @@
                       applyingArtistImages[jellyfinRepairKey(item)] ||
                       fixedArtistImages[jellyfinRepairKey(item)]
                     "
-                    @click="applyJellyfinArtistImage(item)"
+                    @click="openArtistImagePicker(item, { context: 'jellyfin' })"
                   >
                     <span
                       v-if="applyingArtistImages[jellyfinRepairKey(item)]"
@@ -1093,7 +1101,9 @@
                     {{
                       fixedArtistImages[jellyfinRepairKey(item)]
                         ? t('metadata.fixed')
-                        : t('metadata.applyImage')
+                        : failedArtistRepairKeys[jellyfinRepairKey(item)]
+                          ? t('metadata.fixFailed')
+                          : t('metadata.chooseCover')
                     }}
                   </button>
                   <p
@@ -1133,6 +1143,113 @@
         </div>
       </section>
     </main>
+
+    <div
+      v-if="artistImagePickerOpen"
+      class="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-4 sm:items-center"
+      @click.self="closeArtistImagePicker"
+    >
+      <div
+        class="surface-strong w-full max-w-3xl overflow-hidden rounded-3xl border border-white/10 shadow-glow-md"
+        role="dialog"
+        aria-modal="true"
+      >
+        <div class="border-b border-white/10 px-5 py-4">
+          <h3 class="text-lg font-semibold">
+            {{ t('metadata.chooseCoverTitle') }}
+          </h3>
+          <p class="mt-1 text-sm text-base-content/60">
+            {{ artistImagePickerItem?.name || artistImagePickerItem?.artist }}
+          </p>
+          <p class="mt-1 text-xs text-base-content/45">
+            {{ t('metadata.chooseCoverHint') }}
+          </p>
+        </div>
+
+        <div class="max-h-[28rem] overflow-y-auto px-5 py-4">
+          <div
+            v-if="artistImagePickerLoading"
+            class="flex min-h-40 items-center justify-center gap-3 text-sm text-base-content/60"
+          >
+            <span class="loading loading-spinner loading-md text-primary" />
+            {{ t('metadata.chooseCoverLoading') }}
+          </div>
+          <p
+            v-else-if="artistImagePickerError"
+            class="rounded-2xl border border-error/20 bg-error/10 px-4 py-3 text-sm text-error"
+          >
+            {{ artistImagePickerError }}
+          </p>
+          <p
+            v-else-if="artistImagePickerOptions.length === 0"
+            class="rounded-2xl border border-white/10 bg-base-100/60 px-4 py-8 text-center text-sm text-base-content/55"
+          >
+            {{ t('metadata.chooseCoverEmpty') }}
+          </p>
+          <div
+            v-else
+            class="grid grid-cols-2 gap-3 sm:grid-cols-3"
+          >
+            <button
+              v-for="option in artistImagePickerOptions"
+              :key="option.id"
+              type="button"
+              class="overflow-hidden rounded-2xl border text-left transition"
+              :class="
+                artistImagePickerSelected?.id === option.id
+                  ? 'border-primary ring-2 ring-primary/40'
+                  : 'border-white/10 hover:border-primary/30'
+              "
+              @click="artistImagePickerSelected = option"
+            >
+              <div class="aspect-square bg-base-100/80">
+                <img
+                  v-if="option.preview_url"
+                  :src="option.preview_url"
+                  :alt="option.label"
+                  class="h-full w-full object-cover"
+                  loading="lazy"
+                />
+              </div>
+              <div class="space-y-1 p-3">
+                <p class="truncate text-sm font-medium">{{ option.label }}</p>
+                <p class="truncate text-[11px] text-base-content/55">
+                  {{ option.source }}
+                </p>
+                <p
+                  v-if="option.subtitle"
+                  class="truncate text-[11px] text-base-content/40"
+                >
+                  {{ option.subtitle }}
+                </p>
+              </div>
+            </button>
+          </div>
+        </div>
+
+        <div class="flex flex-col gap-2 border-t border-white/10 px-5 py-4 sm:flex-row sm:justify-end">
+          <button
+            type="button"
+            class="btn btn-ghost metadata-btn"
+            @click="closeArtistImagePicker"
+          >
+            {{ t('common.cancel') }}
+          </button>
+          <button
+            type="button"
+            class="btn btn-primary metadata-btn"
+            :disabled="!artistImagePickerSelected || artistImagePickerApplying"
+            @click="confirmArtistImageSelection"
+          >
+            <span
+              v-if="artistImagePickerApplying"
+              class="loading loading-spinner loading-xs mr-2"
+            />
+            {{ t('metadata.applySelectedCover') }}
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -1177,7 +1294,16 @@ const activeArtistImageTab = ref('needs')
 const cleanArtistImageView = ref('grid')
 const applyingArtistImages = ref({})
 const fixedArtistImages = ref({})
+const failedArtistRepairKeys = ref({})
 const jellyfinPreviewFailed = ref({})
+const artistImagePickerOpen = ref(false)
+const artistImagePickerContext = ref('artist')
+const artistImagePickerItem = ref(null)
+const artistImagePickerOptions = ref([])
+const artistImagePickerSelected = ref(null)
+const artistImagePickerLoading = ref(false)
+const artistImagePickerApplying = ref(false)
+const artistImagePickerError = ref('')
 const repairingAllImages = ref(false)
 const artistImageSummary = ref({ scanned: 0, matched: 0, total: 0 })
 const artistReconciliation = ref(null)
@@ -1371,6 +1497,48 @@ function firstSavedFolder(result) {
   return path ? String(path).split('/', 1)[0] : ''
 }
 
+function artistImageRepairSucceeded(data) {
+  return (
+    data?.verified_on_disk === true &&
+    [...(data?.verified || []), ...(data?.saved || [])].some(Boolean)
+  )
+}
+
+function markArtistRepairFailed(key, error = '') {
+  const nextFixed = { ...fixedArtistImages.value }
+  delete nextFixed[key]
+  fixedArtistImages.value = nextFixed
+  failedArtistRepairKeys.value = {
+    ...failedArtistRepairKeys.value,
+    [key]: error || true,
+  }
+}
+
+function markArtistRepairSucceeded(key) {
+  const nextFailed = { ...failedArtistRepairKeys.value }
+  delete nextFailed[key]
+  failedArtistRepairKeys.value = nextFailed
+  fixedArtistImages.value = {
+    ...fixedArtistImages.value,
+    [key]: true,
+  }
+}
+
+function syncFailedRepairKeysFromReconciliation() {
+  const stillMissing = new Set(
+    (artistReconciliation.value?.missing_images || []).map((item) =>
+      jellyfinRepairKey(item)
+    )
+  )
+  const next = {}
+  for (const [key, value] of Object.entries(failedArtistRepairKeys.value)) {
+    if (stillMissing.has(key)) {
+      next[key] = value
+    }
+  }
+  failedArtistRepairKeys.value = next
+}
+
 function jellyfinPreviewSrc(item) {
   const key = jellyfinRepairKey(item)
   if (!item?.preview_url || jellyfinPreviewFailed.value[key]) {
@@ -1398,7 +1566,10 @@ function sameJellyfinArtist(left, right) {
 }
 
 function markJellyfinArtistImageFixed(item, result) {
-  const folder = item.folder || firstSavedFolder(result)
+  if (!artistImageRepairSucceeded(result)) {
+    return
+  }
+  const folder = item.folder || result.folder || firstSavedFolder(result)
   const previewStamp = Date.now()
   const updateItem = (existing) => {
     if (!sameJellyfinArtist(existing, item)) return existing
@@ -1579,6 +1750,7 @@ async function reconcileArtists(options = {}) {
     const res = await API.reconcileJellyfinArtists()
     artistReconciliation.value = res.data
     jellyfinPreviewFailed.value = {}
+    syncFailedRepairKeysFromReconciliation()
     lastReconciled.value = new Date().toLocaleString()
     if (!preserveMessage) {
       jellyfinMessage.value = t('metadata.jellyfinReconcileOk')
@@ -1717,7 +1889,63 @@ async function scanAllArtistImages() {
   }
 }
 
-async function applyArtistImage(item) {
+async function openArtistImagePicker(item, options = {}) {
+  const { context = 'artist' } = options
+  artistImagePickerContext.value = context
+  artistImagePickerItem.value = item
+  artistImagePickerOpen.value = true
+  artistImagePickerOptions.value = []
+  artistImagePickerSelected.value = null
+  artistImagePickerError.value = ''
+  artistImagePickerLoading.value = true
+  try {
+    const res = await API.getArtistImageOptions(item)
+    artistImagePickerOptions.value = res.data?.options || []
+    if (artistImagePickerOptions.value.length === 1) {
+      artistImagePickerSelected.value = artistImagePickerOptions.value[0]
+    }
+  } catch (err) {
+    artistImagePickerError.value =
+      err?.response?.data?.detail || t('metadata.chooseCoverFailed')
+  } finally {
+    artistImagePickerLoading.value = false
+  }
+}
+
+function closeArtistImagePicker() {
+  if (artistImagePickerApplying.value) return
+  artistImagePickerOpen.value = false
+  artistImagePickerItem.value = null
+  artistImagePickerOptions.value = []
+  artistImagePickerSelected.value = null
+  artistImagePickerError.value = ''
+}
+
+async function confirmArtistImageSelection() {
+  const item = artistImagePickerItem.value
+  const selection = artistImagePickerSelected.value
+  if (!item || !selection) return
+
+  artistImagePickerApplying.value = true
+  try {
+    let ok = false
+    if (artistImagePickerContext.value === 'jellyfin') {
+      ok = await applyJellyfinArtistImage(item, {
+        quiet: false,
+        selection,
+      })
+    } else {
+      ok = await applyArtistImageWithSelection(item, selection)
+    }
+    if (ok) {
+      closeArtistImagePicker()
+    }
+  } finally {
+    artistImagePickerApplying.value = false
+  }
+}
+
+async function applyArtistImageWithSelection(item, selection = {}) {
   const key = itemKey(item)
   applyingArtistImages.value = {
     ...applyingArtistImages.value,
@@ -1725,16 +1953,13 @@ async function applyArtistImage(item) {
   }
   artistImageError.value = ''
   try {
-    const res = await API.applyArtistImage(item)
-    const savedOrVerified = [
-      ...(res.data?.saved || []),
-      ...(res.data?.verified || []),
-    ]
-    if (savedOrVerified.length === 0) {
+    const res = await API.applyArtistImage(item, selection)
+    if (!artistImageRepairSucceeded(res.data)) {
+      markArtistRepairFailed(key, t('metadata.failedArtistImageApply'))
       artistImageError.value = t('metadata.failedArtistImageApply')
-      return
+      return false
     }
-    fixedArtistImages.value = { ...fixedArtistImages.value, [key]: true }
+    markArtistRepairSucceeded(key)
     completedArtistImages.value = [res.data, ...completedArtistImages.value]
     failedArtistImages.value = failedArtistImages.value.filter(
       (existing) => itemKey(existing) !== key
@@ -1746,8 +1971,10 @@ async function applyArtistImage(item) {
       ...artistImageSummary.value,
       matched: artistImageItems.value.length,
     }
+    return true
   } catch (err) {
     const detail = err?.response?.data?.detail
+    markArtistRepairFailed(key, detail || t('metadata.failedArtistImageApply'))
     artistImageError.value = detail
       ? `${t('metadata.failedArtistImageApply')} ${detail}`
       : t('metadata.failedArtistImageApply')
@@ -1760,6 +1987,7 @@ async function applyArtistImage(item) {
         (existing) => itemKey(existing) !== key
       ),
     ]
+    return false
   } finally {
     applyingArtistImages.value = {
       ...applyingArtistImages.value,
@@ -1769,7 +1997,7 @@ async function applyArtistImage(item) {
 }
 
 async function applyJellyfinArtistImage(item, options = {}) {
-  const { quiet = false } = options
+  const { quiet = false, selection = null } = options
   const key = jellyfinRepairKey(item)
   applyingArtistImages.value = {
     ...applyingArtistImages.value,
@@ -1785,17 +2013,14 @@ async function applyJellyfinArtistImage(item, options = {}) {
       artist: item.name,
       artist_id: item.artist_id || '',
       folder: item.folder || item.name,
-      jellyfin_artist_id: item.jellyfin_artist_id || '',
+      jellyfin_artist_id:
+        selection?.jellyfin_artist_id || item.jellyfin_artist_id || '',
     }
-    const res = await API.applyArtistImage(repairItem)
-    const savedOrVerified = [
-      ...(res.data?.saved || []),
-      ...(res.data?.verified || []),
-    ]
-    if (savedOrVerified.length === 0) {
+    const res = await API.applyArtistImage(repairItem, selection || {})
+    if (!artistImageRepairSucceeded(res.data)) {
       throw new Error(t('metadata.failedArtistImageApply'))
     }
-    fixedArtistImages.value = { ...fixedArtistImages.value, [key]: true }
+    markArtistRepairSucceeded(key)
     completedArtistImages.value = [res.data, ...completedArtistImages.value]
     markJellyfinArtistImageFixed(item, res.data)
     if (!quiet) {
@@ -1814,8 +2039,11 @@ async function applyJellyfinArtistImage(item, options = {}) {
         err?.response?.data?.detail ||
         err?.message ||
         t('metadata.failedArtistImageApply')
+      markArtistRepairFailed(key, detail)
       jellyfinError.value = true
       jellyfinMessage.value = `${t('metadata.failedArtistImageApply')} ${detail}`
+    } else {
+      markArtistRepairFailed(key)
     }
     return false
   } finally {
@@ -1890,7 +2118,7 @@ async function repairAllArtistImages() {
   repairingAllImages.value = true
   for (const item of [...artistImageItems.value]) {
     // eslint-disable-next-line no-await-in-loop
-    await applyArtistImage(item)
+    await applyArtistImageWithSelection(item, {})
   }
   repairingAllImages.value = false
 }

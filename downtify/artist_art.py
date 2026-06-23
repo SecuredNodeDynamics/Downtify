@@ -276,6 +276,27 @@ def _download_image(url: str) -> bytes | None:
     return response.content
 
 
+def download_image_url(url: str) -> bytes | None:
+    return _download_image(url)
+
+
+def musicbrainz_artist_image_urls(mbid: str) -> list[tuple[str, str]]:
+    mbid = str(mbid or '').strip()
+    if not mbid:
+        return []
+    urls: list[tuple[str, str]] = []
+    wikimedia = _wikimedia_artist_image_url(mbid)
+    if wikimedia:
+        urls.append((wikimedia, 'MusicBrainz'))
+    urls.append(
+        (
+            COVERART_ARCHIVE_ARTIST_URL.format(mbid=mbid),
+            'MusicBrainz (Cover Art Archive)',
+        )
+    )
+    return urls
+
+
 def artist_image_bytes(mbid: str) -> bytes | None:
     if not mbid:
         return None

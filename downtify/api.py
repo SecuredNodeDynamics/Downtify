@@ -50,6 +50,7 @@ from loguru import logger
 
 from . import (
     artist_art,
+    artist_image_options,
     artist_image_sources,
     m3u,
     metadata_repair,
@@ -1530,6 +1531,73 @@ def _artist_candidate_preview_url(
     return '/api/metadata/artist-images/candidate-preview?' + urlencode(params)
 
 
+_ALLOWED_REMOTE_IMAGE_HOST_SUFFIXES = (
+    '.scdn.co',
+    'spotifycdn.com',
+    'mzstatic.com',
+    'discogs.com',
+    'wikimedia.org',
+    'coverartarchive.org',
+    'archive.org',
+)
+
+
+def _is_allowed_remote_image_url(url: str) -> bool:
+    parsed = requests.utils.urlparse(str(url or '').strip())
+    if parsed.scheme not in {'http', 'https'}:
+        return False
+    host = str(parsed.netloc or '').casefold()
+    if not host:
+        return False
+    return any(
+        host == suffix.lstrip('.') or host.endswith(suffix)
+        for suffix in _ALLOWED_REMOTE_IMAGE_HOST_SUFFIXES
+    )
+
+
+def _remote_image_preview_url(url: str) -> str:
+    return '/api/metadata/artist-images/remote-preview?' + urlencode({'url': url})
+
+
+def _artist_image_option_preview_url(option: dict[str, Any]) -> str:
+    image_url = str(option.get('image_url') or '').strip()
+    if image_url:
+        return _remote_image_preview_url(image_url)
+    jellyfin_artist_id = str(option.get('jellyfin_artist_id') or '').strip()
+    if jellyfin_artist_id:
+        return _artist_candidate_preview_url(
+            str(option.get('label') or ''),
+            jellyfin_artist_id=jellyfin_artist_id,
+        )
+    return ''
+
+
+def _resolve_manual_artist_image_bytes(
+    artist: dict[str, str],
+    *,
+    image_url: str = '',
+) -> tuple[bytes | None, str]:
+    image_url = str(image_url or '').strip()
+    if image_url:
+        if not _is_allowed_remote_image_url(image_url):
+            raise HTTPException(
+                status_code=400,
+                detail='Selected image URL is not allowed',
+            )
+        data = artist_art.download_image_url(image_url)
+        return (data, 'Selected image') if data else (None, '')
+
+    jellyfin_artist_id = str(artist.get('jellyfin_artist_id') or '').strip()
+    if jellyfin_artist_id:
+        data = _fetch_jellyfin_artist_image_bytes(
+            artist['name'],
+            artist_id=jellyfin_artist_id,
+        )
+        return (data, 'Jellyfin') if data else (None, '')
+
+    return None, ''
+
+
 def _with_artist_image_preview(
     items: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
@@ -1623,6 +1691,63 @@ def artist_image_preview(
     )
 
 
+@router.get('/api/metadata/artist-images/remote-preview')
+def artist_remote_image_preview(url: str = Query(...)) -> Response:
+    if state.downloader is None:
+        raise HTTPException(status_code=500, detail='Downloader not ready')
+    if not _is_allowed_remote_image_url(url):
+        raise HTTPException(status_code=400, detail='Image URL is not allowed')
+    data = artist_art.download_image_url(url)
+    if not data:
+        raise HTTPException(status_code=404, detail='Preview not available')
+    return Response(
+        content=data,
+        media_type=artist_art.media_type_for_image(data),
+        headers={'Cache-Control': 'no-store'},
+    )
+
+
+@router.get('/api/metadata/artist-images/options')
+def artist_image_options_list(
+    artist: str = Query(...),
+    file: str = Query(''),
+    folder: str = Query(''),
+    jellyfin_artist_id: str = Query(''),
+) -> dict[str, Any]:
+    if state.downloader is None:
+        raise HTTPException(status_code=500, detail='Downloader not ready')
+    artist_name = str(artist or '').strip()
+    if not artist_name:
+        raise HTTPException(status_code=400, detail='artist is required')
+
+    download_dir = _active_download_dir()
+    file, folder = _resolve_artist_image_repair_paths(
+        download_dir,
+        artist_name,
+        str(file or '').strip(),
+        str(folder or '').strip(),
+    )
+    discogs_token = str(state.settings.get('discogs_token') or '').strip()
+    options = artist_image_options.collect_artist_image_options(
+        artist_name,
+        discogs_token=discogs_token,
+        jellyfin_artist_id=str(jellyfin_artist_id or '').strip(),
+        jellyfin_label=artist_name,
+    )
+    payload_options: list[dict[str, Any]] = []
+    for option in options:
+        payload_options.append({
+            **option,
+            'preview_url': _artist_image_option_preview_url(option),
+        })
+    return {
+        'artist': artist_name,
+        'file': file,
+        'folder': folder,
+        'options': payload_options,
+    }
+
+
 @router.get('/api/metadata/artist-images/candidate-preview')
 def artist_candidate_image_preview(
     artist: str = Query(...),
@@ -1700,6 +1825,8 @@ async def apply_artist_image(request: Request) -> dict[str, Any]:
         ).strip(),
     }
     folder = str(payload.get('folder') or '').strip()
+    image_url = str(payload.get('image_url') or '').strip()
+    selected_option_id = str(payload.get('selected_option_id') or '').strip()
     if not artist['name']:
         raise HTTPException(status_code=400, detail='artist is required')
     file, folder = _resolve_artist_image_repair_paths(
@@ -1714,14 +1841,29 @@ async def apply_artist_image(request: Request) -> dict[str, Any]:
             detail='file or folder is required',
         )
     try:
-        result = metadata_repair.repair_artist_image(
-            download_dir,
-            file,
-            artist,
-            artist_folder_policy=_artist_folder_policy(),
-            target_folder=folder,
-            image_fetchers=_artist_image_fetchers(),
-        )
+        if image_url or selected_option_id:
+            image_data, _source = _resolve_manual_artist_image_bytes(
+                artist,
+                image_url=image_url,
+            )
+            if not image_data:
+                raise ValueError('Could not download the selected artist image')
+            result = metadata_repair.repair_artist_image_bytes(
+                download_dir,
+                file,
+                artist,
+                image_data,
+                target_folder=folder,
+            )
+        else:
+            result = metadata_repair.repair_artist_image(
+                download_dir,
+                file,
+                artist,
+                artist_folder_policy=_artist_folder_policy(),
+                target_folder=folder,
+                image_fetchers=_artist_image_fetchers(),
+            )
         image_path = next(
             (
                 download_dir / relative

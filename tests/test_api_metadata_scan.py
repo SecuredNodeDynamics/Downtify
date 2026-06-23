@@ -589,6 +589,115 @@ def test_named_items_include_jellyfin_candidate_preview():
     assert 'jellyfin_artist_id=jf-artist-id' in item['preview_url']
 
 
+def test_artist_image_options_list_returns_source_previews(tmp_path, monkeypatch):
+    old_downloader = api.state.downloader
+    api.state.downloader = FakeDownloader(tmp_path)
+    monkeypatch.setattr(
+        api.artist_image_options,
+        'collect_artist_image_options',
+        lambda *_args, **_kwargs: [
+            {
+                'id': 'spotify:abc',
+                'source': 'Spotify',
+                'label': 'Jane Murdoch',
+                'subtitle': '95% name match',
+                'image_url': 'https://i.scdn.co/image/abc.jpg',
+                'jellyfin_artist_id': '',
+            }
+        ],
+    )
+    try:
+        payload = api.artist_image_options_list(
+            artist='Jane Murdoch',
+            folder='Jane Murdoch',
+        )
+    finally:
+        api.state.downloader = old_downloader
+
+    assert payload['artist'] == 'Jane Murdoch'
+    assert payload['options'][0]['preview_url'].startswith(
+        '/api/metadata/artist-images/remote-preview?'
+    )
+
+
+def test_remote_preview_rejects_untrusted_host(tmp_path):
+    old_downloader = api.state.downloader
+    api.state.downloader = FakeDownloader(tmp_path)
+    try:
+        import pytest
+        from fastapi import HTTPException
+
+        with pytest.raises(HTTPException, match='not allowed'):
+            api.artist_remote_image_preview(
+                url='https://evil.example.test/image.jpg',
+            )
+    finally:
+        api.state.downloader = old_downloader
+
+
+def test_apply_artist_image_accepts_selected_image_url(
+    tmp_path,
+    monkeypatch,
+):
+    old_downloader = api.state.downloader
+    old_scan = dict(api.state.artist_image_scan)
+    old_repair_log = list(api.state.repair_log)
+    api.state.downloader = FakeDownloader(tmp_path)
+    api.state.artist_image_scan = {**old_scan, 'completed': [], 'items': [], 'matched': 0}
+
+    captured = {}
+
+    def fake_repair_bytes(root, file, artist, image, **kwargs):
+        captured['image'] = image
+        folder = tmp_path / 'Guest Artist'
+        folder.mkdir(exist_ok=True)
+        target = folder / 'Guest Artist.jpg'
+        target.write_bytes(image)
+        return {
+            'artist': artist['name'],
+            'artist_id': artist['id'],
+            'file': file,
+            'saved': ['Guest Artist/Guest Artist.jpg'],
+            'verified': ['Guest Artist/Guest Artist.jpg'],
+            'verified_on_disk': True,
+            'folder': 'Guest Artist',
+        }
+
+    monkeypatch.setattr(
+        api.metadata_repair,
+        'repair_artist_image_bytes',
+        fake_repair_bytes,
+    )
+    monkeypatch.setattr(
+        api,
+        '_resolve_manual_artist_image_bytes',
+        lambda *_args, **_kwargs: (b'selected-image', 'Selected image'),
+    )
+    monkeypatch.setattr(
+        api,
+        '_sync_artist_image_to_jellyfin',
+        lambda *_args, **_kwargs: {'synced': False},
+    )
+    try:
+        result = asyncio.run(
+            api.apply_artist_image(
+                FakeRequest({
+                    'artist': 'Guest Artist',
+                    'folder': 'Guest Artist',
+                    'image_url': 'https://i.scdn.co/image/abc.jpg',
+                    'selected_option_id': 'spotify:abc',
+                })
+            )
+        )
+    finally:
+        api.state.downloader = old_downloader
+        api.state.artist_image_scan = old_scan
+        api.state.repair_log = old_repair_log
+
+    assert captured['image'] == b'selected-image'
+    assert result['saved'] == ['Guest Artist/Guest Artist.jpg']
+
+
 def test_candidate_preview_uses_jellyfin_image(tmp_path, monkeypatch):
     old_downloader = api.state.downloader
     api.state.downloader = FakeDownloader(tmp_path)

@@ -17,6 +17,7 @@ from .artist_art import (
     embedded_cover_bytes,
     ensure_named_artist_image,
     has_artist_image,
+    has_named_artist_image,
     missing_artist_image_items,
     resolve_artist_mbid,
     save_missing_artist_images,
@@ -546,13 +547,87 @@ def repair_artist_image(
             'No artist image source found (MusicBrainz, album art, Jellyfin, '
             'Spotify, Apple Music, or Discogs)'
         )
-    return {
-        'artist': artist_name,
-        'artist_id': artist.get('id', ''),
-        'file': path.relative_to(root).as_posix() if path is not None else '',
-        'saved': saved,
-        'verified': verified,
-    }
+    return _finalize_artist_image_repair_result(
+        root,
+        artist,
+        folder,
+        {
+            'artist': artist_name,
+            'artist_id': artist.get('id', ''),
+            'file': path.relative_to(root).as_posix() if path is not None else '',
+            'saved': saved,
+            'verified': verified,
+        },
+    )
+
+
+def repair_artist_image_bytes(
+    root: Path,
+    relative_file: str,
+    artist: dict[str, str],
+    image: bytes,
+    target_folder: str = '',
+):
+    root = root.resolve()
+    artist_name = str(artist.get('name') or '').strip()
+    if not artist_name:
+        raise ValueError('Artist name is required')
+    if not image:
+        raise ValueError('Image data is required')
+
+    folder = _safe_artist_image_folder(root, target_folder)
+    if folder is None and artist_name and not relative_file:
+        folder = _safe_artist_image_folder(root, artist_name)
+    if folder is None:
+        raise ValueError('A library file or artist folder is required')
+
+    path: Path | None = None
+    relative_file = str(relative_file or '').strip()
+    if relative_file:
+        path = safe_library_path(root, relative_file)
+        if not path.exists() or not path.is_file():
+            raise FileNotFoundError(relative_file)
+
+    folder.mkdir(parents=True, exist_ok=True)
+    target = artist_image_target_path(
+        folder,
+        image,
+        artist_name=artist_name,
+    )
+    target.write_bytes(image)
+    saved = sorted(
+        {
+            target.relative_to(root).as_posix(),
+            *ensure_named_artist_image(
+                folder,
+                root,
+                artist_name=artist_name,
+            ),
+        }
+    )
+    verified = _verified_artist_image_paths(root, path, artist, folder)
+    if not verified and saved:
+        verified = sorted(
+            {
+                relative
+                for relative in saved
+                if (root / relative).is_file()
+            }
+        )
+    if not verified:
+        raise ValueError('Artist image was not written')
+    return _finalize_artist_image_repair_result(
+        root,
+        artist,
+        folder,
+        {
+            'artist': artist_name,
+            'artist_id': artist.get('id', ''),
+            'file': path.relative_to(root).as_posix() if path is not None else '',
+            'saved': saved,
+            'verified': verified,
+        },
+    )
 
 
 def _safe_artist_image_folder(root: Path, folder: str) -> Path | None:
@@ -683,6 +758,75 @@ def _verified_artist_image_paths(
                 continue
             verified.append(relative.as_posix())
     return sorted(set(verified))
+
+
+def verify_artist_folder_image(
+    root: Path,
+    artist: dict[str, str],
+    folder: Path | None,
+    *,
+    saved: list[str] | None = None,
+    verified: list[str] | None = None,
+) -> dict[str, Any]:
+    """Confirm artist artwork exists on disk in the expected artist folder."""
+
+    artist_name = str(artist.get('name') or '').strip()
+    root = root.resolve()
+    candidate_paths = sorted(set((saved or []) + (verified or [])))
+
+    on_disk: list[str] = []
+    for relative in candidate_paths:
+        path = (root / relative).resolve()
+        try:
+            path.relative_to(root)
+        except ValueError:
+            continue
+        if path.is_file() and path.stat().st_size > 0:
+            on_disk.append(relative)
+
+    target_folder = folder
+    if target_folder is None and on_disk:
+        target_folder = (root / on_disk[0].split('/', 1)[0]).resolve()
+
+    folder_ready = False
+    folder_relative = ''
+    if target_folder is not None and target_folder.is_dir():
+        try:
+            folder_relative = target_folder.relative_to(root).as_posix()
+        except ValueError:
+            folder_relative = target_folder.name
+        folder_ready = has_named_artist_image(
+            target_folder,
+            artist_name=artist_name,
+        )
+
+    return {
+        'verified_on_disk': bool(on_disk) and folder_ready,
+        'verified': on_disk,
+        'folder': folder_relative,
+    }
+
+
+def _finalize_artist_image_repair_result(
+    root: Path,
+    artist: dict[str, str],
+    folder: Path | None,
+    result: dict[str, Any],
+) -> dict[str, Any]:
+    check = verify_artist_folder_image(
+        root,
+        artist,
+        folder,
+        saved=result.get('saved') or [],
+        verified=result.get('verified') or [],
+    )
+    if not check['verified_on_disk']:
+        raise ValueError('Artist image was not written to the artist folder')
+    result['verified_on_disk'] = True
+    result['verified'] = check['verified']
+    if check['folder']:
+        result['folder'] = check['folder']
+    return result
 
 
 def repair_file(

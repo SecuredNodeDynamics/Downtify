@@ -1069,6 +1069,42 @@ def test_repair_artist_image_verified_falls_back_to_saved_paths(
     assert result['verified'] == ['Saved Only/Saved Only.jpg']
 
 
+def test_verify_artist_folder_image_requires_named_artist_file(tmp_path):
+    folder = tmp_path / 'Artist'
+    folder.mkdir()
+    (folder / 'thumb.jpg').write_bytes(b'image')
+
+    check = metadata_repair.verify_artist_folder_image(
+        tmp_path,
+        {'id': '', 'name': 'Artist'},
+        folder,
+        saved=['Artist/thumb.jpg'],
+        verified=['Artist/thumb.jpg'],
+    )
+
+    assert check['verified_on_disk'] is False
+
+
+def test_finalize_artist_image_repair_result_rejects_missing_named_file(
+    tmp_path,
+):
+    folder = tmp_path / 'Artist'
+    folder.mkdir()
+    (folder / 'thumb.jpg').write_bytes(b'image')
+
+    with pytest.raises(ValueError, match='not written to the artist folder'):
+        metadata_repair._finalize_artist_image_repair_result(
+            tmp_path,
+            {'id': '', 'name': 'Artist'},
+            folder,
+            {
+                'artist': 'Artist',
+                'saved': ['Artist/thumb.jpg'],
+                'verified': ['Artist/thumb.jpg'],
+            },
+        )
+
+
 def test_repair_file_fails_when_metadata_does_not_persist(
     tmp_path,
     monkeypatch,
