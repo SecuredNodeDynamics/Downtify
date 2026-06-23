@@ -249,8 +249,8 @@ def test_apply_artist_image_allows_folder_without_file(tmp_path, monkeypatch):
             'artist': artist['name'],
             'artist_id': artist['id'],
             'file': '',
-            'saved': ['Guest Artist/folder.jpg'],
-            'verified': ['Guest Artist/folder.jpg'],
+            'saved': ['Guest Artist/Guest Artist.jpg'],
+            'verified': ['Guest Artist/Guest Artist.jpg'],
         }
 
     monkeypatch.setattr(
@@ -273,7 +273,7 @@ def test_apply_artist_image_allows_folder_without_file(tmp_path, monkeypatch):
 
         assert captured['file'] == ''
         assert captured['artist'] == {'id': '', 'name': 'Guest Artist'}
-        assert result['verified'] == ['Guest Artist/folder.jpg']
+        assert result['verified'] == ['Guest Artist/Guest Artist.jpg']
     finally:
         api.state.downloader = old_downloader
         api.state.artist_image_scan = old_scan
@@ -309,7 +309,7 @@ def test_apply_artist_image_allows_name_only_artist(tmp_path, monkeypatch):
             'artist': artist['name'],
             'artist_id': artist['id'],
             'file': file,
-            'saved': ['Guest Artist/folder.jpg'],
+            'saved': ['Guest Artist/Guest Artist.jpg'],
         }
 
     monkeypatch.setattr(
@@ -327,7 +327,7 @@ def test_apply_artist_image_allows_name_only_artist(tmp_path, monkeypatch):
         )
 
         assert captured['artist'] == {'id': '', 'name': 'Guest Artist'}
-        assert result['saved'] == ['Guest Artist/folder.jpg']
+        assert result['saved'] == ['Guest Artist/Guest Artist.jpg']
         assert api.state.artist_image_scan['completed'][0] == result
         assert api.state.artist_image_scan['items'] == []
         assert api.state.artist_image_scan['matched'] == 0
@@ -407,8 +407,8 @@ def test_apply_artist_image_passes_requested_folder(tmp_path, monkeypatch):
             'artist': artist['name'],
             'artist_id': artist['id'],
             'file': file,
-            'saved': ['Local Folder/folder.jpg'],
-            'verified': ['Local Folder/folder.jpg'],
+            'saved': ['Local Folder/Local Folder.jpg'],
+            'verified': ['Local Folder/Local Folder.jpg'],
         }
 
     monkeypatch.setattr(
@@ -427,7 +427,7 @@ def test_apply_artist_image_passes_requested_folder(tmp_path, monkeypatch):
         )
 
         assert captured['target_folder'] == 'Local Folder'
-        assert result['verified'] == ['Local Folder/folder.jpg']
+        assert result['verified'] == ['Local Folder/Local Folder.jpg']
     finally:
         api.state.downloader = old_downloader
         api.state.artist_image_scan = old_scan
@@ -466,7 +466,7 @@ def test_local_artist_inventory_tracks_folder_images_and_tag_files(
     album_dir.mkdir(parents=True)
     track = album_dir / 'song.mp3'
     track.write_bytes(b'audio')
-    (artist_dir / 'folder.jpg').write_bytes(b'image')
+    (artist_dir / 'Artist One.jpg').write_bytes(b'image')
 
     guest_track = tmp_path / 'guest.mp3'
     guest_track.write_bytes(b'audio')
@@ -523,7 +523,7 @@ def test_local_artist_inventory_counts_named_artist_jpg(tmp_path):
 def test_jellyfin_reconcile_detects_existing_folder_by_jellyfin_name(tmp_path):
     artist_dir = tmp_path / 'Jellyfin Match'
     artist_dir.mkdir()
-    (artist_dir / 'folder.jpg').write_bytes(b'image')
+    (artist_dir / 'Jellyfin Match.jpg').write_bytes(b'image')
 
     payload = api._build_jellyfin_reconcile_payload(
         {'name': 'Music'},

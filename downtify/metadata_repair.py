@@ -15,9 +15,8 @@ from .artist_art import (
     artist_image_target_path,
     artist_or_fallback_image,
     embedded_cover_bytes,
-    ensure_jellyfin_sidecar_image,
+    ensure_named_artist_image,
     has_artist_image,
-    has_jellyfin_sidecar_image,
     missing_artist_image_items,
     resolve_artist_mbid,
     save_missing_artist_images,
@@ -568,10 +567,19 @@ def _safe_artist_image_folder(root: Path, folder: str) -> Path | None:
     return target
 
 
-def _existing_folder_image_paths(root: Path, folder: Path) -> list[str]:
+def _existing_folder_image_paths(
+    root: Path,
+    folder: Path,
+    *,
+    artist_name: str = '',
+) -> list[str]:
     if not folder.is_dir() or not has_artist_image(folder):
         return []
-    saved = ensure_jellyfin_sidecar_image(folder, root)
+    saved = ensure_named_artist_image(
+        folder,
+        root,
+        artist_name=artist_name,
+    )
     paths: list[str] = []
     for image_path in artist_image_paths(folder):
         try:
@@ -589,11 +597,15 @@ def _save_artist_image_to_folder(
     *,
     image_fetchers: list[ArtistImageFetcher] | None = None,
 ) -> list[str]:
-    existing = _existing_folder_image_paths(root, folder)
+    artist_name = str(artist.get('name') or '').strip()
+    existing = _existing_folder_image_paths(
+        root,
+        folder,
+        artist_name=artist_name,
+    )
     if existing:
         return existing
 
-    artist_name = str(artist.get('name') or '').strip()
     fallback_path = path
     image: bytes | None = None
     if fallback_path is not None:
@@ -612,11 +624,21 @@ def _save_artist_image_to_folder(
     if not image:
         return []
     folder.mkdir(parents=True, exist_ok=True)
-    target = artist_image_target_path(folder, image)
+    target = artist_image_target_path(
+        folder,
+        image,
+        artist_name=artist_name,
+    )
     if not target.exists():
         target.write_bytes(image)
     saved = [target.relative_to(root).as_posix()]
-    saved.extend(ensure_jellyfin_sidecar_image(folder, root))
+    saved.extend(
+        ensure_named_artist_image(
+            folder,
+            root,
+            artist_name=artist_name,
+        )
+    )
     return sorted(set(saved))
 
 

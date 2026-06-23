@@ -1,4 +1,4 @@
-"""Artist image lookup and Jellyfin-friendly sidecar writing."""
+"""Artist image lookup and local artist folder artwork writing."""
 
 from __future__ import annotations
 
@@ -138,12 +138,28 @@ def _artists_for_policy(
     return artists
 
 
+def _target_image_stem(folder: Path, artist_name: str = '') -> str:
+    return _safe_image_stem(artist_name or folder.name)
+
+
+def has_named_artist_image(folder: Path, *, artist_name: str = '') -> bool:
+    stem = _target_image_stem(folder, artist_name).casefold()
+    return any(
+        path.is_file()
+        and path.suffix.casefold() in IMAGE_EXTENSIONS
+        and path.stem.casefold() == stem
+        for path in folder.iterdir()
+    )
+
+
 def has_jellyfin_sidecar_image(folder: Path) -> bool:
-    return any((folder / name).is_file() for name in IMAGE_NAMES)
+    """Backward-compatible alias for :func:`has_named_artist_image`."""
+
+    return has_named_artist_image(folder)
 
 
 def has_artist_image(folder: Path) -> bool:
-    if has_jellyfin_sidecar_image(folder):
+    if has_named_artist_image(folder):
         return True
     return any(
         path.is_file() and path.suffix.casefold() in IMAGE_EXTENSIONS
@@ -382,40 +398,98 @@ def _extension_for_image(data: bytes) -> str:
 def artist_image_target_path(
     folder: Path,
     image_data: bytes,
+    *,
+    artist_name: str = '',
 ) -> Path:
     extension = _extension_for_image(image_data)
-    return folder / f'folder{extension}'
+    stem = _safe_image_stem(artist_name or folder.name)
+    return folder / f'{stem}{extension}'
+
+
+def _legacy_folder_sidecar_paths(folder: Path) -> list[Path]:
+    return [
+        folder / name
+        for name in IMAGE_NAMES
+        if name.casefold().startswith('folder.')
+        and (folder / name).is_file()
+    ]
+
+
+def _relative_saved_path(path: Path, root: Path | None) -> str:
+    if root is None:
+        return path.name
+    try:
+        return path.relative_to(root.resolve()).as_posix()
+    except ValueError:
+        return path.name
+
+
+def ensure_named_artist_image(
+    folder: Path,
+    root: Path | None = None,
+    *,
+    artist_name: str = '',
+) -> list[str]:
+    """Ensure artwork uses ``{ArtistName}.{ext}`` and remove legacy ``folder.*`` files."""
+
+    migrated: list[str] = []
+    target_stem = _target_image_stem(folder, artist_name).casefold()
+    named_targets = [
+        path
+        for path in artist_image_paths(folder)
+        if path.stem.casefold() == target_stem
+    ]
+    if named_targets:
+        for legacy in _legacy_folder_sidecar_paths(folder):
+            legacy.unlink(missing_ok=True)
+        return migrated
+
+    source: Path | None = None
+    for path in artist_image_paths(folder):
+        source = path
+        break
+    if source is None:
+        return migrated
+
+    extension = source.suffix.casefold() or _extension_for_image(
+        source.read_bytes()
+    )
+    target = folder / f'{_target_image_stem(folder, artist_name)}{extension}'
+    if not target.exists():
+        target.write_bytes(source.read_bytes())
+        migrated.append(_relative_saved_path(target, root))
+
+    for legacy in _legacy_folder_sidecar_paths(folder):
+        if legacy.resolve() != target.resolve():
+            legacy.unlink(missing_ok=True)
+
+    generic_sidecars = {
+        name.casefold()
+        for name in IMAGE_NAMES
+        if not name.casefold().startswith('folder.')
+    }
+    if (
+        source.name.casefold() in generic_sidecars
+        and source.resolve() != target.resolve()
+    ):
+        source.unlink(missing_ok=True)
+
+    return migrated
 
 
 def ensure_jellyfin_sidecar_image(
     folder: Path,
     root: Path | None = None,
+    *,
+    artist_name: str = '',
 ) -> list[str]:
-    """Ensure a Jellyfin-compatible ``folder.*`` sidecar exists."""
+    """Backward-compatible alias for :func:`ensure_named_artist_image`."""
 
-    if has_jellyfin_sidecar_image(folder):
-        return []
-
-    migrated: list[str] = []
-    for path in artist_image_paths(folder):
-        if path.name.casefold() in {name.casefold() for name in IMAGE_NAMES}:
-            continue
-        extension = path.suffix.casefold() or _extension_for_image(
-            path.read_bytes()
-        )
-        target = folder / f'folder{extension}'
-        if target.exists():
-            continue
-        target.write_bytes(path.read_bytes())
-        if root is not None:
-            try:
-                migrated.append(target.relative_to(root.resolve()).as_posix())
-            except ValueError:
-                migrated.append(target.name)
-        else:
-            migrated.append(target.name)
-        break
-    return migrated
+    return ensure_named_artist_image(
+        folder,
+        root,
+        artist_name=artist_name,
+    )
 
 
 def media_type_for_image(data: bytes) -> str:
@@ -462,12 +536,16 @@ def save_missing_artist_images(
             continue
         for folder in folders:
             folder.mkdir(parents=True, exist_ok=True)
-            target = artist_image_target_path(folder, image)
+            target = artist_image_target_path(
+                folder,
+                image,
+                artist_name=artist.get('name', ''),
+            )
             if target.exists():
                 continue
             target.write_bytes(image)
             saved.append(unquote(target.relative_to(root.resolve()).as_posix()))
-            saved.extend(ensure_jellyfin_sidecar_image(folder, root.resolve()))
+            saved.extend(ensure_named_artist_image(folder, root.resolve()))
     return saved
 
 
@@ -504,7 +582,11 @@ def missing_artist_image_items(
         if not image:
             continue
         for folder in folders:
-            target = artist_image_target_path(folder, image)
+            target = artist_image_target_path(
+                folder,
+                image,
+                artist_name=artist.get('name', ''),
+            )
             items.append({
                 'artist': artist.get('name', ''),
                 'artist_id': artist.get('id', ''),
