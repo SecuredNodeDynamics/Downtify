@@ -1,8 +1,8 @@
 import axios from 'axios'
-import config from '/src/config.js'
+import { buildApiBaseUrl, getServerConfig } from './serverConnection.js'
 
 const API = axios.create({
-  baseURL: `${config.PROTOCOL}//${config.BACKEND}:${config.PORT}${config.BASEURL}`,
+  baseURL: buildApiBaseUrl(getServerConfig()),
 })
 
 function listMonitoredPlaylists() {

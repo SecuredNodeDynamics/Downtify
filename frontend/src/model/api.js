@@ -1,14 +1,19 @@
 // small file used as placeholder/settings for API calls via axios to server-side
 import axios from 'axios' // used to connect to server backend in ./server folder
-import config from '/src/config.js'
+import {
+  buildApiBaseUrl,
+  buildWsUrl,
+  getServerConfig,
+} from './serverConnection.js'
 
 import { v4 as uuidv4 } from 'uuid'
 
+const runtimeConfig = getServerConfig()
 console.log('using env:', process.env)
-console.log('using config: ', config)
+console.log('using server config: ', runtimeConfig)
 
 const API = axios.create({
-  baseURL: `${config.PROTOCOL}//${config.BACKEND}:${config.PORT}${config.BASEURL}`,
+  baseURL: buildApiBaseUrl(runtimeConfig),
 })
 
 const sessionID = uuidv4()
@@ -30,11 +35,7 @@ function sanitizeStoredVersion() {
 sanitizeStoredVersion()
 getVersion()
 
-const wsConnection = new WebSocket(
-  `${config.WS_PROTOCOL}//${config.BACKEND}${
-    config.PORT !== '' ? ':' + config.PORT : ''
-  }${config.BASEURL}/api/ws?client_id=${sessionID}`
-)
+const wsConnection = new WebSocket(buildWsUrl(runtimeConfig, sessionID))
 
 wsConnection.onopen = (event) => {
   console.log('websocket connection opened', event)
@@ -192,9 +193,7 @@ function apiAssetUrl(path) {
   const value = String(path || '').trim()
   if (!value) return ''
   if (/^https?:\/\//i.test(value)) return value
-  const port = config.PORT ? `:${config.PORT}` : ''
-  const base = `${config.PROTOCOL}//${config.BACKEND}${port}${config.BASEURL}`
-  return `${base}${value.startsWith('/') ? value : `/${value}`}`
+  return `${buildApiBaseUrl(getServerConfig())}${value.startsWith('/') ? value : `/${value}`}`
 }
 
 function listDownloads() {

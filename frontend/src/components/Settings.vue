@@ -474,6 +474,90 @@
           <label
             class="block text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2"
           >
+            {{ t('settings.serverConnectionSection') }}
+          </label>
+          <p class="mb-3 text-sm text-base-content/60">
+            {{ t('settings.serverConnectionHint') }}
+          </p>
+          <div class="space-y-3">
+            <div class="surface rounded-xl px-3 py-2.5 text-sm">
+              <span class="text-base-content/50">
+                {{ t('settings.serverUrlCurrent') }}:
+              </span>
+              <span class="ml-1 font-medium text-base-content">
+                {{
+                  usesCustomServer
+                    ? activeServerDisplay
+                    : t('settings.serverUrlDefault')
+                }}
+              </span>
+            </div>
+            <div>
+              <label class="block text-xs text-base-content/50 mb-1.5">
+                {{ t('settings.serverUrl') }}
+              </label>
+              <input
+                v-model="serverUrlInput"
+                type="url"
+                inputmode="url"
+                autocapitalize="off"
+                autocorrect="off"
+                spellcheck="false"
+                class="input-modern h-10 w-full text-sm"
+                :placeholder="t('settings.serverUrlPlaceholder')"
+              />
+              <p class="text-[11px] text-base-content/40 mt-1.5">
+                {{ t('settings.serverSaveHint') }}
+              </p>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <button
+                type="button"
+                class="btn btn-sm h-10 rounded-full border-white/10 bg-base-100/85 px-4 hover:bg-base-100"
+                :disabled="serverTestLoading || !serverUrlInput.trim()"
+                @click="testServerConnection"
+              >
+                <span
+                  v-if="serverTestLoading"
+                  class="loading loading-spinner loading-xs mr-2"
+                />
+                {{
+                  serverTestLoading
+                    ? t('settings.serverTesting')
+                    : t('settings.serverTest')
+                }}
+              </button>
+              <button
+                type="button"
+                class="btn btn-primary btn-sm h-10 rounded-full px-4"
+                :disabled="!serverUrlInput.trim()"
+                @click="saveServerConnection"
+              >
+                {{ t('settings.serverSave') }}
+              </button>
+              <button
+                v-if="usesCustomServer"
+                type="button"
+                class="btn btn-sm h-10 rounded-full border-white/10 bg-base-100/85 px-4 hover:bg-base-100"
+                @click="resetServerConnection"
+              >
+                {{ t('settings.serverReset') }}
+              </button>
+            </div>
+            <p
+              v-if="serverTestMessage"
+              class="text-[11px]"
+              :class="serverTestError ? 'text-error' : 'text-primary'"
+            >
+              {{ serverTestMessage }}
+            </p>
+          </div>
+        </div>
+
+        <div>
+          <label
+            class="block text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2"
+          >
             {{ t('settings.jellyfinSection') }}
           </label>
           <div class="space-y-3">
@@ -1030,8 +1114,18 @@
 <script setup>
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { Icon } from '@iconify/vue'
+import axios from 'axios'
 import { useSettingsManager } from '../model/settings'
 import { useDownloadDestination } from '../model/downloadDestination'
+import {
+  buildApiBaseUrl,
+  formatServerDisplay,
+  getServerConfig,
+  getStoredServerUrl,
+  parseServerUrl,
+  setStoredServerUrl,
+  usesCustomServerUrl,
+} from '../model/serverConnection'
 import { useI18n } from '../i18n'
 import API from '../model/api'
 
@@ -1082,6 +1176,12 @@ const jellyfinLibraryError = ref('')
 const jellyfinTestLoading = ref(false)
 const jellyfinTestMessage = ref('')
 const jellyfinTestError = ref(false)
+const serverUrlInput = ref(getStoredServerUrl())
+const serverTestLoading = ref(false)
+const serverTestMessage = ref('')
+const serverTestError = ref(false)
+const usesCustomServer = computed(() => usesCustomServerUrl())
+const activeServerDisplay = computed(() => formatServerDisplay(getServerConfig()))
 const repairLog = ref([])
 const repairLogLoading = ref(false)
 const repairLogError = ref('')
@@ -1515,6 +1615,59 @@ async function onJellyfinConfigChange() {
   } finally {
     jellyfinLibraryLoading.value = false
   }
+}
+
+async function testServerConnection() {
+  serverTestMessage.value = ''
+  serverTestError.value = false
+  const parsed = parseServerUrl(serverUrlInput.value)
+  if (!parsed) {
+    serverTestError.value = true
+    serverTestMessage.value = t('settings.serverInvalidUrl')
+    return
+  }
+  serverTestLoading.value = true
+  try {
+    const client = axios.create({
+      baseURL: buildApiBaseUrl(parsed),
+      timeout: 15000,
+    })
+    const [healthRes, versionRes] = await Promise.all([
+      client.get('/api/health'),
+      client.get('/api/version'),
+    ])
+    const version = String(versionRes.data || '').trim()
+    if (!healthRes.data || healthRes.status !== 200) {
+      throw new Error(t('settings.serverTestFailed'))
+    }
+    serverTestMessage.value = t('settings.serverTestSuccess', {
+      version: version || '?',
+    })
+  } catch (err) {
+    serverTestError.value = true
+    const detail = err?.response?.data?.detail || err?.message
+    serverTestMessage.value = detail
+      ? `${t('settings.serverTestFailed')}: ${detail}`
+      : t('settings.serverTestFailed')
+  } finally {
+    serverTestLoading.value = false
+  }
+}
+
+function saveServerConnection() {
+  const parsed = parseServerUrl(serverUrlInput.value)
+  if (!parsed) {
+    serverTestError.value = true
+    serverTestMessage.value = t('settings.serverInvalidUrl')
+    return
+  }
+  setStoredServerUrl(serverUrlInput.value.trim())
+  window.location.reload()
+}
+
+function resetServerConnection() {
+  setStoredServerUrl('')
+  window.location.reload()
 }
 
 async function testJellyfinApi() {

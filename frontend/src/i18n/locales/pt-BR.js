@@ -446,6 +446,23 @@ export default {
     artistFolderPolicyPrimary: 'Somente artista principal',
     artistFolderPolicyExisting: 'Somente pastas existentes',
     jellyfinSection: 'API do Jellyfin',
+    serverConnectionSection: 'Servidor Downtify',
+    serverConnectionHint:
+      'No app movel, informe o endereco do seu servidor Downtify — um IP local (com porta) ou uma URL publica como um tunel Cloudflare. Deixe vazio ao usar o navegador no mesmo host do servidor.',
+    serverUrl: 'Endereco do servidor',
+    serverUrlPlaceholder:
+      'https://downtify.exemplo.com ou 192.168.1.50:8765',
+    serverUrlCurrent: 'Conectado a',
+    serverUrlDefault: 'Esta pagina (mesmo host)',
+    serverTest: 'Testar conexao',
+    serverTesting: 'Testando…',
+    serverTestSuccess: 'Conectado ao Downtify v{version}',
+    serverTestFailed: 'Nao foi possivel alcancar o servidor Downtify',
+    serverInvalidUrl: 'Informe uma URL valida ou host:porta.',
+    serverSave: 'Salvar e reconectar',
+    serverReset: 'Usar esta pagina',
+    serverSaveHint:
+      'O app recarrega apos salvar para que todas as requisicoes usem o novo endereco.',
     enableJellyfinTools: 'Ativar ferramentas Jellyfin',
     enableJellyfinToolsHint:
       'Mostra as ferramentas de comparacao e atualizacao do Jellyfin em Metadados.',
