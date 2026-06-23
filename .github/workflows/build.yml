@@ -17,6 +17,7 @@ permissions:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Check out code
         uses: actions/checkout@v6
@@ -82,5 +83,11 @@ jobs:
             ghcr.io/securednodedynamics/downtify:${{ steps.version.outputs.VERSION }}
             ghcr.io/securednodedynamics/downtify:${{ steps.version.outputs.V_TAG }}
           platforms: linux/amd64,linux/arm64
+          cache-from: |
+            type=gha
+            type=registry,ref=ghcr.io/securednodedynamics/downtify:buildcache
+          cache-to: |
+            type=gha,mode=max
+            type=registry,ref=ghcr.io/securednodedynamics/downtify:buildcache,mode=max
           build-args: |
             DOCKER_METADATA_OUTPUT_JSON
