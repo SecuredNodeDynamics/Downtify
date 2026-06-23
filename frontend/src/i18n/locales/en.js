@@ -450,10 +450,11 @@ export default {
     serverTestSuccess: 'Connected to Downtify v{version}',
     serverTestFailed: 'Could not reach the Downtify server',
     serverInvalidUrl: 'Enter a valid URL or host:port address.',
-    serverSave: 'Save & reconnect',
-    serverReset: 'Use this page',
+    serverSave: 'Save address',
+    serverConnectDevice: 'Connect to this device',
+    serverClear: 'Clear saved server',
     serverSaveHint:
-      'The app reloads after saving so all requests use the new server address.',
+      'Use Connect to this device when you are already browsing Downtify on the server. For a remote server, enter its IP or tunnel URL and tap Save address. The app reloads after connecting.',
     enableJellyfinTools: 'Enable Jellyfin tools',
     enableJellyfinToolsHint:
       'Show the Metadata page reconciliation and Jellyfin refresh tools.',

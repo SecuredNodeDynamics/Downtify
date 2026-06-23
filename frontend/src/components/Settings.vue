@@ -510,10 +510,20 @@
                 {{ t('settings.serverSaveHint') }}
               </p>
             </div>
-            <div class="flex flex-wrap gap-2">
+            <div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+              <button
+                v-if="canConnectDevice"
+                type="button"
+                class="btn btn-primary btn-sm h-10 w-full rounded-full px-4 sm:w-auto"
+                :disabled="connectedToThisDevice || serverTestLoading"
+                @click="connectToThisDevice"
+              >
+                {{ t('settings.serverConnectDevice') }}
+              </button>
               <button
                 type="button"
-                class="btn btn-sm h-10 rounded-full border-white/10 bg-base-100/85 px-4 hover:bg-base-100"
+                class="btn btn-sm h-10 w-full rounded-full border-white/10 bg-base-100/85 px-4 hover:bg-base-100 sm:w-auto"
+                :class="canConnectDevice ? '' : 'btn-primary'"
                 :disabled="serverTestLoading || !serverUrlInput.trim()"
                 @click="testServerConnection"
               >
@@ -529,19 +539,19 @@
               </button>
               <button
                 type="button"
-                class="btn btn-primary btn-sm h-10 rounded-full px-4"
-                :disabled="!serverUrlInput.trim()"
+                class="btn btn-sm h-10 w-full rounded-full border-white/10 bg-base-100/85 px-4 hover:bg-base-100 sm:w-auto"
+                :disabled="!serverUrlInput.trim() || connectedToThisDevice"
                 @click="saveServerConnection"
               >
                 {{ t('settings.serverSave') }}
               </button>
               <button
-                v-if="usesCustomServer"
+                v-if="usesCustomServer && !connectedToThisDevice"
                 type="button"
-                class="btn btn-sm h-10 rounded-full border-white/10 bg-base-100/85 px-4 hover:bg-base-100"
+                class="btn btn-sm h-10 w-full rounded-full border-white/10 bg-base-100/85 px-4 hover:bg-base-100 sm:w-auto"
                 @click="resetServerConnection"
               >
-                {{ t('settings.serverReset') }}
+                {{ t('settings.serverClear') }}
               </button>
             </div>
             <p
@@ -1119,9 +1129,12 @@ import { useSettingsManager } from '../model/settings'
 import { useDownloadDestination } from '../model/downloadDestination'
 import {
   buildApiBaseUrl,
+  canConnectToCurrentPage,
   formatServerDisplay,
+  getCurrentPageServerUrl,
   getServerConfig,
   getStoredServerUrl,
+  isConnectedToCurrentPage,
   parseServerUrl,
   setStoredServerUrl,
   usesCustomServerUrl,
@@ -1182,6 +1195,8 @@ const serverTestMessage = ref('')
 const serverTestError = ref(false)
 const usesCustomServer = computed(() => usesCustomServerUrl())
 const activeServerDisplay = computed(() => formatServerDisplay(getServerConfig()))
+const canConnectDevice = computed(() => canConnectToCurrentPage())
+const connectedToThisDevice = computed(() => isConnectedToCurrentPage())
 const repairLog = ref([])
 const repairLogLoading = ref(false)
 const repairLogError = ref('')
@@ -1652,6 +1667,14 @@ async function testServerConnection() {
   } finally {
     serverTestLoading.value = false
   }
+}
+
+function connectToThisDevice() {
+  const current = getCurrentPageServerUrl()
+  if (!current) return
+  serverUrlInput.value = current
+  setStoredServerUrl(current)
+  window.location.reload()
 }
 
 function saveServerConnection() {

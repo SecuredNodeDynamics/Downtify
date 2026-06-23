@@ -459,10 +459,11 @@ export default {
     serverTestSuccess: 'Conectado a Downtify v{version}',
     serverTestFailed: 'No se pudo alcanzar el servidor Downtify',
     serverInvalidUrl: 'Introduce una URL valida o host:puerto.',
-    serverSave: 'Guardar y reconectar',
-    serverReset: 'Usar esta pagina',
+    serverSave: 'Guardar direccion',
+    serverConnectDevice: 'Conectar a este dispositivo',
+    serverClear: 'Borrar servidor guardado',
     serverSaveHint:
-      'La app se recarga al guardar para que todas las peticiones usen la nueva direccion.',
+      'Usa Conectar a este dispositivo si ya estas navegando Downtify en el servidor. Para un servidor remoto, introduce su IP o URL del tunel y pulsa Guardar direccion. La app se recarga al conectar.',
     enableJellyfinTools: 'Activar herramientas Jellyfin',
     enableJellyfinToolsHint:
       'Muestra las herramientas de comparacion y actualizacion de Jellyfin en Metadatos.',

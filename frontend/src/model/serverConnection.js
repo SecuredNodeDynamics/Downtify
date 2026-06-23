@@ -88,3 +88,34 @@ export function buildWsUrl(cfg, clientId) {
 export function formatServerDisplay(cfg = getServerConfig()) {
   return buildApiBaseUrl(cfg)
 }
+
+export function getCurrentPageServerUrl() {
+  if (typeof window === 'undefined') return ''
+  const { protocol, hostname, port, pathname } = window.location
+  if (!hostname || protocol === 'file:' || protocol === 'capacitor:') {
+    return ''
+  }
+  const origin = `${protocol}//${hostname}${port ? `:${port}` : ''}`
+  let basePath = pathname || ''
+  if (basePath.endsWith('/')) basePath = basePath.slice(0, -1)
+  if (basePath === '/') basePath = ''
+  return `${origin}${basePath}`
+}
+
+export function canConnectToCurrentPage() {
+  return Boolean(getCurrentPageServerUrl())
+}
+
+export function isConnectedToCurrentPage() {
+  const current = getCurrentPageServerUrl()
+  if (!current) return !usesCustomServerUrl()
+  const stored = getStoredServerUrl().trim()
+  if (!stored) {
+    const implicit = buildApiBaseUrl(envOrLocation())
+    const page = buildApiBaseUrl(parseServerUrl(current))
+    return implicit === page
+  }
+  const storedBase = buildApiBaseUrl(parseServerUrl(stored))
+  const pageBase = buildApiBaseUrl(parseServerUrl(current))
+  return storedBase === pageBase
+}
