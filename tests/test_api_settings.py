@@ -329,6 +329,62 @@ def test_is_newer_version_compares_semver():
     assert _is_newer_version('2.9.0', '2.9.0') is False
 
 
+def test_latest_version_from_release_redirect(monkeypatch):
+    class FakeResponse:
+        status_code = 302
+        headers = {
+            'Location': (
+                'https://github.com/SecuredNodeDynamics/Downtify/releases/tag/v2.10.46'
+            ),
+        }
+
+    monkeypatch.setattr(
+        'downtify.api.requests.get',
+        lambda *_args, **_kwargs: FakeResponse(),
+    )
+
+    result = api._latest_version_from_release_redirect()
+
+    assert result['latest_version'] == '2.10.46'
+    assert result['source'] == 'redirect'
+
+
+def test_latest_github_version_falls_back_to_release_redirect(monkeypatch, tmp_path):
+    api._UPDATE_CACHE.clear()
+    api._UPDATE_CACHE_AT = 0.0
+
+    def fail_api(*_args, **_kwargs):
+        return {}
+
+    def redirect_ok(*_args, **kwargs):
+        if kwargs.get('allow_redirects') is False:
+            class FakeResponse:
+                status_code = 302
+                headers = {
+                    'Location': (
+                        'https://github.com/SecuredNodeDynamics/Downtify/'
+                        'releases/tag/v2.10.46'
+                    ),
+                }
+
+            return FakeResponse()
+        raise requests.exceptions.HTTPError('rate limit')
+
+    monkeypatch.setattr(api, '_latest_release_from_github_api', fail_api)
+    monkeypatch.setattr(api, '_latest_tag_from_github_api', fail_api)
+    monkeypatch.setattr('downtify.api.requests.get', redirect_ok)
+    monkeypatch.setattr(
+        api,
+        '_update_cache_path',
+        lambda: tmp_path / 'update_check_cache.json',
+    )
+
+    result = api._latest_github_version()
+
+    assert result['latest_version'] == '2.10.46'
+    assert result['source'] == 'redirect'
+
+
 def test_check_update_reports_available_update(monkeypatch):
     old_version = api.state.version
     try:

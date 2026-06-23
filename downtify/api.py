@@ -28,6 +28,7 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 import unicodedata
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -88,6 +89,10 @@ AUDIO_EXTENSIONS = {'.mp3', '.m4a', '.flac', '.ogg', '.wav', '.aac', '.opus'}
 GITHUB_REPO = 'SecuredNodeDynamics/Downtify'
 GITHUB_API_BASE = f'https://api.github.com/repos/{GITHUB_REPO}'
 GITHUB_RELEASES_URL = f'https://github.com/{GITHUB_REPO}/releases'
+_UPDATE_CACHE: dict[str, Any] = {}
+_UPDATE_CACHE_AT = 0.0
+_UPDATE_CACHE_TTL_SECONDS = 3600
+_RELEASE_TAG_RE = re.compile(r'/releases/tag/([^/?#]+)/?$', re.I)
 
 
 def _effective_lyrics_providers(settings: dict[str, Any]) -> list[str]:
@@ -668,14 +673,117 @@ def _is_newer_version(candidate: str, current: str) -> bool:
     return candidate_parsed > current_parsed
 
 
+def _github_token() -> str:
+    return os.getenv('GITHUB_TOKEN', '').strip() or os.getenv('GH_TOKEN', '').strip()
+
+
 def _github_headers() -> dict[str, str]:
-    return {
+    headers = {
         'Accept': 'application/vnd.github+json',
         'User-Agent': f'Downtify/{state.version}',
     }
+    token = _github_token()
+    if token:
+        headers['Authorization'] = f'Bearer {token}'
+    return headers
 
 
-def _latest_github_version(timeout: int = 8) -> dict[str, Any]:
+def _update_cache_path() -> Path:
+    return Path(os.getenv('DOWNTIFY_DATA_DIR', '/data')) / 'update_check_cache.json'
+
+
+def _load_update_cache_from_disk() -> dict[str, Any]:
+    path = _update_cache_path()
+    if not path.exists():
+        return {}
+    try:
+        payload = json.loads(path.read_text(encoding='utf-8'))
+        if isinstance(payload, dict) and payload.get('latest_version'):
+            return payload
+    except Exception:
+        logger.opt(exception=True).debug(
+            'Could not read update cache from {}',
+            path,
+        )
+    return {}
+
+
+def _save_update_cache_to_disk(payload: dict[str, Any]) -> None:
+    if not payload.get('latest_version'):
+        return
+    path = _update_cache_path()
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(payload, indent=2), encoding='utf-8')
+    except Exception:
+        logger.opt(exception=True).debug(
+            'Could not write update cache to {}',
+            path,
+        )
+
+
+def _read_cached_update_result() -> dict[str, Any]:
+    global _UPDATE_CACHE_AT
+
+    now = time.monotonic()
+    if (
+        _UPDATE_CACHE.get('latest_version')
+        and now - _UPDATE_CACHE_AT < _UPDATE_CACHE_TTL_SECONDS
+    ):
+        return dict(_UPDATE_CACHE)
+
+    cached = _load_update_cache_from_disk()
+    if cached:
+        _UPDATE_CACHE.clear()
+        _UPDATE_CACHE.update(cached)
+        _UPDATE_CACHE_AT = now
+        return dict(cached)
+    return {}
+
+
+def _cache_update_result(result: dict[str, Any]) -> dict[str, Any]:
+    global _UPDATE_CACHE_AT
+
+    if result.get('latest_version'):
+        _UPDATE_CACHE.clear()
+        _UPDATE_CACHE.update(result)
+        _UPDATE_CACHE_AT = time.monotonic()
+        _save_update_cache_to_disk(result)
+    return result
+
+
+def _latest_version_from_release_redirect(timeout: int = 8) -> dict[str, Any]:
+    try:
+        response = requests.get(
+            f'{GITHUB_RELEASES_URL}/latest',
+            headers={'User-Agent': f'Downtify/{state.version}'},
+            timeout=timeout,
+            allow_redirects=False,
+        )
+        if response.status_code not in {301, 302, 303, 307, 308}:
+            return {}
+        location = str(response.headers.get('Location') or '').strip()
+        match = _RELEASE_TAG_RE.search(location)
+        if not match:
+            return {}
+        tag = match.group(1).strip()
+        version = _clean_version(tag)
+        if not version:
+            return {}
+        return {
+            'latest_version': version,
+            'release_url': location,
+            'source': 'redirect',
+            'name': tag,
+            'published_at': None,
+            'error': '',
+        }
+    except Exception as exc:
+        logger.warning('Could not resolve latest release redirect: {}', exc)
+        return {}
+
+
+def _latest_release_from_github_api(timeout: int = 8) -> dict[str, Any]:
     try:
         response = requests.get(
             f'{GITHUB_API_BASE}/releases/latest',
@@ -698,7 +806,10 @@ def _latest_github_version(timeout: int = 8) -> dict[str, Any]:
                 }
     except Exception as exc:
         logger.warning('Could not check latest GitHub release: {}', exc)
+    return {}
 
+
+def _latest_tag_from_github_api(timeout: int = 8) -> dict[str, Any]:
     try:
         response = requests.get(
             f'{GITHUB_API_BASE}/tags',
@@ -727,14 +838,26 @@ def _latest_github_version(timeout: int = 8) -> dict[str, Any]:
             }
     except Exception as exc:
         logger.warning('Could not check latest GitHub tag: {}', exc)
-        return {
-            'latest_version': None,
-            'release_url': GITHUB_RELEASES_URL,
-            'source': 'github',
-            'name': None,
-            'published_at': None,
-            'error': str(exc),
-        }
+        return {'error': str(exc)}
+    return {}
+
+
+def _latest_github_version(timeout: int = 8) -> dict[str, Any]:
+    cached = _read_cached_update_result()
+    if cached:
+        return cached
+
+    errors: list[str] = []
+    for fetcher in (
+        _latest_release_from_github_api,
+        _latest_version_from_release_redirect,
+        _latest_tag_from_github_api,
+    ):
+        result = fetcher(timeout)
+        if result.get('latest_version'):
+            return _cache_update_result(result)
+        if result.get('error'):
+            errors.append(str(result['error']))
 
     return {
         'latest_version': None,
@@ -742,7 +865,7 @@ def _latest_github_version(timeout: int = 8) -> dict[str, Any]:
         'source': 'github',
         'name': None,
         'published_at': None,
-        'error': 'No valid releases or tags found',
+        'error': errors[-1] if errors else 'No valid releases or tags found',
     }
 
 
