@@ -29,9 +29,15 @@ def test_list_library_files_reads_tags_and_paths(tmp_path):
     assert items[0]['browse_genre'] == 'Jazz'
 
 
-def test_list_library_files_falls_back_to_filename(tmp_path):
+def test_list_library_files_falls_back_to_filename(monkeypatch, tmp_path):
     path = tmp_path / 'Artist - Title.mp3'
     path.write_bytes(b'audio')
+
+    monkeypatch.setattr(
+        library_index,
+        'lookup_artist_genre',
+        lambda artist, fetch=True: '',
+    )
 
     items = library_index.list_library_files(tmp_path)
 

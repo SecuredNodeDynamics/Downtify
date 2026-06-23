@@ -456,7 +456,7 @@ def test_check_update_reports_available_update(monkeypatch):
         monkeypatch.setattr(
             api,
             '_latest_github_version',
-            lambda: {
+            lambda *_args, **_kwargs: {
                 'latest_version': '2.10.0',
                 'release_url': 'https://github.com/example/release',
                 'source': 'release',
