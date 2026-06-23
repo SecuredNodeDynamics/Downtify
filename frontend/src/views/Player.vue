@@ -86,19 +86,19 @@
           <!-- Progress -->
           <div class="mt-4 w-full sm:mt-6">
             <div
-              class="player-progress group relative cursor-pointer overflow-hidden rounded-full bg-white/10 py-2"
+              class="player-progress"
               ref="progressBar"
               @click="onSeekClick"
               @pointerdown="onSeekStart"
             >
-              <div class="relative h-1.5 rounded-full bg-white/10 sm:h-2">
+              <div class="player-progress-track">
                 <div
-                  class="h-full rounded-full bg-primary transition-[width] duration-150"
+                  class="player-progress-fill"
                   :style="`width: ${player.progressPct.value}%`"
                 />
                 <div
-                  class="player-progress-thumb absolute top-1/2 h-4 w-4 -translate-y-1/2 rounded-full bg-primary shadow-glow-sm transition-all duration-150 sm:h-3.5 sm:w-3.5"
-                  :style="`left: calc(${player.progressPct.value}% - 8px)`"
+                  class="player-progress-thumb"
+                  :style="`left: calc(${player.progressPct.value}% - 7px)`"
                 />
               </div>
             </div>
@@ -468,14 +468,45 @@ onUnmounted(() => {
     height: 3.5rem;
     width: 3.5rem;
   }
+}
 
-  .player-progress-thumb {
-    opacity: 0;
-  }
+.player-progress {
+  position: relative;
+  width: 100%;
+  padding: 0.625rem 0;
+  cursor: pointer;
+  touch-action: none;
+}
 
-  .player-progress:hover .player-progress-thumb {
-    opacity: 1;
-  }
+.player-progress-track {
+  position: relative;
+  height: 4px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+[data-theme='downtify-light'] .player-progress-track {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.player-progress-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 9999px;
+  background: #1ad05c;
+  transition: width 150ms ease;
+}
+
+.player-progress-thumb {
+  position: absolute;
+  top: 50%;
+  height: 14px;
+  width: 14px;
+  border-radius: 9999px;
+  background: #1ad05c;
+  box-shadow: 0 0 12px rgba(26, 208, 92, 0.45);
+  transform: translateY(-50%);
+  transition: left 150ms ease;
 }
 
 .player-range {
