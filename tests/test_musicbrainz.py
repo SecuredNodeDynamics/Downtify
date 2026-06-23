@@ -64,6 +64,11 @@ def test_musicbrainz_enriches_high_confidence_match(monkeypatch):
         })
 
     monkeypatch.setattr(musicbrainz.requests, 'get', fake_get)
+    monkeypatch.setattr(
+        musicbrainz,
+        'lookup_artist_genre',
+        lambda _artist, fetch=True: 'rock',
+    )
 
     result = musicbrainz.enrich_song_metadata({
         'name': 'The Correct Title',
@@ -82,6 +87,39 @@ def test_musicbrainz_enriches_high_confidence_match(monkeypatch):
     assert result['musicbrainz_artist_ids'] == [
         {'id': 'artist-1', 'name': 'The Artist'}
     ]
+    assert result['genre'] == 'rock'
+
+
+def test_lookup_artist_genre_uses_musicbrainz_tags(monkeypatch, tmp_path):
+    musicbrainz._ARTIST_ID_CACHE.clear()
+    musicbrainz._ARTIST_GENRE_CACHE.clear()
+    musicbrainz._ARTIST_GENRE_CACHE_LOADED = True
+    musicbrainz._LAST_REQUEST_AT = 0
+    monkeypatch.setattr(
+        musicbrainz,
+        '_artist_genre_cache_path',
+        lambda: tmp_path / 'artist_genre_cache.json',
+    )
+
+    calls: list[str] = []
+
+    def fake_get(url, *args, **kwargs):
+        calls.append(url)
+        if url.endswith('/artist/artist-id'):
+            return _Response({
+                'tags': [
+                    {'name': 'jazz', 'count': 10},
+                    {'name': 'swing', 'count': 3},
+                ]
+            })
+        return _Response({'artists': [{'id': 'artist-id', 'name': 'Nas'}]})
+
+    monkeypatch.setattr(musicbrainz, 'lookup_artist_id', lambda _name: 'artist-id')
+    monkeypatch.setattr(musicbrainz.requests, 'get', fake_get)
+
+    assert musicbrainz.lookup_artist_genre('Nas') == 'jazz'
+    assert musicbrainz.lookup_artist_genre('Nas') == 'jazz'
+    assert calls == [f'{musicbrainz.MUSICBRAINZ_ARTIST_URL}artist-id']
 
 
 def test_musicbrainz_rejects_weak_match(monkeypatch):

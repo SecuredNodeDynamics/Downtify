@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import json
+import os
 import time
 from difflib import SequenceMatcher
+from pathlib import Path
 from typing import Any, Optional
 
 import requests
@@ -15,6 +18,8 @@ USER_AGENT = 'Downtify/1.0 (https://github.com/JanzenMediaGroup/Downtify)'
 
 _CACHE: dict[str, Optional[dict[str, Any]]] = {}
 _ARTIST_ID_CACHE: dict[str, str | None] = {}
+_ARTIST_GENRE_CACHE: dict[str, str] = {}
+_ARTIST_GENRE_CACHE_LOADED = False
 _LAST_REQUEST_AT = 0.0
 
 
@@ -142,6 +147,118 @@ def _candidate_score(
             duration_score = 2
 
     return title_score + min(45, artist_score) + album_score + duration_score
+
+
+def _artist_genre_cache_path() -> Path:
+    data_dir = Path(os.getenv('DOWNTIFY_DATA_DIR', '/data'))
+    return data_dir / 'artist_genre_cache.json'
+
+
+def _load_artist_genre_cache() -> None:
+    global _ARTIST_GENRE_CACHE_LOADED
+    if _ARTIST_GENRE_CACHE_LOADED:
+        return
+    path = _artist_genre_cache_path()
+    if path.exists():
+        try:
+            payload = json.loads(path.read_text(encoding='utf-8'))
+            if isinstance(payload, dict):
+                for key, value in payload.items():
+                    if isinstance(key, str) and isinstance(value, str):
+                        _ARTIST_GENRE_CACHE[key] = value
+        except Exception:
+            logger.opt(exception=True).warning(
+                'Failed to load artist genre cache from {}',
+                path,
+            )
+    _ARTIST_GENRE_CACHE_LOADED = True
+
+
+def _save_artist_genre_cache() -> None:
+    path = _artist_genre_cache_path()
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            json.dumps(_ARTIST_GENRE_CACHE, indent=2, sort_keys=True),
+            encoding='utf-8',
+        )
+    except Exception:
+        logger.opt(exception=True).warning(
+            'Failed to save artist genre cache to {}',
+            path,
+        )
+
+
+def _top_tag_name(tags: Any) -> str:
+    if not isinstance(tags, list):
+        return ''
+    ranked = [
+        item
+        for item in tags
+        if isinstance(item, dict) and str(item.get('name') or '').strip()
+    ]
+    if not ranked:
+        return ''
+    ranked.sort(key=lambda item: int(item.get('count') or 0), reverse=True)
+    return str(ranked[0]['name']).strip()
+
+
+def lookup_artist_genre(artist_name: str, *, fetch: bool = True) -> str:
+    """Return a genre label for *artist_name* using cached MusicBrainz tags."""
+
+    name = str(artist_name or '').strip()
+    if not name or _norm(name) == _norm('Unknown Artist'):
+        return ''
+
+    _load_artist_genre_cache()
+    cache_key = _norm(name)
+    if cache_key in _ARTIST_GENRE_CACHE:
+        return _ARTIST_GENRE_CACHE[cache_key]
+    if not fetch:
+        return ''
+
+    genre = _fetch_artist_genre_from_musicbrainz(name)
+    _ARTIST_GENRE_CACHE[cache_key] = genre
+    _save_artist_genre_cache()
+    return genre
+
+
+def _fetch_artist_genre_from_musicbrainz(artist_name: str) -> str:
+    artist_id = lookup_artist_id(artist_name)
+    if not artist_id:
+        return ''
+
+    global _LAST_REQUEST_AT
+
+    try:
+        _throttle_musicbrainz()
+        response = requests.get(
+            f'{MUSICBRAINZ_ARTIST_URL}{artist_id}',
+            params={'inc': 'tags', 'fmt': 'json'},
+            headers={'User-Agent': USER_AGENT},
+            timeout=8,
+        )
+        _LAST_REQUEST_AT = time.monotonic()
+        response.raise_for_status()
+        return _top_tag_name(response.json().get('tags'))
+    except Exception:
+        logger.opt(exception=True).debug(
+            'MusicBrainz artist genre lookup failed for {!r}',
+            artist_name,
+        )
+        return ''
+
+
+def warm_artist_genre_cache(artist_names: list[str]) -> None:
+    """Populate the on-disk artist genre cache for library browsing."""
+
+    seen: set[str] = set()
+    for artist_name in artist_names:
+        key = _norm(str(artist_name or '').strip())
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        lookup_artist_genre(artist_name, fetch=True)
 
 
 def _throttle_musicbrainz() -> None:
@@ -331,5 +448,12 @@ def enrich_song_metadata(song: dict[str, Any]) -> dict[str, Any]:
         enriched['musicbrainz_artist_ids'] = artist_ids
     if release and release.get('id'):
         enriched['musicbrainz_release_id'] = release.get('id')
+
+    if not str(enriched.get('genre') or '').strip():
+        genre = _top_tag_name(recording.get('tags'))
+        if not genre and artists:
+            genre = lookup_artist_genre(artists[0], fetch=True)
+        if genre:
+            enriched['genre'] = genre
 
     return enriched

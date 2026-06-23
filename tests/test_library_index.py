@@ -47,4 +47,30 @@ def test_list_library_files_falls_back_to_filename(tmp_path):
 
 def test_read_library_entry_rejects_traversal(tmp_path):
     with pytest.raises(ValueError, match='Invalid library path'):
-        library_index.read_library_entry(tmp_path, '../outside.mp3')
+        library_index.read_library_entry(
+            tmp_path,
+            '../outside.mp3',
+            {},
+            fetch_missing_genres=False,
+        )
+
+
+def test_list_library_files_uses_artist_genre_when_tags_missing(
+    monkeypatch, tmp_path
+):
+    path = tmp_path / 'Aaron Copland' / 'Fanfare.mp3'
+    path.parent.mkdir(parents=True)
+    path.write_bytes(b'audio')
+
+    monkeypatch.setattr(
+        library_index,
+        'lookup_artist_genre',
+        lambda artist, fetch=True: 'classical'
+        if artist == 'Aaron Copland'
+        else '',
+    )
+
+    items = library_index.list_library_files(tmp_path)
+
+    assert len(items) == 1
+    assert items[0]['genre'] == 'classical'

@@ -1,5 +1,38 @@
 const STORAGE_KEY = 'downtify-server-url'
 
+const SPA_ROUTE_PREFIXES = [
+  '/monitor',
+  '/player',
+  '/metadata',
+  '/health',
+  '/download',
+  '/list',
+  '/search',
+]
+
+function deployBasePath() {
+  return String(process.env.BASEURL || '').replace(/\/+$/, '')
+}
+
+function isSpaRoutePath(path) {
+  const normalized = String(path || '').replace(/\/+$/, '') || ''
+  if (!normalized) return false
+  return SPA_ROUTE_PREFIXES.some(
+    (prefix) => normalized === prefix || normalized.startsWith(`${prefix}/`)
+  )
+}
+
+export function repairStoredServerUrl() {
+  const stored = getStoredServerUrl()
+  if (!stored) return
+  const parsed = parseServerUrl(stored)
+  if (!parsed || !isSpaRoutePath(parsed.BASEURL)) return
+  const fixed = buildApiBaseUrl({ ...parsed, BASEURL: deployBasePath() })
+  if (fixed !== stored.replace(/\/+$/, '')) {
+    setStoredServerUrl(fixed)
+  }
+}
+
 export function getStoredServerUrl() {
   try {
     return localStorage.getItem(STORAGE_KEY) || ''
@@ -91,15 +124,13 @@ export function formatServerDisplay(cfg = getServerConfig()) {
 
 export function getCurrentPageServerUrl() {
   if (typeof window === 'undefined') return ''
-  const { protocol, hostname, port, pathname } = window.location
+  const { protocol, hostname, port } = window.location
   if (!hostname || protocol === 'file:' || protocol === 'capacitor:') {
     return ''
   }
   const origin = `${protocol}//${hostname}${port ? `:${port}` : ''}`
-  let basePath = pathname || ''
-  if (basePath.endsWith('/')) basePath = basePath.slice(0, -1)
-  if (basePath === '/') basePath = ''
-  return `${origin}${basePath}`
+  const basePath = deployBasePath()
+  return basePath ? `${origin}${basePath}` : origin
 }
 
 export function canConnectToCurrentPage() {
@@ -118,4 +149,8 @@ export function isConnectedToCurrentPage() {
   const storedBase = buildApiBaseUrl(parseServerUrl(stored))
   const pageBase = buildApiBaseUrl(parseServerUrl(current))
   return storedBase === pageBase
+}
+
+if (typeof window !== 'undefined') {
+  repairStoredServerUrl()
 }

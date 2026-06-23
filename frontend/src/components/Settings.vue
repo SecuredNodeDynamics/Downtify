@@ -965,25 +965,17 @@
 
         <div class="flex flex-wrap items-center gap-2">
           <button
+            v-if="!updateRunning"
             type="button"
             class="btn btn-primary btn-sm h-10 rounded-full px-5"
-            :disabled="!canRunUpdate || updateRunning"
+            :disabled="!canRunUpdate"
             @click="runUpdate"
           >
-            <span
-              v-if="updateRunning"
-              class="loading loading-spinner loading-xs mr-2"
-            />
             <Icon
-              v-else
               icon="clarity:download-cloud-line"
               class="h-4 w-4 mr-2"
             />
-            {{
-              updateWaiting
-                ? t('settings.updatingApp')
-                : t('settings.updateApp')
-            }}
+            {{ t('settings.updateApp') }}
           </button>
           <p class="text-xs text-base-content/45">
             {{ t('settings.updateHint') }}
@@ -1673,6 +1665,7 @@ function connectToThisDevice() {
   const current = getCurrentPageServerUrl()
   if (!current) return
   serverUrlInput.value = current
+  if (isConnectedToCurrentPage()) return
   setStoredServerUrl(current)
   window.location.reload()
 }

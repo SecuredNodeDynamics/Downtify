@@ -131,6 +131,40 @@ def _first(tags: Any, keys: list[str]) -> str:
     return ''
 
 
+def _genre_from_path(path: Path) -> str:
+    try:
+        audio = MutagenFile(str(path), easy=True)
+        if audio is not None and audio.tags:
+            genre = _first(audio.tags, ['genre', '\xa9gen', 'TCON'])
+            if genre:
+                return genre
+    except Exception:
+        pass
+    try:
+        from mutagen.id3 import ID3
+
+        tags = ID3(str(path))
+        return _first(tags, ['TCON'])
+    except Exception:
+        pass
+    try:
+        from mutagen.mp4 import MP4
+
+        audio = MP4(str(path))
+        return _first(audio, ['\xa9gen'])
+    except Exception:
+        pass
+    try:
+        from mutagen.flac import FLAC
+
+        audio = FLAC(str(path))
+        if audio.tags:
+            return _first(audio, ['genre'])
+    except Exception:
+        pass
+    return ''
+
+
 def _artists(tags: Any) -> list[str]:
     if tags:
         for key in ['artist', 'artists', '\xa9ART', 'TPE1']:
@@ -174,6 +208,7 @@ def _song_from_file(path: Path) -> dict[str, Any]:
         'name': _first(tags, ['title', '\xa9nam', 'TIT2']) or path.stem,
         'artists': artists,
         'album_name': _first(tags, ['album', '\xa9alb', 'TALB']),
+        'genre': _first(tags, ['genre', '\xa9gen', 'TCON']),
         'release_date': release_date,
         'year': release_date[:4] if len(release_date) >= 4 else '',
         'track_number': _first(tags, ['tracknumber', 'trkn', 'TRCK']),
@@ -189,6 +224,8 @@ def _song_from_file(path: Path) -> dict[str, Any]:
     length = getattr(getattr(audio, 'info', None), 'length', None)
     if length:
         song['duration_ms'] = int(float(length) * 1000)
+    if not song.get('genre'):
+        song['genre'] = _genre_from_path(path)
     return song
 
 
@@ -517,6 +554,7 @@ def apply_text_tags(path: Path, metadata: dict[str, Any]) -> None:
     set_key('artist', metadata.get('artists') or metadata.get('artist'))
     set_key('album', metadata.get('album_name'))
     set_key('date', metadata.get('release_date') or metadata.get('year'))
+    set_key('genre', metadata.get('genre'), optional=True)
     set_key('tracknumber', metadata.get('track_number'))
     set_key('discnumber', metadata.get('disc_number'))
     set_key(

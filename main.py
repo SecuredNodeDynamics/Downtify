@@ -35,6 +35,7 @@ from uvicorn import Config, Server
 from downtify import __version__, api
 from downtify.downloader import Downloader
 from downtify.history import DownloadHistoryDB
+from downtify.library_index import schedule_artist_genre_warmup
 from downtify.monitor import PlaylistMonitorDB, monitor_loop
 from downtify.versioning import read_runtime_version, runtime_version_path
 
@@ -252,6 +253,14 @@ def build_app() -> FastAPI:
                 settings=api.state.settings,
             )
         )
+        asyncio.create_task(_warm_artist_genre_cache())
+
+    async def _warm_artist_genre_cache() -> None:
+        try:
+            download_dir = api._active_download_dir()
+            await asyncio.to_thread(schedule_artist_genre_warmup, download_dir)
+        except Exception:
+            logger.opt(exception=True).warning('Artist genre cache warmup failed')
 
     @app.get('/list')
     def list_downloads() -> list[str]:

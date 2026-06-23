@@ -1,7 +1,7 @@
 <template>
   <input id="mobile-more-sheet" type="checkbox" class="modal-toggle" />
   <div class="modal modal-bottom lg:hidden">
-    <div class="modal-box mobile-more-sheet safe-bottom">
+    <div class="modal-box mobile-more-sheet">
       <div class="mobile-more-sheet-handle" aria-hidden="true" />
 
       <h2 class="mobile-more-sheet-title">{{ t('nav.more') }}</h2>

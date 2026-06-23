@@ -1,7 +1,9 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   buildApiBaseUrl,
+  getCurrentPageServerUrl,
   parseServerUrl,
+  repairStoredServerUrl,
 } from '../model/serverConnection.js'
 
 describe('serverConnection', () => {
@@ -39,5 +41,37 @@ describe('serverConnection', () => {
     expect(parseServerUrl('')).toBeNull()
     expect(parseServerUrl('   ')).toBeNull()
     expect(parseServerUrl('not a url')).toBeNull()
+  })
+
+  it('getCurrentPageServerUrl uses origin not SPA route path', () => {
+    vi.stubGlobal('window', {
+      location: {
+        protocol: 'http:',
+        hostname: '192.168.1.50',
+        port: '8765',
+        pathname: '/monitor',
+      },
+    })
+    expect(getCurrentPageServerUrl()).toBe('http://192.168.1.50:8765')
+  })
+
+  it('repairs stored URLs that mistakenly include SPA route paths', () => {
+    const storage = {}
+    vi.stubGlobal('localStorage', {
+      getItem: (key) => storage[key] ?? null,
+      setItem: (key, value) => {
+        storage[key] = value
+      },
+      removeItem: (key) => {
+        delete storage[key]
+      },
+    })
+    storage['downtify-server-url'] = 'http://192.168.1.50:8765/monitor'
+    repairStoredServerUrl()
+    expect(storage['downtify-server-url']).toBe('http://192.168.1.50:8765')
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
   })
 })

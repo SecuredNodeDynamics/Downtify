@@ -995,7 +995,7 @@ onUnmounted(() => {
 }
 
 .player-browse-tabs .metadata-tab-btn {
-  @apply inline-flex w-full items-center justify-center gap-1 whitespace-normal px-2 py-2.5 text-center text-[11px] font-medium leading-tight transition-colors sm:w-auto sm:gap-0 sm:whitespace-nowrap sm:rounded-full sm:px-4 sm:py-2 sm:text-sm sm:leading-normal;
+  @apply inline-flex w-full items-center justify-center gap-1 whitespace-normal rounded-xl px-2 py-2.5 text-center text-[11px] font-medium leading-tight transition-colors sm:w-auto sm:gap-0 sm:whitespace-nowrap sm:rounded-full sm:px-4 sm:py-2 sm:text-sm sm:leading-normal;
 }
 
 .player-browse-body {
