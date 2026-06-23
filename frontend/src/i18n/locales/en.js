@@ -238,6 +238,9 @@ export default {
     chooseCoverHint:
       'Pick an image from Spotify, Discogs, MusicBrainz, or Jellyfin.',
     chooseCoverLoading: 'Loading cover options…',
+    chooseCoverLoadingSlow:
+      'Still searching Spotify, Discogs, and MusicBrainz — this can take up to a minute.',
+    chooseCoverPreviewUnavailable: 'Preview unavailable',
     chooseCoverEmpty: 'No cover options were found for this artist.',
     chooseCoverFailed: 'Failed to load cover options.',
     applySelectedCover: 'Apply selected cover',

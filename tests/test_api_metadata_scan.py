@@ -585,7 +585,7 @@ def test_named_items_include_jellyfin_candidate_preview():
 
     item = result[0]
     assert item['jellyfin_artist_id'] == 'jf-artist-id'
-    assert 'candidate-preview' in item['preview_url']
+    assert 'jellyfin-preview' in item['preview_url']
     assert 'jellyfin_artist_id=jf-artist-id' in item['preview_url']
 
 

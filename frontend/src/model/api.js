@@ -188,6 +188,15 @@ function coverFileURL(fileName) {
   return `/cover?file=${encodeURIComponent(fileName)}`
 }
 
+function apiAssetUrl(path) {
+  const value = String(path || '').trim()
+  if (!value) return ''
+  if (/^https?:\/\//i.test(value)) return value
+  const port = config.PORT ? `:${config.PORT}` : ''
+  const base = `${config.PROTOCOL}//${config.BACKEND}${port}${config.BASEURL}`
+  return `${base}${value.startsWith('/') ? value : `/${value}`}`
+}
+
 function listDownloads() {
   return API.get('/list')
 }
@@ -270,6 +279,7 @@ export default {
   audioPreview,
   downloadFileURL,
   coverFileURL,
+  apiAssetUrl,
   listDownloads,
   deleteDownload,
   writePlaylistM3u,

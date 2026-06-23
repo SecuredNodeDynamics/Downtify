@@ -1531,6 +1531,25 @@ def _artist_candidate_preview_url(
     return '/api/metadata/artist-images/candidate-preview?' + urlencode(params)
 
 
+def _jellyfin_artist_preview_url(
+    artist_name: str,
+    *,
+    jellyfin_artist_id: str,
+) -> str:
+    params = {
+        'artist': artist_name,
+        'jellyfin_artist_id': jellyfin_artist_id,
+    }
+    return '/api/metadata/artist-images/jellyfin-preview?' + urlencode(params)
+
+
+def _musicbrainz_artist_preview_url(mbid: str) -> str:
+    return (
+        '/api/metadata/artist-images/musicbrainz-preview?'
+        + urlencode({'mbid': mbid})
+    )
+
+
 _ALLOWED_REMOTE_IMAGE_HOST_SUFFIXES = (
     '.scdn.co',
     'spotifycdn.com',
@@ -1565,10 +1584,15 @@ def _artist_image_option_preview_url(option: dict[str, Any]) -> str:
         return _remote_image_preview_url(image_url)
     jellyfin_artist_id = str(option.get('jellyfin_artist_id') or '').strip()
     if jellyfin_artist_id:
-        return _artist_candidate_preview_url(
+        return _jellyfin_artist_preview_url(
             str(option.get('label') or ''),
             jellyfin_artist_id=jellyfin_artist_id,
         )
+    mbid = str(option.get('mbid') or '').strip()
+    if not mbid and str(option.get('id') or '').startswith('musicbrainz:'):
+        mbid = str(option.get('id') or '').split(':', 1)[1].split(':', 1)[0]
+    if mbid:
+        return _musicbrainz_artist_preview_url(mbid)
     return ''
 
 
@@ -1576,6 +1600,7 @@ def _resolve_manual_artist_image_bytes(
     artist: dict[str, str],
     *,
     image_url: str = '',
+    selected_option_id: str = '',
 ) -> tuple[bytes | None, str]:
     image_url = str(image_url or '').strip()
     if image_url:
@@ -1594,6 +1619,14 @@ def _resolve_manual_artist_image_bytes(
             artist_id=jellyfin_artist_id,
         )
         return (data, 'Jellyfin') if data else (None, '')
+
+    mbid = ''
+    selected_option_id = str(selected_option_id or '').strip()
+    if selected_option_id.startswith('musicbrainz:'):
+        mbid = selected_option_id.split(':', 1)[1].split(':', 1)[0].strip()
+    if mbid:
+        data = artist_art.artist_image_bytes(mbid)
+        return (data, 'MusicBrainz') if data else (None, '')
 
     return None, ''
 
@@ -1698,6 +1731,50 @@ def artist_remote_image_preview(url: str = Query(...)) -> Response:
     if not _is_allowed_remote_image_url(url):
         raise HTTPException(status_code=400, detail='Image URL is not allowed')
     data = artist_art.download_image_url(url)
+    if not data:
+        raise HTTPException(status_code=404, detail='Preview not available')
+    return Response(
+        content=data,
+        media_type=artist_art.media_type_for_image(data),
+        headers={'Cache-Control': 'no-store'},
+    )
+
+
+@router.get('/api/metadata/artist-images/jellyfin-preview')
+def artist_jellyfin_image_preview(
+    artist: str = Query(...),
+    jellyfin_artist_id: str = Query(...),
+) -> Response:
+    if state.downloader is None:
+        raise HTTPException(status_code=500, detail='Downloader not ready')
+    artist_name = str(artist or '').strip()
+    artist_id = str(jellyfin_artist_id or '').strip()
+    if not artist_name or not artist_id:
+        raise HTTPException(
+            status_code=400,
+            detail='artist and jellyfin_artist_id are required',
+        )
+    data = _fetch_jellyfin_artist_image_bytes(
+        artist_name,
+        artist_id=artist_id,
+    )
+    if not data:
+        raise HTTPException(status_code=404, detail='Preview not available')
+    return Response(
+        content=data,
+        media_type=artist_art.media_type_for_image(data),
+        headers={'Cache-Control': 'no-store'},
+    )
+
+
+@router.get('/api/metadata/artist-images/musicbrainz-preview')
+def artist_musicbrainz_image_preview(mbid: str = Query(...)) -> Response:
+    if state.downloader is None:
+        raise HTTPException(status_code=500, detail='Downloader not ready')
+    mbid = str(mbid or '').strip()
+    if not mbid:
+        raise HTTPException(status_code=400, detail='mbid is required')
+    data = artist_art.artist_image_bytes(mbid)
     if not data:
         raise HTTPException(status_code=404, detail='Preview not available')
     return Response(
@@ -1845,6 +1922,7 @@ async def apply_artist_image(request: Request) -> dict[str, Any]:
             image_data, _source = _resolve_manual_artist_image_bytes(
                 artist,
                 image_url=image_url,
+                selected_option_id=selected_option_id,
             )
             if not image_data:
                 raise ValueError('Could not download the selected artist image')
@@ -2790,12 +2868,17 @@ def _named_items(
         if file:
             item['file'] = file
         if not item.get('preview_url'):
-            item['preview_url'] = _artist_candidate_preview_url(
-                name,
-                file=file or '',
-                folder=folder or '',
-                jellyfin_artist_id=jellyfin_artist_id,
-            )
+            if jellyfin_artist_id:
+                item['preview_url'] = _jellyfin_artist_preview_url(
+                    name,
+                    jellyfin_artist_id=jellyfin_artist_id,
+                )
+            else:
+                item['preview_url'] = _artist_candidate_preview_url(
+                    name,
+                    file=file or '',
+                    folder=folder or '',
+                )
         items.append(item)
     return items
 

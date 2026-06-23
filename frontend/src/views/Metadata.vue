@@ -590,7 +590,7 @@
               >
                 <img
                   v-if="item.preview_url"
-                  :src="item.preview_url"
+                  :src="apiPreviewSrc(item.preview_url)"
                   :alt="item.artist"
                   class="h-full w-full object-cover"
                   loading="lazy"
@@ -679,7 +679,7 @@
                     >
                       <img
                         v-if="item.preview_url"
-                        :src="item.preview_url"
+                        :src="apiPreviewSrc(item.preview_url)"
                         :alt="item.artist"
                         class="h-full w-full object-cover"
                         loading="lazy"
@@ -1169,10 +1169,13 @@
         <div class="max-h-[28rem] overflow-y-auto px-5 py-4">
           <div
             v-if="artistImagePickerLoading"
-            class="flex min-h-40 items-center justify-center gap-3 text-sm text-base-content/60"
+            class="flex min-h-40 flex-col items-center justify-center gap-3 px-4 text-center text-sm text-base-content/60"
           >
             <span class="loading loading-spinner loading-md text-primary" />
-            {{ t('metadata.chooseCoverLoading') }}
+            <p>{{ t('metadata.chooseCoverLoading') }}</p>
+            <p v-if="artistImagePickerSlowHint" class="text-xs text-base-content/45">
+              {{ t('metadata.chooseCoverLoadingSlow') }}
+            </p>
           </div>
           <p
             v-else-if="artistImagePickerError"
@@ -1202,14 +1205,32 @@
               "
               @click="artistImagePickerSelected = option"
             >
-              <div class="aspect-square bg-base-100/80">
+              <div
+                class="relative flex aspect-square items-center justify-center overflow-hidden bg-base-100/80"
+              >
                 <img
-                  v-if="option.preview_url"
-                  :src="option.preview_url"
+                  v-if="
+                    option.preview_url &&
+                    !isArtistImagePickerPreviewFailed(option.id)
+                  "
+                  :src="apiPreviewSrc(option.preview_url)"
                   :alt="option.label"
                   class="h-full w-full object-cover"
                   loading="lazy"
+                  @error="markArtistImagePickerPreviewFailed(option.id)"
                 />
+                <div
+                  v-else
+                  class="flex flex-col items-center gap-2 px-3 text-center text-base-content/45"
+                >
+                  <Icon
+                    icon="clarity:image-off-line"
+                    class="h-10 w-10"
+                  />
+                  <span class="text-xs">
+                    {{ t('metadata.chooseCoverPreviewUnavailable') }}
+                  </span>
+                </div>
               </div>
               <div class="space-y-1 p-3">
                 <p class="truncate text-sm font-medium">{{ option.label }}</p>
@@ -1304,6 +1325,9 @@ const artistImagePickerSelected = ref(null)
 const artistImagePickerLoading = ref(false)
 const artistImagePickerApplying = ref(false)
 const artistImagePickerError = ref('')
+const artistImagePickerSlowHint = ref(false)
+const artistImagePickerPreviewFailed = ref({})
+let artistImagePickerSlowTimer = null
 const repairingAllImages = ref(false)
 const artistImageSummary = ref({ scanned: 0, matched: 0, total: 0 })
 const artistReconciliation = ref(null)
@@ -1539,12 +1563,27 @@ function syncFailedRepairKeysFromReconciliation() {
   failedArtistRepairKeys.value = next
 }
 
+function apiPreviewSrc(path) {
+  return API.apiAssetUrl(path)
+}
+
+function isArtistImagePickerPreviewFailed(optionId) {
+  return Boolean(artistImagePickerPreviewFailed.value[optionId])
+}
+
+function markArtistImagePickerPreviewFailed(optionId) {
+  artistImagePickerPreviewFailed.value = {
+    ...artistImagePickerPreviewFailed.value,
+    [optionId]: true,
+  }
+}
+
 function jellyfinPreviewSrc(item) {
   const key = jellyfinRepairKey(item)
   if (!item?.preview_url || jellyfinPreviewFailed.value[key]) {
     return ''
   }
-  return item.preview_url
+  return apiPreviewSrc(item.preview_url)
 }
 
 function markJellyfinPreviewFailed(item) {
@@ -1561,7 +1600,8 @@ function jellyfinArtistName(item) {
 
 function sameJellyfinArtist(left, right) {
   return (
-    jellyfinArtistName(left).casefold() === jellyfinArtistName(right).casefold()
+    jellyfinArtistName(left).toLocaleLowerCase() ===
+    jellyfinArtistName(right).toLocaleLowerCase()
   )
 }
 
@@ -1897,7 +1937,15 @@ async function openArtistImagePicker(item, options = {}) {
   artistImagePickerOptions.value = []
   artistImagePickerSelected.value = null
   artistImagePickerError.value = ''
+  artistImagePickerPreviewFailed.value = {}
   artistImagePickerLoading.value = true
+  artistImagePickerSlowHint.value = false
+  if (artistImagePickerSlowTimer !== null) {
+    clearTimeout(artistImagePickerSlowTimer)
+  }
+  artistImagePickerSlowTimer = setTimeout(() => {
+    artistImagePickerSlowHint.value = true
+  }, 4000)
   try {
     const res = await API.getArtistImageOptions(item)
     artistImagePickerOptions.value = res.data?.options || []
@@ -1908,17 +1956,27 @@ async function openArtistImagePicker(item, options = {}) {
     artistImagePickerError.value =
       err?.response?.data?.detail || t('metadata.chooseCoverFailed')
   } finally {
+    if (artistImagePickerSlowTimer !== null) {
+      clearTimeout(artistImagePickerSlowTimer)
+      artistImagePickerSlowTimer = null
+    }
     artistImagePickerLoading.value = false
   }
 }
 
 function closeArtistImagePicker() {
   if (artistImagePickerApplying.value) return
+  if (artistImagePickerSlowTimer !== null) {
+    clearTimeout(artistImagePickerSlowTimer)
+    artistImagePickerSlowTimer = null
+  }
+  artistImagePickerSlowHint.value = false
   artistImagePickerOpen.value = false
   artistImagePickerItem.value = null
   artistImagePickerOptions.value = []
   artistImagePickerSelected.value = null
   artistImagePickerError.value = ''
+  artistImagePickerPreviewFailed.value = {}
 }
 
 async function confirmArtistImageSelection() {

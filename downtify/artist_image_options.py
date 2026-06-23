@@ -2,23 +2,28 @@
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, TypedDict
 
+import requests
 from loguru import logger
 
-from . import artist_art, artist_image_sources
+from . import artist_image_sources
+from .artist_art import _wikimedia_artist_image_url
+from .metadata_repair import artist_search_names
 from .musicbrainz import USER_AGENT, _ratio
 
-import requests
-
-
-class ArtistImageOption(TypedDict):
-    id: str
-    source: str
-    label: str
-    subtitle: str
-    image_url: str
-    jellyfin_artist_id: str
+ArtistImageOption = TypedDict(
+    'ArtistImageOption',
+    {
+        'id': str,
+        'source': str,
+        'label': str,
+        'subtitle': str,
+        'image_url': str,
+        'jellyfin_artist_id': str,
+    },
+)
 
 
 def _append_option(
@@ -67,7 +72,7 @@ def _spotify_artist_items(artist_name: str, *, limit: int = 5) -> list[dict[str,
                 'type': 'artist',
                 'limit': limit,
             },
-            timeout=15,
+            timeout=10,
         )
         if response.status_code in {401, 403}:
             artist_image_sources._SPOTIFY_TOKEN.clear()
@@ -102,7 +107,7 @@ def list_spotify_artist_image_options(
     artist_name: str,
     *,
     limit: int = 5,
-    minimum_score: float = 0.75,
+    minimum_score: float = 0.72,
 ) -> list[ArtistImageOption]:
     options: list[ArtistImageOption] = []
     seen: set[str] = set()
@@ -129,12 +134,68 @@ def list_spotify_artist_image_options(
     return options
 
 
+def list_apple_music_artist_image_options(
+    artist_name: str,
+    *,
+    minimum_score: float = 0.72,
+) -> list[ArtistImageOption]:
+    options: list[ArtistImageOption] = []
+    seen: set[str] = set()
+    response = requests.get(
+        artist_image_sources._ITUNES_SEARCH_URL,
+        params={
+            'term': artist_name,
+            'entity': 'musicArtist',
+            'limit': 5,
+        },
+        headers={'User-Agent': USER_AGENT},
+        timeout=10,
+    )
+    response.raise_for_status()
+    match = artist_image_sources._best_name_match(
+        response.json().get('results') or [],
+        artist_name,
+        key='artistName',
+        minimum=minimum_score,
+    )
+    if not match:
+        return options
+    label = str(match.get('artistName') or artist_name).strip()
+    artist_url = str(match.get('artistLinkUrl') or '').strip()
+    if not artist_url:
+        return options
+    page = requests.get(
+        artist_url,
+        headers={'User-Agent': artist_image_sources._SPOTIFY_UA},
+        timeout=10,
+    )
+    page.raise_for_status()
+    image_match = artist_image_sources._APPLE_OG_IMAGE_RE.search(page.text)
+    if not image_match:
+        return options
+    image_url = artist_image_sources._upgrade_mzstatic_url(
+        image_match.group(1).strip()
+    )
+    if not image_url:
+        return options
+    _append_option(
+        options,
+        seen,
+        option_id=f'apple-music:{label.casefold()}',
+        source='Apple Music',
+        label=label,
+        subtitle='Apple Music artist page',
+        image_url=image_url,
+    )
+    return options
+
+
 def list_discogs_artist_image_options(
     artist_name: str,
     *,
     discogs_token: str = '',
-    limit: int = 5,
-    minimum_score: float = 0.75,
+    limit: int = 3,
+    minimum_score: float = 0.72,
 ) -> list[ArtistImageOption]:
     options: list[ArtistImageOption] = []
     seen: set[str] = set()
@@ -147,7 +208,7 @@ def list_discogs_artist_image_options(
                 'type': 'artist',
                 'per_page': limit,
             },
-            timeout=15,
+            timeout=10,
         )
         response.raise_for_status()
         results = response.json().get('results') or []
@@ -170,11 +231,23 @@ def list_discogs_artist_image_options(
         artist_id = item.get('id')
         if not artist_id:
             continue
+        thumb = str(item.get('thumb') or '').strip()
+        if thumb:
+            _append_option(
+                options,
+                seen,
+                option_id=f'discogs:{artist_id}:thumb',
+                source='Discogs',
+                label=label,
+                subtitle=f'{int(score * 100)}% name match',
+                image_url=thumb,
+            )
+            continue
         try:
             detail = requests.get(
                 f'https://api.discogs.com/artists/{artist_id}',
                 headers=artist_image_sources._discogs_headers(discogs_token),
-                timeout=15,
+                timeout=10,
             )
             detail.raise_for_status()
             images = detail.json().get('images') or []
@@ -215,7 +288,7 @@ def list_discogs_artist_image_options(
 def _musicbrainz_search_artists(
     artist_name: str,
     *,
-    limit: int = 5,
+    limit: int = 3,
 ) -> list[dict[str, Any]]:
     try:
         response = requests.get(
@@ -226,7 +299,7 @@ def _musicbrainz_search_artists(
                 'limit': limit,
             },
             headers={'User-Agent': USER_AGENT},
-            timeout=12,
+            timeout=10,
         )
         response.raise_for_status()
         return [
@@ -245,8 +318,8 @@ def _musicbrainz_search_artists(
 def list_musicbrainz_artist_image_options(
     artist_name: str,
     *,
-    limit: int = 5,
-    minimum_score: float = 0.75,
+    limit: int = 3,
+    minimum_score: float = 0.72,
 ) -> list[ArtistImageOption]:
     options: list[ArtistImageOption] = []
     seen: set[str] = set()
@@ -258,19 +331,76 @@ def list_musicbrainz_artist_image_options(
         score = _ratio(label, artist_name)
         if score < minimum_score:
             continue
-        for image_url, source_label in artist_art.musicbrainz_artist_image_urls(
-            mbid
-        ):
-            _append_option(
-                options,
-                seen,
-                option_id=f'musicbrainz:{mbid}:{source_label.casefold()}',
-                source=source_label,
-                label=label,
-                subtitle=f'{int(score * 100)}% name match',
-                image_url=image_url,
-            )
+        image_url = _wikimedia_artist_image_url(mbid) or ''
+        if not image_url:
+            continue
+        _append_option(
+            options,
+            seen,
+            option_id=f'musicbrainz:{mbid}',
+            source='MusicBrainz',
+            label=label,
+            subtitle=f'{int(score * 100)}% name match',
+            image_url=image_url,
+        )
     return options
+
+
+def _merge_source_options(
+    options: list[ArtistImageOption],
+    seen: set[str],
+    source_options: list[ArtistImageOption],
+) -> None:
+    for option in source_options:
+        dedupe_key = (
+            option['image_url'].casefold()
+            if option['image_url']
+            else f"jellyfin:{option['jellyfin_artist_id']}"
+        )
+        if dedupe_key in seen:
+            continue
+        seen.add(dedupe_key)
+        options.append(option)
+
+
+def _collect_for_search_name(
+    artist_name: str,
+    *,
+    discogs_token: str = '',
+    per_source_limit: int = 3,
+) -> list[ArtistImageOption]:
+    tasks = {
+        'spotify': lambda: list_spotify_artist_image_options(
+            artist_name,
+            limit=per_source_limit,
+        ),
+        'apple': lambda: list_apple_music_artist_image_options(artist_name),
+        'discogs': lambda: list_discogs_artist_image_options(
+            artist_name,
+            discogs_token=discogs_token,
+            limit=per_source_limit,
+        ),
+        'musicbrainz': lambda: list_musicbrainz_artist_image_options(
+            artist_name,
+            limit=per_source_limit,
+        ),
+    }
+    collected: list[ArtistImageOption] = []
+    with ThreadPoolExecutor(max_workers=len(tasks)) as executor:
+        futures = {
+            executor.submit(fetch): label for label, fetch in tasks.items()
+        }
+        for future in as_completed(futures):
+            label = futures[future]
+            try:
+                collected.extend(future.result())
+            except Exception:
+                logger.opt(exception=True).debug(
+                    'Artist image source {} failed for {!r}',
+                    label,
+                    artist_name,
+                )
+    return collected
 
 
 def collect_artist_image_options(
@@ -279,7 +409,7 @@ def collect_artist_image_options(
     discogs_token: str = '',
     jellyfin_artist_id: str = '',
     jellyfin_label: str = '',
-    per_source_limit: int = 5,
+    per_source_limit: int = 3,
 ) -> list[ArtistImageOption]:
     artist_name = str(artist_name or '').strip()
     if not artist_name:
@@ -300,30 +430,15 @@ def collect_artist_image_options(
             jellyfin_artist_id=jellyfin_artist_id,
         )
 
-    for source_options in (
-        list_spotify_artist_image_options(
-            artist_name,
-            limit=per_source_limit,
-        ),
-        list_discogs_artist_image_options(
-            artist_name,
-            discogs_token=discogs_token,
-            limit=per_source_limit,
-        ),
-        list_musicbrainz_artist_image_options(
-            artist_name,
-            limit=per_source_limit,
-        ),
-    ):
-        for option in source_options:
-            dedupe_key = (
-                option['image_url'].casefold()
-                if option['image_url']
-                else f"jellyfin:{option['jellyfin_artist_id']}"
-            )
-            if dedupe_key in seen:
-                continue
-            seen.add(dedupe_key)
-            options.append(option)
+    for search_name in artist_search_names(artist_name):
+        _merge_source_options(
+            options,
+            seen,
+            _collect_for_search_name(
+                search_name,
+                discogs_token=discogs_token,
+                per_source_limit=per_source_limit,
+            ),
+        )
 
     return options

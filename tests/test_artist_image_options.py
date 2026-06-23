@@ -1,6 +1,13 @@
-from __future__ import annotations
-
+from downtify import artist_art
 from downtify import artist_image_options as options
+from downtify.metadata_repair import artist_search_names
+
+
+def test_artist_search_names_splits_collaboration():
+    names = artist_search_names('A$AP Rocky & French Montana')
+
+    assert 'A$AP Rocky' in names
+    assert 'French Montana' in names
 
 
 def test_collect_artist_image_options_includes_jellyfin_and_sources(
@@ -8,7 +15,7 @@ def test_collect_artist_image_options_includes_jellyfin_and_sources(
 ):
     monkeypatch.setattr(
         options,
-        'list_spotify_artist_image_options',
+        '_collect_for_search_name',
         lambda *_args, **_kwargs: [
             {
                 'id': 'spotify:abc',
@@ -16,34 +23,6 @@ def test_collect_artist_image_options_includes_jellyfin_and_sources(
                 'label': 'Jane Murdoch',
                 'subtitle': '95% name match',
                 'image_url': 'https://i.scdn.co/image/abc.jpg',
-                'jellyfin_artist_id': '',
-            }
-        ],
-    )
-    monkeypatch.setattr(
-        options,
-        'list_discogs_artist_image_options',
-        lambda *_args, **_kwargs: [
-            {
-                'id': 'discogs:123',
-                'source': 'Discogs',
-                'label': 'Jane Murdoch',
-                'subtitle': '95% name match',
-                'image_url': 'https://img.discogs.com/artist.jpg',
-                'jellyfin_artist_id': '',
-            }
-        ],
-    )
-    monkeypatch.setattr(
-        options,
-        'list_musicbrainz_artist_image_options',
-        lambda *_args, **_kwargs: [
-            {
-                'id': 'musicbrainz:mbid:musicbrainz',
-                'source': 'MusicBrainz',
-                'label': 'Jane Murdoch',
-                'subtitle': '95% name match',
-                'image_url': 'https://commons.wikimedia.org/wiki/Special:FilePath/test.jpg',
                 'jellyfin_artist_id': '',
             }
         ],
@@ -56,11 +35,51 @@ def test_collect_artist_image_options_includes_jellyfin_and_sources(
 
     assert result[0]['source'] == 'Jellyfin'
     assert result[0]['jellyfin_artist_id'] == 'jf-1'
-    assert {item['source'] for item in result[1:]} == {
-        'Spotify',
-        'Discogs',
-        'MusicBrainz',
-    }
+    assert result[1]['source'] == 'Spotify'
+
+
+def test_list_musicbrainz_artist_image_options_uses_wikimedia_urls(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        options,
+        '_musicbrainz_search_artists',
+        lambda *_args, **_kwargs: [
+            {'id': 'mbid-1', 'name': 'Andrew Bird'},
+        ],
+    )
+    monkeypatch.setattr(
+        options,
+        '_wikimedia_artist_image_url',
+        lambda mbid: f'https://commons.wikimedia.org/wiki/Special:FilePath/{mbid}.jpg',
+    )
+
+    result = options.list_musicbrainz_artist_image_options('Andrew Bird')
+
+    assert len(result) == 1
+    assert result[0]['id'] == 'musicbrainz:mbid-1'
+    assert result[0]['image_url'].startswith('https://commons.wikimedia.org/')
+
+
+def test_list_musicbrainz_artist_image_options_skips_missing_images(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        options,
+        '_musicbrainz_search_artists',
+        lambda *_args, **_kwargs: [
+            {'id': 'mbid-1', 'name': 'Jane Murdoch'},
+        ],
+    )
+    monkeypatch.setattr(
+        options,
+        '_wikimedia_artist_image_url',
+        lambda *_args, **_kwargs: '',
+    )
+
+    result = options.list_musicbrainz_artist_image_options('Jane Murdoch')
+
+    assert result == []
 
 
 def test_list_spotify_artist_image_options_filters_low_matches(monkeypatch):
