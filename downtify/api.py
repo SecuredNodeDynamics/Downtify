@@ -32,7 +32,7 @@ import unicodedata
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Optional
-from urllib.parse import quote
+from urllib.parse import quote, urlencode
 
 import requests
 import yt_dlp
@@ -1513,6 +1513,23 @@ def _artist_folder_preview_url(folder: str) -> str:
     return f'/api/metadata/artist-images/folder-preview?folder={quote(folder)}'
 
 
+def _artist_candidate_preview_url(
+    artist_name: str,
+    *,
+    file: str = '',
+    folder: str = '',
+    jellyfin_artist_id: str = '',
+) -> str:
+    params = {'artist': artist_name}
+    if file:
+        params['file'] = file
+    if folder:
+        params['folder'] = folder
+    if jellyfin_artist_id:
+        params['jellyfin_artist_id'] = jellyfin_artist_id
+    return '/api/metadata/artist-images/candidate-preview?' + urlencode(params)
+
+
 def _with_artist_image_preview(
     items: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
@@ -1606,6 +1623,65 @@ def artist_image_preview(
     )
 
 
+@router.get('/api/metadata/artist-images/candidate-preview')
+def artist_candidate_image_preview(
+    artist: str = Query(...),
+    file: str = Query(''),
+    folder: str = Query(''),
+    jellyfin_artist_id: str = Query(''),
+) -> Response:
+    if state.downloader is None:
+        raise HTTPException(status_code=500, detail='Downloader not ready')
+    artist_name = str(artist or '').strip()
+    if not artist_name:
+        raise HTTPException(status_code=400, detail='artist is required')
+
+    download_dir = _active_download_dir()
+    file, folder = _resolve_artist_image_repair_paths(
+        download_dir,
+        artist_name,
+        str(file or '').strip(),
+        str(folder or '').strip(),
+    )
+    path: Path | None = None
+    if file:
+        try:
+            path = metadata_repair.safe_library_path(download_dir, file)
+        except (ValueError, FileNotFoundError):
+            path = None
+
+    artist_info = {
+        'id': '',
+        'name': artist_name,
+        'jellyfin_artist_id': str(jellyfin_artist_id or '').strip(),
+    }
+    if artist_info['jellyfin_artist_id']:
+        image = _fetch_jellyfin_artist_image_bytes(
+            artist_name,
+            artist_id=artist_info['jellyfin_artist_id'],
+        )
+        if image:
+            return Response(
+                content=image,
+                media_type=artist_art.media_type_for_image(image),
+                headers={'Cache-Control': 'no-store'},
+            )
+
+    fetchers = _artist_image_fetchers()
+    data, _source = metadata_repair.fetch_artist_image_bytes(
+        path,
+        artist_info,
+        image_fetchers=fetchers,
+    )
+    if not data:
+        raise HTTPException(status_code=404, detail='Preview not available')
+    return Response(
+        content=data,
+        media_type=artist_art.media_type_for_image(data),
+        headers={'Cache-Control': 'no-store'},
+    )
+
+
 @router.post('/api/metadata/artist-images/apply')
 async def apply_artist_image(request: Request) -> dict[str, Any]:
     if state.downloader is None:
@@ -1619,6 +1695,9 @@ async def apply_artist_image(request: Request) -> dict[str, Any]:
     artist = {
         'id': str(payload.get('artist_id') or '').strip(),
         'name': str(payload.get('artist') or '').strip(),
+        'jellyfin_artist_id': str(
+            payload.get('jellyfin_artist_id') or ''
+        ).strip(),
     }
     folder = str(payload.get('folder') or '').strip()
     if not artist['name']:
@@ -1657,6 +1736,7 @@ async def apply_artist_image(request: Request) -> dict[str, Any]:
             sync = _sync_artist_image_to_jellyfin(
                 artist['name'],
                 image_path.read_bytes(),
+                artist_id=artist.get('jellyfin_artist_id') or '',
             )
             result['jellyfin_sync'] = sync
         completed = list(state.artist_image_scan.get('completed') or [])
@@ -2542,6 +2622,7 @@ def _named_items(
     files: dict[str, str] | None = None,
     *,
     propose_folder_from_name: bool = False,
+    jellyfin_ids: dict[str, str] | None = None,
 ) -> list[dict[str, Any]]:
     items: list[dict[str, Any]] = []
     for key, name in sorted(
@@ -2551,11 +2632,14 @@ def _named_items(
         folder = (folders or {}).get(key)
         if not folder and propose_folder_from_name:
             folder = name
+        jellyfin_artist_id = str((jellyfin_ids or {}).get(key) or '').strip()
         item: dict[str, Any] = {
             'name': name,
             'has_image': bool((folder_images or {}).get(key)),
             'missing_image': not bool((folder_images or {}).get(key)),
         }
+        if jellyfin_artist_id:
+            item['jellyfin_artist_id'] = jellyfin_artist_id
         if folder:
             item['folder'] = folder
             if (folder_images or {}).get(key):
@@ -2563,6 +2647,13 @@ def _named_items(
         file = (files or {}).get(key)
         if file:
             item['file'] = file
+        if not item.get('preview_url'):
+            item['preview_url'] = _artist_candidate_preview_url(
+                name,
+                file=file or '',
+                folder=folder or '',
+                jellyfin_artist_id=jellyfin_artist_id,
+            )
         items.append(item)
     return items
 
@@ -2667,12 +2758,23 @@ def _jellyfin_artist_inventory(
     url: str,
     headers: dict[str, str],
     library: dict[str, Any] | None,
-) -> dict[str, str]:
+) -> tuple[dict[str, str], dict[str, str]]:
     params: dict[str, Any] = {'Recursive': True}
     if library and library.get('id'):
         params['ParentId'] = library['id']
 
     artists: dict[str, str] = {}
+    artist_ids: dict[str, str] = {}
+
+    def _store_item(item: dict[str, Any]) -> None:
+        name = item.get('Name')
+        key = _artist_compare_key(name)
+        artist_id = str(item.get('Id') or '').strip()
+        if key:
+            artists.setdefault(key, str(name).strip())
+            if artist_id:
+                artist_ids.setdefault(key, artist_id)
+
     try:
         response = requests.get(
             f'{url}/Artists',
@@ -2682,17 +2784,14 @@ def _jellyfin_artist_inventory(
         )
         response.raise_for_status()
         for item in response.json().get('Items', []):
-            name = item.get('Name')
-            key = _artist_compare_key(name)
-            if key:
-                artists.setdefault(key, str(name).strip())
+            _store_item(item)
     except Exception:
         logger.opt(exception=True).warning(
             'Could not fetch Jellyfin /Artists; falling back to audio items'
         )
 
     if artists:
-        return artists
+        return artists, artist_ids
 
     item_params = {
         **params,
@@ -2706,7 +2805,11 @@ def _jellyfin_artist_inventory(
         timeout=30,
     )
     response.raise_for_status()
-    return _artist_names_from_jellyfin_items(response.json().get('Items', []))
+    for item in response.json().get('Items', []):
+        for nested in item.get('ArtistItems') or []:
+            if isinstance(nested, dict):
+                _store_item(nested)
+    return artists, artist_ids
 
 
 def _jellyfin_artist_id_for_name(
@@ -2747,18 +2850,26 @@ def _resolve_artist_image_repair_paths(
     return file, folder
 
 
-def _fetch_jellyfin_artist_image_bytes(artist_name: str) -> bytes | None:
+def _fetch_jellyfin_artist_image_bytes(
+    artist_name: str,
+    *,
+    artist_id: str = '',
+) -> bytes | None:
     try:
         url, headers = _configured_jellyfin()
     except HTTPException:
         return None
 
-    artist_id = _jellyfin_artist_id_for_name(url, headers, artist_name)
-    if not artist_id:
+    resolved_id = str(artist_id or '').strip() or _jellyfin_artist_id_for_name(
+        url,
+        headers,
+        artist_name,
+    )
+    if not resolved_id:
         return None
 
     response = requests.get(
-        f'{url}/Items/{artist_id}/Images/Primary',
+        f'{url}/Items/{resolved_id}/Images/Primary',
         headers=headers,
         params={'MaxWidth': 2000},
         timeout=20,
@@ -2777,9 +2888,12 @@ def _fetch_jellyfin_artist_image_bytes(artist_name: str) -> bytes | None:
 
 def _jellyfin_artist_image_fetcher(
     artist_name: str,
-    _artist: dict[str, str],
+    artist: dict[str, str],
 ) -> tuple[bytes | None, str]:
-    image = _fetch_jellyfin_artist_image_bytes(artist_name)
+    image = _fetch_jellyfin_artist_image_bytes(
+        artist_name,
+        artist_id=str(artist.get('jellyfin_artist_id') or '').strip(),
+    )
     if image:
         return image, 'Jellyfin'
     return None, ''
@@ -2802,6 +2916,8 @@ def _artist_image_fetchers() -> list[metadata_repair.ArtistImageFetcher]:
 def _sync_artist_image_to_jellyfin(
     artist_name: str,
     image_data: bytes,
+    *,
+    artist_id: str = '',
 ) -> dict[str, Any]:
     if not image_data:
         return {'synced': False, 'reason': 'empty_image'}
@@ -2810,12 +2926,16 @@ def _sync_artist_image_to_jellyfin(
     except HTTPException as exc:
         return {'synced': False, 'reason': str(exc.detail)}
 
-    artist_id = _jellyfin_artist_id_for_name(url, headers, artist_name)
-    if not artist_id:
+    resolved_id = str(artist_id or '').strip() or _jellyfin_artist_id_for_name(
+        url,
+        headers,
+        artist_name,
+    )
+    if not resolved_id:
         return {'synced': False, 'reason': 'artist_not_found'}
 
     response = requests.post(
-        f'{url}/Items/{artist_id}/Images/Primary',
+        f'{url}/Items/{resolved_id}/Images/Primary',
         headers={
             **headers,
             'Content-Type': artist_art.media_type_for_image(image_data),
@@ -2833,8 +2953,8 @@ def _sync_artist_image_to_jellyfin(
             artist_name,
             detail,
         )
-        return {'synced': False, 'reason': detail, 'artist_id': artist_id}
-    return {'synced': True, 'artist_id': artist_id}
+        return {'synced': False, 'reason': detail, 'artist_id': resolved_id}
+    return {'synced': True, 'artist_id': resolved_id}
 
 
 def _refresh_local_folder_image_flags(
@@ -2861,6 +2981,7 @@ def _build_jellyfin_reconcile_payload(
     local: dict[str, dict[str, Any]],
     *,
     root: Path | None = None,
+    jellyfin_artist_ids: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     folders = dict(local['folders'])
     folder_images = dict(local.get('folder_images', {}))
@@ -2907,6 +3028,7 @@ def _build_jellyfin_reconcile_payload(
             },
             files=tag_files,
             propose_folder_from_name=True,
+            jellyfin_ids=jellyfin_artist_ids,
         ),
         'folder_only': _named_items(
             {key: folders[key] for key in folder_keys - jellyfin_keys},
@@ -2925,6 +3047,7 @@ def _build_jellyfin_reconcile_payload(
             folders,
             folder_images,
             repair_files,
+            jellyfin_ids=jellyfin_artist_ids,
         ),
         'missing_images': _named_items(
             {key: jellyfin_artists[key] for key in missing_image_keys},
@@ -2932,6 +3055,7 @@ def _build_jellyfin_reconcile_payload(
             folder_images,
             repair_files,
             propose_folder_from_name=True,
+            jellyfin_ids=jellyfin_artist_ids,
         ),
     }
 
@@ -2944,13 +3068,18 @@ def reconcile_jellyfin_artists() -> dict[str, Any]:
     try:
         url, headers = _configured_jellyfin()
         library = _matching_jellyfin_library(url, headers)
-        jellyfin_artists = _jellyfin_artist_inventory(url, headers, library)
+        jellyfin_artists, jellyfin_artist_ids = _jellyfin_artist_inventory(
+            url,
+            headers,
+            library,
+        )
         local = _local_artist_inventory(download_dir)
         return _build_jellyfin_reconcile_payload(
             library,
             jellyfin_artists,
             local,
             root=download_dir,
+            jellyfin_artist_ids=jellyfin_artist_ids,
         )
     except HTTPException:
         raise

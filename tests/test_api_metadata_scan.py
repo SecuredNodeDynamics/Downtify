@@ -272,7 +272,11 @@ def test_apply_artist_image_allows_folder_without_file(tmp_path, monkeypatch):
         )
 
         assert captured['file'] == ''
-        assert captured['artist'] == {'id': '', 'name': 'Guest Artist'}
+        assert captured['artist'] == {
+            'id': '',
+            'name': 'Guest Artist',
+            'jellyfin_artist_id': '',
+        }
         assert result['verified'] == ['Guest Artist/Guest Artist.jpg']
     finally:
         api.state.downloader = old_downloader
@@ -326,7 +330,11 @@ def test_apply_artist_image_allows_name_only_artist(tmp_path, monkeypatch):
             )
         )
 
-        assert captured['artist'] == {'id': '', 'name': 'Guest Artist'}
+        assert captured['artist'] == {
+            'id': '',
+            'name': 'Guest Artist',
+            'jellyfin_artist_id': '',
+        }
         assert result['saved'] == ['Guest Artist/Guest Artist.jpg']
         assert api.state.artist_image_scan['completed'][0] == result
         assert api.state.artist_image_scan['items'] == []
@@ -562,6 +570,46 @@ def test_named_items_include_image_state_and_repair_file():
     assert by_name['Guest Artist']['has_image'] is False
     assert by_name['Guest Artist']['missing_image'] is True
     assert by_name['Guest Artist']['file'] == 'guest.mp3'
+    assert (
+        '/api/metadata/artist-images/candidate-preview?'
+        in by_name['Guest Artist']['preview_url']
+    )
+
+
+def test_named_items_include_jellyfin_candidate_preview():
+    result = api._named_items(
+        {'jane murdoch': 'Jane Murdoch'},
+        propose_folder_from_name=True,
+        jellyfin_ids={'jane murdoch': 'jf-artist-id'},
+    )
+
+    item = result[0]
+    assert item['jellyfin_artist_id'] == 'jf-artist-id'
+    assert 'candidate-preview' in item['preview_url']
+    assert 'jellyfin_artist_id=jf-artist-id' in item['preview_url']
+
+
+def test_candidate_preview_uses_jellyfin_image(tmp_path, monkeypatch):
+    old_downloader = api.state.downloader
+    api.state.downloader = FakeDownloader(tmp_path)
+    image = b'\x89PNG\r\n\x1a\nimage'
+
+    monkeypatch.setattr(
+        api,
+        '_fetch_jellyfin_artist_image_bytes',
+        lambda *_args, **_kwargs: image,
+    )
+
+    try:
+        response = api.artist_candidate_image_preview(
+            artist='Jane Murdoch',
+            jellyfin_artist_id='jf-artist-id',
+        )
+    finally:
+        api.state.downloader = old_downloader
+
+    assert response.body == image
+    assert response.media_type == 'image/png'
 
 
 def test_clean_artist_image_items_include_existing_art_preview():

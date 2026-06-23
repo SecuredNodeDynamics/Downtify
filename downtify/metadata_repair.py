@@ -589,6 +589,31 @@ def _existing_folder_image_paths(
     return sorted(set(paths + saved))
 
 
+def fetch_artist_image_bytes(
+    path: Path | None,
+    artist: dict[str, str],
+    *,
+    image_fetchers: list[ArtistImageFetcher] | None = None,
+) -> tuple[bytes | None, str]:
+    artist_name = str(artist.get('name') or '').strip()
+    image: bytes | None = None
+    if path is not None:
+        try:
+            image = embedded_cover_bytes(path)
+        except Exception:
+            image = None
+        if image:
+            return image, 'Album art'
+    if image_fetchers:
+        for fetch in image_fetchers:
+            image, source = fetch(artist_name, artist)
+            if image:
+                return image, source
+    mbid = resolve_artist_mbid(artist, path)
+    image, source = artist_or_fallback_image(mbid, path)
+    return image, source or ''
+
+
 def _save_artist_image_to_folder(
     root: Path,
     path: Path | None,
@@ -606,21 +631,11 @@ def _save_artist_image_to_folder(
     if existing:
         return existing
 
-    fallback_path = path
-    image: bytes | None = None
-    if fallback_path is not None:
-        try:
-            image = embedded_cover_bytes(fallback_path)
-        except Exception:
-            image = None
-    if not image and image_fetchers:
-        for fetch in image_fetchers:
-            image, _source = fetch(artist_name, artist)
-            if image:
-                break
-    if not image:
-        mbid = resolve_artist_mbid(artist, fallback_path)
-        image, _source = artist_or_fallback_image(mbid, fallback_path)
+    image, _source = fetch_artist_image_bytes(
+        path,
+        artist,
+        image_fetchers=image_fetchers,
+    )
     if not image:
         return []
     folder.mkdir(parents=True, exist_ok=True)

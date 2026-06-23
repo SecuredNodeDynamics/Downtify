@@ -1017,11 +1017,12 @@
               >
                 <div class="relative aspect-square bg-base-100/80">
                   <img
-                    v-if="item.preview_url"
-                    :src="item.preview_url"
+                    v-if="jellyfinPreviewSrc(item)"
+                    :src="jellyfinPreviewSrc(item)"
                     :alt="item.name"
                     class="h-full w-full object-cover"
                     loading="lazy"
+                    @error="markJellyfinPreviewFailed(item)"
                   />
                   <div
                     v-else
@@ -1176,6 +1177,7 @@ const activeArtistImageTab = ref('needs')
 const cleanArtistImageView = ref('grid')
 const applyingArtistImages = ref({})
 const fixedArtistImages = ref({})
+const jellyfinPreviewFailed = ref({})
 const repairingAllImages = ref(false)
 const artistImageSummary = ref({ scanned: 0, matched: 0, total: 0 })
 const artistReconciliation = ref(null)
@@ -1369,6 +1371,22 @@ function firstSavedFolder(result) {
   return path ? String(path).split('/', 1)[0] : ''
 }
 
+function jellyfinPreviewSrc(item) {
+  const key = jellyfinRepairKey(item)
+  if (!item?.preview_url || jellyfinPreviewFailed.value[key]) {
+    return ''
+  }
+  return item.preview_url
+}
+
+function markJellyfinPreviewFailed(item) {
+  const key = jellyfinRepairKey(item)
+  jellyfinPreviewFailed.value = {
+    ...jellyfinPreviewFailed.value,
+    [key]: true,
+  }
+}
+
 function jellyfinArtistName(item) {
   return String(item?.name || item?.artist || '').trim()
 }
@@ -1560,6 +1578,7 @@ async function reconcileArtists(options = {}) {
   try {
     const res = await API.reconcileJellyfinArtists()
     artistReconciliation.value = res.data
+    jellyfinPreviewFailed.value = {}
     lastReconciled.value = new Date().toLocaleString()
     if (!preserveMessage) {
       jellyfinMessage.value = t('metadata.jellyfinReconcileOk')
@@ -1766,6 +1785,7 @@ async function applyJellyfinArtistImage(item, options = {}) {
       artist: item.name,
       artist_id: item.artist_id || '',
       folder: item.folder || item.name,
+      jellyfin_artist_id: item.jellyfin_artist_id || '',
     }
     const res = await API.applyArtistImage(repairItem)
     const savedOrVerified = [

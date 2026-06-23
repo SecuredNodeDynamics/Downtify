@@ -142,9 +142,10 @@ function applyArtistImage(item) {
     '/api/metadata/artist-images/apply',
     {
       file: item.file,
-      artist: item.artist,
+      artist: item.artist || item.name,
       artist_id: item.artist_id,
       folder: item.folder,
+      jellyfin_artist_id: item.jellyfin_artist_id,
     },
     { timeout: 120000 },
   )
