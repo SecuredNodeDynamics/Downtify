@@ -63,7 +63,7 @@ function semverToVersionCode(version) {
 function syncAndroidGradle(version) {
   const gradlePath = path.join(root, 'frontend/android/app/build.gradle');
   if (!fs.existsSync(gradlePath)) {
-    console.log('skip android gradle sync (project not present)');
+    console.error('skip android gradle sync (project not present)');
     return false;
   }
   const versionCode = semverToVersionCode(version);
@@ -72,11 +72,11 @@ function syncAndroidGradle(version) {
     .replace(/versionCode\s+\d+/, `versionCode ${versionCode}`)
     .replace(/versionName\s+"[^"]+"/, `versionName "${version}"`);
   if (updated === text) {
-    console.log('android build.gradle already up to date');
+    console.error('android build.gradle already up to date');
     return false;
   }
   fs.writeFileSync(gradlePath, updated, 'utf8');
-  console.log(
+  console.error(
     `updated frontend/android/app/build.gradle (${version}, code ${versionCode})`
   );
   return true;
