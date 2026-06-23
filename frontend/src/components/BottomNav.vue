@@ -57,6 +57,8 @@ function isActive(item) {
 }
 
 function onNav(item) {
+  mobileSearch.closeSheet()
+
   if (item.name === 'More') {
     const sheet = document.getElementById('mobile-more-sheet')
     if (sheet) sheet.checked = true

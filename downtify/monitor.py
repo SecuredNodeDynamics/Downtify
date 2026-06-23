@@ -41,6 +41,7 @@ class MonitoredPlaylist:
     spotify_id: str
     name: str
     url: str
+    kind: str
     interval_minutes: int
     enabled: bool
     last_checked: Optional[str]
@@ -94,6 +95,12 @@ class PlaylistMonitorDB:
                 )
             except Exception:
                 pass
+            try:
+                conn.execute(
+                    "ALTER TABLE monitored_playlists ADD COLUMN kind TEXT NOT NULL DEFAULT 'playlist'"
+                )
+            except Exception:
+                pass
 
     def add_playlist(
         self,
@@ -101,13 +108,14 @@ class PlaylistMonitorDB:
         name: str,
         url: str,
         interval_minutes: int = 60,
+        kind: str = 'playlist',
     ) -> MonitoredPlaylist:
         with self._connect() as conn:
             cur = conn.execute(
                 """INSERT INTO monitored_playlists
-                   (spotify_id, name, url, interval_minutes, enabled, created_at)
-                   VALUES (?, ?, ?, ?, 1, ?)""",
-                (spotify_id, name, url, interval_minutes, _now_iso()),
+                   (spotify_id, name, url, kind, interval_minutes, enabled, created_at)
+                   VALUES (?, ?, ?, ?, ?, 1, ?)""",
+                (spotify_id, name, url, kind, interval_minutes, _now_iso()),
             )
             row = conn.execute(
                 'SELECT * FROM monitored_playlists WHERE id = ?',
@@ -131,13 +139,19 @@ class PlaylistMonitorDB:
             return _row_to_playlist(row) if row else None
 
     def get_by_spotify_id(
-        self, spotify_id: str
+        self, spotify_id: str, kind: Optional[str] = None
     ) -> Optional[MonitoredPlaylist]:
         with self._connect() as conn:
-            row = conn.execute(
-                'SELECT * FROM monitored_playlists WHERE spotify_id = ?',
-                (spotify_id,),
-            ).fetchone()
+            if kind is None:
+                row = conn.execute(
+                    'SELECT * FROM monitored_playlists WHERE spotify_id = ?',
+                    (spotify_id,),
+                ).fetchone()
+            else:
+                row = conn.execute(
+                    'SELECT * FROM monitored_playlists WHERE spotify_id = ? AND kind = ?',
+                    (spotify_id, kind),
+                ).fetchone()
             return _row_to_playlist(row) if row else None
 
     def delete_playlist(self, playlist_id: int) -> bool:
@@ -204,11 +218,14 @@ class PlaylistMonitorDB:
 
 
 def _row_to_playlist(row: sqlite3.Row) -> MonitoredPlaylist:
+    keys = row.keys()
+    kind = row['kind'] if 'kind' in keys else 'playlist'
     return MonitoredPlaylist(
         id=row['id'],
         spotify_id=row['spotify_id'],
         name=row['name'],
         url=row['url'],
+        kind=kind,
         interval_minutes=row['interval_minutes'],
         enabled=bool(row['enabled']),
         last_checked=row['last_checked'],
@@ -217,35 +234,50 @@ def _row_to_playlist(row: sqlite3.Row) -> MonitoredPlaylist:
     )
 
 
-async def check_playlist(
-    playlist: MonitoredPlaylist,
+async def _fetch_monitored_tracks(
+    item: MonitoredPlaylist,
+) -> list[dict[str, Any]]:
+    if item.kind == 'artist':
+        return await asyncio.to_thread(
+            spotify.artist_tracks_from_id, item.spotify_id
+        )
+    return await asyncio.to_thread(
+        spotify.playlist_tracks_from_id, item.spotify_id
+    )
+
+
+async def check_monitored(
+    item: MonitoredPlaylist,
     db: PlaylistMonitorDB,
     downloader: Downloader,
     broadcast: Callable[[dict[str, Any]], Any],
     loop: asyncio.AbstractEventLoop,
     settings: Optional[dict[str, Any]] = None,
 ) -> int:
-    """Fetch playlist, detect new tracks, download them. Returns count downloaded."""
+    """Fetch a monitored playlist or artist, download new tracks."""
+
+    label = 'artist' if item.kind == 'artist' else 'playlist'
     logger.info(
-        'Checking monitored playlist "{}" ({})',
-        playlist.name,
-        playlist.spotify_id,
+        'Checking monitored {} "{}" ({})',
+        label,
+        item.name,
+        item.spotify_id,
     )
 
     try:
-        tracks = await asyncio.to_thread(
-            spotify.playlist_tracks_from_id, playlist.spotify_id
-        )
+        tracks = await _fetch_monitored_tracks(item)
     except Exception:
-        logger.exception('Failed to fetch playlist {}', playlist.spotify_id)
+        logger.exception(
+            'Failed to fetch {} {}', label, item.spotify_id
+        )
         await asyncio.to_thread(
-            db.update_playlist, playlist.id, last_checked=_now_iso()
+            db.update_playlist, item.id, last_checked=_now_iso()
         )
         return 0
 
-    known_tracks = await asyncio.to_thread(db.get_track_filenames, playlist.id)
+    known_tracks = await asyncio.to_thread(db.get_track_filenames, item.id)
 
-    pl_subdir = m3u.sanitize_playlist_name(playlist.name)
+    pl_subdir = m3u.sanitize_playlist_name(item.name)
 
     new_tracks = []
     for t in tracks:
@@ -265,15 +297,16 @@ async def check_playlist(
 
     if new_tracks:
         logger.info(
-            'Found {} track(s) to download in playlist "{}"',
+            'Found {} track(s) to download in {} "{}"',
             len(new_tracks),
-            playlist.name,
+            label,
+            item.name,
         )
 
     downloaded = 0
     for song in new_tracks:
         track_id = song['song_id']
-        pl_name = playlist.name
+        pl_name = item.name
 
         # Playlist embed entries are missing release year and use the
         # playlist cover instead of the album cover. Re-fetching the track
@@ -294,8 +327,9 @@ async def check_playlist(
         except Exception:
             logger.opt(exception=True).warning(
                 'Per-track Spotify fetch failed for {}; '
-                'falling back to playlist data',
+                'falling back to {} data',
                 track_id,
+                label,
             )
 
         def _make_cb(s: dict, name: str) -> Callable[[float, str], None]:
@@ -320,7 +354,7 @@ async def check_playlist(
                 ),
             )
             await asyncio.to_thread(
-                db.mark_track_downloaded, playlist.id, track_id, filename
+                db.mark_track_downloaded, item.id, track_id, filename
             )
             downloaded += 1
         except Exception:
@@ -328,7 +362,7 @@ async def check_playlist(
 
     await asyncio.to_thread(
         db.update_playlist,
-        playlist.id,
+        item.id,
         last_checked=_now_iso(),
         last_track_count=len(tracks),
     )
@@ -336,8 +370,22 @@ async def check_playlist(
     if downloaded > 0 and (
         settings is None or settings.get('generate_m3u', True)
     ):
-        await asyncio.to_thread(_regenerate_m3u, playlist, tracks, downloader)
+        await asyncio.to_thread(_regenerate_m3u, item, tracks, downloader)
     return downloaded
+
+
+async def check_playlist(
+    playlist: MonitoredPlaylist,
+    db: PlaylistMonitorDB,
+    downloader: Downloader,
+    broadcast: Callable[[dict[str, Any]], Any],
+    loop: asyncio.AbstractEventLoop,
+    settings: Optional[dict[str, Any]] = None,
+) -> int:
+    """Backward-compatible alias for monitored item checks."""
+    return await check_monitored(
+        playlist, db, downloader, broadcast, loop, settings
+    )
 
 
 def _regenerate_m3u(
@@ -386,7 +434,7 @@ async def monitor_loop(
     loop: asyncio.AbstractEventLoop,
     settings: Optional[dict[str, Any]] = None,
 ) -> None:
-    """Background task: sweep all enabled playlists that are due for checking."""
+    """Background task: sweep all enabled items that are due for checking."""
     while True:
         try:
             playlists = await asyncio.to_thread(db.list_playlists)
@@ -399,7 +447,7 @@ async def monitor_loop(
                 if downloader is None:
                     continue
                 try:
-                    count = await check_playlist(
+                    count = await check_monitored(
                         pl, db, downloader, broadcast, loop, settings
                     )
                     if count > 0:
@@ -410,7 +458,7 @@ async def monitor_loop(
                         )
                 except Exception:
                     logger.exception(
-                        'Error while checking playlist "{}"', pl.name
+                        'Error while checking monitored item "{}"', pl.name
                     )
         except Exception:
             logger.exception('Unexpected error in monitor loop')

@@ -553,6 +553,10 @@ _PARTNER_API = 'https://api-partner.spotify.com/pathfinder/v1/query'
 _GRAPHQL_HASH = (
     'a65e12194ed5fc443a1cdebed5fabe33ca5b07b987185d63c72483867ad13cb4'
 )
+# sha256 of queryArtistDiscography in the Spotify web player.
+_ARTIST_DISCOGRAPHY_HASH = (
+    '4257bb9c1e5eaa6adb95092514dd09a35559f6ad0e284bed5e13547d342490aa'
+)
 
 
 def _track_dict_from_graphql_item(
@@ -697,6 +701,129 @@ def playlist_tracks_from_id(playlist_id: str) -> list[dict[str, Any]]:
     return _parse_playlist_tracks(entity)
 
 
+def _graphql_artist_discography(
+    artist_id: str, token: str
+) -> dict[str, Any]:
+    resp = requests.get(
+        _PARTNER_API,
+        params={
+            'operationName': 'queryArtistDiscography',
+            'variables': json.dumps({
+                'uri': f'spotify:artist:{artist_id}',
+            }),
+            'extensions': json.dumps({
+                'persistedQuery': {
+                    'version': 1,
+                    'sha256Hash': _ARTIST_DISCOGRAPHY_HASH,
+                }
+            }),
+        },
+        headers={
+            'Authorization': f'Bearer {token}',
+            'User-Agent': _USER_AGENT,
+            'app-platform': 'WebPlayer',
+        },
+        timeout=15,
+    )
+    resp.raise_for_status()
+    data = resp.json()
+    logger.debug(
+        'Spotify GraphQL queryArtistDiscography id={}: {}',
+        artist_id,
+        json_log_blob(redact_sensitive_mapping(data))[:12000],
+    )
+    if 'errors' in data:
+        raise ValueError(f'GraphQL errors: {data["errors"]}')
+    return data.get('data') or {}
+
+
+def _append_album_id(uri: Any, ids: list[str], seen: set[str]) -> None:
+    if not isinstance(uri, str) or ':album:' not in uri:
+        return
+    aid = _id_from_uri(uri)
+    if aid and aid not in seen:
+        seen.add(aid)
+        ids.append(aid)
+
+
+def _album_ids_from_discography_item(
+    item: dict[str, Any], ids: list[str], seen: set[str]
+) -> None:
+    releases = item.get('releases')
+    if isinstance(releases, dict):
+        rel_items = releases.get('items') or []
+        if isinstance(rel_items, list):
+            for rel in rel_items:
+                if isinstance(rel, dict):
+                    _append_album_id(rel.get('uri') or '', ids, seen)
+    _append_album_id(item.get('uri') or '', ids, seen)
+
+
+def _album_ids_from_discography(data: dict[str, Any]) -> list[str]:
+    """Collect unique album IDs from a queryArtistDiscography payload."""
+
+    ids: list[str] = []
+    seen: set[str] = set()
+    root = data.get('artistUnion') or {}
+    discography = root.get('discography') or {}
+    if not isinstance(discography, dict):
+        return ids
+    for section in discography.values():
+        if not isinstance(section, dict):
+            continue
+        items = section.get('items') or []
+        if not isinstance(items, list):
+            continue
+        for item in items:
+            if isinstance(item, dict):
+                _album_ids_from_discography_item(item, ids, seen)
+    return ids
+
+
+def _artist_tracks_from_payload(
+    artist_id: str, payload: dict[str, Any]
+) -> list[dict[str, Any]]:
+    entity = _entity_from(payload)
+    token = _token_from_embed_payload(payload)
+    songs: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    if token:
+        try:
+            discography = _graphql_artist_discography(artist_id, token)
+            for album_id in _album_ids_from_discography(discography):
+                for track in album_tracks_from_id(album_id):
+                    tid = track.get('song_id')
+                    if tid and tid not in seen:
+                        seen.add(tid)
+                        songs.append(track)
+        except Exception:
+            logger.opt(exception=True).warning(
+                'GraphQL artist discography failed for {}; '
+                'using embed top tracks',
+                artist_id,
+            )
+    if songs:
+        return songs
+    return _parse_playlist_tracks(entity)
+
+
+def artist_tracks_from_id(artist_id: str) -> list[dict[str, Any]]:
+    payload = _fetch_embed_json('artist', artist_id)
+    return _artist_tracks_from_payload(artist_id, payload)
+
+
+def artist_info_and_tracks(
+    artist_id: str,
+) -> tuple[str, list[dict[str, Any]]]:
+    """Return ``(artist_name, tracks)`` from discography or embed top tracks."""
+
+    payload = _fetch_embed_json('artist', artist_id)
+    entity = _entity_from(payload)
+    embed_name = entity.get('name') or entity.get('title') or artist_id
+    tracks = _artist_tracks_from_payload(artist_id, payload)
+    return embed_name, tracks
+
+
 def playlist_info_and_tracks(
     playlist_id: str,
 ) -> tuple[str, list[dict[str, Any]]]:
@@ -737,4 +864,6 @@ def resolve(url: str) -> Any:
         return album_tracks_from_id(sid)
     if kind == 'playlist':
         return playlist_tracks_from_id(sid)
+    if kind == 'artist':
+        return artist_tracks_from_id(sid)
     raise ValueError(f'Unsupported Spotify entity type: {kind}')

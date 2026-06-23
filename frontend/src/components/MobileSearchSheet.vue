@@ -1,8 +1,8 @@
 <template>
   <input id="mobile-search-sheet" type="checkbox" class="modal-toggle" />
-  <div class="modal modal-top lg:hidden">
-    <div class="modal-box mobile-search-sheet safe-top">
-      <form class="flex items-center gap-2" @submit.prevent="submit">
+  <div class="modal modal-top mobile-search-modal lg:hidden" @click.self="close">
+    <div class="modal-box mobile-search-sheet">
+      <form class="flex items-center" @submit.prevent="submit">
         <div class="relative min-w-0 flex-1">
           <input
             id="mobile-search-input"
@@ -31,20 +31,17 @@
             <Icon v-else icon="clarity:search-line" class="h-4 w-4" />
           </button>
         </div>
-        <button
-          type="button"
-          class="mobile-app-bar-icon shrink-0"
-          :title="t('common.cancel')"
-          @click="close"
-        >
-          <Icon icon="clarity:close-line" class="h-5 w-5" />
-        </button>
       </form>
       <p v-if="isPlayerSearch" class="mt-2 text-xs text-base-content/50">
         {{ t('search.libraryHint') }}
       </p>
     </div>
-    <label for="mobile-search-sheet" class="modal-backdrop" @click="close" />
+    <label
+      for="mobile-search-sheet"
+      class="modal-backdrop"
+      aria-hidden="true"
+      @click.prevent="close"
+    />
   </div>
 </template>
 

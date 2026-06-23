@@ -6,7 +6,7 @@
     >
       <!-- Header -->
       <div
-        class="flex items-center justify-between px-6 py-4 border-b border-white/5"
+        class="flex items-center justify-between px-4 py-4 border-b border-white/5 sm:px-6"
       >
         <div>
           <h3 class="text-lg font-bold tracking-tight">
@@ -25,75 +25,30 @@
         </label>
       </div>
 
-      <!-- Body -->
-      <div class="px-6 pt-5">
+      <!-- Tabs -->
+      <div class="settings-tabs-wrap px-4 sm:px-6">
         <div
-          class="mb-5 grid grid-cols-2 rounded-2xl border border-white/10 bg-base-100/75 p-1 sm:grid-cols-5 sm:rounded-full"
+          ref="tabShellRef"
+          class="settings-tab-shell tab-glow-shell"
+          role="tablist"
+          :aria-label="t('settings.title')"
         >
           <button
+            v-for="tab in settingsTabs"
+            :key="tab.id"
             type="button"
-            class="rounded-full px-4 py-2 text-sm font-medium transition-colors"
-            :class="
-              activeTab === 'general'
-                ? 'bg-primary text-primary-content shadow-glow-sm'
-                : 'text-base-content/60 hover:text-base-content'
-            "
-            @click="activeTab = 'general'"
+            role="tab"
+            class="settings-tab-btn"
+            :class="{ 'settings-tab-btn-active': activeTab === tab.id }"
+            :aria-selected="activeTab === tab.id"
+            @click="setActiveTab(tab.id)"
           >
-            {{ t('settings.generalTab') }}
-          </button>
-          <button
-            type="button"
-            class="rounded-full px-4 py-2 text-sm font-medium transition-colors"
-            :class="
-              activeTab === 'api'
-                ? 'bg-primary text-primary-content shadow-glow-sm'
-                : 'text-base-content/60 hover:text-base-content'
-            "
-            @click="activeTab = 'api'"
-          >
-            {{ t('settings.apiTab') }}
-          </button>
-          <button
-            type="button"
-            class="rounded-full px-4 py-2 text-sm font-medium transition-colors"
-            :class="
-              activeTab === 'logs'
-                ? 'bg-primary text-primary-content shadow-glow-sm'
-                : 'text-base-content/60 hover:text-base-content'
-            "
-            @click="activeTab = 'logs'"
-          >
-            {{ t('settings.logsTab') }}
-          </button>
-          <button
-            type="button"
-            class="rounded-full px-4 py-2 text-sm font-medium transition-colors"
-            :class="
-              activeTab === 'about'
-                ? 'bg-primary text-primary-content shadow-glow-sm'
-                : 'text-base-content/60 hover:text-base-content'
-            "
-            @click="activeTab = 'about'"
-          >
-            {{ t('settings.aboutTab') }}
-          </button>
-          <button
-            type="button"
-            class="rounded-full px-4 py-2 text-sm font-medium transition-colors"
-            :class="
-              activeTab === 'help'
-                ? 'bg-primary text-primary-content shadow-glow-sm'
-                : 'text-base-content/60 hover:text-base-content'
-            "
-            @click="activeTab = 'help'"
-          >
-            {{ t('settings.helpTab') }}
+            {{ t(tab.labelKey) }}
           </button>
         </div>
       </div>
 
-      <div v-if="activeTab === 'general'" class="px-6 pb-5 space-y-6">
+      <div v-if="activeTab === 'general'" class="px-4 pb-5 space-y-6 sm:px-6">
         <!-- Language -->
         <div>
           <label
@@ -514,7 +469,7 @@
         </transition>
       </div>
 
-      <div v-else-if="activeTab === 'api'" class="px-6 pb-5 space-y-5">
+      <div v-else-if="activeTab === 'api'" class="px-4 pb-5 space-y-5 sm:px-6">
         <div>
           <label
             class="block text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2"
@@ -698,7 +653,7 @@
         </transition>
       </div>
 
-      <div v-else-if="activeTab === 'logs'" class="px-6 pb-5 space-y-5">
+      <div v-else-if="activeTab === 'logs'" class="px-4 pb-5 space-y-5 sm:px-6">
         <div class="flex items-center justify-between gap-3">
           <div>
             <label
@@ -778,7 +733,7 @@
         </ul>
       </div>
 
-      <div v-else-if="activeTab === 'about'" class="px-6 pb-5 space-y-5">
+      <div v-else-if="activeTab === 'about'" class="px-4 pb-5 space-y-5 sm:px-6">
         <div>
           <label
             class="block text-xs font-semibold uppercase tracking-wider text-base-content/50"
@@ -831,7 +786,7 @@
         </div>
       </div>
 
-      <div v-else-if="activeTab === 'help'" class="px-6 pb-5 space-y-5">
+      <div v-else-if="activeTab === 'help'" class="px-4 pb-5 space-y-5 sm:px-6">
         <div class="flex items-start justify-between gap-3">
           <div>
             <label
@@ -930,11 +885,54 @@
               icon="clarity:download-cloud-line"
               class="h-4 w-4 mr-2"
             />
-            {{ t('settings.updateApp') }}
+            {{
+              updateWaiting
+                ? t('settings.updatingApp')
+                : t('settings.updateApp')
+            }}
           </button>
           <p class="text-xs text-base-content/45">
             {{ t('settings.updateHint') }}
           </p>
+        </div>
+
+        <div
+          v-if="updateWaiting"
+          class="surface rounded-2xl border border-primary/30 bg-primary/10 p-5"
+        >
+          <div class="flex items-start gap-3">
+            <span
+              class="loading loading-spinner loading-md shrink-0 text-primary mt-0.5"
+            />
+            <div class="min-w-0">
+              <p class="font-semibold text-primary">
+                {{ t('settings.updateInProgress') }}
+              </p>
+              <p class="mt-1 text-sm text-base-content/70">
+                {{ t('settings.updateInProgressHint') }}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div
+          v-if="updateFailed"
+          class="surface rounded-2xl border border-error/30 bg-error/10 p-5"
+        >
+          <div class="flex items-start gap-3">
+            <Icon
+              icon="clarity:exclamation-circle-line"
+              class="mt-0.5 h-6 w-6 shrink-0 text-error"
+            />
+            <div class="min-w-0">
+              <p class="font-semibold text-error">
+                {{ t('settings.updateFailed') }}
+              </p>
+              <p class="mt-1 text-sm text-base-content/70">
+                {{ updateFailureMessage }}
+              </p>
+            </div>
+          </div>
         </div>
 
         <div
@@ -966,7 +964,7 @@
         </div>
 
         <div
-          v-if="updateResult && !updateCompleted"
+          v-if="updateResult && !updateCompleted && !updateWaiting && !updateFailed"
           class="surface rounded-2xl p-4"
           :class="updateResult.success ? 'text-base-content' : 'text-error'"
         >
@@ -1007,7 +1005,7 @@
 
       <!-- Footer -->
       <div
-        class="flex items-center justify-end gap-2 px-6 py-4 border-t border-white/5"
+        class="flex items-center justify-end gap-2 px-4 py-4 border-t border-white/5 sm:px-6"
       >
         <label
           for="settings-modal"
@@ -1030,7 +1028,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useSettingsManager } from '../model/settings'
 import { useDownloadDestination } from '../model/downloadDestination'
@@ -1052,6 +1050,32 @@ const {
 const { t, locale, setLocale, locales } = useI18n()
 const folderPickerError = ref('')
 const activeTab = ref('general')
+const tabShellRef = ref(null)
+
+const settingsTabs = [
+  { id: 'general', labelKey: 'settings.generalTab' },
+  { id: 'api', labelKey: 'settings.apiTab' },
+  { id: 'logs', labelKey: 'settings.logsTab' },
+  { id: 'about', labelKey: 'settings.aboutTab' },
+  { id: 'help', labelKey: 'settings.helpTab' },
+]
+
+function scrollActiveTabIntoView() {
+  const shell = tabShellRef.value
+  if (!shell) return
+  const selected = shell.querySelector('[aria-selected="true"]')
+  selected?.scrollIntoView({
+    inline: 'center',
+    block: 'nearest',
+    behavior: 'smooth',
+  })
+}
+
+function setActiveTab(tab) {
+  if (!settingsTabs.some((item) => item.id === tab)) return
+  activeTab.value = tab
+  nextTick(scrollActiveTabIntoView)
+}
 const jellyfinLibraries = ref([])
 const jellyfinLibraryLoading = ref(false)
 const jellyfinLibraryError = ref('')
@@ -1065,14 +1089,36 @@ const updateStatus = ref(null)
 const helpLoading = ref(false)
 const helpError = ref('')
 const updateRunning = ref(false)
+const updateWaiting = ref(false)
+const updateFailed = ref(false)
+const updateFailureMessage = ref('')
 const updateResult = ref(null)
 const updateCompleted = ref(false)
 let updateCompletionTimer = null
 
+function clearUpdateTimers() {
+  clearTimeout(updateCompletionTimer)
+  updateCompletionTimer = null
+}
+
+function resetUpdateFeedback() {
+  updateFailed.value = false
+  updateFailureMessage.value = ''
+  updateResult.value = null
+  updateCompleted.value = false
+}
+
+function markUpdateFailed(message) {
+  updateWaiting.value = false
+  updateRunning.value = false
+  updateFailed.value = true
+  updateFailureMessage.value = message || t('settings.updateFailed')
+}
+
 function openSettingsTab(event) {
   const tab = event?.detail?.tab
-  if (['general', 'api', 'logs', 'about', 'help'].includes(tab)) {
-    activeTab.value = tab
+  if (settingsTabs.some((item) => item.id === tab)) {
+    setActiveTab(tab)
   }
 }
 
@@ -1082,7 +1128,7 @@ onMounted(() =>
 onBeforeUnmount(() =>
   window.removeEventListener('downtify:open-settings', openSettingsTab)
 )
-onBeforeUnmount(() => clearTimeout(updateCompletionTimer))
+onBeforeUnmount(() => clearUpdateTimers())
 function normalizedJellyfinLibraryName(value) {
   return String(value || '')
     .normalize('NFKC')
@@ -1293,46 +1339,78 @@ async function loadUpdateStatus() {
 }
 
 async function runUpdate() {
+  clearUpdateTimers()
+  resetUpdateFeedback()
+  updateWaiting.value = false
   updateRunning.value = true
   helpError.value = ''
-  updateResult.value = null
-  updateCompleted.value = false
   try {
     const res = await API.updateApp()
-    updateResult.value = res.data || null
-    if (res.data?.current_version) updateStatus.value = res.data
-    if (res.data?.restart_scheduled) {
-      waitForUpdatedApp(res.data.latest_version)
+    const data = res.data || {}
+    updateResult.value = data
+    if (data.current_version) updateStatus.value = data
+
+    if (data.mode === 'noop') {
+      return
+    }
+
+    if (!data.success) {
+      markUpdateFailed(data.message || t('settings.updateError'))
+      return
+    }
+
+    if (data.restart_scheduled) {
+      updateWaiting.value = true
+      waitForUpdatedApp(data.latest_version)
+      return
+    }
+
+    if (data.requires_manual) {
+      markUpdateFailed(data.message || t('settings.updateFailed'))
     }
   } catch (err) {
-    helpError.value = err?.response?.data?.detail || t('settings.updateError')
+    markUpdateFailed(
+      err?.response?.data?.detail || t('settings.updateError')
+    )
   } finally {
-    updateRunning.value = false
+    if (!updateWaiting.value) {
+      updateRunning.value = false
+    }
   }
 }
 
-async function waitForUpdatedApp(expectedVersion, attempts = 0) {
-  if (attempts >= 60) return
-  try {
-    const response = await API.getAppVersion()
-    const version = String(response.data || '').trim()
-    if (version && (!expectedVersion || version === expectedVersion)) {
-      updateCompleted.value = true
-      updateStatus.value = {
-        ...(updateStatus.value || {}),
-        current_version: version,
-        latest_version: version,
-        update_available: false,
-      }
-      return
-    }
-  } catch {
-    // A short connection failure is expected while Docker recreates the app.
+function waitForUpdatedApp(expectedVersion, attempts = 0) {
+  const maxAttempts = 60
+  if (attempts >= maxAttempts) {
+    markUpdateFailed(t('settings.updateWaitTimeout'))
+    return
   }
-  updateCompletionTimer = setTimeout(
-    () => waitForUpdatedApp(expectedVersion, attempts + 1),
-    1500
-  )
+  API.getAppVersion()
+    .then((response) => {
+      const version = String(response.data || '').trim()
+      if (version && (!expectedVersion || version === expectedVersion)) {
+        updateWaiting.value = false
+        updateRunning.value = false
+        updateCompleted.value = true
+        updateStatus.value = {
+          ...(updateStatus.value || {}),
+          current_version: version,
+          latest_version: version,
+          update_available: false,
+        }
+        return
+      }
+      updateCompletionTimer = setTimeout(
+        () => waitForUpdatedApp(expectedVersion, attempts + 1),
+        1500
+      )
+    })
+    .catch(() => {
+      updateCompletionTimer = setTimeout(
+        () => waitForUpdatedApp(expectedVersion, attempts + 1),
+        1500
+      )
+    })
 }
 
 function refreshPage() {

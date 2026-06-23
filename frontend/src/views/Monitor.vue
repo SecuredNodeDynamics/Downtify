@@ -13,7 +13,7 @@
         </p>
       </div>
 
-      <!-- Add playlist form -->
+      <!-- Add form -->
       <div class="surface rounded-2xl p-4 sm:p-5 mb-6 sm:mb-8 min-w-0 overflow-hidden">
         <h2
           class="text-sm font-semibold uppercase tracking-wider text-base-content/50 mb-4"
@@ -21,6 +21,34 @@
           {{ t('monitor.watchNew') }}
         </h2>
         <form @submit.prevent="onAdd" class="monitor-add-form space-y-3">
+          <div class="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              class="h-11 rounded-2xl border text-sm font-medium transition-colors"
+              :class="
+                newKind === 'playlist'
+                  ? 'border-primary/60 bg-primary/15 text-primary'
+                  : 'border-white/10 bg-base-100/60 text-base-content/70'
+              "
+              :disabled="adding"
+              @click="newKind = 'playlist'"
+            >
+              {{ t('monitor.typePlaylist') }}
+            </button>
+            <button
+              type="button"
+              class="h-11 rounded-2xl border text-sm font-medium transition-colors"
+              :class="
+                newKind === 'artist'
+                  ? 'border-primary/60 bg-primary/15 text-primary'
+                  : 'border-white/10 bg-base-100/60 text-base-content/70'
+              "
+              :disabled="adding"
+              @click="newKind = 'artist'"
+            >
+              {{ t('monitor.typeArtist') }}
+            </button>
+          </div>
           <input
             v-model="newUrl"
             type="url"
@@ -28,7 +56,7 @@
             autocapitalize="off"
             autocorrect="off"
             spellcheck="false"
-            :placeholder="t('monitor.urlPlaceholder')"
+            :placeholder="urlPlaceholder"
             class="input-modern input-modern-plain w-full min-w-0 h-12 text-base sm:text-sm"
             :disabled="adding"
           />
@@ -84,7 +112,7 @@
         </p>
       </div>
 
-      <!-- Playlist cards -->
+      <!-- Item cards -->
       <ul v-else class="space-y-3">
         <li
           v-for="pl in playlists"
@@ -93,8 +121,15 @@
         >
           <!-- Info -->
           <div class="flex-1 min-w-0">
-            <div class="flex items-center gap-2 mb-1">
+            <div class="flex items-center gap-2 mb-1 flex-wrap">
               <span class="font-semibold truncate">{{ pl.name }}</span>
+              <span class="pill shrink-0 badge-neutral-soft text-xs">
+                {{
+                  pl.kind === 'artist'
+                    ? t('monitor.kindArtist')
+                    : t('monitor.kindPlaylist')
+                }}
+              </span>
               <span
                 class="pill shrink-0"
                 :class="pl.enabled ? 'badge-soft' : 'badge-neutral-soft'"
@@ -208,7 +243,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { Icon } from '@iconify/vue'
 import Navbar from '/src/components/Navbar.vue'
 import monitorAPI from '/src/model/monitor.js'
@@ -221,8 +256,15 @@ const loading = ref(false)
 const adding = ref(false)
 const addError = ref('')
 const newUrl = ref('')
+const newKind = ref('playlist')
 const newInterval = ref(60)
 const checking = ref({})
+
+const urlPlaceholder = computed(() =>
+  newKind.value === 'artist'
+    ? t('monitor.urlPlaceholderArtist')
+    : t('monitor.urlPlaceholderPlaylist')
+)
 
 async function load() {
   loading.value = true
@@ -240,7 +282,8 @@ async function onAdd() {
   try {
     const res = await monitorAPI.addMonitoredPlaylist(
       newUrl.value.trim(),
-      newInterval.value
+      newInterval.value,
+      newKind.value
     )
     playlists.value.unshift(res.data)
     newUrl.value = ''

@@ -3456,31 +3456,55 @@ async def add_monitor_playlist(request: Request) -> dict[str, Any]:
 
     url = payload.get('url', '')
     interval_minutes = int(payload.get('interval_minutes', 60))
+    requested_kind = payload.get('kind')
 
     parsed = spotify.parse_spotify_url(url)
-    if parsed is None or parsed[0] != 'playlist':
+    if parsed is None:
         raise HTTPException(
-            status_code=400, detail='A valid Spotify playlist URL is required'
+            status_code=400,
+            detail='A valid Spotify playlist or artist URL is required',
         )
 
-    _, spotify_id = parsed
-
-    existing = await asyncio.to_thread(db.get_by_spotify_id, spotify_id)
-    if existing is not None:
+    kind, spotify_id = parsed
+    if kind not in {'playlist', 'artist'}:
         raise HTTPException(
-            status_code=409, detail='This playlist is already being monitored'
+            status_code=400,
+            detail='Only Spotify playlist and artist URLs are supported',
+        )
+    if requested_kind and requested_kind != kind:
+        raise HTTPException(
+            status_code=400,
+            detail=f'URL is a Spotify {kind}, not a {requested_kind}',
+        )
+
+    existing = await asyncio.to_thread(db.get_by_spotify_id, spotify_id, kind)
+    if existing is not None:
+        label = 'artist' if kind == 'artist' else 'playlist'
+        raise HTTPException(
+            status_code=409,
+            detail=f'This {label} is already being monitored',
         )
 
     try:
-        name, _tracks = await asyncio.to_thread(
-            spotify.playlist_info_and_tracks, spotify_id
-        )
+        if kind == 'artist':
+            name, _tracks = await asyncio.to_thread(
+                spotify.artist_info_and_tracks, spotify_id
+            )
+        else:
+            name, _tracks = await asyncio.to_thread(
+                spotify.playlist_info_and_tracks, spotify_id
+            )
     except Exception as exc:
-        logger.exception('Failed to resolve playlist {}', spotify_id)
+        logger.exception('Failed to resolve {} {}', kind, spotify_id)
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
     playlist = await asyncio.to_thread(
-        db.add_playlist, spotify_id, name, url, interval_minutes
+        db.add_playlist,
+        spotify_id,
+        name,
+        url,
+        interval_minutes,
+        kind,
     )
 
     # Kick off the first download pass immediately so the user does not have
@@ -3499,7 +3523,9 @@ async def add_monitor_playlist(request: Request) -> dict[str, Any]:
                     state.settings,
                 )
             except Exception:
-                logger.exception('Initial check failed for playlist {}', pl.id)
+                logger.exception(
+                    'Initial check failed for monitored item {}', pl.id
+                )
 
         asyncio.create_task(_initial_check())
 
@@ -3527,7 +3553,7 @@ async def update_monitor_playlist(
     )
     if updated is None:
         raise HTTPException(
-            status_code=404, detail='Monitored playlist not found'
+            status_code=404, detail='Monitored item not found'
         )
     return updated.to_dict()
 
@@ -3538,7 +3564,7 @@ async def delete_monitor_playlist(playlist_id: int) -> dict[str, Any]:
     deleted = await asyncio.to_thread(db.delete_playlist, playlist_id)
     if not deleted:
         raise HTTPException(
-            status_code=404, detail='Monitored playlist not found'
+            status_code=404, detail='Monitored item not found'
         )
     return {'deleted': True, 'id': playlist_id}
 
@@ -3549,7 +3575,7 @@ async def manual_check_playlist(playlist_id: int) -> dict[str, Any]:
     playlist = await asyncio.to_thread(db.get_playlist, playlist_id)
     if playlist is None:
         raise HTTPException(
-            status_code=404, detail='Monitored playlist not found'
+            status_code=404, detail='Monitored item not found'
         )
     if state.downloader is None:
         raise HTTPException(status_code=500, detail='Downloader not ready')

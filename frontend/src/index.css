@@ -356,8 +356,49 @@
   }
 
   .mobile-search-sheet {
-    @apply w-full max-w-none rounded-b-3xl border-0 bg-base-100 px-4 pb-4 pt-3;
+    @apply w-full max-w-none rounded-b-3xl border-0 bg-base-100 px-4 pb-4;
     margin-top: 0;
+    padding-top: calc(var(--app-safe-top) + 0.75rem);
+    position: relative;
+    z-index: 1;
+  }
+
+  .settings-tabs-wrap {
+    @apply mb-5 flex justify-center pt-4 sm:pt-5;
+  }
+
+  .settings-tab-shell {
+    @apply mx-auto flex w-max max-w-full min-w-0 gap-1 overflow-x-auto rounded-2xl border border-white/10 bg-base-100/75 p-1;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .settings-tab-shell::-webkit-scrollbar {
+    display: none;
+  }
+
+  .settings-tab-btn {
+    @apply shrink-0 rounded-full px-4 py-2.5 text-sm font-medium text-base-content/60 transition-colors hover:text-base-content;
+  }
+
+  .settings-tab-btn-active {
+    @apply bg-primary text-primary-content shadow-glow-sm hover:text-primary-content;
+  }
+
+  @media (min-width: 640px) {
+    .settings-tab-shell {
+      @apply grid w-max max-w-full grid-cols-5 overflow-visible rounded-full;
+    }
+
+    .settings-tab-btn {
+      @apply w-full min-w-0 shrink px-3 py-2 text-center;
+    }
+  }
+
+  /* DaisyUI puts modal-backdrop at z-index:-1, so taps miss it and hit the page. */
+  #mobile-search-sheet:checked + .mobile-search-modal .modal-backdrop {
+    z-index: 0;
+    cursor: default;
   }
 
   .mobile-more-sheet {

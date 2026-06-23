@@ -9,10 +9,11 @@ function listMonitoredPlaylists() {
   return API.get('/api/monitor/playlists')
 }
 
-function addMonitoredPlaylist(url, intervalMinutes = 60) {
+function addMonitoredPlaylist(url, intervalMinutes = 60, kind = 'playlist') {
   return API.post('/api/monitor/playlists', {
     url,
     interval_minutes: intervalMinutes,
+    kind,
   })
 }
 

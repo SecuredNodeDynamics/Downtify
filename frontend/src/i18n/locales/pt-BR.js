@@ -19,7 +19,7 @@ export default {
   nav: {
     home: 'Início',
     library: 'Biblioteca',
-    monitor: 'Monitor de playlists',
+    monitor: 'Monitor',
     health: 'Saúde',
     metadata: 'Metadados',
     queue: 'Fila',
@@ -279,16 +279,22 @@ export default {
     emptyRepairLog: 'Nenhum reparo registrado ainda.',
   },
   monitor: {
-    title: 'Monitor de playlists',
+    title: 'Monitor',
     subtitle:
-      'Adicione playlists do Spotify para monitorar. Novas faixas adicionadas a essas playlists serão baixadas automaticamente.',
-    watchNew: 'Monitorar uma nova playlist',
-    urlPlaceholder: 'Cole uma URL de playlist do Spotify…',
+      'Monitore playlists e artistas do Spotify. Novas faixas são baixadas automaticamente a cada verificação.',
+    watchNew: 'Monitorar algo novo',
+    typePlaylist: 'Playlist',
+    typeArtist: 'Artista',
+    kindPlaylist: 'Playlist',
+    kindArtist: 'Artista',
+    urlPlaceholderPlaylist: 'Cole uma URL de playlist do Spotify…',
+    urlPlaceholderArtist: 'Cole uma URL de artista do Spotify…',
     watch: 'Monitorar',
     failedAdd:
-      'Falha ao adicionar a playlist. Verifique a URL e tente novamente.',
-    empty: 'Nenhuma playlist sendo monitorada ainda.',
-    emptyHint: 'Cole um link de playlist do Spotify acima para começar.',
+      'Falha ao adicionar. Verifique a URL e tente novamente.',
+    empty: 'Nada está sendo monitorado ainda.',
+    emptyHint:
+      'Cole um link de playlist ou artista do Spotify acima para começar.',
     active: 'Ativa',
     paused: 'Pausada',
     everyInterval: 'A cada {interval}',
@@ -301,7 +307,7 @@ export default {
     checkNow: 'Verificar agora',
     stop: 'Parar de monitorar',
     deletePrompt: 'Parar de monitorar "{name}"?',
-    info: 'Quando você adiciona uma playlist, o Downtify baixa todas as faixas atuais dela e segue monitorando. Qualquer música adicionada depois no Spotify é detectada e baixada automaticamente na próxima verificação.',
+    info: 'Ao adicionar uma playlist ou artista, o Downtify baixa todas as faixas encontradas e continua monitorando. Novas músicas no Spotify são detectadas e baixadas automaticamente na próxima verificação.',
     every15: 'A cada 15 min',
     every30: 'A cada 30 min',
     every1h: 'A cada hora',
@@ -360,9 +366,9 @@ export default {
     aboutPlayerTitle: 'Player',
     aboutPlayerText:
       'Reproduza faixas baixadas no app com arte, controles de fila, aleatorio, repeticao e volume.',
-    aboutMonitorTitle: 'Monitor de playlists',
+    aboutMonitorTitle: 'Monitor',
     aboutMonitorText:
-      'Monitore playlists do Spotify. O Downtify baixa a playlist atual e depois verifica novas musicas.',
+      'Monitore playlists e artistas do Spotify. O Downtify baixa o catálogo atual e verifica novas músicas depois.',
     aboutMetadataTitle: 'Ferramenta de metadados',
     aboutMetadataText:
       'Escaneie arquivos do servidor, compare tags locais com MusicBrainz e aplique reparos verificados.',
@@ -400,6 +406,13 @@ export default {
     updateCheckFailed: 'Falha ao verificar atualizacoes',
     updateCheckError: 'Nao foi possivel verificar atualizacoes.',
     updateApp: 'Atualizar app',
+    updatingApp: 'Atualizando…',
+    updateInProgress: 'Atualizacao em andamento',
+    updateInProgressHint:
+      'O Downtify esta baixando a nova versao e reiniciando. Isso pode levar um minuto — mantenha esta pagina aberta.',
+    updateFailed: 'Falha na atualizacao',
+    updateWaitTimeout:
+      'A atualizacao nao terminou a tempo. O conteiner pode ainda estar reiniciando ou a atualizacao pode ter falido. Verifique o host Docker ou tente novamente.',
     updateHint:
       'Instalacoes Docker atualizam pelo app quando o socket Docker esta montado; o app sera reiniciado.',
     updateError: 'Nao foi possivel atualizar o Downtify.',

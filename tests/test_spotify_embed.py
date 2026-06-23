@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from downtify.spotify import (
+    _album_ids_from_discography,
     _album_release_date_from_open_page,
     _artist_names,
     _artists_from_subtitle,
@@ -271,3 +272,40 @@ def test_album_tracks_from_id_merges_row_subtitle():
     assert songs[0]['album_name'] == 'TestAlbum'
     assert songs[0]['track_number'] == 1
     assert songs[0]['album_track_total'] == 1
+
+
+def test_album_ids_from_discography_collects_unique_albums():
+    data = {
+        'artistUnion': {
+            'discography': {
+                'albums': {
+                    'items': [
+                        {
+                            'releases': {
+                                'items': [
+                                    {'uri': 'spotify:album:albumA'},
+                                    {'uri': 'spotify:album:albumB'},
+                                ]
+                            }
+                        },
+                        {'uri': 'spotify:album:albumB'},
+                    ]
+                },
+                'singles': {
+                    'items': [
+                        {
+                            'releases': {
+                                'items': [{'uri': 'spotify:album:single1'}]
+                            }
+                        }
+                    ]
+                },
+            }
+        }
+    }
+
+    assert _album_ids_from_discography(data) == [
+        'albumA',
+        'albumB',
+        'single1',
+    ]

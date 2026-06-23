@@ -19,7 +19,7 @@ export default {
   nav: {
     home: 'Inicio',
     library: 'Biblioteca',
-    monitor: 'Monitor de listas',
+    monitor: 'Monitor',
     health: 'Salud',
     metadata: 'Metadatos',
     queue: 'Cola',
@@ -279,16 +279,22 @@ export default {
     emptyRepairLog: 'Aun no hay reparaciones registradas.',
   },
   monitor: {
-    title: 'Monitor de listas',
+    title: 'Monitor',
     subtitle:
-      'Añade listas de Spotify para vigilar. Las nuevas pistas añadidas a esas listas se descargarán automáticamente.',
-    watchNew: 'Vigilar una nueva lista',
-    urlPlaceholder: 'Pega una URL de lista de Spotify…',
+      'Vigila listas y artistas de Spotify. Las nuevas pistas se descargan automáticamente en cada revisión.',
+    watchNew: 'Vigilar algo nuevo',
+    typePlaylist: 'Lista',
+    typeArtist: 'Artista',
+    kindPlaylist: 'Lista',
+    kindArtist: 'Artista',
+    urlPlaceholderPlaylist: 'Pega una URL de lista de Spotify…',
+    urlPlaceholderArtist: 'Pega una URL de artista de Spotify…',
     watch: 'Vigilar',
     failedAdd:
-      'No se pudo añadir la lista. Comprueba la URL e inténtalo de nuevo.',
-    empty: 'Aún no hay listas vigiladas.',
-    emptyHint: 'Pega un enlace de lista de Spotify arriba para empezar.',
+      'No se pudo añadir. Comprueba la URL e inténtalo de nuevo.',
+    empty: 'Aún no hay nada vigilado.',
+    emptyHint:
+      'Pega un enlace de lista o artista de Spotify arriba para empezar.',
     active: 'Activa',
     paused: 'Pausada',
     everyInterval: 'Cada {interval}',
@@ -301,7 +307,7 @@ export default {
     checkNow: 'Revisar ahora',
     stop: 'Dejar de vigilar',
     deletePrompt: '¿Dejar de vigilar "{name}"?',
-    info: 'Al añadir una lista, Downtify descarga todas las pistas que contenga en ese momento y la sigue vigilando. Cualquier canción añadida después en Spotify se detecta y descarga automáticamente en la siguiente revisión.',
+    info: 'Al añadir una lista o artista, Downtify descarga todas las pistas que encuentra y sigue vigilando. Las canciones nuevas en Spotify se detectan y descargan automáticamente en la siguiente revisión.',
     every15: 'Cada 15 min',
     every30: 'Cada 30 min',
     every1h: 'Cada hora',
@@ -360,9 +366,9 @@ export default {
     aboutPlayerTitle: 'Reproductor',
     aboutPlayerText:
       'Reproduce pistas descargadas dentro de la app con arte, controles de cola, aleatorio, repeticion y volumen.',
-    aboutMonitorTitle: 'Monitor de listas',
+    aboutMonitorTitle: 'Monitor',
     aboutMonitorText:
-      'Vigila listas de Spotify. Downtify descarga la lista actual y luego revisa si hay canciones nuevas.',
+      'Vigila listas y artistas de Spotify. Downtify descarga el catálogo actual y revisa si hay canciones nuevas.',
     aboutMetadataTitle: 'Herramienta de metadatos',
     aboutMetadataText:
       'Escanea archivos del servidor, compara etiquetas locales con MusicBrainz y aplica reparaciones verificadas.',
@@ -400,6 +406,13 @@ export default {
     updateCheckFailed: 'Fallo la busqueda de actualizaciones',
     updateCheckError: 'No se pudieron buscar actualizaciones.',
     updateApp: 'Actualizar app',
+    updatingApp: 'Actualizando…',
+    updateInProgress: 'Actualizacion en curso',
+    updateInProgressHint:
+      'Downtify esta descargando la nueva version y reiniciando. Puede tardar un minuto; manten esta pagina abierta.',
+    updateFailed: 'Actualizacion fallida',
+    updateWaitTimeout:
+      'La actualizacion no termino a tiempo. El contenedor puede seguir reiniciando o la actualizacion pudo fallar. Revisa el host Docker o intentalo de nuevo.',
     updateHint:
       'Las instalaciones Docker se actualizan desde la app si el socket Docker esta montado; la app se reiniciara.',
     updateError: 'No se pudo actualizar Downtify.',

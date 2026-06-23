@@ -19,7 +19,7 @@ export default {
   nav: {
     home: 'Home',
     library: 'Library',
-    monitor: 'Playlist Monitor',
+    monitor: 'Monitor',
     health: 'Health',
     metadata: 'Metadata',
     queue: 'Queue',
@@ -272,15 +272,20 @@ export default {
     emptyRepairLog: 'No repairs logged yet.',
   },
   monitor: {
-    title: 'Playlist Monitor',
+    title: 'Monitor',
     subtitle:
-      'Add Spotify playlists to watch. New tracks added to those playlists will be downloaded automatically.',
-    watchNew: 'Watch a new playlist',
-    urlPlaceholder: 'Paste a Spotify playlist URL…',
+      'Watch Spotify playlists and artists. New tracks are downloaded automatically on each check.',
+    watchNew: 'Watch something new',
+    typePlaylist: 'Playlist',
+    typeArtist: 'Artist',
+    kindPlaylist: 'Playlist',
+    kindArtist: 'Artist',
+    urlPlaceholderPlaylist: 'Paste a Spotify playlist URL…',
+    urlPlaceholderArtist: 'Paste a Spotify artist URL…',
     watch: 'Watch',
-    failedAdd: 'Failed to add playlist. Check the URL and try again.',
-    empty: 'No playlists being monitored yet.',
-    emptyHint: 'Paste a Spotify playlist link above to get started.',
+    failedAdd: 'Failed to add. Check the URL and try again.',
+    empty: 'Nothing is being monitored yet.',
+    emptyHint: 'Paste a Spotify playlist or artist link above to get started.',
     active: 'Active',
     paused: 'Paused',
     everyInterval: 'Every {interval}',
@@ -293,7 +298,7 @@ export default {
     checkNow: 'Check now',
     stop: 'Stop monitoring',
     deletePrompt: 'Stop monitoring "{name}"?',
-    info: 'When you add a playlist, Downtify downloads every track it currently contains and then keeps watching it. Any songs added later on Spotify are detected and downloaded automatically on the next scheduled check.',
+    info: 'When you add a playlist or artist, Downtify downloads every track it currently finds and keeps watching. New songs on Spotify are detected and downloaded automatically on the next scheduled check.',
     every15: 'Every 15 min',
     every30: 'Every 30 min',
     every1h: 'Every hour',
@@ -352,9 +357,9 @@ export default {
     aboutPlayerTitle: 'Player',
     aboutPlayerText:
       'Play downloaded tracks directly in the app with album art, queue controls, shuffle, repeat, and volume controls.',
-    aboutMonitorTitle: 'Playlist Monitor',
+    aboutMonitorTitle: 'Monitor',
     aboutMonitorText:
-      'Watch Spotify playlists for new tracks. Downtify downloads the current playlist and checks later for additions.',
+      'Watch Spotify playlists and artists for new tracks. Downtify downloads the current catalog and checks later for additions.',
     aboutMetadataTitle: 'Metadata tool',
     aboutMetadataText:
       'Scan server music files, compare local tags against MusicBrainz matches, and apply verified tag repairs.',
@@ -392,6 +397,13 @@ export default {
     updateCheckFailed: 'Update check failed',
     updateCheckError: 'Could not check for updates.',
     updateApp: 'Update app',
+    updatingApp: 'Updating…',
+    updateInProgress: 'Update in progress',
+    updateInProgressHint:
+      'Downtify is pulling the new version and restarting. This can take a minute — please keep this page open.',
+    updateFailed: 'Update failed',
+    updateWaitTimeout:
+      'The update did not finish in time. The container may still be restarting, or the update may have failed. Check your Docker host or try again.',
     updateHint:
       'Docker installs update in place when the Docker socket is mounted; the app will restart.',
     updateError: 'Could not update Downtify.',
@@ -451,7 +463,7 @@ export default {
     playlistsSection: 'Playlists',
     generateM3u: 'Generate M3U file for playlists',
     generateM3uHint:
-      'Writes Playlists/<name>.m3u alongside the tracks for both manual playlist downloads and Playlist Monitor sweeps.',
+      'Writes Playlists/<name>.m3u alongside the tracks for both manual playlist downloads and Monitor sweeps.',
     organizationSection: 'File organization',
     organizeByArtist: 'Organize by artist',
     organizeByArtistHint:
