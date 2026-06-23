@@ -12,6 +12,7 @@
     <Footer class="hidden lg:block" />
     <BottomNav />
     <MobileMoreSheet />
+    <MobileSearchSheet />
     <Settings />
   </div>
 </template>
@@ -22,6 +23,7 @@ import BottomNav from './components/BottomNav.vue'
 import Footer from './components/Footer.vue'
 import MobileAppBar from './components/MobileAppBar.vue'
 import MobileMoreSheet from './components/MobileMoreSheet.vue'
+import MobileSearchSheet from './components/MobileSearchSheet.vue'
 import Settings from './components/Settings.vue'
 import StarField from './components/StarField.vue'
 import { useBinaryThemeManager } from './model/theme'

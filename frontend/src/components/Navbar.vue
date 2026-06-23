@@ -90,6 +90,20 @@
         </button>
 
         <button
+          v-if="route.name === 'Health'"
+          class="icon-btn"
+          :title="t('common.refresh')"
+          :disabled="healthRefreshLoading"
+          @click="refreshHealth()"
+        >
+          <span
+            v-if="healthRefreshLoading"
+            class="loading loading-spinner loading-sm text-primary"
+          />
+          <Icon v-else icon="clarity:refresh-line" class="h-5 w-5" />
+        </button>
+
+        <button
           class="icon-btn"
           @click="
             themeMgr.setTheme(
@@ -130,6 +144,7 @@ import router from '../router'
 import { useBinaryThemeManager } from '../model/theme'
 import { useProgressTracker } from '../model/download'
 import { useSearchManager } from '../model/search'
+import { useHealthRefresh } from '../model/healthRefresh'
 import { useI18n } from '../i18n'
 
 import SearchInput from './SearchInput.vue'
@@ -142,4 +157,5 @@ const themeMgr = useBinaryThemeManager({
 const pt = useProgressTracker()
 const sm = useSearchManager()
 const { t } = useI18n()
+const { loading: healthRefreshLoading, refresh: refreshHealth } = useHealthRefresh()
 </script>

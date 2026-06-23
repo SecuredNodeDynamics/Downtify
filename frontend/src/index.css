@@ -208,6 +208,11 @@
   .input-modern {
     @apply w-full h-12 rounded-full bg-base-100/85 border border-primary/20 px-5 pr-14 text-base-content placeholder:text-base-content/40 shadow-glow-sm outline-none transition focus:border-primary/60 focus:shadow-glow-sm;
   }
+
+  .input-modern-plain {
+    @apply rounded-2xl pr-5;
+  }
+
   [data-theme='downtify-light'] .input-modern {
     @apply bg-white border-black/10;
   }
@@ -346,6 +351,15 @@
     @apply absolute -right-2 -top-1 inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-primary px-1 text-[9px] font-bold text-primary-content;
   }
 
+  .more-menu-badge {
+    @apply ml-auto inline-flex h-4 min-w-[1rem] shrink-0 items-center justify-center rounded-full bg-primary px-1 text-[9px] font-bold text-primary-content;
+  }
+
+  .mobile-search-sheet {
+    @apply w-full max-w-none rounded-b-3xl border-0 bg-base-100 px-4 pb-4 pt-3;
+    margin-top: 0;
+  }
+
   .mobile-more-sheet {
     @apply w-full max-w-none rounded-t-3xl border-0 bg-base-100 px-4 pb-4 pt-3;
     max-height: min(85dvh, calc(100dvh - var(--app-safe-top)));
@@ -378,6 +392,43 @@
 
   .mobile-page-header {
     @apply hidden lg:block;
+  }
+
+  .health-stat-grid {
+    @apply grid grid-cols-1 gap-2 text-xs sm:grid-cols-3 sm:gap-3;
+  }
+
+  .health-stat-item {
+    @apply flex items-center justify-between gap-3 rounded-xl bg-white/5 px-3 py-2 sm:block sm:bg-transparent sm:p-0;
+  }
+
+  [data-theme='downtify-light'] .health-stat-item {
+    @apply sm:bg-transparent;
+  }
+
+  .health-settings-list {
+    @apply space-y-2 text-sm;
+  }
+
+  .health-settings-row {
+    @apply flex min-w-0 items-center justify-between gap-3 rounded-xl bg-white/5 px-3 py-3;
+  }
+
+  [data-theme='downtify-light'] .health-settings-row {
+    @apply bg-black/5;
+  }
+
+  .health-settings-label {
+    @apply min-w-0 flex-1 text-sm text-base-content/70 leading-snug;
+  }
+
+  .health-settings-value {
+    @apply shrink-0 text-right text-sm font-semibold text-base-content;
+  }
+
+  .health-settings-value.badge-soft,
+  .health-settings-value.badge-neutral-soft {
+    @apply text-xs font-medium;
   }
 }
 

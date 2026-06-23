@@ -2,7 +2,7 @@
   <div class="min-h-0 overflow-x-hidden">
     <Navbar />
 
-    <div class="mx-auto max-w-4xl px-4 py-4 sm:py-8 sm:px-6">
+    <div class="mx-auto max-w-4xl w-full min-w-0 px-4 py-4 sm:py-8 sm:px-6">
       <!-- Header -->
       <div class="mb-6 sm:mb-8 mobile-page-header">
         <h1 class="text-2xl font-bold tracking-tight">
@@ -14,24 +14,28 @@
       </div>
 
       <!-- Add playlist form -->
-      <div class="surface rounded-2xl p-5 mb-8">
+      <div class="surface rounded-2xl p-4 sm:p-5 mb-6 sm:mb-8 min-w-0 overflow-hidden">
         <h2
           class="text-sm font-semibold uppercase tracking-wider text-base-content/50 mb-4"
         >
           {{ t('monitor.watchNew') }}
         </h2>
-        <form @submit.prevent="onAdd" class="flex flex-col sm:flex-row gap-3">
+        <form @submit.prevent="onAdd" class="monitor-add-form space-y-3">
           <input
             v-model="newUrl"
-            type="text"
+            type="url"
+            inputmode="url"
+            autocapitalize="off"
+            autocorrect="off"
+            spellcheck="false"
             :placeholder="t('monitor.urlPlaceholder')"
-            class="input-modern flex-1 h-11 text-sm"
+            class="input-modern input-modern-plain w-full min-w-0 h-12 text-base sm:text-sm"
             :disabled="adding"
           />
-          <div class="flex items-center gap-2 shrink-0">
+          <div class="flex flex-col gap-2 sm:flex-row sm:items-stretch">
             <select
               v-model="newInterval"
-              class="select select-sm rounded-full border border-white/10 bg-base-100/85 focus:border-primary/60 h-11 px-3 text-sm"
+              class="select w-full sm:min-w-[10rem] sm:flex-1 rounded-2xl border border-white/10 bg-base-100/85 focus:border-primary/60 h-12 px-4 text-sm"
               :disabled="adding"
             >
               <option :value="15">{{ t('monitor.every15') }}</option>
@@ -47,7 +51,7 @@
             </select>
             <button
               type="submit"
-              class="btn btn-primary btn-sm h-11 px-5 rounded-full"
+              class="btn btn-primary h-12 w-full sm:w-auto sm:shrink-0 px-6 rounded-2xl"
               :disabled="adding || !newUrl.trim()"
             >
               <span v-if="adding" class="loading loading-spinner loading-xs" />

@@ -2,26 +2,14 @@
   <div class="min-h-0 overflow-x-hidden">
     <Navbar />
 
-    <main class="mx-auto max-w-5xl px-4 py-4 sm:py-8 sm:px-6">
-      <div class="mb-6 sm:mb-8 flex flex-wrap items-end justify-between gap-4 mobile-page-header">
-        <div>
-          <h1 class="text-2xl font-bold tracking-tight">
-            {{ t('health.title') }}
-          </h1>
-          <p class="mt-1 text-sm text-base-content/60">
-            {{ t('health.subtitle') }}
-          </p>
-        </div>
-        <button
-          class="btn btn-sm h-11 px-5 rounded-full border-white/10 bg-base-100/85 hover:bg-base-100"
-          @click="loadHealth"
-          :disabled="loading"
-          :title="t('common.refresh')"
-        >
-          <span v-if="loading" class="loading loading-spinner loading-xs mr-2" />
-          <Icon v-else icon="clarity:refresh-line" class="h-4 w-4 mr-2" />
-          {{ t('common.refresh') }}
-        </button>
+    <main class="mx-auto max-w-5xl w-full min-w-0 px-4 py-4 sm:py-8 sm:px-6 overflow-x-hidden">
+      <div class="mb-6 sm:mb-8 mobile-page-header">
+        <h1 class="text-2xl font-bold tracking-tight">
+          {{ t('health.title') }}
+        </h1>
+        <p class="mt-1 text-sm text-base-content/60">
+          {{ t('health.subtitle') }}
+        </p>
       </div>
 
       <div
@@ -36,10 +24,10 @@
         <div v-for="n in 6" :key="n" class="skeleton h-32 rounded-2xl" />
       </div>
 
-      <div v-else-if="health" class="space-y-6">
-        <section class="surface rounded-2xl p-5">
-          <div class="flex flex-wrap items-center justify-between gap-4">
-            <div class="flex items-center gap-3">
+      <div v-else-if="health" class="space-y-4 sm:space-y-6 min-w-0">
+        <section class="surface health-card rounded-2xl p-4 sm:p-5 min-w-0 overflow-hidden">
+          <div class="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+            <div class="flex min-w-0 items-center gap-3">
               <span
                 class="inline-flex h-11 w-11 items-center justify-center rounded-xl"
                 :class="
@@ -70,7 +58,7 @@
                 </p>
               </div>
             </div>
-            <div class="flex flex-wrap gap-2 text-xs">
+            <div class="flex min-w-0 flex-wrap gap-2 text-xs">
               <span class="pill bg-white/5 border border-white/10">
                 Python {{ health.python }}
               </span>
@@ -102,18 +90,18 @@
           </div>
         </section>
 
-        <section class="grid gap-4 md:grid-cols-2">
-          <div class="surface rounded-2xl p-5">
+        <section class="grid min-w-0 gap-4 md:grid-cols-2">
+          <div class="surface health-card rounded-2xl p-4 sm:p-5 min-w-0 overflow-hidden">
             <div class="mb-4 flex items-center justify-between gap-3">
               <h2 class="text-sm font-semibold uppercase text-base-content/50">
                 {{ t('health.downloads') }}
               </h2>
-              <Icon icon="clarity:download-line" class="h-5 w-5 text-primary" />
+              <Icon icon="clarity:download-line" class="h-5 w-5 shrink-0 text-primary" />
             </div>
             <p class="text-xs text-base-content/40">
               {{ downloadLocationLabel }}
             </p>
-            <p class="truncate text-sm font-medium">
+            <p class="mt-1 break-all text-sm font-medium leading-snug">
               {{ displayedDownloadPath }}
             </p>
             <div class="mt-4 h-2 overflow-hidden rounded-full bg-white/10">
@@ -122,18 +110,18 @@
                 :style="`width: ${health.downloads.disk.percent_used}%`"
               />
             </div>
-            <div class="mt-3 grid grid-cols-3 gap-3 text-xs">
-              <div>
+            <div class="health-stat-grid mt-3">
+              <div class="health-stat-item">
                 <p class="text-base-content/40">{{ t('health.audioFiles') }}</p>
                 <p class="font-semibold">{{ health.downloads.audio_count }}</p>
               </div>
-              <div>
+              <div class="health-stat-item">
                 <p class="text-base-content/40">{{ t('health.librarySize') }}</p>
                 <p class="font-semibold">
                   {{ formatBytes(health.downloads.size_bytes) }}
                 </p>
               </div>
-              <div>
+              <div class="health-stat-item">
                 <p class="text-base-content/40">{{ t('health.free') }}</p>
                 <p class="font-semibold">
                   {{ formatBytes(health.downloads.disk.free_bytes) }}
@@ -142,32 +130,34 @@
             </div>
           </div>
 
-          <div class="surface rounded-2xl p-5">
+          <div class="surface health-card rounded-2xl p-4 sm:p-5 min-w-0 overflow-hidden">
             <div class="mb-4 flex items-center justify-between gap-3">
               <h2 class="text-sm font-semibold uppercase text-base-content/50">
                 {{ t('health.data') }}
               </h2>
-              <Icon icon="clarity:folder-line" class="h-5 w-5 text-primary" />
+              <Icon icon="clarity:folder-line" class="h-5 w-5 shrink-0 text-primary" />
             </div>
-            <p class="truncate text-sm font-medium">{{ health.data.path }}</p>
+            <p class="break-all text-sm font-medium leading-snug">
+              {{ health.data.path }}
+            </p>
             <div class="mt-4 h-2 overflow-hidden rounded-full bg-white/10">
               <div
                 class="h-full bg-primary"
                 :style="`width: ${health.data.disk.percent_used}%`"
               />
             </div>
-            <div class="mt-3 grid grid-cols-3 gap-3 text-xs">
-              <div>
+            <div class="health-stat-grid mt-3">
+              <div class="health-stat-item">
                 <p class="text-base-content/40">{{ t('health.files') }}</p>
                 <p class="font-semibold">{{ health.data.file_count }}</p>
               </div>
-              <div>
+              <div class="health-stat-item">
                 <p class="text-base-content/40">{{ t('health.dataSize') }}</p>
                 <p class="font-semibold">
                   {{ formatBytes(health.data.size_bytes) }}
                 </p>
               </div>
-              <div>
+              <div class="health-stat-item">
                 <p class="text-base-content/40">{{ t('health.used') }}</p>
                 <p class="font-semibold">
                   {{ health.data.disk.percent_used }}%
@@ -177,8 +167,8 @@
           </div>
         </section>
 
-        <section class="grid gap-4 lg:grid-cols-[1fr_1fr]">
-          <div class="surface rounded-2xl p-5">
+        <section class="grid min-w-0 gap-4 lg:grid-cols-[1fr_1fr]">
+          <div class="surface health-card rounded-2xl p-4 sm:p-5 min-w-0 overflow-hidden">
             <h2 class="mb-4 text-sm font-semibold uppercase text-base-content/50">
               {{ t('health.tools') }}
             </h2>
@@ -190,7 +180,7 @@
               >
                 <div class="min-w-0">
                   <p class="text-sm font-medium">{{ tool.name }}</p>
-                  <p class="truncate text-xs text-base-content/40">
+                  <p class="break-all text-xs text-base-content/40 sm:truncate">
                     {{ tool.version || tool.path || t('health.notDetected') }}
                   </p>
                 </div>
@@ -208,20 +198,35 @@
             </ul>
           </div>
 
-          <div class="surface rounded-2xl p-5">
+          <div class="surface health-card rounded-2xl p-4 sm:p-5 min-w-0 overflow-hidden">
             <h2 class="mb-4 text-sm font-semibold uppercase text-base-content/50">
               {{ t('health.settings') }}
             </h2>
-            <div class="grid grid-cols-2 gap-3 text-sm">
-              <div v-for="item in settingRows" :key="item.label">
-                <p class="text-xs text-base-content/40">{{ item.label }}</p>
-                <p class="font-medium">{{ item.value }}</p>
-              </div>
-            </div>
+            <ul class="health-settings-list">
+              <li
+                v-for="item in settingRows"
+                :key="item.label"
+                class="health-settings-row"
+              >
+                <span class="health-settings-label">{{ item.label }}</span>
+                <span
+                  class="health-settings-value"
+                  :class="
+                    isToggleValue(item.value)
+                      ? item.value === t('common.yes')
+                        ? 'badge-soft'
+                        : 'badge-neutral-soft'
+                      : ''
+                  "
+                >
+                  {{ item.value }}
+                </span>
+              </li>
+            </ul>
           </div>
         </section>
 
-        <section class="surface rounded-2xl p-5">
+        <section class="surface health-card rounded-2xl p-4 sm:p-5 min-w-0 overflow-hidden">
           <div class="mb-4 flex items-center justify-between gap-3">
             <h2 class="text-sm font-semibold uppercase text-base-content/50">
               {{ t('health.recentHistory') }}
@@ -262,15 +267,17 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { Icon } from '@iconify/vue'
 import API from '../model/api'
 import Navbar from '../components/Navbar.vue'
 import { useDownloadDestination } from '../model/downloadDestination'
+import { useHealthRefresh } from '../model/healthRefresh'
 import { useI18n } from '../i18n'
 
 const { t } = useI18n()
 const downloadDestination = useDownloadDestination()
+const healthRefresh = useHealthRefresh()
 const health = ref(null)
 const loading = ref(false)
 const error = ref('')
@@ -333,10 +340,18 @@ const displayedDownloadPath = computed(() => {
   return health.value?.downloads?.external_path || health.value?.downloads?.path
 })
 
-onMounted(loadHealth)
+onMounted(() => {
+  healthRefresh.register(loadHealth)
+  loadHealth()
+})
+
+onUnmounted(() => {
+  healthRefresh.unregister()
+})
 
 async function loadHealth() {
   loading.value = true
+  healthRefresh.setLoading(true)
   error.value = ''
   try {
     const res = await API.getHealth()
@@ -345,6 +360,7 @@ async function loadHealth() {
     error.value = t('health.failedLoad')
   } finally {
     loading.value = false
+    healthRefresh.setLoading(false)
   }
 }
 
@@ -363,6 +379,10 @@ function formatBytes(value) {
 
 function yesNo(value) {
   return value ? t('common.yes') : t('common.no')
+}
+
+function isToggleValue(value) {
+  return value === t('common.yes') || value === t('common.no')
 }
 
 function historyClass(status) {

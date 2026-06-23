@@ -41,6 +41,8 @@ export default {
   },
   search: {
     placeholder: 'Busca o pega un enlace de Spotify o YouTube Music…',
+    libraryPlaceholder: 'Busca tu música descargada…',
+    libraryHint: 'Filtra la cola del reproductor a la música ya en este servidor.',
     title: 'Resultados de búsqueda',
     matchesFor: 'Mostrando coincidencias para',
     resultsCount: '- {count} resultado',
@@ -183,9 +185,11 @@ export default {
     fixed: 'Corregido',
     completed: 'Completado',
     clean: 'No necesita correccion',
+    cleanShort: 'Sin fix',
     listView: 'Vista de lista',
     gridView: 'Vista de tarjetas',
     repairFailed: 'Correccion fallida',
+    repairFailedShort: 'Fallido',
     artistImages: 'Imagenes locales de artistas',
     artistImagesSubtitle:
       'Busca carpetas de artistas sin imagen local y guarda arte nuevo como Nombre del artista.jpg/png/webp. Jellyfin puede mostrar arte en cache o de proveedores que no esta guardado en tu carpeta de musica.',
@@ -257,6 +261,7 @@ export default {
     applySelectedCover: 'Aplicar portada seleccionada',
     fixFailed: 'Reparación fallida',
     bulkFixGroup: 'Reparar este grupo',
+    bulkFixShort: 'Reparar',
     bulkFixAvailable: '{count} se pueden reparar',
     bulkFixReady: '{count} candidatos de imagen reparables en este grupo.',
     noRepairFile:
@@ -520,6 +525,8 @@ export default {
     playFromLibrary: 'Abrir en el reproductor',
     countOne: '{count} pista',
     countMany: '{count} pistas',
+    noFilterResults: 'Ninguna pista descargada coincide con tu búsqueda.',
+    clearFilter: 'Quitar filtro',
   },
   footer: {
     tagline: 'Descargador de música de código abierto',

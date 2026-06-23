@@ -56,14 +56,6 @@
 
       <section v-if="activeToolTab === 'metadata'" class="metadata-section">
         <div class="metadata-header">
-          <div class="min-w-0">
-            <h2 class="text-xl font-bold tracking-tight">
-              {{ t('metadata.metadataTab') }}
-            </h2>
-            <p class="mt-1 text-sm text-base-content/60">
-              {{ t('metadata.subtitle') }}
-            </p>
-          </div>
           <div class="metadata-toolbar">
             <select
               v-model.number="scanLimit"
@@ -128,25 +120,25 @@
         </div>
 
         <section class="metadata-stat-grid">
-          <div class="surface rounded-2xl p-4">
-            <p class="text-xs uppercase text-base-content/40">
+          <div class="metadata-stat-card surface rounded-2xl">
+            <p class="metadata-stat-label">
               {{ t('metadata.scanned') }}
             </p>
-            <p class="mt-1 text-2xl font-semibold">{{ summary.scanned }}</p>
+            <p class="metadata-stat-value">{{ summary.scanned }}</p>
           </div>
-          <div class="surface rounded-2xl p-4">
-            <p class="text-xs uppercase text-base-content/40">
+          <div class="metadata-stat-card surface rounded-2xl">
+            <p class="metadata-stat-label">
               {{ t('metadata.needsFix') }}
             </p>
-            <p class="mt-1 text-2xl font-semibold text-primary">
+            <p class="metadata-stat-value text-primary">
               {{ summary.matched }}
             </p>
           </div>
-          <div class="surface rounded-2xl p-4">
-            <p class="text-xs uppercase text-base-content/40">
+          <div class="metadata-stat-card surface rounded-2xl">
+            <p class="metadata-stat-label">
               {{ t('metadata.total') }}
             </p>
-            <p class="mt-1 text-2xl font-semibold">{{ summary.total }}</p>
+            <p class="metadata-stat-value">{{ summary.total }}</p>
           </div>
         </section>
 
@@ -342,14 +334,6 @@
 
       <section v-if="activeToolTab === 'images'" class="metadata-section">
         <div class="metadata-header">
-          <div class="min-w-0 flex-1">
-            <h2 class="text-xl font-bold tracking-tight">
-              {{ t('metadata.artistImages') }}
-            </h2>
-            <p class="mt-1 text-sm text-base-content/60">
-              {{ t('metadata.artistImagesSubtitle') }}
-            </p>
-          </div>
           <div class="metadata-toolbar">
             <select
               v-model.number="artistImageLimit"
@@ -416,49 +400,33 @@
         </div>
 
         <section class="metadata-stat-grid">
-          <div class="surface rounded-2xl p-4">
-            <p class="text-xs uppercase text-base-content/40">
+          <div class="metadata-stat-card surface rounded-2xl">
+            <p class="metadata-stat-label">
               {{ t('metadata.scanned') }}
             </p>
-            <p class="mt-1 text-2xl font-semibold">
+            <p class="metadata-stat-value">
               {{ artistImageSummary.scanned }}
             </p>
           </div>
-          <div class="surface rounded-2xl p-4">
-            <p class="text-xs uppercase text-base-content/40">
+          <div class="metadata-stat-card surface rounded-2xl">
+            <p class="metadata-stat-label">
               {{ t('metadata.missingImages') }}
             </p>
-            <p class="mt-1 text-2xl font-semibold text-primary">
+            <p class="metadata-stat-value text-primary">
               {{ artistImageItems.length }}
             </p>
-            <button
-              class="btn btn-primary btn-xs metadata-card-btn"
-              :disabled="artistImageItems.length === 0 || repairingAllImages"
-              @click="repairAllArtistImages"
-            >
-              <span
-                v-if="repairingAllImages"
-                class="loading loading-spinner loading-xs mr-2"
-              />
-              <Icon
-                v-else
-                icon="clarity:magic-wand-line"
-                class="h-4 w-4 mr-2"
-              />
-              {{ t('metadata.fixAllArtistImages') }}
-            </button>
           </div>
-          <div class="surface rounded-2xl p-4">
-            <p class="text-xs uppercase text-base-content/40">
+          <div class="metadata-stat-card surface rounded-2xl">
+            <p class="metadata-stat-label">
               {{ t('metadata.completed') }}
             </p>
-            <p class="mt-1 text-2xl font-semibold">
+            <p class="metadata-stat-value">
               {{ completedArtistImages.length }}
             </p>
           </div>
         </section>
 
-        <div class="metadata-tab-shell tab-glow-shell">
+        <div class="metadata-tab-shell metadata-filter-tab-shell tab-glow-shell">
           <button
             class="metadata-tab-btn"
             :class="
@@ -469,9 +437,7 @@
             @click="activeArtistImageTab = 'needs'"
           >
             {{ t('metadata.needsFix') }}
-            <span
-              class="ml-2 rounded-full bg-current/10 px-2 py-0.5 text-sm font-bold"
-            >
+            <span class="metadata-tab-badge">
               {{ artistImageItems.length }}
             </span>
           </button>
@@ -485,9 +451,7 @@
             @click="activeArtistImageTab = 'completed'"
           >
             {{ t('metadata.completed') }}
-            <span
-              class="ml-2 rounded-full bg-current/10 px-2 py-0.5 text-sm font-bold"
-            >
+            <span class="metadata-tab-badge">
               {{ completedArtistImages.length }}
             </span>
           </button>
@@ -500,10 +464,9 @@
             "
             @click="activeArtistImageTab = 'clean'"
           >
-            {{ t('metadata.clean') }}
-            <span
-              class="ml-2 rounded-full bg-current/10 px-2 py-0.5 text-sm font-bold"
-            >
+            <span class="sm:hidden">{{ t('metadata.cleanShort') }}</span>
+            <span class="hidden sm:inline">{{ t('metadata.clean') }}</span>
+            <span class="metadata-tab-badge">
               {{ cleanArtistImageItems.length }}
             </span>
           </button>
@@ -516,10 +479,9 @@
             "
             @click="activeArtistImageTab = 'failed'"
           >
-            {{ t('metadata.repairFailed') }}
-            <span
-              class="ml-2 rounded-full bg-current/10 px-2 py-0.5 text-sm font-bold"
-            >
+            <span class="sm:hidden">{{ t('metadata.repairFailedShort') }}</span>
+            <span class="hidden sm:inline">{{ t('metadata.repairFailed') }}</span>
+            <span class="metadata-tab-badge">
               {{ failedArtistImages.length }}
             </span>
           </button>
@@ -668,14 +630,6 @@
         class="metadata-section"
       >
         <div class="metadata-header">
-          <div class="min-w-0 flex-1">
-            <h2 class="text-xl font-bold tracking-tight">
-              {{ t('metadata.jellyfinTools') }}
-            </h2>
-            <p class="mt-1 text-sm text-base-content/60">
-              {{ t('metadata.jellyfinToolsSubtitle') }}
-            </p>
-          </div>
           <div class="metadata-toolbar">
             <button
               class="btn btn-primary btn-sm metadata-btn px-5"
@@ -725,34 +679,22 @@
         </div>
 
         <div class="metadata-stat-grid-4">
-          <div class="surface rounded-2xl p-4">
-            <p class="text-xs uppercase text-base-content/40">
+          <div class="metadata-stat-card surface rounded-2xl">
+            <p class="metadata-stat-label">
               {{ t('metadata.jellyfinLibrary') }}
             </p>
-            <p class="mt-1 truncate text-lg font-semibold">
+            <p class="metadata-stat-value metadata-stat-value-text">
               {{ jellyfinLibraryName }}
             </p>
-            <button
-              class="btn btn-primary btn-xs metadata-card-btn"
-              :disabled="refreshingJellyfin || reconcilingArtists"
-              @click="refreshJellyfin"
-            >
-              <span
-                v-if="refreshingJellyfin"
-                class="loading loading-spinner loading-xs mr-2"
-              />
-              <Icon v-else icon="clarity:sync-line" class="h-4 w-4 mr-2" />
-              {{ t('metadata.refreshJellyfin') }}
-            </button>
           </div>
-          <div class="surface rounded-2xl p-4">
-            <p class="text-xs uppercase text-base-content/40">
+          <div class="metadata-stat-card surface rounded-2xl">
+            <p class="metadata-stat-label">
               {{ t('metadata.jellyfinArtists') }}
             </p>
-            <p class="mt-1 text-2xl font-semibold text-primary">
+            <p class="metadata-stat-value text-primary">
               {{ jellyfinCounts.jellyfin }}
             </p>
-            <p class="mt-3 text-[11px] leading-snug text-base-content/45">
+            <p class="metadata-stat-hint">
               {{
                 t('metadata.bulkFixAvailable', {
                   count: jellyfinRepairableBucketItems('missing_images').length,
@@ -760,62 +702,78 @@
               }}
             </p>
           </div>
-          <div class="surface rounded-2xl p-4">
-            <p class="text-xs uppercase text-base-content/40">
+          <div class="metadata-stat-card surface rounded-2xl">
+            <p class="metadata-stat-label">
               {{ t('metadata.localArtistFolders') }}
             </p>
-            <p class="mt-1 text-2xl font-semibold">
+            <p class="metadata-stat-value">
               {{ jellyfinCounts.folders }}
             </p>
             <button
-              class="btn btn-primary btn-xs metadata-card-btn"
+              v-if="artistReconciliation"
+              class="btn btn-primary btn-xs metadata-stat-action"
               :disabled="
                 repairingJellyfinBucket === 'folder_only' ||
                 repairingAllJellyfin ||
                 reconcilingArtists ||
                 jellyfinRepairableBucketItems('folder_only').length === 0
               "
+              :title="t('metadata.bulkFixGroup')"
               @click="repairJellyfinBucket('folder_only')"
             >
               <span
                 v-if="repairingJellyfinBucket === 'folder_only'"
-                class="loading loading-spinner loading-xs mr-2"
+                class="loading loading-spinner loading-xs"
               />
               <Icon
                 v-else
                 icon="clarity:magic-wand-line"
-                class="h-4 w-4 mr-2"
+                class="h-4 w-4 shrink-0"
               />
-              {{ t('metadata.bulkFixGroup') }}
+              <span
+                v-if="repairingJellyfinBucket !== 'folder_only'"
+                class="metadata-stat-action-label"
+              >
+                <span class="sm:hidden">{{ t('metadata.bulkFixShort') }}</span>
+                <span class="hidden sm:inline">{{ t('metadata.bulkFixGroup') }}</span>
+              </span>
             </button>
           </div>
-          <div class="surface rounded-2xl p-4">
-            <p class="text-xs uppercase text-base-content/40">
+          <div class="metadata-stat-card surface rounded-2xl">
+            <p class="metadata-stat-label">
               {{ t('metadata.missingLocalImages') }}
             </p>
-            <p class="mt-1 text-2xl font-semibold text-primary">
+            <p class="metadata-stat-value text-primary">
               {{ jellyfinCounts.missingImages }}
             </p>
             <button
-              class="btn btn-primary btn-xs metadata-card-btn"
+              v-if="artistReconciliation"
+              class="btn btn-primary btn-xs metadata-stat-action"
               :disabled="
                 repairingJellyfinBucket === 'missing_images' ||
                 repairingAllJellyfin ||
                 reconcilingArtists ||
                 jellyfinRepairableBucketItems('missing_images').length === 0
               "
+              :title="t('metadata.bulkFixGroup')"
               @click="repairJellyfinBucket('missing_images')"
             >
               <span
                 v-if="repairingJellyfinBucket === 'missing_images'"
-                class="loading loading-spinner loading-xs mr-2"
+                class="loading loading-spinner loading-xs"
               />
               <Icon
                 v-else
                 icon="clarity:magic-wand-line"
-                class="h-4 w-4 mr-2"
+                class="h-4 w-4 shrink-0"
               />
-              {{ t('metadata.bulkFixGroup') }}
+              <span
+                v-if="repairingJellyfinBucket !== 'missing_images'"
+                class="metadata-stat-action-label"
+              >
+                <span class="sm:hidden">{{ t('metadata.bulkFixShort') }}</span>
+                <span class="hidden sm:inline">{{ t('metadata.bulkFixGroup') }}</span>
+              </span>
             </button>
           </div>
         </div>
@@ -2414,7 +2372,7 @@ async function syncJellyfinAfterImageRepairs(repairedCount) {
 }
 
 .metadata-tab-shell {
-  @apply mb-5 flex w-full max-w-full min-w-0 gap-1 overflow-x-auto rounded-2xl border bg-base-100/75 p-1 sm:mb-6 sm:inline-flex sm:w-auto sm:overflow-visible sm:rounded-full;
+  @apply mb-5 mx-auto flex w-max max-w-full min-w-0 gap-1 overflow-x-auto rounded-2xl border bg-base-100/75 p-1 sm:mb-6 sm:rounded-full;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
 }
@@ -2427,8 +2385,21 @@ async function syncJellyfinAfterImageRepairs(repairedCount) {
   @apply max-w-full shrink-0 whitespace-nowrap rounded-full px-3 py-2 text-sm font-medium transition-colors sm:px-4;
 }
 
+.metadata-filter-tab-shell {
+  @apply mb-5 w-full max-w-full grid grid-cols-2 gap-1 rounded-2xl sm:mb-6 sm:mx-auto sm:flex sm:w-max sm:max-w-full sm:rounded-full;
+}
+
+.metadata-filter-tab-shell .metadata-tab-btn {
+  @apply inline-flex w-full items-center justify-center gap-1 whitespace-normal px-2 py-2.5 text-center text-[11px] leading-tight sm:w-auto sm:gap-0 sm:whitespace-nowrap sm:px-4 sm:py-2 sm:text-left sm:text-sm sm:leading-normal;
+}
+
+.metadata-tab-badge {
+  @apply ml-1 inline-flex min-w-[1.1rem] shrink-0 items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none sm:ml-2 sm:min-w-0 sm:px-2 sm:text-sm;
+  background-color: color-mix(in srgb, currentColor 10%, transparent);
+}
+
 .metadata-header {
-  @apply mb-5 flex min-w-0 max-w-full flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between;
+  @apply mb-5 flex min-w-0 max-w-full flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end sm:justify-end;
 }
 
 .metadata-toolbar {
@@ -2471,11 +2442,40 @@ async function syncJellyfinAfterImageRepairs(repairedCount) {
 }
 
 .metadata-stat-grid {
-  @apply mb-5 grid min-w-0 max-w-full grid-cols-1 gap-3 min-[420px]:grid-cols-2 sm:grid-cols-3;
+  @apply mb-5 grid min-w-0 max-w-full grid-cols-3 gap-2 sm:gap-3;
+}
+
+.metadata-stat-card {
+  @apply flex min-w-0 max-w-full w-full flex-col items-center justify-center p-2.5 text-center sm:items-start sm:p-4 sm:text-left;
+}
+
+.metadata-stat-label {
+  @apply line-clamp-2 text-[10px] font-semibold uppercase leading-tight tracking-wide text-base-content/45 sm:text-xs;
+}
+
+.metadata-stat-value {
+  @apply mt-1 text-lg font-semibold leading-none tabular-nums sm:mt-1.5 sm:text-2xl;
+}
+
+.metadata-stat-value-text {
+  @apply normal-case leading-tight line-clamp-2 text-sm sm:text-lg;
+  overflow-wrap: anywhere;
+}
+
+.metadata-stat-hint {
+  @apply mt-1 line-clamp-2 text-[10px] font-normal normal-case leading-tight text-base-content/45 sm:text-[11px];
+}
+
+.metadata-stat-action {
+  @apply mt-2 inline-flex h-auto min-h-9 w-auto max-w-full self-center items-center justify-center gap-1.5 rounded-full px-3 py-2 normal-case sm:mt-3 sm:self-start sm:gap-2 sm:px-4;
+}
+
+.metadata-stat-action-label {
+  @apply text-[11px] font-semibold leading-none sm:text-xs;
 }
 
 .metadata-stat-grid-4 {
-  @apply mb-5 grid min-w-0 max-w-full grid-cols-1 gap-3 min-[420px]:grid-cols-2 xl:grid-cols-4;
+  @apply mb-5 grid min-w-0 max-w-full grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4;
 }
 
 .metadata-stat-grid > *,

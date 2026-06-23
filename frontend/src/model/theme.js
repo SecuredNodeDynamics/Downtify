@@ -1,9 +1,33 @@
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
+
+export const THEME_STORAGE_KEY = 'downtify-theme'
 
 const currentTheme = ref('')
 
 const lightAlias = ref('light')
 const darkAlias = ref('dark')
+
+let initialized = false
+
+function readStoredTheme() {
+  try {
+    const stored = localStorage.getItem(THEME_STORAGE_KEY)
+    if (stored === 'light' || stored === 'dark') {
+      return stored
+    }
+  } catch {
+    // Ignore storage errors (private mode, blocked storage, etc.).
+  }
+  return null
+}
+
+function persistTheme(theme) {
+  try {
+    localStorage.setItem(THEME_STORAGE_KEY, theme)
+  } catch {
+    // Ignore storage errors.
+  }
+}
 
 export function useBinaryThemeManager({
   useSystem = true,
@@ -24,20 +48,21 @@ export function useBinaryThemeManager({
     const darkThemeMq = window.matchMedia('(prefers-color-scheme: dark)')
     if (darkThemeMq.matches) {
       return 'dark'
-    } else {
-      return 'light'
     }
+    return 'light'
   }
 
   function setTheme(newTheme) {
+    if (newTheme !== 'light' && newTheme !== 'dark') {
+      return
+    }
     currentTheme.value = newTheme
+    persistTheme(newTheme)
     _updateDocument()
   }
 
   function switchTheme() {
-    if (currentTheme === 'dark') currentTheme.value = 'light'
-    else if (currentTheme === 'light') currentTheme.value = 'dark'
-    _updateDocument()
+    setTheme(currentTheme.value === 'dark' ? 'light' : 'dark')
   }
 
   function _updateDocument() {
@@ -47,12 +72,20 @@ export function useBinaryThemeManager({
     )
   }
 
-  if (currentTheme.value !== 'light' && currentTheme.value !== 'dark') {
-    if (useSystem) setTheme(getSystemTheme())
-    if (initialTheme === 'light' || initialTheme === 'dark') {
+  if (!initialized) {
+    initialized = true
+    const storedTheme = readStoredTheme()
+    if (storedTheme) {
+      currentTheme.value = storedTheme
+    } else if (initialTheme === 'light' || initialTheme === 'dark') {
       currentTheme.value = initialTheme
+    } else if (useSystem) {
+      currentTheme.value = getSystemTheme()
+    } else {
+      currentTheme.value = 'dark'
     }
   }
+
   if (newLightAlias) setLightAlias(newLightAlias)
   if (newDarkAlias) setDarkAlias(newDarkAlias)
 

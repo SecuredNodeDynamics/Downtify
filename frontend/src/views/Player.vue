@@ -211,38 +211,55 @@
 
         <!-- Queue list -->
         <aside class="player-queue surface rounded-3xl p-3 sm:p-5 lg:max-h-[640px] lg:overflow-y-auto">
-          <div class="mb-2 flex items-center justify-between px-1 sm:mb-3">
+          <div class="mb-2 flex items-center justify-between gap-2 px-1 sm:mb-3">
             <h2
               class="text-xs font-semibold uppercase tracking-wider text-base-content/50"
             >
               <span class="lg:hidden">{{ t('player.upNext') }}</span>
               <span class="hidden lg:inline">{{ t('player.queue') }}</span>
             </h2>
-            <span class="text-[11px] text-base-content/40">
+            <span class="text-[11px] text-base-content/40 shrink-0">
               {{
-                files.length === 1
-                  ? t('player.countOne', { count: files.length })
-                  : t('player.countMany', { count: files.length })
+                visibleFiles.length === 1
+                  ? t('player.countOne', { count: visibleFiles.length })
+                  : t('player.countMany', { count: visibleFiles.length })
               }}
             </span>
           </div>
 
-          <ul v-if="files.length > 0" class="space-y-1">
+          <div
+            v-if="libraryFilter"
+            class="mb-2 flex items-center gap-2 rounded-xl bg-primary/10 px-3 py-2 text-xs"
+          >
+            <Icon icon="clarity:search-line" class="h-4 w-4 shrink-0 text-primary" />
+            <span class="min-w-0 flex-1 truncate text-base-content/80">
+              {{ libraryFilter }}
+            </span>
+            <button
+              type="button"
+              class="shrink-0 font-medium text-primary"
+              @click="clearLibraryFilter"
+            >
+              {{ t('player.clearFilter') }}
+            </button>
+          </div>
+
+          <ul v-if="visibleFiles.length > 0" class="space-y-1">
             <li
-              v-for="(file, idx) in files"
+              v-for="file in visibleFiles"
               :key="file"
               class="rounded-xl px-2 py-2 flex items-center gap-3 cursor-pointer transition-colors"
               :class="
-                idx === player.currentIndex.value
+                isCurrentFile(file)
                   ? 'bg-primary/10 text-primary'
                   : 'hover:bg-white/5'
               "
-              @click="onPick(idx)"
+              @click="onPickByFile(file)"
             >
               <div
                 class="relative h-9 w-9 shrink-0 rounded-lg overflow-hidden flex items-center justify-center"
                 :class="
-                  idx === player.currentIndex.value
+                  isCurrentFile(file)
                     ? 'bg-primary/15'
                     : 'bg-base-100/60'
                 "
@@ -256,9 +273,7 @@
                   @error="markCoverFailed(file)"
                 />
                 <span
-                  v-if="
-                    idx === player.currentIndex.value && player.isPlaying.value
-                  "
+                  v-if="isCurrentFile(file) && player.isPlaying.value"
                   class="relative equalizer h-3"
                   aria-hidden="true"
                 >
@@ -281,6 +296,12 @@
             </li>
           </ul>
 
+          <div v-else-if="libraryFilter" class="text-center py-10">
+            <p class="text-base-content/50 text-sm">
+              {{ t('player.noFilterResults') }}
+            </p>
+          </div>
+
           <div v-else class="text-center py-10">
             <p class="text-base-content/50 text-sm">{{ t('player.empty') }}</p>
           </div>
@@ -296,10 +317,13 @@ import { Icon } from '@iconify/vue'
 import Navbar from '/src/components/Navbar.vue'
 import API from '/src/model/api'
 import { usePlayer, formatTime, trackInfoFromFile } from '/src/model/player'
+import { useMobileSearch } from '/src/model/mobileSearch'
 import { useI18n } from '/src/i18n'
 
 const { t } = useI18n()
 const player = usePlayer()
+const mobileSearch = useMobileSearch()
+const libraryFilter = mobileSearch.libraryFilter
 
 const files = ref([])
 const loading = ref(false)
@@ -343,6 +367,39 @@ function onPick(idx) {
 
 function trackInfo(file) {
   return trackInfoFromFile(file)
+}
+
+function fileMatchesFilter(file, query) {
+  const q = String(query || '')
+    .trim()
+    .toLowerCase()
+  if (!q) return true
+  const info = trackInfo(file)
+  return [info.title, info.artist, file].some((part) =>
+    String(part || '')
+      .toLowerCase()
+      .includes(q)
+  )
+}
+
+const visibleFiles = computed(() => {
+  const q = libraryFilter.value
+  if (!q) return files.value
+  return files.value.filter((file) => fileMatchesFilter(file, q))
+})
+
+function isCurrentFile(file) {
+  return player.currentTrack.value?.file === file
+}
+
+function clearLibraryFilter() {
+  mobileSearch.clearLibraryFilter()
+}
+
+function onPickByFile(file) {
+  const idx = files.value.indexOf(file)
+  if (idx < 0) return
+  onPick(idx)
 }
 
 const trackTitle = computed(() => {

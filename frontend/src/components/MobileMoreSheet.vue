@@ -8,6 +8,27 @@
 
       <div class="mobile-more-list">
         <button
+          type="button"
+          class="mobile-more-item"
+          :class="{ 'mobile-more-item-active': route.name === 'Download' }"
+          @click="go('Download')"
+        >
+          <Icon icon="clarity:download-line" class="h-5 w-5 shrink-0" />
+          <span class="flex-1 text-left">{{ t('nav.queue') }}</span>
+          <span
+            v-if="pt.activeDownloadCount.value > 0"
+            class="more-menu-badge"
+          >
+            {{ pt.activeDownloadCount.value }}
+          </span>
+          <Icon
+            v-else
+            icon="clarity:angle-line"
+            class="h-4 w-4 -rotate-90 opacity-40"
+          />
+        </button>
+
+        <button
           v-for="item in menuItems"
           :key="item.name"
           type="button"
@@ -65,11 +86,13 @@ import { Icon } from '@iconify/vue'
 import { useRoute } from 'vue-router'
 
 import router from '../router'
+import { useProgressTracker } from '../model/download'
 import { useBinaryThemeManager } from '../model/theme'
 import { useI18n } from '../i18n'
 
 const route = useRoute()
 const { t } = useI18n()
+const pt = useProgressTracker()
 const themeMgr = useBinaryThemeManager({
   newLightAlias: 'downtify-light',
   newDarkAlias: 'downtify-dark',

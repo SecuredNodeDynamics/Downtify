@@ -41,6 +41,8 @@ export default {
   },
   search: {
     placeholder: 'Search, paste a Spotify or YouTube Music link…',
+    libraryPlaceholder: 'Search your downloaded music…',
+    libraryHint: 'Filters the player queue to music already on this server.',
     title: 'Search results',
     matchesFor: 'Showing matches for',
     resultsCount: '- {count} result',
@@ -180,9 +182,11 @@ export default {
     fixed: 'Fixed',
     completed: 'Completed',
     clean: 'No Repair Needed',
+    cleanShort: 'No fix',
     listView: 'List view',
     gridView: 'Card grid view',
     repairFailed: 'Repair Failed',
+    repairFailedShort: 'Failed',
     artistImages: 'Local Artist Images',
     artistImagesSubtitle:
       'Find artist credits missing local image files, create missing artist folders, and save artwork as Artist Name.jpg/png/webp.',
@@ -251,6 +255,7 @@ export default {
     applySelectedCover: 'Apply selected cover',
     fixFailed: 'Fix failed',
     bulkFixGroup: 'Fix this group',
+    bulkFixShort: 'Fix group',
     bulkFixAvailable: '{count} can be fixed',
     bulkFixReady: '{count} repairable image candidates in this group.',
     noRepairFile: 'Run Artist Images scan to find a repair source.',
@@ -512,6 +517,8 @@ export default {
     playFromLibrary: 'Open in player',
     countOne: '{count} track',
     countMany: '{count} tracks',
+    noFilterResults: 'No downloaded tracks match your search.',
+    clearFilter: 'Clear filter',
   },
   footer: {
     tagline: 'Open source music downloader',
