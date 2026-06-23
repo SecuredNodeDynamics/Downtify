@@ -2143,9 +2143,9 @@ async function confirmArtistImageSelection() {
   const selection = artistImagePickerSelected.value
   if (!item || !selection) return
 
+  let ok = false
   artistImagePickerApplying.value = true
   try {
-    let ok = false
     if (artistImagePickerContext.value === 'jellyfin') {
       ok = await applyJellyfinArtistImage(item, {
         quiet: false,
@@ -2154,11 +2154,11 @@ async function confirmArtistImageSelection() {
     } else {
       ok = await applyArtistImageWithSelection(item, selection)
     }
+  } finally {
+    artistImagePickerApplying.value = false
     if (ok) {
       closeArtistImagePicker()
     }
-  } finally {
-    artistImagePickerApplying.value = false
   }
 }
 
