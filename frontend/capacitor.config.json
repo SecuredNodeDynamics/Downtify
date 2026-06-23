@@ -1,0 +1,11 @@
+{
+  "appId": "com.securednodedynamics.downtify",
+  "appName": "Downtify",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "http"
+  },
+  "android": {
+    "allowMixedContent": true
+  }
+}

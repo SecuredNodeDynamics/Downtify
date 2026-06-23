@@ -2,7 +2,7 @@
   <div class="min-h-0 overflow-x-hidden">
     <Navbar />
     <SearchList
-      :data="sm.results.value"
+      :data="filteredResults"
       :error="sm.error.value"
       @download="(song) => dm.queue(song)"
     />
@@ -10,7 +10,7 @@
 </template>
 
 <script setup>
-import { onMounted, watch } from 'vue'
+import { computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 
 import { useSearchManager } from '../model/search'
@@ -24,6 +24,8 @@ onMounted(() => window.scroll(0, 0))
 const route = useRoute()
 const sm = useSearchManager()
 const dm = useDownloadManager()
+
+const filteredResults = computed(() => sm.filterResults(sm.results.value))
 
 watch(
   () => route.params.query,

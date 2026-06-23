@@ -1,30 +1,7 @@
 <template>
-  <input type="checkbox" id="settings-modal" class="modal-toggle" />
-  <div class="modal modal-bottom sm:modal-middle">
-    <div
-      class="modal-box surface-strong rounded-t-3xl sm:rounded-3xl p-0 max-w-3xl max-h-[90dvh] overflow-y-auto"
-    >
-      <!-- Header -->
-      <div
-        class="flex items-center justify-between px-4 py-4 border-b border-white/5 sm:px-6"
-      >
-        <div>
-          <h3 class="text-lg font-bold tracking-tight">
-            {{ t('settings.title') }}
-          </h3>
-          <p class="text-xs text-base-content/50 mt-0.5">
-            {{ t('settings.subtitle') }}
-          </p>
-        </div>
-        <label
-          for="settings-modal"
-          class="icon-btn cursor-pointer"
-          :title="t('common.close')"
-        >
-          <Icon icon="clarity:close-line" class="h-5 w-5" />
-        </label>
-      </div>
-
+  <div
+    class="settings-panel surface-strong rounded-2xl sm:rounded-3xl overflow-hidden"
+  >
       <!-- Tabs -->
       <div class="settings-tabs-wrap px-4 sm:px-6">
         <div
@@ -522,8 +499,12 @@
               </button>
               <button
                 type="button"
-                class="btn btn-sm h-10 w-full rounded-full border-white/10 bg-base-100/85 px-4 hover:bg-base-100 sm:w-auto"
-                :class="canConnectDevice ? '' : 'btn-primary'"
+                class="btn btn-sm h-10 w-full rounded-full px-4 sm:w-auto"
+                :class="
+                  canConnectDevice
+                    ? 'border border-white/10 bg-base-100/85 text-base-content hover:bg-base-100'
+                    : 'btn-primary'
+                "
                 :disabled="serverTestLoading || !serverUrlInput.trim()"
                 @click="testServerConnection"
               >
@@ -539,8 +520,8 @@
               </button>
               <button
                 type="button"
-                class="btn btn-sm h-10 w-full rounded-full border-white/10 bg-base-100/85 px-4 hover:bg-base-100 sm:w-auto"
-                :disabled="!serverUrlInput.trim() || connectedToThisDevice"
+                class="btn btn-sm h-10 w-full rounded-full border border-white/10 bg-base-100/85 px-4 text-base-content hover:bg-base-100 sm:w-auto"
+                :disabled="!canSaveServerUrl || serverTestLoading"
                 @click="saveServerConnection"
               >
                 {{ t('settings.serverSave') }}
@@ -548,7 +529,7 @@
               <button
                 v-if="usesCustomServer && !connectedToThisDevice"
                 type="button"
-                class="btn btn-sm h-10 w-full rounded-full border-white/10 bg-base-100/85 px-4 hover:bg-base-100 sm:w-auto"
+                class="btn btn-sm h-10 w-full rounded-full border border-white/10 bg-base-100/85 px-4 text-base-content hover:bg-base-100 sm:w-auto"
                 @click="resetServerConnection"
               >
                 {{ t('settings.serverClear') }}
@@ -1098,12 +1079,6 @@
       <div
         class="flex items-center justify-end gap-2 px-4 py-4 border-t border-white/5 sm:px-6"
       >
-        <label
-          for="settings-modal"
-          class="btn btn-sm h-10 px-5 rounded-full border-white/10 bg-base-100/85 hover:bg-base-100 cursor-pointer"
-        >
-          {{ t('common.cancel') }}
-        </label>
         <button
           class="btn btn-primary btn-sm h-10 px-6 rounded-full"
           @click="sm.saveSettings()"
@@ -1111,15 +1086,12 @@
           {{ t('common.save') }}
         </button>
       </div>
-    </div>
-    <label class="modal-backdrop" for="settings-modal">{{
-      t('common.close')
-    }}</label>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { useRoute } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import axios from 'axios'
 import { useSettingsManager } from '../model/settings'
@@ -1127,10 +1099,12 @@ import { useDownloadDestination } from '../model/downloadDestination'
 import {
   buildApiBaseUrl,
   canConnectToCurrentPage,
+  canSaveServerUrlInput,
   formatServerDisplay,
   getCurrentPageServerUrl,
   getServerConfig,
   getStoredServerUrl,
+  isCapacitorNative,
   isConnectedToCurrentPage,
   parseServerUrl,
   setStoredServerUrl,
@@ -1139,6 +1113,8 @@ import {
 import { useI18n } from '../i18n'
 import API from '../model/api'
 import ThemedSelect from './ThemedSelect.vue'
+
+const route = useRoute()
 
 const sm = useSettingsManager()
 const {
@@ -1195,6 +1171,9 @@ const usesCustomServer = computed(() => usesCustomServerUrl())
 const activeServerDisplay = computed(() => formatServerDisplay(getServerConfig()))
 const canConnectDevice = computed(() => canConnectToCurrentPage())
 const connectedToThisDevice = computed(() => isConnectedToCurrentPage())
+const canSaveServerUrl = computed(() =>
+  canSaveServerUrlInput(serverUrlInput.value)
+)
 const repairLog = ref([])
 const repairLogLoading = ref(false)
 const repairLogError = ref('')
@@ -1228,12 +1207,23 @@ function markUpdateFailed(message) {
   updateFailureMessage.value = message || t('settings.updateFailed')
 }
 
-function openSettingsTab(event) {
-  const tab = event?.detail?.tab
+function applySettingsTab(tab) {
   if (settingsTabs.some((item) => item.id === tab)) {
     setActiveTab(tab)
   }
 }
+
+function openSettingsTab(event) {
+  applySettingsTab(event?.detail?.tab)
+}
+
+watch(
+  () => route.query.tab,
+  (tab) => {
+    if (typeof tab === 'string') applySettingsTab(tab)
+  },
+  { immediate: true }
+)
 
 onMounted(() =>
   window.addEventListener('downtify:open-settings', openSettingsTab)
@@ -1674,13 +1664,22 @@ async function testServerConnection() {
   }
 }
 
+function reloadAfterServerChange() {
+  if (isCapacitorNative()) {
+    API.reconnectBackend()
+    window.location.reload()
+    return
+  }
+  window.location.reload()
+}
+
 function connectToThisDevice() {
   const current = getCurrentPageServerUrl()
   if (!current) return
   serverUrlInput.value = current
   if (isConnectedToCurrentPage()) return
   setStoredServerUrl(current)
-  window.location.reload()
+  reloadAfterServerChange()
 }
 
 function saveServerConnection() {
@@ -1691,12 +1690,12 @@ function saveServerConnection() {
     return
   }
   setStoredServerUrl(serverUrlInput.value.trim())
-  window.location.reload()
+  reloadAfterServerChange()
 }
 
 function resetServerConnection() {
   setStoredServerUrl('')
-  window.location.reload()
+  reloadAfterServerChange()
 }
 
 async function testJellyfinApi() {

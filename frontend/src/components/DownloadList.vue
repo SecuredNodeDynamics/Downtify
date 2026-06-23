@@ -21,6 +21,8 @@
       </button>
     </div>
 
+    <ServerConnectionPrompt class="mb-4" />
+
     <!-- Empty state -->
     <div
       v-if="pt.downloadQueue.value.length === 0"
@@ -45,12 +47,18 @@
       >
         <!-- Cover -->
         <div class="track-cover h-16 w-16 sm:h-20 sm:w-20">
-          <img
+          <CoverImage
             v-if="item.song.cover_url"
-            :src="item.song.cover_url"
+            :src="coverSrc(item.song.cover_url)"
             :alt="item.song.name"
-            class="h-full w-full object-cover"
-          />
+            img-class="h-full w-full object-cover"
+          >
+            <template #fallback>
+              <div class="h-full w-full flex items-center justify-center text-base-content/30">
+                <Icon icon="clarity:music-note-line" class="h-6 w-6" />
+              </div>
+            </template>
+          </CoverImage>
           <div
             v-else
             class="h-full w-full flex items-center justify-center text-base-content/30"
@@ -222,12 +230,16 @@
           <div
             class="h-11 w-11 shrink-0 rounded-xl bg-primary/10 text-primary flex items-center justify-center overflow-hidden"
           >
-            <img
+            <CoverImage
               v-if="item.song?.cover_url"
-              :src="item.song.cover_url"
+              :src="coverSrc(item.song.cover_url)"
               :alt="item.title"
-              class="h-full w-full object-cover"
-            />
+              img-class="h-full w-full object-cover"
+            >
+              <template #fallback>
+                <Icon icon="clarity:music-note-line" class="h-5 w-5" />
+              </template>
+            </CoverImage>
             <Icon v-else icon="clarity:music-note-line" class="h-5 w-5" />
           </div>
 
@@ -318,6 +330,8 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import API from '../model/api'
+import CoverImage from './CoverImage.vue'
+import ServerConnectionPrompt from './ServerConnectionPrompt.vue'
 import { useProgressTracker, useDownloadManager } from '../model/download'
 import { useDownloadDestination } from '../model/downloadDestination'
 import { useI18n } from '../i18n'
@@ -333,6 +347,10 @@ const historyLoading = ref(false)
 const historyError = ref('')
 const historyPage = ref(1)
 const retrying = ref({})
+
+function coverSrc(url) {
+  return API.mediaUrl(url)
+}
 
 async function onClearAll() {
   if (!confirm(t('queue.clearAllPrompt'))) return

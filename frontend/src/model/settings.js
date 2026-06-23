@@ -1,6 +1,7 @@
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 
 import API from '/src/model/api'
+import { needsServerConnection } from '/src/model/serverConnection'
 
 const settings = ref({
   audio_providers: [''],
@@ -32,18 +33,34 @@ const settingsOptions = {
   output: '{artists} - {title}.{output-ext}',
 }
 
-API.getSettings().then((res) => {
-  if (res.status === 200) {
-    console.log('Received settings:', res.data)
-    settings.value = res.data
-  } else {
-    console.log('Error loading settings')
-  }
-})
+function isSettingsPayload(data) {
+  return Boolean(data) && typeof data === 'object' && !Array.isArray(data)
+}
+
+export function loadSettings() {
+  if (needsServerConnection()) return Promise.resolve()
+
+  return API.getSettings()
+    .then((res) => {
+      if (res.status === 200 && isSettingsPayload(res.data)) {
+        console.log('Received settings:', res.data)
+        settings.value = res.data
+      } else {
+        console.warn('Ignoring invalid /api/settings response')
+      }
+    })
+    .catch((error) => {
+      console.warn('Failed to load settings:', error)
+    })
+}
+
+loadSettings()
 
 export function useSettingsManager() {
   const isSaved = ref()
   function saveSettings() {
+    if (needsServerConnection()) return
+
     console.log('Saving settings:', settings.value)
     API.setSettings(settings.value).then((res) => {
       if (res.status === 200) {

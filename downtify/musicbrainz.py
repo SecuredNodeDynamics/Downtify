@@ -164,8 +164,9 @@ def _load_artist_genre_cache() -> None:
             payload = json.loads(path.read_text(encoding='utf-8'))
             if isinstance(payload, dict):
                 for key, value in payload.items():
-                    if isinstance(key, str) and isinstance(value, str):
-                        _ARTIST_GENRE_CACHE[key] = value
+                    genre = str(value or '').strip()
+                    if isinstance(key, str) and genre:
+                        _ARTIST_GENRE_CACHE[key] = genre
         except Exception:
             logger.opt(exception=True).warning(
                 'Failed to load artist genre cache from {}',
@@ -218,9 +219,20 @@ def lookup_artist_genre(artist_name: str, *, fetch: bool = True) -> str:
         return ''
 
     genre = _fetch_artist_genre_from_musicbrainz(name)
-    _ARTIST_GENRE_CACHE[cache_key] = genre
-    _save_artist_genre_cache()
+    if genre:
+        _ARTIST_GENRE_CACHE[cache_key] = genre
+        _save_artist_genre_cache()
     return genre
+
+
+def remember_artist_genre(artist_name: str, genre: str) -> None:
+    name = str(artist_name or '').strip()
+    label = str(genre or '').strip()
+    if not name or not label or _norm(name) == _norm('Unknown Artist'):
+        return
+    _load_artist_genre_cache()
+    _ARTIST_GENRE_CACHE[_norm(name)] = label
+    _save_artist_genre_cache()
 
 
 def _fetch_artist_genre_from_musicbrainz(artist_name: str) -> str:

@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import API from '/src/model/api'
 import { useDownloadDestination } from '/src/model/downloadDestination'
 import { useSettingsManager } from '/src/model/settings'
+import { needsServerConnection } from '/src/model/serverConnection'
 
 const downloadDestination = useDownloadDestination()
 
@@ -112,32 +113,37 @@ function maybeSaveToLocalMachine(item) {
 }
 
 API.ws_onmessage((event) => {
-  let data = JSON.parse(event.data)
-  let item = progressTracker.getBySong(data.song)
-  if (!item) {
-    progressTracker.appendSong(data.song)
-    item = progressTracker.getBySong(data.song)
-    if (!item) return
-  }
-  if (data.status === 'done') {
-    item.progress = 100
-    item.message = data.message || ''
-    if (data.filename) {
-      item.setWebURL(API.downloadFileURL(data.filename))
-      item.setFilename(data.filename)
+  try {
+    const data = JSON.parse(event.data)
+    if (!data?.song) return
+    let item = progressTracker.getBySong(data.song)
+    if (!item) {
+      progressTracker.appendSong(data.song)
+      item = progressTracker.getBySong(data.song)
+      if (!item) return
     }
-    item.setDownloaded()
-    historyRevision.value += 1
-    maybeSaveToLocalMachine(item)
-  } else if (data.status === 'error') {
-    item.wsUpdate(data)
-    item.setError()
-    historyRevision.value += 1
-  } else if (data.status === 'queued') {
-    item.message = data.message || ''
-  } else {
-    item.wsUpdate(data)
-    if (!item.isDownloading()) item.setDownloading()
+    if (data.status === 'done') {
+      item.progress = 100
+      item.message = data.message || ''
+      if (data.filename) {
+        item.setWebURL(API.downloadFileURL(data.filename))
+        item.setFilename(data.filename)
+      }
+      item.setDownloaded()
+      historyRevision.value += 1
+      maybeSaveToLocalMachine(item)
+    } else if (data.status === 'error') {
+      item.wsUpdate(data)
+      item.setError()
+      historyRevision.value += 1
+    } else if (data.status === 'queued') {
+      item.message = data.message || ''
+    } else {
+      item.wsUpdate(data)
+      if (!item.isDownloading()) item.setDownloading()
+    }
+  } catch (error) {
+    console.warn('Ignoring invalid WebSocket message:', error)
   }
 })
 API.ws_onerror((event) => {
@@ -145,6 +151,7 @@ API.ws_onerror((event) => {
 })
 
 async function _hydrateFromServer() {
+  if (needsServerConnection()) return
   try {
     const res = await API.getQueue()
     const jobs = res.data || []

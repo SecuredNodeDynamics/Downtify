@@ -4,25 +4,35 @@ import {
   buildApiBaseUrl,
   buildWsUrl,
   getServerConfig,
+  isCapacitorNative,
+  needsServerConnection,
+  usesCustomServerUrl,
 } from './serverConnection.js'
+import { libraryCoverFolders } from './library.js'
 
 import { v4 as uuidv4 } from 'uuid'
 
-const runtimeConfig = getServerConfig()
-console.log('using env:', process.env)
-console.log('using server config: ', runtimeConfig)
+const API = axios.create()
 
-const API = axios.create({
-  baseURL: buildApiBaseUrl(runtimeConfig),
+API.interceptors.request.use((config) => {
+  config.baseURL = buildApiBaseUrl(getServerConfig())
+  return config
 })
 
 const sessionID = uuidv4()
-console.log('session ID: ', sessionID)
 
 const SEMVER = /^\d+\.\d+\.\d+$/
 
+let wsConnection = null
+let wsMessageHandler = null
+let wsErrorHandler = null
+
 function isValidVersion(value) {
   return typeof value === 'string' && SEMVER.test(value.trim())
+}
+
+function isJsonObject(value) {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
 }
 
 function sanitizeStoredVersion() {
@@ -32,16 +42,53 @@ function sanitizeStoredVersion() {
   }
 }
 
-sanitizeStoredVersion()
-getVersion()
+function attachWebSocketHandlers(socket) {
+  socket.onopen = (event) => {
+    console.log('websocket connection opened', event)
+  }
+  socket.onmessage = (event) => {
+    try {
+      wsMessageHandler?.(event)
+    } catch (error) {
+      console.warn('WebSocket message handler failed:', error)
+    }
+  }
+  socket.onerror = (event) => {
+    wsErrorHandler?.(event)
+  }
+}
 
-const wsConnection = new WebSocket(buildWsUrl(runtimeConfig, sessionID))
+function ensureWebSocket() {
+  if (needsServerConnection()) {
+    if (wsConnection) {
+      wsConnection.close()
+      wsConnection = null
+    }
+    return null
+  }
 
-wsConnection.onopen = (event) => {
-  console.log('websocket connection opened', event)
+  const url = buildWsUrl(getServerConfig(), sessionID)
+  if (wsConnection && wsConnection.url === url) {
+    return wsConnection
+  }
+
+  if (wsConnection) {
+    wsConnection.close()
+  }
+
+  try {
+    wsConnection = new WebSocket(url)
+    attachWebSocketHandlers(wsConnection)
+  } catch (error) {
+    console.warn('Could not open websocket:', error)
+    wsConnection = null
+  }
+  return wsConnection
 }
 
 function getVersion() {
+  if (needsServerConnection()) return
+
   API.get('/api/version')
     .then((res) => {
       const version = String(res.data ?? '').trim()
@@ -54,7 +101,7 @@ function getVersion() {
       const prevItem = localStorage.getItem('version')
       console.log('Backend version: ', version)
       localStorage.setItem('version', version)
-      if (prevItem != version) {
+      if (prevItem != version && !isCapacitorNative()) {
         location.reload()
       }
     })
@@ -63,6 +110,12 @@ function getVersion() {
       console.log('Error getting version, using 0')
       localStorage.setItem('version', '0.0.0')
     })
+}
+
+sanitizeStoredVersion()
+if (!needsServerConnection()) {
+  getVersion()
+  ensureWebSocket()
 }
 
 function search(query) {
@@ -182,18 +235,98 @@ function encodePath(fileName) {
 }
 
 function downloadFileURL(fileName) {
-  return `/downloads/${encodePath(fileName)}`
+  const path = `/downloads/${encodePath(fileName)}`
+  if (isCapacitorNative() || usesCustomServerUrl()) {
+    return `${buildApiBaseUrl(getServerConfig())}${path}`
+  }
+  return path
 }
 
 function coverFileURL(fileName) {
-  return `/cover?file=${encodeURIComponent(fileName)}`
+  const file = String(fileName || '').trim()
+  if (!file) return ''
+  return apiAssetUrl(`/cover?${new URLSearchParams({ file })}`)
+}
+
+function coverFolderURL(folderPath) {
+  const folder = String(folderPath || '').trim()
+  if (!folder) return ''
+  return apiAssetUrl(
+    `/api/metadata/artist-images/folder-preview?${new URLSearchParams({ folder })}`
+  )
+}
+
+function coverUrlsForLibraryFile(fileName) {
+  const urls = [coverFileURL(fileName)]
+  for (const folder of libraryCoverFolders(fileName)) {
+    urls.push(coverFolderURL(folder))
+  }
+  return [...new Set(urls.filter(Boolean))]
+}
+
+function coverFallbackUrls(fileName) {
+  return coverUrlsForLibraryFile(fileName).slice(1)
+}
+
+const CDN_IMAGE_HOST_SUFFIXES = [
+  'scdn.co',
+  'spotifycdn.com',
+  'googleusercontent.com',
+  'ggpht.com',
+  'ytimg.com',
+  'mzstatic.com',
+]
+
+function isCdnImageUrl(url) {
+  try {
+    const host = new URL(url).hostname.toLowerCase()
+    return CDN_IMAGE_HOST_SUFFIXES.some(
+      (suffix) => host === suffix || host.endsWith(`.${suffix}`)
+    )
+  } catch {
+    return false
+  }
+}
+
+function shouldProxyRemoteImage(url) {
+  if (isCdnImageUrl(url)) return true
+  if (!isCapacitorNative()) return false
+  try {
+    const target = new URL(url)
+    const server = new URL(buildApiBaseUrl(getServerConfig()))
+    if (target.origin === server.origin) return false
+    return target.protocol === 'http:' || target.protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
+function mediaUrl(src) {
+  const value = String(src || '').trim()
+  if (!value) return ''
+  let resolved = value
+  if (/^https?:\/\//i.test(value)) {
+    resolved = value
+  } else if (value.startsWith('//')) {
+    resolved = `${getServerConfig().PROTOCOL}${value}`
+  } else {
+    return apiAssetUrl(value)
+  }
+  if (shouldProxyRemoteImage(resolved)) {
+    const base = buildApiBaseUrl(getServerConfig())
+    return `${base}/api/image-proxy?${new URLSearchParams({ url: resolved })}`
+  }
+  return resolved
 }
 
 function apiAssetUrl(path) {
   const value = String(path || '').trim()
   if (!value) return ''
   if (/^https?:\/\//i.test(value)) return value
-  return `${buildApiBaseUrl(getServerConfig())}${value.startsWith('/') ? value : `/${value}`}`
+  if (isCapacitorNative() || usesCustomServerUrl()) {
+    return `${buildApiBaseUrl(getServerConfig())}${value.startsWith('/') ? value : `/${value}`}`
+  }
+  return value.startsWith('/') ? value : `/${value}`
 }
 
 function listDownloads() {
@@ -202,6 +335,10 @@ function listDownloads() {
 
 function getLibraryFiles() {
   return API.get('/api/library/files')
+}
+
+function getLibraryGenresStatus() {
+  return API.get('/api/library/genres/status')
 }
 
 function deleteDownload(file) {
@@ -266,10 +403,29 @@ function refreshJellyfinLibrary() {
 }
 
 function ws_onmessage(fn) {
-  return (wsConnection.onmessage = fn)
+  wsMessageHandler = fn
+  ensureWebSocket()
+  return fn
 }
 function ws_onerror(fn) {
-  return (wsConnection.onerror = fn)
+  wsErrorHandler = fn
+  ensureWebSocket()
+  return fn
+}
+
+function reconnectBackend() {
+  getVersion()
+  ensureWebSocket()
+}
+
+export function isHealthPayload(data) {
+  return (
+    isJsonObject(data) &&
+    typeof data.status === 'string' &&
+    isJsonObject(data.tools) &&
+    isJsonObject(data.queue) &&
+    isJsonObject(data.history)
+  )
 }
 
 export default {
@@ -282,9 +438,14 @@ export default {
   audioPreview,
   downloadFileURL,
   coverFileURL,
+  coverFolderURL,
+  coverUrlsForLibraryFile,
+  coverFallbackUrls,
   apiAssetUrl,
+  mediaUrl,
   listDownloads,
   getLibraryFiles,
+  getLibraryGenresStatus,
   deleteDownload,
   writePlaylistM3u,
   getQueue,
@@ -314,4 +475,6 @@ export default {
   ws_onmessage,
   ws_onerror,
   getVersion,
+  reconnectBackend,
+  isHealthPayload,
 }

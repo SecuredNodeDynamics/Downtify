@@ -58,9 +58,15 @@ from . import (
     providers,
     spotify,
 )
+from .cover_art import cover_response_for_file
 from .downloader import Downloader, preview_audio_for_song
 from .history import DownloadHistoryDB
-from .library_index import list_library_files
+from .image_proxy import fetch_remote_image, is_allowed_image_url
+from .library_index import (
+    list_library_files,
+    list_library_files_fast,
+    warm_library_genres,
+)
 from .monitor import PlaylistMonitorDB, check_playlist
 from .versioning import parse_version
 
@@ -414,6 +420,23 @@ class AppState:
         'complete': False,
     }
     artist_image_scan_task: Optional[asyncio.Task] = None
+    genre_warmup: dict[str, Any] = {
+        'status': 'idle',
+        'phase': '',
+        'current': 0,
+        'total': 0,
+        'albums_warmed': 0,
+        'tagged_tracks': 0,
+        'total_tracks': 0,
+        'error': '',
+    }
+    genre_warmup_task: Optional[asyncio.Task] = None
+    library_files_cache: dict[str, Any] = {
+        'root': '',
+        'items': [],
+        'built_at': 0.0,
+        'building': False,
+    }
     repair_log: list[dict[str, Any]] = []
 
 
@@ -1282,12 +1305,175 @@ def get_library_files() -> list[dict[str, str]]:
         if state.downloader is not None
         else state.default_download_dir
     )
-    return list_library_files(download_dir)
+    root_key = str(download_dir.resolve())
+    cache = state.library_files_cache
+    if cache.get('root') == root_key and cache.get('items'):
+        return list(cache['items'])
+
+    items = list_library_files_fast(download_dir)
+    schedule_library_files_cache_refresh()
+    return items
+
+
+def invalidate_library_files_cache() -> None:
+    state.library_files_cache = {
+        'root': '',
+        'items': [],
+        'built_at': 0.0,
+        'building': False,
+    }
+
+
+def schedule_library_files_cache_refresh() -> None:
+    download_dir = (
+        _active_download_dir()
+        if state.downloader is not None
+        else state.default_download_dir
+    )
+    root_key = str(download_dir.resolve())
+    cache = state.library_files_cache
+    if cache.get('root') == root_key and cache.get('items'):
+        return
+    if cache.get('building'):
+        return
+    loop = state.loop
+    if loop is None:
+        return
+    state.library_files_cache = {**cache, 'building': True}
+    asyncio.run_coroutine_threadsafe(_refresh_library_files_cache(), loop)
+
+
+async def _refresh_library_files_cache() -> None:
+    download_dir = (
+        _active_download_dir()
+        if state.downloader is not None
+        else state.default_download_dir
+    )
+    root_key = str(download_dir.resolve())
+    try:
+        items = await asyncio.to_thread(
+            list_library_files,
+            download_dir,
+            fetch_missing_genres=False,
+        )
+        state.library_files_cache = {
+            'root': root_key,
+            'items': items,
+            'built_at': time.monotonic(),
+            'building': False,
+        }
+    except Exception:
+        logger.opt(exception=True).warning('Library files cache refresh failed')
+        state.library_files_cache = {
+            **state.library_files_cache,
+            'building': False,
+        }
+
+
+async def warm_library_files_cache() -> None:
+    download_dir = (
+        _active_download_dir()
+        if state.downloader is not None
+        else state.default_download_dir
+    )
+    root_key = str(download_dir.resolve())
+    if state.library_files_cache.get('root') == root_key and state.library_files_cache.get(
+        'items'
+    ):
+        return
+    await _refresh_library_files_cache()
+
+
+async def _run_genre_warmup() -> None:
+    download_dir = (
+        _active_download_dir()
+        if state.downloader is not None
+        else state.default_download_dir
+    )
+    state.genre_warmup = {
+        **state.genre_warmup,
+        'status': 'running',
+        'phase': 'artists',
+        'error': '',
+    }
+
+    def progress(update: dict[str, Any]) -> None:
+        state.genre_warmup = {
+            **state.genre_warmup,
+            'status': 'running',
+            **update,
+        }
+
+    try:
+        result = await asyncio.to_thread(
+            warm_library_genres,
+            download_dir,
+            progress_cb=progress,
+        )
+        state.genre_warmup = {
+            'status': 'complete',
+            'phase': 'done',
+            'current': 0,
+            'total': 0,
+            'error': '',
+            **result,
+        }
+    except Exception as exc:
+        logger.opt(exception=True).warning('Genre warmup failed')
+        state.genre_warmup = {
+            **state.genre_warmup,
+            'status': 'error',
+            'error': str(exc),
+        }
+
+
+async def start_genre_warmup() -> None:
+    task = state.genre_warmup_task
+    if task is not None and not task.done():
+        return
+    state.genre_warmup_task = asyncio.create_task(_run_genre_warmup())
+
+
+@router.get('/api/library/genres/status')
+def library_genres_status() -> dict[str, Any]:
+    return dict(state.genre_warmup)
 
 
 @router.get('/api/songs/search')
 def search_endpoint(query: str = Query('')) -> list[dict[str, Any]]:
     return providers.search_media(query, limit=80)
+
+
+@router.get('/api/image-proxy')
+def image_proxy(url: str = Query('')) -> Response:
+    """Proxy album-art CDN URLs for mobile WebViews that block hotlinked images."""
+
+    target = str(url or '').strip()
+    if not is_allowed_image_url(target):
+        raise HTTPException(status_code=400, detail='Invalid image URL')
+    try:
+        data, mime = fetch_remote_image(target)
+    except Exception as exc:
+        logger.opt(exception=True).debug('Image proxy failed for {!r}', target)
+        raise HTTPException(status_code=502, detail='Image fetch failed') from exc
+    return Response(
+        content=data,
+        media_type=mime,
+        headers={
+            'Cache-Control': 'public, max-age=86400',
+            'Access-Control-Allow-Origin': '*',
+        },
+    )
+
+
+@router.get('/api/library/cover')
+def library_cover(file: str = Query('')) -> Response:
+    download_dir = (
+        _active_download_dir()
+        if state.downloader is not None
+        else state.default_download_dir
+    )
+    return cover_response_for_file(download_dir, file)
 
 
 def _metadata_scan_status() -> dict[str, Any]:
@@ -2515,6 +2701,8 @@ async def _run_download(
     job['progress'] = 100
     if history_id is not None and state.history_db is not None:
         state.history_db.mark_done(history_id, filename)
+    invalidate_library_files_cache()
+    schedule_library_files_cache_refresh()
     await state.connections.broadcast({
         'song': song,
         'progress': 100,

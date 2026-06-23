@@ -13,25 +13,48 @@
     <BottomNav />
     <MobileMoreSheet />
     <MobileSearchSheet />
-    <Settings />
   </div>
 </template>
 
 <script setup>
-import { onBeforeMount } from 'vue'
+import { onBeforeMount, onMounted } from 'vue'
 import BottomNav from './components/BottomNav.vue'
 import Footer from './components/Footer.vue'
 import MobileAppBar from './components/MobileAppBar.vue'
 import MobileMoreSheet from './components/MobileMoreSheet.vue'
 import MobileSearchSheet from './components/MobileSearchSheet.vue'
-import Settings from './components/Settings.vue'
 import StarField from './components/StarField.vue'
+import router from './router'
 import { useBinaryThemeManager } from './model/theme'
 
 const themeMgr = useBinaryThemeManager()
 onBeforeMount(() => {
   themeMgr.setLightAlias('downtify-light')
   themeMgr.setDarkAlias('downtify-dark')
+})
+
+onMounted(async () => {
+  const capacitor = window.Capacitor
+  if (!capacitor?.isNativePlatform?.()) return
+  try {
+    const { App } = await import('@capacitor/app')
+    await App.addListener('backButton', () => {
+      for (const id of ['mobile-more-sheet', 'mobile-search-sheet']) {
+        const sheet = document.getElementById(id)
+        if (sheet?.checked) {
+          sheet.checked = false
+          return
+        }
+      }
+      if (window.history.length > 1 && router.currentRoute.value.name !== 'Home') {
+        router.back()
+        return
+      }
+      App.exitApp()
+    })
+  } catch {
+    // Capacitor app plugin unavailable in web builds.
+  }
 })
 </script>
 

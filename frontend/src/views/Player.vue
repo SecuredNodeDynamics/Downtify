@@ -3,7 +3,7 @@
     <Navbar />
 
     <div
-      class="player-page mx-auto flex w-full max-w-5xl flex-1 flex-col px-4 py-2 sm:px-6 sm:py-8 min-h-0"
+      class="player-page mx-auto flex w-full max-w-5xl flex-col px-4 py-2 sm:flex-1 sm:px-6 sm:py-8 min-h-0"
     >
       <!-- Header -->
       <div class="mb-4 sm:mb-8 mobile-page-header shrink-0">
@@ -38,9 +38,9 @@
       </div>
 
       <!-- Player + queue -->
-      <div v-else class="player-shell min-h-0 flex-1">
+      <div v-else class="player-shell min-h-0 lg:flex-1">
         <!-- Now playing -->
-        <section class="player-now surface rounded-3xl p-4 sm:p-8 flex flex-col items-center text-center">
+        <section class="player-now surface rounded-3xl p-3 sm:p-8 flex flex-col items-center text-center">
           <p
             class="mb-3 w-full text-left text-xs font-semibold uppercase tracking-wider text-base-content/50 lg:hidden"
           >
@@ -52,18 +52,22 @@
             class="player-cover relative flex items-center justify-center overflow-hidden rounded-2xl bg-primary/10 text-primary shadow-glow sm:rounded-3xl"
             :class="{ 'pulse-glow': player.isPlaying.value }"
           >
-            <img
-              v-if="
-                player.currentTrack.value &&
-                player.currentTrack.value.cover &&
-                !coverFailed[player.currentTrack.value.file]
-              "
+            <CoverImage
+              v-if="player.currentTrack.value?.cover"
               :src="player.currentTrack.value.cover"
+              :fallbacks="coverFallbacksFor(player.currentTrack.value?.file)"
               :alt="player.currentTrack.value.title"
-              class="absolute inset-0 h-full w-full object-cover"
-              @error="markCoverFailed(player.currentTrack.value.file)"
+              img-class="absolute inset-0 h-full w-full object-cover"
+            >
+              <template #fallback>
+                <Icon icon="clarity:music-note-line" class="h-16 w-16 sm:h-24 sm:w-24" />
+              </template>
+            </CoverImage>
+            <Icon
+              v-else
+              icon="clarity:music-note-line"
+              class="h-16 w-16 sm:h-24 sm:w-24"
             />
-            <Icon v-else icon="clarity:music-note-line" class="h-16 w-16 sm:h-24 sm:w-24" />
             <div
               v-if="player.isPlaying.value"
               class="absolute bottom-2 right-2 equalizer h-5 sm:bottom-3 sm:right-3"
@@ -74,7 +78,7 @@
           </div>
 
           <!-- Title / artist -->
-          <div class="mt-4 w-full sm:mt-6">
+          <div class="mt-3 w-full sm:mt-6">
             <p class="text-lg font-bold tracking-tight truncate sm:text-xl">
               {{ trackTitle }}
             </p>
@@ -84,7 +88,7 @@
           </div>
 
           <!-- Progress -->
-          <div class="mt-4 w-full sm:mt-6">
+          <div class="mt-3 w-full sm:mt-6">
             <div
               class="player-progress"
               ref="progressBar"
@@ -111,7 +115,7 @@
           </div>
 
           <!-- Transport -->
-          <div class="mt-4 flex items-center justify-center gap-2 sm:mt-5 sm:gap-3">
+          <div class="mt-3 flex items-center justify-center gap-2 sm:mt-5 sm:gap-3">
             <button
               class="icon-btn h-9 w-9 sm:h-10 sm:w-10"
               :class="{ 'icon-btn-active': player.shuffle.value }"
@@ -210,7 +214,9 @@
         </section>
 
         <!-- Library browser -->
-        <aside class="player-queue surface rounded-3xl p-3 sm:p-5 lg:max-h-[640px] lg:overflow-y-auto">
+        <aside
+          class="player-queue surface flex flex-col rounded-3xl p-3 sm:p-5 lg:max-h-[640px] lg:overflow-y-auto"
+        >
           <div class="mb-2 flex items-center justify-between gap-2 px-1 sm:mb-3">
             <div class="min-w-0">
               <h2
@@ -225,9 +231,20 @@
                 {{ browseSubtitle }}
               </p>
             </div>
-            <span class="shrink-0 text-[11px] text-base-content/40">
-              {{ browseCountText }}
-            </span>
+            <div class="flex shrink-0 items-center gap-2">
+              <button
+                v-if="browsePlayFiles.length"
+                type="button"
+                class="btn btn-primary btn-xs h-8 rounded-full px-3"
+                @click="playFiles(browsePlayFiles)"
+              >
+                <Icon icon="clarity:play-line" class="h-3.5 w-3.5" />
+                {{ t('player.playAll') }}
+              </button>
+              <span class="text-[11px] text-base-content/40">
+                {{ browseCountText }}
+              </span>
+            </div>
           </div>
 
           <button
@@ -278,41 +295,59 @@
             </button>
           </div>
 
-          <div class="player-browse-body">
+          <div class="player-browse-body min-h-0 flex-1 overflow-y-auto">
+            <div
+              v-if="loading && libraryItems.length === 0"
+              class="player-browse-grid"
+            >
+              <div v-for="n in 6" :key="n" class="skeleton aspect-[4/5] rounded-2xl" />
+            </div>
+
             <ul
-              v-if="browseView === 'artists'"
-              class="player-browse-list"
+              v-else-if="browseView === 'artists'"
+              class="player-browse-grid"
             >
               <li v-for="artist in filteredArtists" :key="artist.name">
-                <button
-                  type="button"
-                  class="player-browse-row"
+                <article
+                  class="player-browse-card"
+                  role="button"
+                  tabindex="0"
                   @click="openArtist(artist.name)"
+                  @keydown.enter="openArtist(artist.name)"
+                  @keydown.space.prevent="openArtist(artist.name)"
                 >
-                  <div class="player-browse-covers">
-                    <div
-                      v-for="file in artist.previewFiles"
-                      :key="file"
-                      class="player-browse-cover"
+                  <div class="player-browse-card-cover">
+                    <CoverImage
+                      v-if="artistCoverSources(artist).length"
+                      :src="artistCoverSources(artist)[0]"
+                      :fallbacks="artistCoverSources(artist).slice(1)"
+                      :alt="artist.name"
+                      img-class="absolute inset-0 h-full w-full object-cover"
                     >
-                      <img
-                        v-if="!coverFailed[file]"
-                        :src="coverUrlFor(file)"
-                        :alt="artist.name"
-                        class="absolute inset-0 h-full w-full object-cover"
-                        loading="lazy"
-                        @error="markCoverFailed(file)"
-                      />
-                      <Icon
-                        v-else
-                        icon="clarity:user-line"
-                        class="h-4 w-4 text-base-content/50"
-                      />
-                    </div>
+                      <template #fallback>
+                        <Icon
+                          icon="clarity:user-line"
+                          class="absolute left-1/2 top-1/2 h-8 w-8 -translate-x-1/2 -translate-y-1/2 text-base-content/40"
+                        />
+                      </template>
+                    </CoverImage>
+                    <Icon
+                      v-else
+                      icon="clarity:user-line"
+                      class="absolute left-1/2 top-1/2 h-8 w-8 -translate-x-1/2 -translate-y-1/2 text-base-content/40"
+                    />
+                    <button
+                      type="button"
+                      class="player-browse-card-play"
+                      :title="t('library.playArtist')"
+                      @click.stop="playFiles(artist.files)"
+                    >
+                      <Icon icon="clarity:play-line" class="h-4 w-4" />
+                    </button>
                   </div>
-                  <div class="min-w-0 flex-1 text-left">
-                    <p class="truncate text-sm font-medium">{{ artist.name }}</p>
-                    <p class="truncate text-[11px] text-base-content/50">
+                  <div class="player-browse-card-body">
+                    <p class="player-browse-card-title">{{ artist.name }}</p>
+                    <p class="player-browse-card-sub">
                       {{
                         t('library.artistMeta', {
                           tracks: artist.files.length,
@@ -321,99 +356,97 @@
                       }}
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    class="player-browse-play icon-btn shrink-0"
-                    :title="t('library.playArtist')"
-                    @click.stop="playFiles(artist.files)"
-                  >
-                    <Icon icon="clarity:play-line" class="h-4 w-4" />
-                  </button>
-                </button>
+                </article>
               </li>
             </ul>
 
             <ul
               v-else-if="browseView === 'albums' || browseView === 'artist-albums'"
-              class="player-browse-list"
+              class="player-browse-grid"
             >
               <li
                 v-for="album in visibleAlbums"
                 :key="album.key"
               >
-                <button
-                  type="button"
-                  class="player-browse-row"
+                <article
+                  class="player-browse-card"
+                  role="button"
+                  tabindex="0"
                   @click="openAlbum(album.key)"
+                  @keydown.enter="openAlbum(album.key)"
+                  @keydown.space.prevent="openAlbum(album.key)"
                 >
-                  <div class="player-browse-cover player-browse-cover-lg">
-                    <img
-                      v-if="!coverFailed[album.coverFile]"
+                  <div class="player-browse-card-cover">
+                    <CoverImage
                       :src="coverUrlFor(album.coverFile)"
+                      :fallbacks="coverFallbacksFor(album.coverFile)"
                       :alt="album.name"
-                      class="absolute inset-0 h-full w-full object-cover"
-                      loading="lazy"
-                      @error="markCoverFailed(album.coverFile)"
-                    />
-                    <Icon
-                      v-else
-                      icon="clarity:album-line"
-                      class="h-5 w-5 text-base-content/50"
-                    />
+                      img-class="absolute inset-0 h-full w-full object-cover"
+                    >
+                      <template #fallback>
+                        <Icon
+                          icon="clarity:album-line"
+                          class="absolute left-1/2 top-1/2 h-8 w-8 -translate-x-1/2 -translate-y-1/2 text-base-content/40"
+                        />
+                      </template>
+                    </CoverImage>
+                    <button
+                      type="button"
+                      class="player-browse-card-play"
+                      :title="t('library.playAlbum')"
+                      @click.stop="playFiles(album.files)"
+                    >
+                      <Icon icon="clarity:play-line" class="h-4 w-4" />
+                    </button>
                   </div>
-                  <div class="min-w-0 flex-1 text-left">
-                    <p class="truncate text-sm font-medium">{{ album.name }}</p>
-                    <p class="truncate text-[11px] text-base-content/50">
-                      {{ album.artist }}
-                    </p>
-                    <p class="text-[11px] text-base-content/40">
+                  <div class="player-browse-card-body">
+                    <p class="player-browse-card-title">{{ album.name }}</p>
+                    <p class="player-browse-card-sub">{{ album.artist }}</p>
+                    <p class="player-browse-card-meta">
                       {{ t('library.albumMeta', { tracks: album.files.length }) }}
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    class="player-browse-play icon-btn shrink-0"
-                    :title="t('library.playAlbum')"
-                    @click.stop="playFiles(album.files)"
-                  >
-                    <Icon icon="clarity:play-line" class="h-4 w-4" />
-                  </button>
-                </button>
+                </article>
               </li>
             </ul>
 
             <ul
               v-else-if="browseView === 'genres'"
-              class="player-browse-list"
+              class="player-browse-grid"
             >
               <li v-for="genre in filteredGenres" :key="genre.name">
-                <button
-                  type="button"
-                  class="player-browse-row"
+                <article
+                  class="player-browse-card"
+                  role="button"
+                  tabindex="0"
                   @click="openGenre(genre.name)"
+                  @keydown.enter="openGenre(genre.name)"
+                  @keydown.space.prevent="openGenre(genre.name)"
                 >
-                  <div class="player-browse-cover player-browse-cover-lg">
-                    <Icon icon="clarity:tags-line" class="h-5 w-5 text-primary/80" />
+                  <div class="player-browse-card-cover player-browse-card-cover-icon">
+                    <Icon icon="clarity:tags-line" class="h-8 w-8 text-primary/80" />
+                    <button
+                      type="button"
+                      class="player-browse-card-play"
+                      :title="t('library.playGenre')"
+                      @click.stop="playFiles(genre.files)"
+                    >
+                      <Icon icon="clarity:play-line" class="h-4 w-4" />
+                    </button>
                   </div>
-                  <div class="min-w-0 flex-1 text-left">
-                    <p class="truncate text-sm font-medium">{{ genre.name }}</p>
-                    <p class="text-[11px] text-base-content/50">
-                      {{
-                        t('player.genreMeta', { count: genre.files.length })
-                      }}
+                  <div class="player-browse-card-body">
+                    <p class="player-browse-card-title">{{ genre.name }}</p>
+                    <p class="player-browse-card-sub">
+                      {{ t('player.genreMeta', { count: genre.files.length }) }}
                     </p>
                   </div>
-                  <Icon
-                    icon="clarity:angle-line"
-                    class="h-4 w-4 shrink-0 text-base-content/35"
-                  />
-                </button>
+                </article>
               </li>
             </ul>
 
             <ul
               v-else-if="browseView === 'tracks' && visibleTrackItems.length > 0"
-              class="player-browse-list"
+              class="player-browse-grid"
             >
               <li
                 v-for="item in visibleTrackItems"
@@ -421,38 +454,38 @@
               >
                 <button
                   type="button"
-                  class="player-browse-row"
-                  :class="{ 'player-browse-row-active': isCurrentFile(item.file) }"
+                  class="player-browse-card"
+                  :class="{ 'player-browse-card-active': isCurrentFile(item.file) }"
                   @click="playFiles(visibleTrackFiles, item.file)"
                 >
                   <div
-                    class="player-browse-cover"
-                    :class="{ 'ring-2 ring-primary/40': isCurrentFile(item.file) }"
+                    class="player-browse-card-cover"
+                    :class="{ 'ring-2 ring-primary/50': isCurrentFile(item.file) }"
                   >
-                    <img
-                      v-if="!coverFailed[item.file]"
+                    <CoverImage
                       :src="coverUrlFor(item.file)"
+                      :fallbacks="coverFallbacksFor(item.file)"
                       :alt="item.title"
-                      class="absolute inset-0 h-full w-full object-cover"
-                      loading="lazy"
-                      @error="markCoverFailed(item.file)"
-                    />
+                      img-class="absolute inset-0 h-full w-full object-cover"
+                    >
+                      <template #fallback>
+                        <Icon
+                          icon="clarity:music-note-line"
+                          class="absolute left-1/2 top-1/2 h-8 w-8 -translate-x-1/2 -translate-y-1/2 text-base-content/40"
+                        />
+                      </template>
+                    </CoverImage>
                     <span
                       v-if="isCurrentFile(item.file) && player.isPlaying.value"
-                      class="relative equalizer h-3"
+                      class="absolute bottom-2 right-2 equalizer h-4"
                       aria-hidden="true"
                     >
                       <span></span><span></span><span></span>
                     </span>
-                    <Icon
-                      v-else-if="coverFailed[item.file]"
-                      icon="clarity:music-note-line"
-                      class="h-4 w-4 text-base-content/50"
-                    />
                   </div>
-                  <div class="min-w-0 flex-1 text-left">
-                    <p class="truncate text-sm font-medium">{{ item.title }}</p>
-                    <p class="truncate text-[11px] text-base-content/50">
+                  <div class="player-browse-card-body">
+                    <p class="player-browse-card-title">{{ item.title }}</p>
+                    <p class="player-browse-card-sub">
                       {{ item.artist || t('common.unknownArtist') }}
                       <span v-if="item.album"> · {{ item.album }}</span>
                     </p>
@@ -484,12 +517,14 @@
 import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { Icon } from '@iconify/vue'
 import Navbar from '/src/components/Navbar.vue'
+import CoverImage from '/src/components/CoverImage.vue'
 import API from '/src/model/api'
 import {
   groupAlbums,
   groupArtists,
   groupGenres,
   matchesLibraryFilter,
+  normalizeLibraryItem,
 } from '/src/model/library'
 import { usePlayer, formatTime, trackInfoFromFile } from '/src/model/player'
 import { useMobileSearch } from '/src/model/mobileSearch'
@@ -510,13 +545,25 @@ const selectedGenreName = ref('')
 const progressBar = ref(null)
 const coverFailed = ref({})
 let dragging = false
+let genreRefreshTimers = []
 
 const unknownGenreLabel = computed(() => t('player.unknownGenre'))
+const libraryGroupOptions = computed(() => ({
+  unknownArtist: t('common.unknownArtist'),
+}))
 
-const artists = computed(() => groupArtists(libraryItems.value))
-const albums = computed(() => groupAlbums(libraryItems.value))
+const artists = computed(() =>
+  groupArtists(libraryItems.value, libraryGroupOptions.value)
+)
+const albums = computed(() =>
+  groupAlbums(libraryItems.value, libraryGroupOptions.value)
+)
 const genres = computed(() =>
-  groupGenres(libraryItems.value, unknownGenreLabel.value)
+  groupGenres(
+    libraryItems.value,
+    unknownGenreLabel.value,
+    libraryGroupOptions.value
+  )
 )
 
 const browseTabs = computed(() => [
@@ -594,13 +641,17 @@ const visibleAlbums = computed(() => {
 
 const filteredGenres = computed(() => {
   const q = libraryFilter.value
-  if (!q) return genres.value
-  return genres.value.filter((genre) =>
-    genre.files.some((file) => {
-      const item = libraryItems.value.find((entry) => entry.file === file)
-      return item ? matchesLibraryFilter(item, q) : false
-    })
-  )
+  const source = q
+    ? genres.value.filter((genre) =>
+        genre.files.some((file) => {
+          const item = libraryItems.value.find((entry) => entry.file === file)
+          return item ? matchesLibraryFilter(item, q) : false
+        })
+      )
+    : genres.value
+  const unknown = unknownGenreLabel.value
+  const tagged = source.filter((genre) => genre.name !== unknown)
+  return tagged.length > 0 ? tagged : source
 })
 
 const visibleTrackItems = computed(() => {
@@ -629,6 +680,11 @@ const visibleTrackItems = computed(() => {
 const visibleTrackFiles = computed(() =>
   visibleTrackItems.value.map((item) => item.file)
 )
+
+const browsePlayFiles = computed(() => {
+  if (browseView.value !== 'tracks') return []
+  return visibleTrackFiles.value
+})
 
 const canBrowseBack = computed(
   () =>
@@ -694,40 +750,124 @@ function coverUrlFor(file) {
   return API.coverFileURL(file)
 }
 
+function coverFallbacksFor(file) {
+  return API.coverFallbackUrls(file)
+}
+
+function artistCoverSources(artist) {
+  const urls = []
+  const name = String(artist?.name || '').trim()
+  if (name) urls.push(API.coverFolderURL(name))
+  for (const file of artist?.previewFiles || []) {
+    urls.push(coverUrlFor(file))
+    urls.push(...coverFallbacksFor(file))
+  }
+  return [...new Set(urls.filter(Boolean))]
+}
+
 function markCoverFailed(file) {
   coverFailed.value = { ...coverFailed.value, [file]: true }
 }
 
 function fallbackLibraryItems(paths) {
+  const options = libraryGroupOptions.value
   return (paths || []).map((file) => {
     const info = trackInfoFromFile(file)
-    return {
-      file,
-      title: info.title,
-      artist: info.artist || t('common.unknownArtist'),
-      album: '',
-      genre: '',
-    }
+    return normalizeLibraryItem(
+      {
+        file,
+        title: info.title,
+        artist: info.artist,
+        album: '',
+        genre: '',
+      },
+      options
+    )
   })
+}
+
+function applyLibraryItems(items) {
+  const options = libraryGroupOptions.value
+  libraryItems.value = items.map((item) => normalizeLibraryItem(item, options))
+  files.value = libraryItems.value.map((item) => item.file)
+}
+
+function countUnknownGenres(items) {
+  const label = unknownGenreLabel.value
+  return (items || []).filter((item) => {
+    const genre = String(item?.genre || '').trim()
+    return !genre || genre === label
+  }).length
+}
+
+function clearGenreRefreshTimers() {
+  for (const timer of genreRefreshTimers) {
+    clearTimeout(timer)
+  }
+  genreRefreshTimers = []
+}
+
+async function refreshLibraryMetadata() {
+  try {
+    const res = await API.getLibraryFiles()
+    const items = Array.isArray(res.data) ? res.data : []
+    if (items.length > 0) {
+      applyLibraryItems(items)
+      scheduleGenreRefresh(items)
+    }
+  } catch {
+    // Ignore background refresh failures.
+  }
+}
+
+async function refreshLibraryGenres() {
+  await refreshLibraryMetadata()
+}
+
+function scheduleGenreRefresh(items) {
+  clearGenreRefreshTimers()
+  if (countUnknownGenres(items) === 0) return
+
+  for (const delay of [3000, 10000, 30000, 90000, 300000]) {
+    genreRefreshTimers.push(
+      setTimeout(() => {
+        refreshLibraryGenres()
+      }, delay)
+    )
+  }
 }
 
 async function load() {
   loading.value = true
   try {
-    const res = await API.getLibraryFiles()
-    libraryItems.value = res.data || []
-    files.value = libraryItems.value.map((item) => item.file)
-  } catch {
-    const res = await API.listDownloads()
-    const paths = res.data || []
-    libraryItems.value = fallbackLibraryItems(paths)
+    const listRes = await API.listDownloads()
+    const paths = listRes.data || []
     files.value = paths
+    if (paths.length > 0) {
+      applyLibraryItems(fallbackLibraryItems(paths))
+      if (player.playlist.value.length === 0) {
+        player.setPlaylist(paths)
+      }
+    } else {
+      libraryItems.value = []
+    }
+  } catch {
+    try {
+      const res = await API.listDownloads()
+      const paths = res.data || []
+      applyLibraryItems(fallbackLibraryItems(paths))
+      files.value = paths
+      if (player.playlist.value.length === 0 && files.value.length > 0) {
+        player.setPlaylist(files.value)
+      }
+    } catch {
+      files.value = []
+      libraryItems.value = []
+    }
   } finally {
     loading.value = false
-    if (player.playlist.value.length === 0 && files.value.length > 0) {
-      player.setPlaylist(files.value)
-    }
   }
+  refreshLibraryMetadata()
 }
 
 function setBrowseMode(mode) {
@@ -841,6 +981,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  clearGenreRefreshTimers()
   window.removeEventListener('pointermove', onSeekDrag)
 })
 </script>
@@ -850,22 +991,21 @@ onUnmounted(() => {
   .player-view {
     display: flex;
     flex-direction: column;
-    height: calc(
-      100dvh - var(--app-header-height) - var(--app-safe-top) -
-        var(--app-bottom-nav-height) - var(--app-safe-bottom)
-    );
-    overflow: hidden;
+    min-height: 0;
+    height: auto;
+    overflow: visible;
   }
 
   .player-page {
     min-height: 0;
+    flex: 1 1 auto;
   }
 
   .player-shell {
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
-    min-height: 0;
+    min-height: auto;
   }
 
   .player-now {
@@ -873,19 +1013,23 @@ onUnmounted(() => {
   }
 
   .player-cover {
-    width: min(42vw, 11rem);
+    width: min(28vw, 6.5rem);
     aspect-ratio: 1;
   }
 
   .player-play-btn {
-    height: 3.75rem;
-    width: 3.75rem;
+    height: 3rem;
+    width: 3rem;
   }
 
   .player-queue {
-    flex: 1;
-    min-height: 0;
-    overflow-y: auto;
+    flex: 1 1 auto;
+    min-height: min(62vh, 38rem);
+    overflow: hidden;
+  }
+
+  .player-browse-body {
+    min-height: min(52vh, 32rem);
     -webkit-overflow-scrolling: touch;
   }
 }
@@ -1002,31 +1146,74 @@ onUnmounted(() => {
   @apply min-h-0;
 }
 
-.player-browse-list {
-  @apply space-y-1;
+.player-browse-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
 }
 
-.player-browse-row {
-  @apply flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition-colors hover:bg-white/5 active:bg-white/10;
+.player-browse-card {
+  @apply flex h-full w-full cursor-pointer flex-col overflow-hidden rounded-2xl border border-white/10 bg-white/5 text-left transition-colors active:bg-white/10;
 }
 
-.player-browse-row-active {
-  @apply bg-primary/10 text-primary;
+.player-browse-card-active {
+  @apply border-primary/30 bg-primary/10;
 }
 
-.player-browse-covers {
-  @apply flex shrink-0 -space-x-2;
+.player-browse-card-cover {
+  @apply relative aspect-square w-full shrink-0 overflow-hidden bg-primary/10;
 }
 
-.player-browse-cover {
-  @apply relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-base-100/60;
+.player-browse-card-cover-icon {
+  @apply flex items-center justify-center;
 }
 
-.player-browse-cover-lg {
-  @apply h-11 w-11 rounded-xl;
+.player-browse-card-play {
+  @apply absolute bottom-2 right-2 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-primary text-primary-content shadow-glow-sm transition-transform active:scale-95;
 }
 
-.player-browse-play {
-  @apply h-9 w-9 text-primary hover:bg-primary/10;
+.player-browse-card-body {
+  @apply p-2.5;
+}
+
+.player-browse-card-title {
+  @apply truncate text-sm font-semibold leading-snug;
+}
+
+.player-browse-card-sub {
+  @apply mt-0.5 line-clamp-2 text-[11px] leading-4 text-base-content/50;
+}
+
+.player-browse-card-meta {
+  @apply mt-0.5 text-[11px] text-base-content/40;
+}
+
+@media (min-width: 1024px) {
+  .player-browse-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .player-browse-card {
+    @apply flex-row items-center gap-3 rounded-xl border-transparent bg-transparent p-2 active:bg-white/10;
+  }
+
+  .player-browse-card-cover {
+    @apply aspect-auto h-11 w-11 rounded-xl;
+  }
+
+  .player-browse-card-play {
+    @apply static shrink-0;
+  }
+
+  .player-browse-card-body {
+    @apply min-w-0 flex-1 p-0;
+  }
+
+  .player-browse-card-sub,
+  .player-browse-card-meta {
+    @apply line-clamp-1;
+  }
 }
 </style>

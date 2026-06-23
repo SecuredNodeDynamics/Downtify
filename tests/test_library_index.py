@@ -45,6 +45,28 @@ def test_list_library_files_falls_back_to_filename(tmp_path):
     ]
 
 
+def test_list_library_files_fast_skips_tag_reads(tmp_path):
+    artist_dir = tmp_path / 'Artist One' / 'Album A'
+    artist_dir.mkdir(parents=True)
+    path = artist_dir / '01 - Song Title.mp3'
+    path.write_bytes(b'audio')
+    tags = ID3()
+    tags.add(TIT2(encoding=3, text='Tagged Title'))
+    tags.add(TPE1(encoding=3, text='Tagged Artist'))
+    tags.add(TALB(encoding=3, text='Tagged Album'))
+    tags.add(TCON(encoding=3, text='Jazz'))
+    tags.save(path)
+
+    items = library_index.list_library_files_fast(tmp_path)
+
+    assert len(items) == 1
+    assert items[0]['file'] == 'Artist One/Album A/01 - Song Title.mp3'
+    assert items[0]['title'] == 'Song Title'
+    assert items[0]['artist'] == 'Artist One'
+    assert items[0]['album'] == 'Album A'
+    assert items[0]['genre'] == ''
+
+
 def test_read_library_entry_rejects_traversal(tmp_path):
     with pytest.raises(ValueError, match='Invalid library path'):
         library_index.read_library_entry(
@@ -73,4 +95,20 @@ def test_list_library_files_uses_artist_genre_when_tags_missing(
     items = library_index.list_library_files(tmp_path)
 
     assert len(items) == 1
-    assert items[0]['genre'] == 'classical'
+    assert items[0]['genre'] == 'Classical'
+
+
+def test_enrich_library_genres_propagates_within_album(tmp_path):
+    album = tmp_path / 'Aaron Copland' / 'Hollywood'
+    album.mkdir(parents=True)
+    (album / '01 Fanfare.mp3').write_bytes(b'audio')
+    tagged = album / '02 Rodeo.mp3'
+    tagged.write_bytes(b'audio')
+    tags = ID3()
+    tags.add(TCON(encoding=3, text='Classical'))
+    tags.save(tagged)
+
+    items = library_index.list_library_files(tmp_path)
+
+    assert len(items) == 2
+    assert all(item['genre'] == 'Classical' for item in items)

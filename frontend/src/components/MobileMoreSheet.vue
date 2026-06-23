@@ -63,14 +63,14 @@
           </span>
         </button>
 
-        <label
-          for="settings-modal"
-          class="mobile-more-item cursor-pointer"
-          @click="closeSheet"
+        <button
+          type="button"
+          class="mobile-more-item"
+          @click="openSettings"
         >
           <Icon icon="clarity:cog-line" class="h-5 w-5 shrink-0" />
           <span class="flex-1 text-left">{{ t('nav.settings') }}</span>
-        </label>
+        </button>
       </div>
 
       <label for="mobile-more-sheet" class="mobile-more-cancel">
@@ -112,6 +112,11 @@ function closeSheet() {
 function go(name) {
   closeSheet()
   router.push({ name })
+}
+
+function openSettings() {
+  closeSheet()
+  router.push({ name: 'Settings' })
 }
 
 function toggleTheme() {

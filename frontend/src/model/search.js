@@ -2,13 +2,59 @@ import { ref } from 'vue'
 
 import API from '/src/model/api'
 
+const SEARCH_RESULT_FILTER_KEY = 'downtify-search-result-filter'
+
 const searchTerm = ref('')
 const results = ref()
 const isSearching = ref(false)
 const error = ref(false)
 const errorValue = ref('')
 
+function loadResultFilter() {
+  try {
+    const saved = globalThis.localStorage?.getItem(SEARCH_RESULT_FILTER_KEY)
+    if (saved === 'albums' || saved === 'tracks' || saved === 'both') {
+      return saved
+    }
+  } catch {
+    // Ignore storage read failures in restricted environments.
+  }
+  return 'both'
+}
+
+const resultFilter = ref('both')
+let resultFilterHydrated = false
+
+function hydrateResultFilter() {
+  if (resultFilterHydrated) return
+  resultFilter.value = loadResultFilter()
+  resultFilterHydrated = true
+}
+
+function setResultFilter(mode) {
+  if (mode !== 'albums' && mode !== 'tracks' && mode !== 'both') return
+  hydrateResultFilter()
+  resultFilter.value = mode
+  try {
+    globalThis.localStorage?.setItem(SEARCH_RESULT_FILTER_KEY, mode)
+  } catch {
+    // Ignore storage write failures in restricted environments.
+  }
+}
+
+function filterResults(items) {
+  const list = Array.isArray(items) ? items : []
+  if (resultFilter.value === 'albums') {
+    return list.filter((item) => item?.media_type === 'album')
+  }
+  if (resultFilter.value === 'tracks') {
+    return list.filter((item) => item?.media_type !== 'album')
+  }
+  return list
+}
+
 function useSearchManager() {
+  hydrateResultFilter()
   function isValid(str) {
     return isValidSearch(str) || isValidURL(str)
   }
@@ -67,6 +113,9 @@ function useSearchManager() {
     results,
     error,
     errorValue,
+    resultFilter,
+    setResultFilter,
+    filterResults,
     searchFor,
     isValid,
     isValidSearch,

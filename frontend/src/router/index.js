@@ -7,6 +7,7 @@ import Monitor from '/src/views/Monitor.vue'
 import Player from '/src/views/Player.vue'
 import Health from '/src/views/Health.vue'
 import Metadata from '/src/views/Metadata.vue'
+import Settings from '/src/views/Settings.vue'
 import config from '/src/config'
 
 const routes = [
@@ -57,6 +58,12 @@ const routes = [
     name: 'Metadata',
     component: Metadata,
     meta: { mobileTitleKey: 'nav.metadata' },
+  },
+  {
+    path: '/settings',
+    name: 'Settings',
+    component: Settings,
+    meta: { mobileTitleKey: 'nav.settings' },
   },
 ]
 

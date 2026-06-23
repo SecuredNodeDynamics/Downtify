@@ -26,7 +26,7 @@
         <div v-if="type !== 'track'" class="surface rounded-2xl p-5 mb-6 flex gap-5 items-center">
           <img
             v-if="tracks[0]?.cover_url"
-            :src="tracks[0].cover_url"
+            :src="coverSrc(tracks[0]?.cover_url)"
             class="h-20 w-20 rounded-xl object-cover shrink-0 shadow-lg"
           />
           <div class="flex-1 min-w-0">
@@ -66,7 +66,7 @@
             >
               <img
                 v-if="song.cover_url"
-                :src="song.cover_url"
+                :src="coverSrc(song.cover_url)"
                 :alt="song.name"
                 class="h-full w-full object-cover"
                 loading="lazy"
@@ -159,7 +159,7 @@
         <!-- Cover -->
         <img
           v-if="currentTrack.cover_url"
-          :src="currentTrack.cover_url"
+          :src="coverSrc(currentTrack.cover_url)"
           class="h-10 w-10 rounded-lg object-cover shrink-0"
         />
 
@@ -240,6 +240,10 @@ const route = useRoute()
 const router = useRouter()
 const dm = useDownloadManager()
 const pt = useProgressTracker()
+
+function coverSrc(url) {
+  return API.mediaUrl(url)
+}
 
 // ── State ────────────────────────────────────────────────────────────────────
 const loading = ref(true)

@@ -124,13 +124,14 @@
           <Icon v-else icon="clarity:moon-line" class="h-5 w-5" />
         </button>
 
-        <label
-          for="settings-modal"
+        <button
+          type="button"
           class="icon-btn cursor-pointer"
           :title="t('nav.settings')"
+          @click="openSettingsModal()"
         >
           <Icon icon="clarity:cog-line" class="h-5 w-5" />
-        </label>
+        </button>
       </div>
     </div>
   </header>
@@ -148,6 +149,7 @@ import { useHealthRefresh } from '../model/healthRefresh'
 import { useI18n } from '../i18n'
 
 import SearchInput from './SearchInput.vue'
+import { openSettingsModal } from '../model/settingsModal'
 
 const route = useRoute()
 const themeMgr = useBinaryThemeManager({

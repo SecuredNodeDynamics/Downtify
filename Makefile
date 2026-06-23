@@ -1,6 +1,6 @@
 #!make
 
-DOWNTIFY_VERSION := 2.10.47
+DOWNTIFY_VERSION := 2.10.48
 TARGET := ghcr.io/securednodedynamics/downtify
 
 all: build latest
@@ -44,6 +44,9 @@ test:
 	npm run test --prefix frontend
 	uv run pytest -x -s -v
 
+android-apk:
+	bash scripts/build-android-apk.sh
+
 version:
 	@VERSION=$(word 2,$(MAKECMDGOALS)); \
 	if [ -z "$$VERSION" ]; then VERSION=patch; fi; \
@@ -60,4 +63,4 @@ doc:
 %:
 	@:
 
-.PHONY: all build latest clean up down run format lint export changelog version doc
+.PHONY: all build latest clean up down run format lint export changelog version doc android-apk

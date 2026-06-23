@@ -1,5 +1,7 @@
 import { ref, computed } from 'vue'
 
+import API from './api.js'
+
 const VOLUME_KEY = 'downtify-player-volume'
 
 const playlist = ref([])
@@ -41,11 +43,11 @@ function ensureAudio() {
 }
 
 function fileUrl(file) {
-  return `/downloads/${encodeURIComponent(file)}`
+  return API.downloadFileURL(file)
 }
 
 function coverUrl(file) {
-  return `/cover?file=${encodeURIComponent(file)}`
+  return API.coverFileURL(file)
 }
 
 function trackFromFile(file) {

@@ -3,8 +3,10 @@ import vue from '@vitejs/plugin-vue'
 
 const backend = process.env.VITE_BACKEND_URL || 'http://127.0.0.1:8000'
 const appVersion = process.env.npm_package_version
+const forCapacitor = process.env.VITE_CAPACITOR === '1'
 
 export default defineConfig({
+  base: forCapacitor ? './' : '/',
   plugins: [vue()],
   define: {
     'process.env': {},

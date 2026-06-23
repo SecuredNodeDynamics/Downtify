@@ -136,21 +136,21 @@
               <div
                 v-for="file in artist.previewFiles"
                 :key="file"
-                class="relative h-12 w-12 overflow-hidden rounded-xl border border-base-100 bg-primary/10 text-primary"
+                class="relative h-12 w-12 overflow-hidden rounded-xl border border-base-100 bg-base-200/80"
               >
-                <img
-                  v-if="!coverFailed[file]"
+                <CoverImage
                   :src="coverUrlFor(file)"
+                  :fallbacks="coverFallbacksFor(file)"
                   :alt="displayName(file)"
-                  class="absolute inset-0 h-full w-full object-cover"
-                  loading="lazy"
-                  @error="markCoverFailed(file)"
-                />
-                <Icon
-                  v-else
-                  icon="clarity:music-note-line"
-                  class="absolute left-1/2 top-1/2 h-5 w-5 -translate-x-1/2 -translate-y-1/2"
-                />
+                  img-class="absolute inset-0 h-full w-full object-cover"
+                >
+                  <template #fallback>
+                    <Icon
+                      icon="clarity:music-note-line"
+                      class="absolute left-1/2 top-1/2 h-5 w-5 -translate-x-1/2 -translate-y-1/2 text-base-content/35"
+                    />
+                  </template>
+                </CoverImage>
               </div>
             </div>
             <h2 class="truncate text-base font-semibold">
@@ -257,21 +257,21 @@
             @keydown.space.prevent="openAlbum(album)"
           >
             <div
-              class="relative mb-4 aspect-square overflow-hidden rounded-xl bg-primary/10 text-primary"
+              class="relative mb-4 aspect-square overflow-hidden rounded-xl bg-base-200/80"
             >
-              <img
-                v-if="!coverFailed[album.coverFile]"
+              <CoverImage
                 :src="coverUrlFor(album.coverFile)"
+                :fallbacks="coverFallbacksFor(album.coverFile)"
                 :alt="album.name"
-                class="absolute inset-0 h-full w-full object-cover"
-                loading="lazy"
-                @error="markCoverFailed(album.coverFile)"
-              />
-              <Icon
-                v-else
-                icon="clarity:album-line"
-                class="absolute left-1/2 top-1/2 h-8 w-8 -translate-x-1/2 -translate-y-1/2"
-              />
+                img-class="absolute inset-0 h-full w-full object-cover"
+              >
+                <template #fallback>
+                  <Icon
+                    icon="clarity:album-line"
+                    class="absolute left-1/2 top-1/2 h-8 w-8 -translate-x-1/2 -translate-y-1/2 text-base-content/35"
+                  />
+                </template>
+              </CoverImage>
             </div>
             <h2 class="truncate text-base font-semibold">
               {{ album.name }}
@@ -313,17 +313,20 @@
           >
             <!-- Cover thumb -->
             <div
-              class="relative h-11 w-11 shrink-0 rounded-xl bg-primary/10 text-primary flex items-center justify-center overflow-hidden"
+              class="relative h-11 w-11 shrink-0 overflow-hidden rounded-xl bg-base-200/80"
             >
-              <img
-                v-if="!coverFailed[file]"
+              <CoverImage
                 :src="coverUrlFor(file)"
+                :fallbacks="coverFallbacksFor(file)"
                 :alt="file"
-                class="absolute inset-0 h-full w-full object-cover"
-                loading="lazy"
-                @error="markCoverFailed(file)"
-              />
-              <Icon v-else icon="clarity:music-note-line" class="h-5 w-5" />
+                img-class="absolute inset-0 h-full w-full object-cover"
+              >
+                <template #fallback>
+                  <div class="flex h-full w-full items-center justify-center text-base-content/35">
+                    <Icon icon="clarity:music-note-line" class="h-5 w-5" />
+                  </div>
+                </template>
+              </CoverImage>
             </div>
 
             <!-- Filename -->
@@ -435,6 +438,7 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useRouter } from 'vue-router'
 import Navbar from '/src/components/Navbar.vue'
+import CoverImage from '/src/components/CoverImage.vue'
 import API from '/src/model/api'
 import { useI18n } from '/src/i18n'
 import { usePlayer } from '/src/model/player'
@@ -450,7 +454,6 @@ const files = ref([])
 const loading = ref(false)
 const error = ref('')
 const deleting = ref({})
-const coverFailed = ref({})
 const currentPage = ref(1)
 const viewMode = ref('artists')
 const selectedArtistName = ref('')
@@ -639,8 +642,8 @@ function coverUrlFor(file) {
   return API.coverFileURL(file)
 }
 
-function markCoverFailed(file) {
-  coverFailed.value = { ...coverFailed.value, [file]: true }
+function coverFallbacksFor(file) {
+  return API.coverFallbackUrls(file)
 }
 
 async function refresh() {

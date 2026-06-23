@@ -12,6 +12,8 @@
         </p>
       </div>
 
+      <ServerConnectionPrompt class="mb-4" />
+
       <div
         v-if="error"
         class="surface rounded-2xl p-4 mb-4 flex gap-3 items-center text-sm text-error"
@@ -24,7 +26,10 @@
         <div v-for="n in 6" :key="n" class="skeleton h-32 rounded-2xl" />
       </div>
 
-      <div v-else-if="health" class="space-y-4 sm:space-y-6 min-w-0">
+      <div
+        v-else-if="!needsServerConnection() && health"
+        class="space-y-4 sm:space-y-6 min-w-0"
+      >
         <section class="surface health-card rounded-2xl p-4 sm:p-5 min-w-0 overflow-hidden">
           <div class="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
             <div class="flex min-w-0 items-center gap-3">
@@ -269,11 +274,13 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { Icon } from '@iconify/vue'
-import API from '../model/api'
+import API, { isHealthPayload } from '../model/api'
 import Navbar from '../components/Navbar.vue'
+import ServerConnectionPrompt from '../components/ServerConnectionPrompt.vue'
 import { useDownloadDestination } from '../model/downloadDestination'
 import { useHealthRefresh } from '../model/healthRefresh'
 import { useI18n } from '../i18n'
+import { needsServerConnection } from '../model/serverConnection'
 
 const { t } = useI18n()
 const downloadDestination = useDownloadDestination()
@@ -350,13 +357,25 @@ onUnmounted(() => {
 })
 
 async function loadHealth() {
+  if (needsServerConnection()) {
+    health.value = null
+    error.value = ''
+    loading.value = false
+    healthRefresh.setLoading(false)
+    return
+  }
+
   loading.value = true
   healthRefresh.setLoading(true)
   error.value = ''
   try {
     const res = await API.getHealth()
+    if (!isHealthPayload(res.data)) {
+      throw new Error('invalid health payload')
+    }
     health.value = res.data
   } catch {
+    health.value = null
     error.value = t('health.failedLoad')
   } finally {
     loading.value = false

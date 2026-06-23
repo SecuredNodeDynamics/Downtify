@@ -26,6 +26,7 @@
 import { onMounted, ref } from 'vue'
 import { useI18n } from '../i18n'
 import API from '../model/api'
+import { openSettingsModal } from '../model/settingsModal'
 
 const { t } = useI18n()
 const updateAvailable = ref(false)
@@ -40,10 +41,6 @@ onMounted(async () => {
 })
 
 function openUpdateSettings() {
-  window.dispatchEvent(
-    new CustomEvent('downtify:open-settings', { detail: { tab: 'help' } })
-  )
-  const modal = document.getElementById('settings-modal')
-  if (modal) modal.checked = true
+  openSettingsModal('help')
 }
 </script>

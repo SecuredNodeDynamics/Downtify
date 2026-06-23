@@ -53,6 +53,14 @@ export default {
     empty: 'No se encontraron canciones.',
     emptyHint:
       'Prueba con otra búsqueda — artista + título suele funcionar mejor.',
+    emptyAlbums: 'No se encontraron álbumes.',
+    emptyTracks: 'No se encontraron pistas.',
+    emptyFilterHint:
+      'Prueba cambiar el filtro de arriba a Ambos u otro tipo.',
+    filterLabel: 'Tipo de resultado',
+    filterBoth: 'Ambos',
+    filterAlbums: 'Álbumes',
+    filterTracks: 'Pistas',
     openOnSpotify: 'Abrir en Spotify',
     openOnYoutubeMusic: 'Abrir en YouTube Music',
     inQueue: 'En la cola',
@@ -154,6 +162,7 @@ export default {
     openAlbum: 'Abrir album',
     playArtist: 'Reproducir artista',
     playAlbum: 'Reproducir album',
+    playGenre: 'Reproducir genero',
     backToArtists: 'Artistas',
     backToAlbums: 'Albumes',
   },
@@ -449,6 +458,9 @@ export default {
     serverConnectionSection: 'Servidor Downtify',
     serverConnectionHint:
       'Para la app movil, introduce la direccion de tu servidor Downtify: una IP local (con puerto) o una URL publica como un tunel de Cloudflare. Dejalo vacio si usas el navegador en el mismo host que el servidor.',
+    serverRequiredTitle: 'Conecta tu servidor Downtify',
+    serverRequiredHint:
+      'La app movil necesita la direccion del servidor antes de cargar cola, salud y otros datos. Abre Ajustes → API e introduce tu IP local o URL del tunel.',
     serverUrl: 'Direccion del servidor',
     serverUrlPlaceholder:
       'https://downtify.ejemplo.com o 192.168.1.50:8765',
@@ -554,6 +566,7 @@ export default {
     nowPlaying: 'Sonando ahora',
     upNext: 'A continuación',
     playFromLibrary: 'Abrir en el reproductor',
+    playAll: 'Reproducir todo',
     countOne: '{count} pista',
     countMany: '{count} pistas',
     browse: 'Explorar',

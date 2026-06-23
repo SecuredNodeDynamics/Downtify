@@ -85,13 +85,14 @@
           />
           <Icon v-else icon="clarity:moon-line" class="h-5 w-5" />
         </button>
-        <label
-          for="settings-modal"
+        <button
+          type="button"
           class="icon-btn cursor-pointer"
           :title="t('nav.settings')"
+          @click="openSettingsModal()"
         >
           <Icon icon="clarity:cog-line" class="h-5 w-5" />
-        </label>
+        </button>
       </div>
     </div>
   </header>
@@ -103,6 +104,7 @@ import router from '../router'
 import { useBinaryThemeManager } from '../model/theme'
 import { useProgressTracker } from '../model/download'
 import { useI18n } from '../i18n'
+import { openSettingsModal } from '../model/settingsModal'
 
 const themeMgr = useBinaryThemeManager({
   newLightAlias: 'downtify-light',

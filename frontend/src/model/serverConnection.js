@@ -1,3 +1,5 @@
+import { Capacitor } from '@capacitor/core'
+
 const STORAGE_KEY = 'downtify-server-url'
 
 const SPA_ROUTE_PREFIXES = [
@@ -8,6 +10,7 @@ const SPA_ROUTE_PREFIXES = [
   '/download',
   '/list',
   '/search',
+  '/settings',
 ]
 
 function deployBasePath() {
@@ -53,6 +56,20 @@ export function setStoredServerUrl(url) {
 
 export function usesCustomServerUrl() {
   return Boolean(getStoredServerUrl())
+}
+
+export function isCapacitorNative() {
+  try {
+    return Capacitor.isNativePlatform()
+  } catch {
+    return Boolean(
+      typeof window !== 'undefined' && window.Capacitor?.isNativePlatform?.()
+    )
+  }
+}
+
+export function needsServerConnection() {
+  return isCapacitorNative() && !usesCustomServerUrl()
 }
 
 export function parseServerUrl(input) {
@@ -124,6 +141,7 @@ export function formatServerDisplay(cfg = getServerConfig()) {
 
 export function getCurrentPageServerUrl() {
   if (typeof window === 'undefined') return ''
+  if (isCapacitorNative()) return ''
   const { protocol, hostname, port } = window.location
   if (!hostname || protocol === 'file:' || protocol === 'capacitor:') {
     return ''
@@ -138,6 +156,7 @@ export function canConnectToCurrentPage() {
 }
 
 export function isConnectedToCurrentPage() {
+  if (isCapacitorNative()) return false
   const current = getCurrentPageServerUrl()
   if (!current) return !usesCustomServerUrl()
   const stored = getStoredServerUrl().trim()
@@ -149,6 +168,18 @@ export function isConnectedToCurrentPage() {
   const storedBase = buildApiBaseUrl(parseServerUrl(stored))
   const pageBase = buildApiBaseUrl(parseServerUrl(current))
   return storedBase === pageBase
+}
+
+export function configuredServerBaseUrl() {
+  return buildApiBaseUrl(getServerConfig())
+}
+
+export function canSaveServerUrlInput(input, { native = isCapacitorNative() } = {}) {
+  const trimmed = String(input || '').trim()
+  const parsed = parseServerUrl(trimmed)
+  if (!parsed) return false
+  if (native) return true
+  return buildApiBaseUrl(parsed) !== configuredServerBaseUrl()
 }
 
 if (typeof window !== 'undefined') {

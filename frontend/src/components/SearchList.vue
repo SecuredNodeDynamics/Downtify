@@ -21,6 +21,9 @@
         </template>
         <template v-else>{{ t('search.typeToBegin') }}</template>
       </p>
+      <div v-if="sm.searchTerm.value" class="mt-4 max-w-md">
+        <SearchResultFilter />
+      </div>
     </div>
 
     <!-- Error -->
@@ -52,9 +55,19 @@
         icon="clarity:search-line"
         class="h-12 w-12 text-base-content/20 mb-4"
       />
-      <p class="text-base-content/50 text-sm">{{ t('search.empty') }}</p>
+      <p class="text-base-content/50 text-sm">
+        {{
+          hasUnfilteredResults
+            ? emptyFilterMessage
+            : t('search.empty')
+        }}
+      </p>
       <p class="text-base-content/40 text-xs mt-1">
-        {{ t('search.emptyHint') }}
+        {{
+          hasUnfilteredResults
+            ? t('search.emptyFilterHint')
+            : t('search.emptyHint')
+        }}
       </p>
     </div>
 
@@ -68,13 +81,18 @@
         <div class="flex min-w-0 flex-1 items-center gap-3 sm:gap-4">
         <!-- Cover -->
         <div class="track-cover w-14 sm:w-16">
-          <img
+          <CoverImage
             v-if="song.cover_url"
-            :src="song.cover_url"
+            :src="coverSrc(song.cover_url)"
             :alt="song.name"
-            class="h-full w-full object-cover"
-            loading="lazy"
-          />
+            img-class="h-full w-full object-cover"
+          >
+            <template #fallback>
+              <div class="h-full w-full flex items-center justify-center text-base-content/30">
+                <Icon icon="clarity:music-note-line" class="h-6 w-6" />
+              </div>
+            </template>
+          </CoverImage>
           <div
             v-else
             class="h-full w-full flex items-center justify-center text-base-content/30"
@@ -238,12 +256,18 @@
             <template v-else>
               <div class="grid gap-5 p-5 sm:grid-cols-[160px_1fr]">
                 <div class="relative aspect-square overflow-hidden rounded-2xl bg-base-content/10 shadow-lg">
-                  <img
+                  <CoverImage
                     v-if="activeDemoTrack?.cover_url"
-                    :src="activeDemoTrack.cover_url"
+                    :src="coverSrc(activeDemoTrack?.cover_url)"
                     :alt="activeDemoTrack.name"
-                    class="h-full w-full object-cover"
-                  />
+                    img-class="h-full w-full object-cover"
+                  >
+                    <template #fallback>
+                      <div class="flex h-full w-full items-center justify-center text-base-content/30">
+                        <Icon icon="clarity:music-note-line" class="h-12 w-12" />
+                      </div>
+                    </template>
+                  </CoverImage>
                   <div
                     v-else
                     class="flex h-full w-full items-center justify-center text-base-content/30"
@@ -406,12 +430,18 @@
                   @keydown.enter.prevent="selectDemoTrack(track)"
                   @keydown.space.prevent="selectDemoTrack(track)"
                 >
-                  <img
+                  <CoverImage
                     v-if="track.cover_url"
-                    :src="track.cover_url"
+                    :src="coverSrc(track.cover_url)"
                     :alt="track.name"
-                    class="h-10 w-10 shrink-0 rounded-lg object-cover"
-                  />
+                    img-class="h-10 w-10 shrink-0 rounded-lg object-cover"
+                  >
+                    <template #fallback>
+                      <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-base-content/10">
+                        <Icon icon="clarity:music-note-line" class="h-4 w-4" />
+                      </div>
+                    </template>
+                  </CoverImage>
                   <div
                     v-else
                     class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-base-content/10"
@@ -457,6 +487,8 @@ import { useSearchManager } from '../model/search'
 import { useProgressTracker, useDownloadManager } from '../model/download'
 import { useI18n } from '../i18n'
 import API from '../model/api'
+import CoverImage from './CoverImage.vue'
+import SearchResultFilter from './SearchResultFilter.vue'
 
 const PAGE_SIZE = 5
 
@@ -467,6 +499,10 @@ const sm = useSearchManager()
 const pt = useProgressTracker()
 const dm = useDownloadManager()
 const { t } = useI18n()
+
+function coverSrc(url) {
+  return API.mediaUrl(url)
+}
 
 const currentPage = ref(1)
 const demoOpen = ref(false)
@@ -553,6 +589,17 @@ const paginatedData = computed(() => {
   return props.data.slice(start, start + PAGE_SIZE)
 })
 
+const hasUnfilteredResults = computed(
+  () =>
+    (sm.results.value?.length || 0) > 0 && (props.data?.length || 0) === 0
+)
+
+const emptyFilterMessage = computed(() => {
+  if (sm.resultFilter.value === 'albums') return t('search.emptyAlbums')
+  if (sm.resultFilter.value === 'tracks') return t('search.emptyTracks')
+  return t('search.empty')
+})
+
 const demoTypeLabel = computed(() =>
   demoType.value === 'album' ? t('search.albumType') : t('search.trackType')
 )
@@ -589,6 +636,13 @@ const demoVolumeIcon = computed(() => {
 
 watch(
   () => props.data,
+  () => {
+    currentPage.value = 1
+  }
+)
+
+watch(
+  () => sm.resultFilter.value,
   () => {
     currentPage.value = 1
   }
