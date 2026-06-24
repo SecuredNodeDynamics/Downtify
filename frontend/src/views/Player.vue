@@ -542,12 +542,18 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, onActivated, computed } from 'vue'
 import { Icon } from '@iconify/vue'
 import Navbar from '/src/components/Navbar.vue'
 import CoverImage from '/src/components/CoverImage.vue'
 import GenreCover from '/src/components/GenreCover.vue'
 import API from '/src/model/api'
+import { preloadCoverSourcesBatch } from '/src/model/imageLoader'
+import {
+  getCachedLibraryItems,
+  getCachedLibraryPaths,
+  setLibrarySessionCache,
+} from '/src/model/librarySession'
 import {
   groupAlbums,
   groupArtists,
@@ -558,6 +564,8 @@ import {
 import { usePlayer, formatTime, trackInfoFromFile } from '/src/model/player'
 import { useMobileSearch } from '/src/model/mobileSearch'
 import { useI18n } from '/src/i18n'
+
+defineOptions({ name: 'Player' })
 
 const { t } = useI18n()
 const player = usePlayer()
@@ -818,6 +826,35 @@ function applyLibraryItems(items) {
   const options = libraryGroupOptions.value
   libraryItems.value = items.map((item) => normalizeLibraryItem(item, options))
   files.value = libraryItems.value.map((item) => item.file)
+  setLibrarySessionCache(files.value, libraryItems.value)
+  warmCoverCacheForLibrary()
+}
+
+function warmCoverCacheForLibrary() {
+  const entries = libraryItems.value.map((item) =>
+    API.coverSourcesForFile(item.file)
+  )
+  for (const artist of artists.value.slice(0, 24)) {
+    entries.push(API.coverSourcesForArtist(artist.name, artist.previewFiles))
+  }
+  preloadCoverSourcesBatch(entries, { limit: 64 })
+}
+
+function hydrateLibraryFromSession() {
+  const cachedPaths = getCachedLibraryPaths()
+  if (!cachedPaths?.length) return false
+
+  files.value = cachedPaths
+  const cachedItems = getCachedLibraryItems()
+  if (cachedItems?.length) {
+    libraryItems.value = cachedItems.map((item) =>
+      normalizeLibraryItem(item, libraryGroupOptions.value)
+    )
+  } else {
+    libraryItems.value = fallbackLibraryItems(cachedPaths)
+  }
+  warmCoverCacheForLibrary()
+  return true
 }
 
 function libraryItemsUnchanged(nextItems) {
@@ -881,8 +918,14 @@ function scheduleGenreRefresh(items) {
   }
 }
 
-async function load() {
-  loading.value = true
+async function load({ background = false } = {}) {
+  if (!background) {
+    if (hydrateLibraryFromSession()) {
+      loading.value = false
+    } else {
+      loading.value = true
+    }
+  }
   try {
     const listRes = await API.listDownloads()
     const paths = listRes.data || []
@@ -1022,6 +1065,14 @@ function onSeekEnd() {
 onMounted(() => {
   window.scroll(0, 0)
   load()
+})
+
+onActivated(() => {
+  if (files.value.length > 0) {
+    void load({ background: true })
+    return
+  }
+  void load()
 })
 
 onUnmounted(() => {

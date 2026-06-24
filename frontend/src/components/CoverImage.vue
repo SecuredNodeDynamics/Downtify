@@ -6,7 +6,7 @@
       :alt="alt"
       :class="imgClass"
       referrerpolicy="no-referrer"
-      loading="lazy"
+      :loading="imageLoading"
       decoding="async"
       @error="onError"
     />
@@ -23,7 +23,12 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 
-import { resolveNativeImageSrc } from '../model/imageLoader'
+import {
+  buildCoverSourceKey,
+  getCachedCoverDisplay,
+  rememberCoverDisplay,
+  resolveImageSrc,
+} from '../model/imageLoader'
 
 const props = defineProps({
   src: {
@@ -46,15 +51,17 @@ const props = defineProps({
 
 const displaySrc = ref('')
 const failed = ref(false)
+const restoredFromCache = ref(false)
 let requestId = 0
 let candidateUrls = []
 let candidateIndex = 0
 
 const sourceKey = computed(() =>
-  [props.src, ...(props.fallbacks || [])]
-    .map((url) => String(url || '').trim())
-    .filter(Boolean)
-    .join('\0')
+  buildCoverSourceKey(props.src, props.fallbacks)
+)
+
+const imageLoading = computed(() =>
+  restoredFromCache.value || displaySrc.value ? 'eager' : 'lazy'
 )
 
 function resetCandidates(primary, fallbacks = []) {
@@ -64,15 +71,30 @@ function resetCandidates(primary, fallbacks = []) {
   candidateIndex = 0
 }
 
+function restoreFromCache(key) {
+  const cached = getCachedCoverDisplay(key)
+  if (!cached) {
+    restoredFromCache.value = false
+    return false
+  }
+
+  displaySrc.value = cached.displaySrc
+  failed.value = cached.failed
+  restoredFromCache.value = Boolean(cached.displaySrc && !cached.failed)
+  return restoredFromCache.value || cached.failed
+}
+
 async function applyCandidate(url) {
   if (!url) return false
   const current = ++requestId
   failed.value = false
 
-  const resolved = await resolveNativeImageSrc(url)
+  const resolved = await resolveImageSrc(url)
   if (current !== requestId) return true
 
   displaySrc.value = resolved || url
+  rememberCoverDisplay(sourceKey.value, displaySrc.value, false)
+  restoredFromCache.value = true
   return true
 }
 
@@ -80,6 +102,7 @@ async function loadCurrentCandidate() {
   const url = candidateUrls[candidateIndex]
   if (!url) {
     failed.value = true
+    rememberCoverDisplay(sourceKey.value, '', true)
     return
   }
   await applyCandidate(url)
@@ -94,6 +117,7 @@ function onError() {
     return
   }
   failed.value = true
+  rememberCoverDisplay(sourceKey.value, '', true)
 }
 
 watch(
@@ -102,15 +126,24 @@ watch(
     if (!key) {
       failed.value = true
       displaySrc.value = ''
+      restoredFromCache.value = false
       candidateUrls = []
       candidateIndex = 0
       return
     }
+
     resetCandidates(props.src, props.fallbacks)
+
+    if (restoreFromCache(key)) {
+      return
+    }
+
     if (previousKey && previousKey !== key) {
       displaySrc.value = ''
       failed.value = false
+      restoredFromCache.value = false
     }
+
     void loadCurrentCandidate()
   },
   { immediate: true }

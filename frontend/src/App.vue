@@ -7,7 +7,9 @@
     <main class="mobile-main flex-1 overflow-x-hidden">
       <router-view v-slot="{ Component, route }">
         <transition name="page" mode="out-in">
-          <component :is="Component" :key="route.fullPath" />
+          <keep-alive :include="['Player', 'List']">
+            <component :is="Component" :key="route.name" />
+          </keep-alive>
         </transition>
       </router-view>
     </main>

@@ -442,14 +442,21 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onActivated } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useRouter } from 'vue-router'
 import Navbar from '/src/components/Navbar.vue'
 import CoverImage from '/src/components/CoverImage.vue'
 import API from '/src/model/api'
+import { preloadCoverSourcesBatch } from '/src/model/imageLoader'
+import {
+  getCachedLibraryPaths,
+  setLibrarySessionPaths,
+} from '/src/model/librarySession'
 import { useI18n } from '/src/i18n'
 import { usePlayer } from '/src/model/player'
+
+defineOptions({ name: 'List' })
 
 const PAGE_SIZE = 10
 const ARTIST_PAGE_SIZE = 24
@@ -647,12 +654,35 @@ function coverSourcesFor(file) {
   return API.coverSourcesForFile(file)
 }
 
-async function refresh() {
-  loading.value = true
+function warmCoverCacheForPaths(paths) {
+  preloadCoverSourcesBatch(
+    (paths || []).map((file) => API.coverSourcesForFile(file)),
+    { limit: 48 }
+  )
+}
+
+function hydrateLibraryFromSession() {
+  const cachedPaths = getCachedLibraryPaths()
+  if (!cachedPaths?.length) return false
+  files.value = cachedPaths
+  warmCoverCacheForPaths(cachedPaths)
+  return true
+}
+
+async function refresh({ background = false } = {}) {
+  if (!background) {
+    if (hydrateLibraryFromSession()) {
+      loading.value = false
+    } else {
+      loading.value = true
+    }
+  }
   error.value = ''
   try {
     const res = await API.listDownloads()
     files.value = res.data || []
+    setLibrarySessionPaths(files.value)
+    warmCoverCacheForPaths(files.value)
   } catch {
     error.value = t('library.failedLoad')
   } finally {
@@ -774,5 +804,15 @@ function playAll() {
   router.push({ name: 'Player' })
 }
 
-onMounted(refresh)
+onMounted(() => {
+  void refresh()
+})
+
+onActivated(() => {
+  if (files.value.length > 0) {
+    void refresh({ background: true })
+    return
+  }
+  void refresh()
+})
 </script>
