@@ -17,12 +17,12 @@ const STATUS = {
 
 const downloadQueue = ref([])
 const historyRevision = ref(0)
-const activeDownloadCount = computed(
-  () =>
-    downloadQueue.value.filter(
-      (item) => !item.isDownloaded() && !item.isErrored()
-    ).length
+const activeQueue = computed(() =>
+  [...downloadQueue.value].sort(
+    (a, b) => (b.queuedAt || 0) - (a.queuedAt || 0)
+  )
 )
+const activeDownloadCount = computed(() => activeQueue.value.length)
 
 class DownloadItem {
   constructor(song) {
@@ -32,6 +32,7 @@ class DownloadItem {
     this.message = ''
     this.web_download_url = null
     this.filename = null
+    this.queuedAt = Date.now()
   }
   setDownloading() {
     this.web_status = STATUS.DOWNLOADING
@@ -80,15 +81,22 @@ export function useProgressTracker() {
     )
   }
   function appendSong(song) {
-    let downloadItem = new DownloadItem(song)
-    downloadQueue.value.push(downloadItem)
+    const downloadItem = new DownloadItem(song)
+    downloadQueue.value.unshift(downloadItem)
   }
   function removeSong(song) {
-    console.log('removing', song, song.song_id)
+    const key = songKey(song)
     downloadQueue.value = downloadQueue.value.filter(
-      (downloadItem) => downloadItem.song.song_id !== song.song_id
+      (downloadItem) => songKey(downloadItem.song) !== key
     )
-    console.log(downloadQueue.value)
+  }
+
+  function removeFromQueue(song) {
+    removeSong(song)
+    const songId = songKey(song)
+    if (songId) {
+      API.removeQueueItem(songId).catch(() => {})
+    }
   }
 
   function getBySong(song) {
@@ -100,14 +108,24 @@ export function useProgressTracker() {
   return {
     appendSong,
     removeSong,
+    removeFromQueue,
     getBySong,
     downloadQueue,
+    activeQueue,
     activeDownloadCount,
     historyRevision,
   }
 }
 
 const progressTracker = useProgressTracker()
+
+function completeQueueItem(song, item) {
+  if (item) {
+    maybeSaveToLocalMachine(item)
+  }
+  progressTracker.removeFromQueue(song)
+  notifyLibraryChanged()
+}
 
 function maybeSaveToLocalMachine(item) {
   if (
@@ -150,13 +168,10 @@ API.ws_onmessage((event) => {
         item.setWebURL(API.downloadFileURL(data.filename))
         item.setFilename(data.filename)
       }
-      item.setDownloaded()
-      notifyLibraryChanged()
-      maybeSaveToLocalMachine(item)
+      completeQueueItem(data.song, item)
     } else if (data.status === 'error') {
       item.wsUpdate(data)
-      item.setError()
-      notifyLibraryChanged()
+      completeQueueItem(data.song, item)
     } else if (data.status === 'queued') {
       item.message = data.message || ''
     } else {
@@ -173,31 +188,32 @@ API.ws_onerror((event) => {
 
 async function _hydrateFromServer() {
   if (needsServerConnection()) return
+  downloadQueue.value = downloadQueue.value.filter(
+    (item) => !item.isDownloaded() && !item.isErrored()
+  )
   try {
     const res = await API.getQueue()
     const jobs = res.data || []
     for (const job of jobs) {
-      if (downloadQueue.value.some((i) => i.song.song_id === job.song.song_id))
+      if (job.status === 'done' || job.status === 'error') continue
+      const key = String(job.song?.song_id || job.song?.url || '')
+      if (
+        key &&
+        downloadQueue.value.some(
+          (i) => String(i.song?.song_id || i.song?.url || '') === key
+        )
+      ) {
         continue
+      }
       const item = new DownloadItem(job.song)
-      if (job.status === 'done') {
-        item.setDownloaded()
-        if (job.filename) {
-          item.setWebURL(API.downloadFileURL(job.filename))
-          item.setFilename(job.filename)
-        }
-        item.progress = 100
-      } else if (job.status === 'error') {
-        item.setError()
-        item.message = job.message || ''
-      } else if (job.status === 'downloading') {
+      if (job.status === 'downloading') {
         item.setDownloading()
         item.progress = job.progress || 0
         item.message = job.message || ''
       } else {
         item.message = job.message || ''
       }
-      downloadQueue.value.push(item)
+      downloadQueue.value.unshift(item)
     }
   } catch (e) {
     console.log('Failed to load queue from server:', e)
@@ -283,23 +299,23 @@ export function useDownloadManager() {
         if (res.status === 200) {
           let filename = res.data
           console.log('Download Complete:', filename)
-          progressTracker
-            .getBySong(song)
-            .setWebURL(API.downloadFileURL(filename))
-          progressTracker.getBySong(song).setFilename(filename)
-          progressTracker.getBySong(song).setDownloaded()
-          maybeSaveToLocalMachine(progressTracker.getBySong(song))
+          const item = progressTracker.getBySong(song)
+          if (item) {
+            item.setWebURL(API.downloadFileURL(filename))
+            item.setFilename(filename)
+          }
+          completeQueueItem(song, item)
           historyRevision.value += 1
           return { song, filename }
         } else {
           console.log('Error:', res)
-          progressTracker.getBySong(song).setError()
+          completeQueueItem(song, progressTracker.getBySong(song))
           return { song, filename: null }
         }
       })
       .catch((err) => {
         console.log('Other Error:', err.message)
-        progressTracker.getBySong(song).setError()
+        completeQueueItem(song, progressTracker.getBySong(song))
         return { song, filename: null }
       })
   }
@@ -328,28 +344,22 @@ export function useDownloadManager() {
           if (it) {
             it.setWebURL(API.downloadFileURL(filename))
             it.setFilename(filename)
-            it.setDownloaded()
-            maybeSaveToLocalMachine(it)
           }
+          completeQueueItem(overriddenSong, it)
           return { song: overriddenSong, filename }
         }
-        if (it) it.setError()
+        completeQueueItem(overriddenSong, it)
         return { song: overriddenSong, filename: null }
       })
       .catch((err) => {
         console.error('retryWithAudio error:', err.message)
-        const it = progressTracker.getBySong(overriddenSong)
-        if (it) it.setError()
+        completeQueueItem(overriddenSong, progressTracker.getBySong(overriddenSong))
         return { song: overriddenSong, filename: null }
       })
   }
 
   function remove(song) {
-    const songId = String(song.song_id || song.url || '')
-    progressTracker.removeSong(song)
-    if (songId) {
-      API.removeQueueItem(songId).catch(() => {})
-    }
+    progressTracker.removeFromQueue(song)
   }
 
   async function clearAll() {

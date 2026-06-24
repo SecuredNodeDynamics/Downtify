@@ -17,10 +17,10 @@
           >
             {{ t('queue.tab') }}
             <span
-              v-if="pt.downloadQueue.value.length > 0"
+              v-if="pt.activeDownloadCount.value > 0"
               class="queue-tab-count"
             >
-              {{ pt.downloadQueue.value.length }}
+              {{ pt.activeDownloadCount.value }}
             </span>
           </button>
           <button
@@ -38,7 +38,7 @@
         </div>
 
         <button
-          v-if="activeTab === 'queue' && pt.downloadQueue.value.length > 0"
+          v-if="activeTab === 'queue' && pt.activeDownloadCount.value > 0"
           type="button"
           class="queue-action-btn text-error/70 hover:text-error"
           @click="onClearAll"
@@ -85,7 +85,7 @@
           <div class="queue-scroll-body">
             <template v-if="activeTab === 'queue'">
               <div
-                v-if="pt.downloadQueue.value.length === 0"
+                v-if="pt.activeDownloadCount.value === 0"
                 class="queue-empty"
               >
                 <Icon
@@ -102,7 +102,7 @@
 
               <ul v-else class="queue-list">
                 <li
-                  v-for="item in pt.downloadQueue.value"
+                  v-for="item in pt.activeQueue.value"
                   :key="item.song.song_id || item.song.name"
                   class="queue-item"
                 >
@@ -148,17 +148,8 @@
                   </div>
 
                   <div class="flex shrink-0 items-center gap-1">
-                    <a
-                      v-if="item.isDownloaded() && !dd.isLocal.value"
-                      class="icon-btn text-primary hover:bg-primary/10"
-                      href="javascript:;"
-                      @click="forceDownload(item.web_download_url)"
-                      :title="t('queue.saveToDevice')"
-                    >
-                      <Icon icon="clarity:download-line" class="h-4 w-4" />
-                    </a>
                     <div
-                      v-else-if="item.progress > 0 && !item.isErrored()"
+                      v-if="item.progress > 0 && !item.isErrored()"
                       class="radial-progress text-primary"
                       :style="`--value:${item.progress}; --size:2.5rem; --thickness:3px`"
                     >
@@ -354,7 +345,6 @@ import API from '../model/api'
 import CoverImage from './CoverImage.vue'
 import ServerConnectionPrompt from './ServerConnectionPrompt.vue'
 import { useProgressTracker, useDownloadManager } from '../model/download'
-import { useDownloadDestination } from '../model/downloadDestination'
 import {
   canOpenHistoryInPlayer,
   setPlayerNavigation,
@@ -365,7 +355,6 @@ const router = useRouter()
 
 const pt = useProgressTracker()
 const dm = useDownloadManager()
-const dd = useDownloadDestination()
 const { t } = useI18n()
 const activeTab = ref('queue')
 const history = ref([])
@@ -393,7 +382,7 @@ function artistsOf(song) {
 
 function statusClass(item) {
   if (item.isErrored()) return 'badge-error-soft'
-  if (item.isDownloaded()) return 'badge-soft'
+  if (item.isDownloading()) return 'badge-neutral-soft'
   return 'badge-neutral-soft'
 }
 
@@ -427,7 +416,13 @@ function sortHistoryItems(items) {
   })
 }
 
-const sortedHistory = computed(() => sortHistoryItems(history.value))
+const sortedHistory = computed(() =>
+  sortHistoryItems(
+    history.value.filter((item) =>
+      ['done', 'skipped', 'error'].includes(item.status)
+    )
+  )
+)
 
 function formatDate(value) {
   if (!value) return ''
@@ -487,15 +482,6 @@ async function onClearHistory() {
   if (!confirm(t('history.clearPrompt'))) return
   await API.clearHistory()
   history.value = []
-}
-
-function forceDownload(url) {
-  const a = document.createElement('a')
-  a.href = url
-  a.download = url.split('/').pop()
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
 }
 
 function openHistoryInPlayer(item) {

@@ -450,6 +450,10 @@ async def _broadcast_history_changed() -> None:
     await state.connections.broadcast({'event': 'history_changed'})
 
 
+def _drop_queue_job(song_id: str) -> None:
+    state.download_jobs.pop(song_id, None)
+
+
 def _load_settings(path: Path) -> dict[str, Any]:
     """Load saved settings from *path*, merging with DEFAULT_SETTINGS as base."""
     try:
@@ -2898,6 +2902,7 @@ async def _run_download(
                 'status': 'done',
                 'filename': existing,
             })
+            _drop_queue_job(song_id)
             return existing
 
     await state.connections.broadcast({
@@ -2944,6 +2949,7 @@ async def _run_download(
             'message': f'Error: {exc}',
             'status': 'error',
         })
+        _drop_queue_job(song_id)
         raise
 
     job['status'] = 'done'
@@ -2960,6 +2966,7 @@ async def _run_download(
         'status': 'done',
         'filename': filename,
     })
+    _drop_queue_job(song_id)
     return filename
 
 
@@ -3151,7 +3158,11 @@ async def download_batch_endpoint(request: Request) -> dict[str, Any]:
 
 @router.get('/api/queue')
 def get_queue() -> list[dict[str, Any]]:
-    return list(state.download_jobs.values())
+    return [
+        job
+        for job in state.download_jobs.values()
+        if job.get('status') in {'queued', 'downloading'}
+    ]
 
 
 @router.delete('/api/queue')
