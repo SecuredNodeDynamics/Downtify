@@ -89,6 +89,7 @@ export function groupArtists(items, options = {}) {
       name: artist.name,
       files: artist.files,
       albumCount: artist.albums.size,
+      albumNames: Array.from(artist.albums).sort((a, b) => a.localeCompare(b)),
       previewFiles: artist.files.slice(0, 3),
     }))
     .sort((a, b) => a.name.localeCompare(b.name))

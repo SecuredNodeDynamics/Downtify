@@ -448,12 +448,17 @@ import { useRouter } from 'vue-router'
 import Navbar from '/src/components/Navbar.vue'
 import CoverImage from '/src/components/CoverImage.vue'
 import API from '/src/model/api'
-import { preloadCoverSourcesBatch } from '/src/model/imageLoader'
+import {
+  albumKey,
+  displayNameFromFile,
+  groupAlbums,
+  groupArtists,
+  normalizeLibraryItem,
+  pathParts,
+} from '/src/model/library'
 import {
   fetchLibraryItems,
-  getCachedLibraryPaths,
-  hydrateLibraryFromPersistence,
-  setLibrarySessionPaths,
+  getInitialLibrarySnapshot,
 } from '/src/model/librarySession'
 import { buildApiBaseUrl, getServerConfig } from '/src/model/serverConnection'
 import { useI18n } from '/src/i18n'
@@ -463,13 +468,16 @@ defineOptions({ name: 'List' })
 
 const PAGE_SIZE = 10
 const ARTIST_PAGE_SIZE = 24
+const libraryServerKey = buildApiBaseUrl(getServerConfig())
+const initialLibrarySnapshot = getInitialLibrarySnapshot(libraryServerKey)
 
 const { t } = useI18n()
 const player = usePlayer()
 const router = useRouter()
 
-const files = ref([])
-const loading = ref(false)
+const libraryItems = ref(initialLibrarySnapshot.items)
+const files = ref(initialLibrarySnapshot.paths)
+const loading = ref(!initialLibrarySnapshot.ready)
 const error = ref('')
 const deleting = ref({})
 const currentPage = ref(1)
@@ -477,66 +485,17 @@ const viewMode = ref('artists')
 const selectedArtistName = ref('')
 const selectedAlbumKey = ref('')
 
-const albums = computed(() => {
-  const grouped = new Map()
+const libraryGroupOptions = computed(() => ({
+  unknownArtist: t('common.unknownArtist'),
+}))
 
-  for (const file of files.value) {
-    const artistName = artistOf(file)
-    const albumName = albumOf(file)
-    if (!albumName) continue
+const artists = computed(() =>
+  groupArtists(libraryItems.value, libraryGroupOptions.value)
+)
 
-    const key = albumKey(artistName, albumName)
-    if (!grouped.has(key)) {
-      grouped.set(key, {
-        key,
-        name: albumName,
-        artist: artistName,
-        files: [],
-      })
-    }
-
-    grouped.get(key).files.push(file)
-  }
-
-  return Array.from(grouped.values())
-    .map((album) => ({
-      ...album,
-      coverFile: album.files[0],
-    }))
-    .sort(
-      (a, b) => a.artist.localeCompare(b.artist) || a.name.localeCompare(b.name)
-    )
-})
-
-const artists = computed(() => {
-  const grouped = new Map()
-
-  for (const file of files.value) {
-    const artistName = artistOf(file)
-    const albumName = albumOf(file)
-    if (!grouped.has(artistName)) {
-      grouped.set(artistName, {
-        name: artistName,
-        files: [],
-        albums: new Set(),
-      })
-    }
-
-    const artist = grouped.get(artistName)
-    artist.files.push(file)
-    if (albumName) artist.albums.add(albumName)
-  }
-
-  return Array.from(grouped.values())
-    .map((artist) => ({
-      name: artist.name,
-      files: artist.files,
-      albumCount: artist.albums.size,
-      albumNames: Array.from(artist.albums).sort((a, b) => a.localeCompare(b)),
-      previewFiles: artist.files.slice(0, 3),
-    }))
-    .sort((a, b) => a.name.localeCompare(b.name))
-})
+const albums = computed(() =>
+  groupAlbums(libraryItems.value, libraryGroupOptions.value)
+)
 
 const selectedArtist = computed(() =>
   artists.value.find((artist) => artist.name === selectedArtistName.value)
@@ -657,45 +616,53 @@ function coverSourcesFor(file) {
   return API.coverSourcesForFile(file)
 }
 
-function warmCoverCacheForPaths(paths) {
-  preloadCoverSourcesBatch(
-    (paths || []).map((file) => API.coverSourcesForFile(file)),
-    { limit: 48 }
-  )
+function applyLibraryData(items) {
+  const options = libraryGroupOptions.value
+  libraryItems.value = items.map((item) => normalizeLibraryItem(item, options))
+  files.value = libraryItems.value.map((item) => item.file)
+  API.warmLibraryCovers(libraryItems.value)
+}
+
+function pathsToLibraryItems(paths) {
+  const options = libraryGroupOptions.value
+  return (paths || []).map((file) => normalizeLibraryItem({ file }, options))
 }
 
 function hydrateLibraryFromSession() {
-  hydrateLibraryFromPersistence(buildApiBaseUrl(getServerConfig()))
-  const cachedPaths = getCachedLibraryPaths()
-  if (!cachedPaths?.length) return false
-  files.value = cachedPaths
-  warmCoverCacheForPaths(cachedPaths)
+  const snapshot = getInitialLibrarySnapshot(libraryServerKey)
+  if (!snapshot.ready) return false
+  libraryItems.value = snapshot.items.map((item) =>
+    normalizeLibraryItem(item, libraryGroupOptions.value)
+  )
+  files.value = snapshot.paths
+  API.warmLibraryCovers(libraryItems.value)
   return true
 }
 
 async function refresh({ background = false } = {}) {
-  const hadCache = hydrateLibraryFromSession()
+  const hadCache = files.value.length > 0 || hydrateLibraryFromSession()
   if (!background) {
     loading.value = !hadCache
   }
   error.value = ''
   try {
+    if (background) {
+      const items = await API.refreshLibraryInBackground(false)
+      if (items.length) applyLibraryData(items)
+      return
+    }
+
     const items = await fetchLibraryItems(
       () => API.getLibraryFiles().then((res) => res.data || []),
-      { preferPrefetch: !background }
+      { preferPrefetch: true }
     )
     if (items.length > 0) {
-      const paths = items.map((item) => item.file)
-      files.value = paths
-      setLibrarySessionPaths(paths)
-      warmCoverCacheForPaths(paths)
+      applyLibraryData(items)
       return
     }
 
     const res = await API.listDownloads()
-    files.value = res.data || []
-    setLibrarySessionPaths(files.value)
-    warmCoverCacheForPaths(files.value)
+    applyLibraryData(pathsToLibraryItems(res.data || []))
   } catch {
     if (!hadCache) {
       error.value = t('library.failedLoad')
@@ -711,6 +678,7 @@ async function onDelete(file) {
   try {
     await API.deleteDownload(file)
     files.value = files.value.filter((f) => f !== file)
+    libraryItems.value = libraryItems.value.filter((item) => item.file !== file)
   } catch {
     error.value = t('library.failedDelete', { file })
   } finally {
@@ -724,41 +692,13 @@ function formatExt(file) {
 }
 
 function displayName(file) {
-  const slash = file.lastIndexOf('/')
-  return slash >= 0 ? file.slice(slash + 1) : file
+  return displayNameFromFile(file)
 }
 
 function folderOf(file) {
-  const slash = file.lastIndexOf('/')
-  return slash >= 0 ? file.slice(0, slash) : ''
-}
-
-function pathParts(file) {
-  return String(file || '')
-    .split('/')
-    .map((part) => part.trim())
-    .filter(Boolean)
-}
-
-function artistOf(file) {
   const parts = pathParts(file)
-  if (parts.length > 1) return parts[0]
-
-  const name = displayName(file).replace(/\.[^/.]+$/, '')
-  const separator = name.indexOf(' - ')
-  if (separator > 0) return name.slice(0, separator).trim()
-
-  return t('common.unknownArtist')
-}
-
-function albumOf(file) {
-  const parts = pathParts(file)
-  if (parts.length > 2) return parts[1]
-  return ''
-}
-
-function albumKey(artist, album) {
-  return `${artist}\u0000${album}`
+  if (parts.length <= 1) return ''
+  return parts.slice(0, -1).join('/')
 }
 
 function showArtists() {
@@ -820,6 +760,9 @@ function playAll() {
 }
 
 onMounted(() => {
+  if (libraryItems.value.length) {
+    API.warmLibraryCovers(libraryItems.value)
+  }
   void refresh()
 })
 

@@ -39,10 +39,10 @@ const options = computed(() => [
 
 <style scoped>
 .search-result-filter {
-  @apply grid w-full grid-cols-3 gap-1 rounded-2xl border border-white/10 bg-base-100/75 p-1;
+  @apply grid w-full grid-cols-3 gap-1 rounded-full border border-white/10 bg-base-100/75 p-1;
 }
 
 .search-result-filter-btn {
-  @apply inline-flex w-full items-center justify-center rounded-xl px-2 py-2.5 text-center text-xs font-medium leading-tight transition-colors sm:rounded-full sm:px-4 sm:py-2 sm:text-sm;
+  @apply inline-flex w-full items-center justify-center rounded-full px-2 py-2.5 text-center text-xs font-medium leading-tight transition-colors sm:px-4 sm:py-2 sm:text-sm;
 }
 </style>

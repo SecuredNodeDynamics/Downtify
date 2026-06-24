@@ -11,9 +11,11 @@ import {
 import { libraryCoverFolders } from './library.js'
 import {
   persistLibraryCache,
+  refreshLibraryInBackground as refreshLibrarySession,
   resetLibraryPrefetch,
   startLibraryPrefetch,
 } from './librarySession.js'
+import { preloadCoverSourcesBatch } from './imageLoader.js'
 
 import { v4 as uuidv4 } from 'uuid'
 
@@ -327,6 +329,27 @@ function clearCoverSourcesCache() {
   coverSourcesCache.clear()
 }
 
+function warmLibraryCovers(items = []) {
+  const entries = []
+  const seenArtists = new Set()
+
+  for (const item of items) {
+    const artist = String(item?.artist || '').trim()
+    const file = String(item?.file || '').trim()
+    if (!artist || !file || seenArtists.has(artist)) continue
+    seenArtists.add(artist)
+    entries.push(coverSourcesForArtist(artist, [file]))
+    if (seenArtists.size >= 24) break
+  }
+
+  for (const item of items.slice(0, 48)) {
+    const file = String(item?.file || '').trim()
+    if (file) entries.push(coverSourcesForFile(file))
+  }
+
+  preloadCoverSourcesBatch(entries, { limit: 96 })
+}
+
 const CDN_IMAGE_HOST_SUFFIXES = [
   'scdn.co',
   'spotifycdn.com',
@@ -484,7 +507,25 @@ async function fetchLibraryItemsFromApi() {
 }
 
 function prefetchLibrary() {
-  return startLibraryPrefetch(fetchLibraryItemsFromApi, libraryServerKey())
+  const promise = startLibraryPrefetch(
+    fetchLibraryItemsFromApi,
+    libraryServerKey()
+  )
+  promise?.then((items) => {
+    if (items?.length) warmLibraryCovers(items)
+    return items
+  })
+  return promise
+}
+
+function refreshLibraryInBackground(force = false) {
+  return refreshLibrarySession(fetchLibraryItemsFromApi, {
+    serverKey: libraryServerKey(),
+    force,
+  }).then((items) => {
+    if (items?.length) warmLibraryCovers(items)
+    return items
+  })
 }
 
 function reconnectBackend() {
@@ -520,6 +561,9 @@ export default {
   coverSourcesForFile,
   coverSourcesForArtist,
   clearCoverSourcesCache,
+  warmLibraryCovers,
+  refreshLibraryInBackground,
+  libraryServerKey,
   apiAssetUrl,
   mediaUrl,
   listDownloads,

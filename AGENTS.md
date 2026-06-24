@@ -78,6 +78,12 @@ Frontend production build:
 npm run build --prefix frontend
 ```
 
+Android release APK (requires release keystore — see `docs/android-apk-signing.md`):
+```bash
+./scripts/setup-android-release-keystore.sh   # once
+bash scripts/build-android-apk.sh
+```
+
 Containerized local run:
 ```bash
 make up

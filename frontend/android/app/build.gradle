@@ -1,5 +1,20 @@
 apply plugin: 'com.android.application'
 
+def releaseSigningAvailable = false
+def releaseKeystore = new Properties()
+
+def keystorePropertiesFile = rootProject.file('keystore.properties')
+if (keystorePropertiesFile.exists()) {
+    releaseKeystore.load(new FileInputStream(keystorePropertiesFile))
+    releaseSigningAvailable = true
+} else if (System.getenv('ANDROID_KEYSTORE_PATH')) {
+    releaseKeystore['storeFile'] = System.getenv('ANDROID_KEYSTORE_PATH')
+    releaseKeystore['storePassword'] = System.getenv('ANDROID_KEYSTORE_PASSWORD')
+    releaseKeystore['keyAlias'] = System.getenv('ANDROID_KEY_ALIAS')
+    releaseKeystore['keyPassword'] = System.getenv('ANDROID_KEY_PASSWORD')
+    releaseSigningAvailable = true
+}
+
 android {
     namespace = "com.securednodedynamics.downtify"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -16,12 +31,34 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    if (releaseSigningAvailable) {
+        signingConfigs {
+            release {
+                keyAlias releaseKeystore['keyAlias']
+                keyPassword releaseKeystore['keyPassword']
+                storeFile rootProject.file(releaseKeystore['storeFile'])
+                storePassword releaseKeystore['storePassword']
+                v1SigningEnabled true
+                v2SigningEnabled true
+            }
+        }
+    }
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            if (releaseSigningAvailable) {
+                signingConfig signingConfigs.release
+            }
         }
     }
+}
+
+if (!releaseSigningAvailable) {
+    logger.lifecycle(
+        'Release signing is not configured. Create frontend/android/keystore.properties ' +
+        'or set ANDROID_KEYSTORE_PATH and related env vars before building a release APK.'
+    )
 }
 
 repositories {

@@ -294,22 +294,28 @@
 
           <div
             v-if="!canBrowseBack"
-            class="metadata-tab-shell metadata-filter-tab-shell player-browse-tabs tab-glow-shell"
+            class="player-browse-tabs tab-glow-shell"
+            role="tablist"
+            :aria-label="t('player.browse')"
           >
             <button
               v-for="tab in browseTabs"
               :key="tab.id"
               type="button"
-              class="metadata-tab-btn"
+              role="tab"
+              class="player-browse-tab-btn"
               :class="
                 browseMode === tab.id
-                  ? 'bg-primary text-primary-content shadow-glow-sm'
-                  : 'text-base-content/60 hover:text-base-content'
+                  ? 'player-browse-tab-btn-active'
+                  : 'player-browse-tab-btn-inactive'
               "
+              :aria-selected="browseMode === tab.id"
               @click="setBrowseMode(tab.id)"
             >
-              <span class="sm:hidden">{{ tab.shortLabel }}</span>
-              <span class="hidden sm:inline">{{ tab.label }}</span>
+              <span class="player-browse-tab-label-short">{{
+                tab.shortLabel
+              }}</span>
+              <span class="player-browse-tab-label-full">{{ tab.label }}</span>
             </button>
           </div>
 
@@ -551,15 +557,6 @@ import Navbar from '/src/components/Navbar.vue'
 import CoverImage from '/src/components/CoverImage.vue'
 import GenreCover from '/src/components/GenreCover.vue'
 import API from '/src/model/api'
-import { preloadCoverSourcesBatch } from '/src/model/imageLoader'
-import {
-  fetchLibraryItems,
-  getCachedLibraryItems,
-  getCachedLibraryPaths,
-  hydrateLibraryFromPersistence,
-  persistLibraryCache,
-  setLibrarySessionCache,
-} from '/src/model/librarySession'
 import {
   groupAlbums,
   groupArtists,
@@ -567,6 +564,10 @@ import {
   matchesLibraryFilter,
   normalizeLibraryItem,
 } from '/src/model/library'
+import {
+  fetchLibraryItems,
+  getInitialLibrarySnapshot,
+} from '/src/model/librarySession'
 import { usePlayer, formatTime, trackInfoFromFile } from '/src/model/player'
 import { useMobileSearch } from '/src/model/mobileSearch'
 import { buildApiBaseUrl, getServerConfig } from '/src/model/serverConnection'
@@ -574,14 +575,17 @@ import { useI18n } from '/src/i18n'
 
 defineOptions({ name: 'Player' })
 
+const playerServerKey = buildApiBaseUrl(getServerConfig())
+const initialPlayerSnapshot = getInitialLibrarySnapshot(playerServerKey)
+
 const { t } = useI18n()
 const player = usePlayer()
 const mobileSearch = useMobileSearch()
 const libraryFilter = mobileSearch.libraryFilter
 
-const files = ref([])
-const libraryItems = ref([])
-const loading = ref(false)
+const files = ref(initialPlayerSnapshot.paths)
+const libraryItems = ref(initialPlayerSnapshot.items)
+const loading = ref(!initialPlayerSnapshot.ready)
 const browseMode = ref('artists')
 const selectedArtistName = ref('')
 const selectedAlbumKey = ref('')
@@ -833,48 +837,23 @@ function applyLibraryItems(items) {
   const options = libraryGroupOptions.value
   libraryItems.value = items.map((item) => normalizeLibraryItem(item, options))
   files.value = libraryItems.value.map((item) => item.file)
-  setLibrarySessionCache(files.value, libraryItems.value)
-  persistLibraryCache(
-    files.value,
-    libraryItems.value,
-    buildApiBaseUrl(getServerConfig())
-  )
-  warmCoverCacheForLibrary()
-}
-
-function warmCoverCacheForLibrary() {
-  const entries = libraryItems.value.map((item) =>
-    API.coverSourcesForFile(item.file)
-  )
-  for (const artist of artists.value.slice(0, 24)) {
-    entries.push(API.coverSourcesForArtist(artist.name, artist.previewFiles))
-  }
-  preloadCoverSourcesBatch(entries, { limit: 64 })
+  API.warmLibraryCovers(libraryItems.value)
 }
 
 function hydrateLibraryFromSession() {
-  if (!getCachedLibraryItems()?.length) {
-    hydrateLibraryFromPersistence()
-  }
+  const snapshot = getInitialLibrarySnapshot(playerServerKey)
+  if (!snapshot.ready) return false
 
-  const cachedPaths = getCachedLibraryPaths()
-  if (!cachedPaths?.length) return false
-
-  files.value = cachedPaths
-  const cachedItems = getCachedLibraryItems()
-  if (cachedItems?.length) {
-    libraryItems.value = cachedItems.map((item) =>
-      normalizeLibraryItem(item, libraryGroupOptions.value)
-    )
-  } else {
-    libraryItems.value = fallbackLibraryItems(cachedPaths)
-  }
+  libraryItems.value = snapshot.items.map((item) =>
+    normalizeLibraryItem(item, libraryGroupOptions.value)
+  )
+  files.value = snapshot.paths
 
   if (player.playlist.value.length === 0 && files.value.length > 0) {
     player.setPlaylist(files.value)
   }
 
-  warmCoverCacheForLibrary()
+  API.warmLibraryCovers(libraryItems.value)
   return true
 }
 
@@ -900,7 +879,7 @@ async function applyFetchedLibrary(items) {
 
 async function refreshLibraryMetadataInBackground() {
   try {
-    const items = await fetchPlayerLibraryItems({ preferPrefetch: false })
+    const items = await API.refreshLibraryInBackground(false)
     if (items.length > 0 && !libraryItemsUnchanged(items)) {
       applyLibraryItems(items)
       scheduleGenreRefresh(items)
@@ -1110,6 +1089,9 @@ function onSeekEnd() {
 
 onMounted(() => {
   window.scroll(0, 0)
+  if (libraryItems.value.length) {
+    API.warmLibraryCovers(libraryItems.value)
+  }
   load()
 })
 
@@ -1276,11 +1258,56 @@ onUnmounted(() => {
 }
 
 .player-browse-tabs {
-  @apply mb-3 w-full max-w-full grid grid-cols-2 gap-1 rounded-2xl border border-white/10 bg-base-100/75 p-1 sm:mx-auto sm:mb-4 sm:flex sm:w-max sm:max-w-full sm:rounded-full;
+  @apply mb-3 grid w-full max-w-full grid-cols-2 gap-1 rounded-2xl border border-white/10 bg-base-100/75 p-1;
 }
 
-.player-browse-tabs .metadata-tab-btn {
-  @apply inline-flex w-full items-center justify-center gap-1 whitespace-normal rounded-xl px-2 py-2.5 text-center text-[11px] font-medium leading-tight transition-colors sm:w-auto sm:gap-0 sm:whitespace-nowrap sm:rounded-full sm:px-4 sm:py-2 sm:text-sm sm:leading-normal;
+.player-browse-tab-btn {
+  @apply inline-flex min-w-0 items-center justify-center rounded-xl px-2 py-2.5 text-center text-[11px] font-medium leading-tight transition-colors;
+}
+
+.player-browse-tab-btn-active {
+  @apply bg-primary text-primary-content shadow-glow-sm;
+}
+
+.player-browse-tab-btn-inactive {
+  @apply text-base-content/60 hover:bg-white/5 hover:text-base-content;
+}
+
+.player-browse-tab-label-short {
+  @apply sm:hidden;
+}
+
+.player-browse-tab-label-full {
+  @apply hidden sm:inline;
+}
+
+@media (min-width: 640px) {
+  .player-browse-tabs {
+    display: flex;
+    border-radius: 9999px;
+  }
+
+  .player-browse-tab-btn {
+    @apply flex-1 rounded-full px-2 py-2 text-xs;
+  }
+}
+
+@media (min-width: 1024px) {
+  .player-browse-tabs {
+    @apply rounded-2xl;
+  }
+
+  .player-browse-tab-btn {
+    @apply rounded-xl py-2 text-[11px];
+  }
+
+  .player-browse-tab-label-short {
+    @apply inline;
+  }
+
+  .player-browse-tab-label-full {
+    @apply hidden;
+  }
 }
 
 .player-browse-body {

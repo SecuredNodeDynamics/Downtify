@@ -2,9 +2,12 @@ let cachedPaths = null
 let cachedLibraryItems = null
 let cachedServerKey = ''
 let prefetchPromise = null
+let backgroundRefreshPromise = null
+let lastBackgroundRefreshAt = 0
 
 const PERSIST_KEY = 'downtify-library-cache-v1'
 const PERSIST_MAX_AGE_MS = 24 * 60 * 60 * 1000
+export const LIBRARY_BACKGROUND_REFRESH_MS = 30_000
 
 export function getCachedLibraryPaths() {
   return cachedPaths ? [...cachedPaths] : null
@@ -48,6 +51,8 @@ export function clearLibrarySessionCache() {
 
 export function resetLibraryPrefetch() {
   prefetchPromise = null
+  backgroundRefreshPromise = null
+  lastBackgroundRefreshAt = 0
 }
 
 export function getLibraryPrefetchPromise() {
@@ -129,6 +134,32 @@ export function hydrateLibraryFromPersistence(serverKey = '') {
   return true
 }
 
+export function getInitialLibrarySnapshot(serverKey = '') {
+  if (!getCachedLibraryItems()?.length) {
+    hydrateLibraryFromPersistence(serverKey)
+  }
+
+  const items = getCachedLibraryItems() || []
+  const paths = getCachedLibraryPaths() || items.map((item) => item.file)
+  return {
+    items: [...items],
+    paths: [...paths],
+    ready: paths.length > 0,
+  }
+}
+
+export function applyLibrarySnapshot(items, serverKey = '') {
+  const normalized = normalizeLibraryPayload(items)
+  if (!normalized.length) {
+    return []
+  }
+
+  const paths = normalized.map((item) => item.file)
+  setLibrarySessionCache(paths, normalized, serverKey)
+  persistLibraryCache(paths, normalized, serverKey)
+  return normalized
+}
+
 export function startLibraryPrefetch(fetchLibrary, serverKey = '') {
   if (!fetchLibrary) return null
   if (prefetchPromise) return prefetchPromise
@@ -139,17 +170,7 @@ export function startLibraryPrefetch(fetchLibrary, serverKey = '') {
 
   prefetchPromise = Promise.resolve()
     .then(() => fetchLibrary())
-    .then((items) => {
-      const normalized = normalizeLibraryPayload(items)
-      if (!normalized.length) {
-        return getCachedLibraryItems() || []
-      }
-
-      const paths = normalized.map((item) => item.file)
-      setLibrarySessionCache(paths, normalized, serverKey)
-      persistLibraryCache(paths, normalized, serverKey)
-      return normalized
-    })
+    .then((items) => applyLibrarySnapshot(items, serverKey))
     .catch(() => getCachedLibraryItems() || [])
 
   return prefetchPromise
@@ -172,10 +193,43 @@ export async function fetchLibraryItems(
   }
 
   const items = await fetchLibrary()
-  const normalized = normalizeLibraryPayload(items)
-  if (normalized.length) {
-    const paths = normalized.map((item) => item.file)
-    setLibrarySessionCache(paths, normalized)
+  return applyLibrarySnapshot(items)
+}
+
+export function refreshLibraryInBackground(
+  fetchLibrary,
+  {
+    serverKey = '',
+    force = false,
+    minIntervalMs = LIBRARY_BACKGROUND_REFRESH_MS,
+  } = {}
+) {
+  if (!fetchLibrary) return Promise.resolve(getCachedLibraryItems() || [])
+
+  const now = Date.now()
+  if (
+    !force &&
+    backgroundRefreshPromise === null &&
+    now - lastBackgroundRefreshAt < minIntervalMs
+  ) {
+    return Promise.resolve(getCachedLibraryItems() || [])
   }
-  return normalized
+
+  if (backgroundRefreshPromise) {
+    return backgroundRefreshPromise
+  }
+
+  backgroundRefreshPromise = fetchLibraryItems(fetchLibrary, {
+    preferPrefetch: false,
+  })
+    .then((items) => {
+      lastBackgroundRefreshAt = Date.now()
+      return items
+    })
+    .catch(() => getCachedLibraryItems() || [])
+    .finally(() => {
+      backgroundRefreshPromise = null
+    })
+
+  return backgroundRefreshPromise
 }

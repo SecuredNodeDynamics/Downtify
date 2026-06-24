@@ -63,6 +63,29 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci --prefix frontend
 
+      - name: Configure release signing
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${ANDROID_KEYSTORE_BASE64:-}" ]]; then
+            echo "Missing GitHub secret ANDROID_KEYSTORE_BASE64." >&2
+            echo "See docs/android-apk-signing.md for setup." >&2
+            exit 1
+          fi
+          mkdir -p frontend/android/keystore
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > frontend/android/keystore/downtify-release.keystore
+          cat > frontend/android/keystore.properties <<EOF
+storeFile=keystore/downtify-release.keystore
+storePassword=${ANDROID_KEYSTORE_PASSWORD}
+keyAlias=${ANDROID_KEY_ALIAS}
+keyPassword=${ANDROID_KEY_PASSWORD}
+EOF
+
       - name: Verify release versions match
         shell: bash
         run: |
@@ -79,7 +102,7 @@ jobs:
             exit 1
           fi
 
-      - name: Build debug APK
+      - name: Build release APK
         run: bash scripts/build-android-apk.sh
 
       - name: Upload APK to GitHub release

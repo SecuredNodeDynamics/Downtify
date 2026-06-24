@@ -1,12 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
+  applyLibrarySnapshot,
   clearLibrarySessionCache,
   getCachedLibraryItems,
   getCachedLibraryPaths,
+  getInitialLibrarySnapshot,
   hydrateLibraryFromPersistence,
   loadPersistedLibrary,
   persistLibraryCache,
+  refreshLibraryInBackground,
   resetLibraryPrefetch,
   setLibrarySessionCache,
   startLibraryPrefetch,
@@ -81,6 +84,62 @@ describe('librarySession', () => {
     expect(loadPersistedLibrary('http://127.0.0.1:8000')?.items[0]?.file).toBe(
       'Artist/track.flac'
     )
+  })
+
+  it('returns an immediate snapshot from memory or persistence', () => {
+    applyLibrarySnapshot(
+      [
+        {
+          file: 'Artist/Album/track.flac',
+          title: 'Track',
+          artist: 'Artist',
+          album: 'Album',
+          genre: 'Rock',
+          browse_genre: 'Rock',
+        },
+      ],
+      'http://127.0.0.1:8000'
+    )
+
+    const snapshot = getInitialLibrarySnapshot('http://127.0.0.1:8000')
+    expect(snapshot.ready).toBe(true)
+    expect(snapshot.paths).toEqual(['Artist/Album/track.flac'])
+    expect(snapshot.items[0]?.title).toBe('Track')
+  })
+
+  it('dedupes background refresh calls', async () => {
+    const fetchLibrary = vi.fn().mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          setTimeout(
+            () =>
+              resolve([
+                {
+                  file: 'Artist/track.flac',
+                  title: 'Track',
+                  artist: 'Artist',
+                  album: '',
+                  genre: '',
+                  browse_genre: '',
+                },
+              ]),
+            10
+          )
+        })
+    )
+
+    const first = refreshLibraryInBackground(fetchLibrary, {
+      serverKey: 'http://127.0.0.1:8000',
+      force: true,
+    })
+    const second = refreshLibraryInBackground(fetchLibrary, {
+      serverKey: 'http://127.0.0.1:8000',
+      force: true,
+    })
+
+    expect(first).toBe(second)
+    await first
+    expect(fetchLibrary).toHaveBeenCalledTimes(1)
   })
 
   it('stores session cache entries for player hydration', () => {

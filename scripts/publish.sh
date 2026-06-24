@@ -141,7 +141,7 @@ git commit -m "$(cat <<EOF
 chore: release ${TAG}
 
 Bump Downtify to ${VERSION}, rebuild frontend assets, and sync Android
-version metadata for the matching debug APK.
+version metadata for the matching release-signed APK.
 EOF
 )"
 

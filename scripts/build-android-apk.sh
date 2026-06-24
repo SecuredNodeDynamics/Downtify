@@ -3,11 +3,44 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 FRONTEND="$ROOT/frontend"
+ANDROID_DIR="$FRONTEND/android"
 TOOLS="$ROOT/.tools"
 
 export JAVA_HOME="${JAVA_HOME:-$TOOLS/jdk-21}"
 export ANDROID_HOME="${ANDROID_HOME:-$TOOLS/android-sdk}"
 export PATH="$JAVA_HOME/bin:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
+
+require_release_signing() {
+  if [[ -f "$ANDROID_DIR/keystore.properties" ]]; then
+    return 0
+  fi
+  if [[ -n "${ANDROID_KEYSTORE_PATH:-}" && -n "${ANDROID_KEYSTORE_PASSWORD:-}" && -n "${ANDROID_KEY_ALIAS:-}" && -n "${ANDROID_KEY_PASSWORD:-}" ]]; then
+    return 0
+  fi
+  echo "Release signing is required for Play Protect–friendly APKs." >&2
+  echo "Run: ./scripts/setup-android-release-keystore.sh" >&2
+  echo "Or set ANDROID_KEYSTORE_PATH and related env vars." >&2
+  exit 1
+}
+
+verify_apk_signature() {
+  local apk="$1"
+  local build_tools
+  build_tools="$(ls -d "$ANDROID_HOME/build-tools"/* 2>/dev/null | sort -V | tail -1)"
+  if [[ -z "$build_tools" || ! -x "$build_tools/apksigner" ]]; then
+    echo "apksigner not found under ANDROID_HOME/build-tools" >&2
+    exit 1
+  fi
+
+  "$build_tools/apksigner" verify --verbose "$apk" >/dev/null
+
+  if "$build_tools/apksigner" verify --print-certs "$apk" 2>/dev/null | grep -qi 'Android Debug'; then
+    echo "Refusing to ship a debug-signed APK: $apk" >&2
+    exit 1
+  fi
+}
+
+require_release_signing
 
 cd "$FRONTEND"
 
@@ -22,13 +55,20 @@ cp "$ROOT/assets/icon-without-backgroud.svg" "$FRONTEND/assets/logo.svg"
 npm run android:icons
 npm run build:android
 cd android
-./gradlew assembleDebug
+./gradlew assembleRelease
 
-APK_SRC="$FRONTEND/android/app/build/outputs/apk/debug/app-debug.apk"
+APK_SRC="$FRONTEND/android/app/build/outputs/apk/release/app-release.apk"
 APK_DST="$FRONTEND/dist/downtify-${VERSION}.apk"
+
+if [[ ! -f "$APK_SRC" ]]; then
+  echo "Release APK not found: $APK_SRC" >&2
+  echo "Ensure release signing is configured in frontend/android/keystore.properties" >&2
+  exit 1
+fi
 
 mkdir -p "$FRONTEND/dist"
 cp "$APK_SRC" "$APK_DST"
+verify_apk_signature "$APK_DST"
 
 GRADLE_VERSION="$(sed -n 's/.*versionName "\([^"]*\)".*/\1/p' "$FRONTEND/android/app/build.gradle" | head -1)"
 if [[ "$GRADLE_VERSION" != "$VERSION" ]]; then
@@ -36,4 +76,4 @@ if [[ "$GRADLE_VERSION" != "$VERSION" ]]; then
   exit 1
 fi
 
-echo "Built $APK_DST"
+echo "Built release-signed $APK_DST"
