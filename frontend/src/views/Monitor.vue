@@ -97,6 +97,14 @@
         <div v-for="n in 3" :key="n" class="skeleton h-24 rounded-2xl" />
       </div>
 
+      <div
+        v-else-if="loadError"
+        class="surface rounded-2xl p-4 text-sm text-error flex items-center gap-3"
+      >
+        <Icon icon="clarity:exclamation-circle-line" class="h-5 w-5 shrink-0" />
+        <span>{{ loadError }}</span>
+      </div>
+
       <!-- Empty state -->
       <div
         v-else-if="playlists.length === 0"
@@ -302,6 +310,7 @@ const { t } = useI18n()
 
 const playlists = ref([])
 const loading = ref(false)
+const loadError = ref('')
 const adding = ref(false)
 const addError = ref('')
 const newUrl = ref('')
@@ -321,9 +330,13 @@ const urlPlaceholder = computed(() =>
 
 async function load() {
   loading.value = true
+  loadError.value = ''
   try {
     const res = await monitorAPI.listMonitoredPlaylists()
     setPlaylists(res.data || [])
+  } catch (err) {
+    loadError.value =
+      err?.response?.data?.detail || err?.message || t('monitor.failedLoad')
   } finally {
     loading.value = false
   }

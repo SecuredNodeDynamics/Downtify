@@ -4223,9 +4223,33 @@ async def _apply_monitor_playlist_update(
 async def list_monitor_playlists() -> list[dict[str, Any]]:
     db = _require_monitor_db()
     playlists = await asyncio.to_thread(db.list_playlists)
-    return await asyncio.to_thread(
-        lambda: [_monitor_playlist_dict(p) for p in playlists]
+    result = await asyncio.to_thread(
+        lambda: [
+            _monitor_playlist_dict(playlist, fetch_image=False)
+            for playlist in playlists
+        ]
     )
+    asyncio.create_task(_prefetch_monitor_images(playlists))
+    return result
+
+
+async def _prefetch_monitor_images(playlists: list[MonitoredPlaylist]) -> None:
+    for playlist in playlists:
+        cache_key = f'{playlist.kind}:{playlist.spotify_id}'
+        if cache_key in _MONITOR_IMAGE_CACHE:
+            continue
+        try:
+            await asyncio.to_thread(
+                _monitor_item_image_url,
+                playlist.kind,
+                playlist.spotify_id,
+            )
+        except Exception:
+            logger.opt(exception=True).debug(
+                'Background monitor cover prefetch failed for {} {}',
+                playlist.kind,
+                playlist.spotify_id,
+            )
 
 
 @router.get('/api/monitor/artists/lookup')

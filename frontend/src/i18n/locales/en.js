@@ -323,6 +323,7 @@ export default {
     urlPlaceholderArtist: 'Paste a Spotify artist URL…',
     watch: 'Watch',
     failedAdd: 'Failed to add. Check the URL and try again.',
+    failedLoad: 'Failed to load monitored playlists. Try refreshing.',
     empty: 'Nothing is being monitored yet.',
     emptyHint: 'Paste a Spotify playlist or artist link above to get started.',
     active: 'Active',

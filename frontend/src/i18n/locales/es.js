@@ -336,6 +336,7 @@ export default {
     urlPlaceholderArtist: 'Pega una URL de artista de Spotify…',
     watch: 'Vigilar',
     failedAdd: 'No se pudo añadir. Comprueba la URL e inténtalo de nuevo.',
+    failedLoad: 'No se pudieron cargar las listas monitorizadas. Actualiza la página.',
     empty: 'Aún no hay nada vigilado.',
     emptyHint:
       'Pega un enlace de lista o artista de Spotify arriba para empezar.',
