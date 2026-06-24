@@ -10,7 +10,9 @@
       />
       <div class="min-w-0 space-y-3">
         <div>
-          <p class="text-sm font-semibold">{{ t('settings.serverRequiredTitle') }}</p>
+          <p class="text-sm font-semibold">
+            {{ t('settings.serverRequiredTitle') }}
+          </p>
           <p class="mt-1 text-sm text-base-content/70">
             {{ t('settings.serverRequiredHint') }}
           </p>

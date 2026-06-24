@@ -2,7 +2,9 @@
   <div class="min-h-0 overflow-x-hidden">
     <Navbar />
 
-    <main class="mx-auto max-w-5xl w-full min-w-0 px-4 py-4 sm:py-8 sm:px-6 overflow-x-hidden">
+    <main
+      class="mx-auto max-w-5xl w-full min-w-0 px-4 py-4 sm:py-8 sm:px-6 overflow-x-hidden"
+    >
       <div class="mb-6 sm:mb-8 mobile-page-header">
         <h1 class="text-2xl font-bold tracking-tight">
           {{ t('health.title') }}
@@ -30,8 +32,12 @@
         v-else-if="!needsServerConnection() && health"
         class="space-y-4 sm:space-y-6 min-w-0"
       >
-        <section class="surface health-card rounded-2xl p-4 sm:p-5 min-w-0 overflow-hidden">
-          <div class="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+        <section
+          class="surface health-card rounded-2xl p-4 sm:p-5 min-w-0 overflow-hidden"
+        >
+          <div
+            class="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between"
+          >
             <div class="flex min-w-0 items-center gap-3">
               <span
                 class="inline-flex h-11 w-11 items-center justify-center rounded-xl"
@@ -96,12 +102,17 @@
         </section>
 
         <section class="grid min-w-0 gap-4 md:grid-cols-2">
-          <div class="surface health-card rounded-2xl p-4 sm:p-5 min-w-0 overflow-hidden">
+          <div
+            class="surface health-card rounded-2xl p-4 sm:p-5 min-w-0 overflow-hidden"
+          >
             <div class="mb-4 flex items-center justify-between gap-3">
               <h2 class="text-sm font-semibold uppercase text-base-content/50">
                 {{ t('health.downloads') }}
               </h2>
-              <Icon icon="clarity:download-line" class="h-5 w-5 shrink-0 text-primary" />
+              <Icon
+                icon="clarity:download-line"
+                class="h-5 w-5 shrink-0 text-primary"
+              />
             </div>
             <p class="text-xs text-base-content/40">
               {{ downloadLocationLabel }}
@@ -121,7 +132,9 @@
                 <p class="font-semibold">{{ health.downloads.audio_count }}</p>
               </div>
               <div class="health-stat-item">
-                <p class="text-base-content/40">{{ t('health.librarySize') }}</p>
+                <p class="text-base-content/40">
+                  {{ t('health.librarySize') }}
+                </p>
                 <p class="font-semibold">
                   {{ formatBytes(health.downloads.size_bytes) }}
                 </p>
@@ -135,12 +148,17 @@
             </div>
           </div>
 
-          <div class="surface health-card rounded-2xl p-4 sm:p-5 min-w-0 overflow-hidden">
+          <div
+            class="surface health-card rounded-2xl p-4 sm:p-5 min-w-0 overflow-hidden"
+          >
             <div class="mb-4 flex items-center justify-between gap-3">
               <h2 class="text-sm font-semibold uppercase text-base-content/50">
                 {{ t('health.data') }}
               </h2>
-              <Icon icon="clarity:folder-line" class="h-5 w-5 shrink-0 text-primary" />
+              <Icon
+                icon="clarity:folder-line"
+                class="h-5 w-5 shrink-0 text-primary"
+              />
             </div>
             <p class="break-all text-sm font-medium leading-snug">
               {{ health.data.path }}
@@ -173,8 +191,12 @@
         </section>
 
         <section class="grid min-w-0 gap-4 lg:grid-cols-[1fr_1fr]">
-          <div class="surface health-card rounded-2xl p-4 sm:p-5 min-w-0 overflow-hidden">
-            <h2 class="mb-4 text-sm font-semibold uppercase text-base-content/50">
+          <div
+            class="surface health-card rounded-2xl p-4 sm:p-5 min-w-0 overflow-hidden"
+          >
+            <h2
+              class="mb-4 text-sm font-semibold uppercase text-base-content/50"
+            >
               {{ t('health.tools') }}
             </h2>
             <ul class="space-y-3">
@@ -194,17 +216,19 @@
                   :class="tool.available ? 'badge-soft' : 'badge-error-soft'"
                 >
                   {{
-                    tool.available
-                      ? t('health.available')
-                      : t('health.missing')
+                    tool.available ? t('health.available') : t('health.missing')
                   }}
                 </span>
               </li>
             </ul>
           </div>
 
-          <div class="surface health-card rounded-2xl p-4 sm:p-5 min-w-0 overflow-hidden">
-            <h2 class="mb-4 text-sm font-semibold uppercase text-base-content/50">
+          <div
+            class="surface health-card rounded-2xl p-4 sm:p-5 min-w-0 overflow-hidden"
+          >
+            <h2
+              class="mb-4 text-sm font-semibold uppercase text-base-content/50"
+            >
               {{ t('health.settings') }}
             </h2>
             <ul class="health-settings-list">
@@ -231,7 +255,9 @@
           </div>
         </section>
 
-        <section class="surface health-card rounded-2xl p-4 sm:p-5 min-w-0 overflow-hidden">
+        <section
+          class="surface health-card rounded-2xl p-4 sm:p-5 min-w-0 overflow-hidden"
+        >
           <div class="mb-4 flex items-center justify-between gap-3">
             <h2 class="text-sm font-semibold uppercase text-base-content/50">
               {{ t('health.recentHistory') }}

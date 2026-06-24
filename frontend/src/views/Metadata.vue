@@ -197,7 +197,9 @@
           </button>
         </div>
 
-        <div class="max-h-[45rem] overflow-x-hidden overflow-y-auto pr-1 sm:pr-2">
+        <div
+          class="max-h-[45rem] overflow-x-hidden overflow-y-auto pr-1 sm:pr-2"
+        >
           <div
             v-if="loading && visibleItems.length === 0"
             class="metadata-artist-grid"
@@ -313,17 +315,13 @@
                     v-if="applying[item.file]"
                     class="loading loading-spinner loading-xs mr-2"
                   />
-                  <Icon
-                    v-else
-                    icon="clarity:check-line"
-                    class="mr-2 h-4 w-4"
-                  />
+                  <Icon v-else icon="clarity:check-line" class="mr-2 h-4 w-4" />
                   {{
                     applying[item.file]
                       ? t('metadata.fixing')
                       : fixed[item.file]
-                        ? t('metadata.fixed')
-                        : t('metadata.apply')
+                      ? t('metadata.fixed')
+                      : t('metadata.apply')
                   }}
                 </button>
               </div>
@@ -426,7 +424,9 @@
           </div>
         </section>
 
-        <div class="metadata-tab-shell metadata-filter-tab-shell tab-glow-shell">
+        <div
+          class="metadata-tab-shell metadata-filter-tab-shell tab-glow-shell"
+        >
           <button
             class="metadata-tab-btn"
             :class="
@@ -480,14 +480,18 @@
             @click="activeArtistImageTab = 'failed'"
           >
             <span class="sm:hidden">{{ t('metadata.repairFailedShort') }}</span>
-            <span class="hidden sm:inline">{{ t('metadata.repairFailed') }}</span>
+            <span class="hidden sm:inline">{{
+              t('metadata.repairFailed')
+            }}</span>
             <span class="metadata-tab-badge">
               {{ failedArtistImages.length }}
             </span>
           </button>
         </div>
 
-        <div class="max-h-[34rem] overflow-x-hidden overflow-y-auto pr-1 sm:pr-2">
+        <div
+          class="max-h-[34rem] overflow-x-hidden overflow-y-auto pr-1 sm:pr-2"
+        >
           <div
             v-if="artistImageLoading && visibleArtistImageItems.length === 0"
             class="metadata-artist-grid"
@@ -591,8 +595,8 @@
                     isArtistImageUpdateTab
                       ? ''
                       : fixedArtistImages[itemKey(item)]
-                        ? 'text-primary'
-                        : ''
+                      ? 'text-primary'
+                      : ''
                   "
                   :disabled="applyingArtistImages[itemKey(item)]"
                   @click="
@@ -735,7 +739,9 @@
                 class="metadata-stat-action-label"
               >
                 <span class="sm:hidden">{{ t('metadata.bulkFixShort') }}</span>
-                <span class="hidden sm:inline">{{ t('metadata.bulkFixGroup') }}</span>
+                <span class="hidden sm:inline">{{
+                  t('metadata.bulkFixGroup')
+                }}</span>
               </span>
             </button>
           </div>
@@ -772,7 +778,9 @@
                 class="metadata-stat-action-label"
               >
                 <span class="sm:hidden">{{ t('metadata.bulkFixShort') }}</span>
-                <span class="hidden sm:inline">{{ t('metadata.bulkFixGroup') }}</span>
+                <span class="hidden sm:inline">{{
+                  t('metadata.bulkFixGroup')
+                }}</span>
               </span>
             </button>
           </div>
@@ -819,7 +827,10 @@
           </p>
         </div>
 
-        <div v-else-if="artistReconciliation" class="surface min-w-0 rounded-2xl p-3 sm:p-4">
+        <div
+          v-else-if="artistReconciliation"
+          class="surface min-w-0 rounded-2xl p-3 sm:p-4"
+        >
           <div class="metadata-bucket-grid">
             <button
               v-for="bucket in reconciliationBuckets"
@@ -857,10 +868,7 @@
             </button>
           </div>
 
-          <div
-            v-if="activeReconciliationBucketMeta"
-            class="metadata-bulk-bar"
-          >
+          <div v-if="activeReconciliationBucketMeta" class="metadata-bulk-bar">
             <div class="min-w-0">
               <p class="text-sm font-semibold">
                 {{ activeReconciliationBucketMeta.label }}
@@ -928,7 +936,9 @@
                     v-if="applyingArtistImages[jellyfinRepairKey(item)]"
                     class="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-base-100/80 px-3 text-center"
                   >
-                    <span class="loading loading-spinner loading-md text-primary" />
+                    <span
+                      class="loading loading-spinner loading-md text-primary"
+                    />
                     <p class="text-[11px] font-medium text-base-content/70">
                       {{ t('metadata.fixing') }}
                     </p>
@@ -976,7 +986,9 @@
                       applyingArtistImages[jellyfinRepairKey(item)] ||
                       fixedArtistImages[jellyfinRepairKey(item)]
                     "
-                    @click="openArtistImagePicker(item, { context: 'jellyfin' })"
+                    @click="
+                      openArtistImagePicker(item, { context: 'jellyfin' })
+                    "
                   >
                     <span
                       v-if="applyingArtistImages[jellyfinRepairKey(item)]"
@@ -991,15 +1003,17 @@
                       fixedArtistImages[jellyfinRepairKey(item)]
                         ? t('metadata.fixed')
                         : failedArtistRepairKeys[jellyfinRepairKey(item)]
-                          ? t('metadata.fixFailed')
-                          : t('metadata.chooseCover')
+                        ? t('metadata.fixFailed')
+                        : t('metadata.chooseCover')
                     }}
                   </button>
                   <button
                     v-else-if="canUpdateJellyfinArtistImage(item)"
                     class="btn btn-sm metadata-card-btn w-full border-white/10 bg-base-100/85 hover:bg-base-100"
                     :disabled="applyingArtistImages[jellyfinRepairKey(item)]"
-                    @click="openArtistImagePicker(item, { context: 'jellyfin' })"
+                    @click="
+                      openArtistImagePicker(item, { context: 'jellyfin' })
+                    "
                   >
                     <span
                       v-if="applyingArtistImages[jellyfinRepairKey(item)]"
@@ -1083,7 +1097,10 @@
           >
             <span class="loading loading-spinner loading-md text-primary" />
             <p>{{ t('metadata.chooseCoverLoading') }}</p>
-            <p v-if="artistImagePickerSlowHint" class="text-xs text-base-content/45">
+            <p
+              v-if="artistImagePickerSlowHint"
+              class="text-xs text-base-content/45"
+            >
               {{ t('metadata.chooseCoverLoadingSlow') }}
             </p>
           </div>
@@ -1099,10 +1116,7 @@
           >
             {{ t('metadata.chooseCoverEmpty') }}
           </p>
-          <div
-            v-else
-            class="grid grid-cols-2 gap-3 sm:grid-cols-3"
-          >
+          <div v-else class="grid grid-cols-2 gap-3 sm:grid-cols-3">
             <button
               v-for="option in artistImagePickerOptions"
               :key="option.id"
@@ -1133,10 +1147,7 @@
                   v-else
                   class="flex flex-col items-center gap-2 px-3 text-center text-base-content/45"
                 >
-                  <Icon
-                    icon="clarity:image-off-line"
-                    class="h-10 w-10"
-                  />
+                  <Icon icon="clarity:image-off-line" class="h-10 w-10" />
                   <span class="text-xs">
                     {{ t('metadata.chooseCoverPreviewUnavailable') }}
                   </span>
@@ -1158,7 +1169,9 @@
           </div>
         </div>
 
-        <div class="flex flex-col gap-2 border-t border-white/10 px-5 py-4 sm:flex-row sm:justify-end">
+        <div
+          class="flex flex-col gap-2 border-t border-white/10 px-5 py-4 sm:flex-row sm:justify-end"
+        >
           <button
             type="button"
             class="btn btn-ghost metadata-btn"
@@ -1255,18 +1268,18 @@ const visibleItems = computed(() =>
   activeTab.value === 'completed'
     ? completedItems.value
     : activeTab.value === 'clean'
-      ? cleanItems.value
-      : items.value
+    ? cleanItems.value
+    : items.value
 )
 
 const visibleArtistImageItems = computed(() =>
   activeArtistImageTab.value === 'completed'
     ? completedArtistImages.value
     : activeArtistImageTab.value === 'clean'
-      ? cleanArtistImageItems.value
-      : activeArtistImageTab.value === 'failed'
-        ? failedArtistImages.value
-        : artistImageItems.value
+    ? cleanArtistImageItems.value
+    : activeArtistImageTab.value === 'failed'
+    ? failedArtistImages.value
+    : artistImageItems.value
 )
 
 const isArtistImageUpdateTab = computed(() =>
@@ -1509,13 +1522,19 @@ function artistImageActionLabel(item) {
 function refreshArtistImageItemPreview(item, result) {
   const key = itemKey(item)
   const folder =
-    result?.folder || firstSavedFolder(result) || item.folder || item.target || ''
+    result?.folder ||
+    firstSavedFolder(result) ||
+    item.folder ||
+    item.target ||
+    ''
   const preview_url = folder
     ? `${folderPreviewUrl(folder)}&t=${Date.now()}`
     : item.preview_url
   const updateList = (list) =>
     list.map((existing) =>
-      itemKey(existing) === key ? { ...existing, ...result, preview_url } : existing
+      itemKey(existing) === key
+        ? { ...existing, ...result, preview_url }
+        : existing
     )
   cleanArtistImageItems.value = updateList(cleanArtistImageItems.value)
   completedArtistImages.value = updateList(completedArtistImages.value)
@@ -1543,7 +1562,9 @@ function firstSavedFolder(result) {
 function folderPreviewUrl(folder) {
   const value = String(folder || '').trim()
   if (!value) return ''
-  return `/api/metadata/artist-images/folder-preview?folder=${encodeURIComponent(value)}`
+  return `/api/metadata/artist-images/folder-preview?folder=${encodeURIComponent(
+    value
+  )}`
 }
 
 function enrichArtistImageItem(item) {
@@ -1607,7 +1628,9 @@ function apiPreviewSrc(path) {
 }
 
 function artistImageItemArtist(item) {
-  return String(item?.artist || item?.name || '').trim() || t('common.unknownArtist')
+  return (
+    String(item?.artist || item?.name || '').trim() || t('common.unknownArtist')
+  )
 }
 
 function artistImagePreviewUrl(item) {
@@ -1618,7 +1641,9 @@ function artistImagePreviewUrl(item) {
   const folder = item.folder || firstSavedFolder(item) || item.target || ''
   if (folder) {
     return apiPreviewSrc(
-      `/api/metadata/artist-images/folder-preview?folder=${encodeURIComponent(folder)}`
+      `/api/metadata/artist-images/folder-preview?folder=${encodeURIComponent(
+        folder
+      )}`
     )
   }
   const file = String(item.file || '').trim()
@@ -1730,7 +1755,9 @@ function markJellyfinArtistImageFixed(item, result) {
       has_image: true,
       missing_image: false,
       preview_url: folder
-        ? `/api/metadata/artist-images/folder-preview?folder=${encodeURIComponent(folder)}&t=${previewStamp}`
+        ? `/api/metadata/artist-images/folder-preview?folder=${encodeURIComponent(
+            folder
+          )}&t=${previewStamp}`
         : existing.preview_url,
     }
   }
@@ -1748,7 +1775,7 @@ function markJellyfinArtistImageFixed(item, result) {
     jellyfin_only: (current.jellyfin_only || []).map(updateItem),
     tag_only: (current.tag_only || []).map(updateItem),
     missing_images: (current.missing_images || []).filter(
-      (existing) => !sameJellyfinArtist(existing, item),
+      (existing) => !sameJellyfinArtist(existing, item)
     ),
   }
 }
@@ -2139,12 +2166,18 @@ async function applyArtistImageWithSelection(item, selection = {}) {
         res.data?.folder || firstSavedFolder(res.data) || item.folder || ''
       ),
     }
-    if (isArtistImageUpdateTab.value || activeArtistImageTab.value === 'failed') {
+    if (
+      isArtistImageUpdateTab.value ||
+      activeArtistImageTab.value === 'failed'
+    ) {
       refreshArtistImageItemPreview(item, completedItem)
       artistImageError.value = ''
       return true
     }
-    completedArtistImages.value = [completedItem, ...completedArtistImages.value]
+    completedArtistImages.value = [
+      completedItem,
+      ...completedArtistImages.value,
+    ]
     failedArtistImages.value = failedArtistImages.value.filter(
       (existing) => itemKey(existing) !== key
     )
@@ -2211,25 +2244,38 @@ async function applyJellyfinArtistImage(item, options = {}) {
         res.data?.folder || firstSavedFolder(res.data) || item.folder || ''
       ),
     }
-    completedArtistImages.value = [completedItem, ...completedArtistImages.value]
+    completedArtistImages.value = [
+      completedItem,
+      ...completedArtistImages.value,
+    ]
     markJellyfinArtistImageFixed(item, res.data)
     if (item.has_image) {
       const key = jellyfinRepairKey(item)
-      const folder = item.folder || res.data?.folder || firstSavedFolder(res.data)
+      const folder =
+        item.folder || res.data?.folder || firstSavedFolder(res.data)
       if (folder) {
         const preview_url = `${folderPreviewUrl(folder)}&t=${Date.now()}`
         const updateBucket = (bucketKey) => {
           const data = artistReconciliation.value || {}
           const items = (data[bucketKey] || []).map((existing) =>
             jellyfinRepairKey(existing) === key
-              ? { ...existing, preview_url, has_image: true, missing_image: false }
+              ? {
+                  ...existing,
+                  preview_url,
+                  has_image: true,
+                  missing_image: false,
+                }
               : existing
           )
           artistReconciliation.value = { ...data, [bucketKey]: items }
         }
-        ;['matched', 'missing_images', 'folder_only', 'jellyfin_only', 'tag_only'].forEach(
-          updateBucket
-        )
+        ;[
+          'matched',
+          'missing_images',
+          'folder_only',
+          'jellyfin_only',
+          'tag_only',
+        ].forEach(updateBucket)
         jellyfinPreviewFailed.value = { ...jellyfinPreviewFailed.value }
         delete jellyfinPreviewFailed.value[key]
       }
@@ -2238,7 +2284,9 @@ async function applyJellyfinArtistImage(item, options = {}) {
       const sync = res.data?.jellyfin_sync
       if (sync && sync.synced === false) {
         jellyfinError.value = false
-        jellyfinMessage.value = `${t('metadata.artistImageRepairOk')} ${t('metadata.artistImageRepairSyncWarning')}`
+        jellyfinMessage.value = `${t('metadata.artistImageRepairOk')} ${t(
+          'metadata.artistImageRepairSyncWarning'
+        )}`
       } else {
         jellyfinMessage.value = t('metadata.artistImageRepairOk')
       }
@@ -2252,7 +2300,9 @@ async function applyJellyfinArtistImage(item, options = {}) {
         t('metadata.failedArtistImageApply')
       markArtistRepairFailed(key, detail)
       jellyfinError.value = true
-      jellyfinMessage.value = `${t('metadata.failedArtistImageApply')} ${detail}`
+      jellyfinMessage.value = `${t(
+        'metadata.failedArtistImageApply'
+      )} ${detail}`
     } else {
       markArtistRepairFailed(key)
     }

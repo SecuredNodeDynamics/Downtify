@@ -41,7 +41,13 @@ const items = [
   },
 ]
 
-const moreRoutes = new Set(['Monitor', 'Health', 'Metadata', 'Download', 'Settings'])
+const moreRoutes = new Set([
+  'Monitor',
+  'Health',
+  'Metadata',
+  'Download',
+  'Settings',
+])
 
 function isActive(item) {
   if (item.name === 'More') {

@@ -91,7 +91,6 @@ def test_metadata_scan_resets_offset_when_download_root_changes(
 
     def fake_create_task(coro):
         captured['coro'] = coro
-        return None
 
     monkeypatch.setattr(asyncio, 'create_task', fake_create_task)
     try:
@@ -210,7 +209,6 @@ def test_artist_image_scan_resets_offset_when_download_root_changes(
 
     def fake_create_task(coro):
         captured['coro'] = coro
-        return None
 
     monkeypatch.setattr(asyncio, 'create_task', fake_create_task)
     try:

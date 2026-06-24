@@ -38,8 +38,7 @@ export function normalizeLibraryItem(item, options = {}) {
     String(item?.title || '').trim() ||
     displayNameFromFile(file).replace(/\.[^/.]+$/, '')
   const genre = String(item?.genre || '').trim()
-  const browseGenre =
-    String(item?.browse_genre || '').trim() || genre
+  const browseGenre = String(item?.browse_genre || '').trim() || genre
   return {
     ...item,
     file,
@@ -119,8 +118,7 @@ export function groupAlbums(items, options = {}) {
       coverFile: album.files[0],
     }))
     .sort(
-      (a, b) =>
-        a.artist.localeCompare(b.artist) || a.name.localeCompare(b.name)
+      (a, b) => a.artist.localeCompare(b.artist) || a.name.localeCompare(b.name)
     )
 }
 
@@ -134,8 +132,8 @@ export function genreCoverFiles(files) {
       parts.length > 2
         ? `${parts[0]}\u0000${parts[1]}`
         : parts.length > 1
-          ? parts[0]
-          : String(file || '')
+        ? parts[0]
+        : String(file || '')
     if (!key || seen.has(key)) continue
     seen.add(key)
     covers.push(file)
@@ -171,9 +169,7 @@ export function groupGenres(items, unknownLabel = 'Unknown', options = {}) {
       name: genre.name,
       files: genre.files,
       coverFiles: genreCoverFiles(genre.files),
-      subgenres: Array.from(genre.subgenres).sort((a, b) =>
-        a.localeCompare(b)
-      ),
+      subgenres: Array.from(genre.subgenres).sort((a, b) => a.localeCompare(b)),
     }))
     .sort((a, b) => {
       if (a.name === unknownLabel) return 1
@@ -191,10 +187,16 @@ export function matchesLibraryFilter(item, query) {
     .trim()
     .toLowerCase()
   if (!q) return true
-  return [item.title, item.artist, item.album, item.genre, item.browse_genre, item.file].some(
-    (part) =>
-      String(part || '')
-        .toLowerCase()
-        .includes(q)
+  return [
+    item.title,
+    item.artist,
+    item.album,
+    item.genre,
+    item.browse_genre,
+    item.file,
+  ].some((part) =>
+    String(part || '')
+      .toLowerCase()
+      .includes(q)
   )
 }

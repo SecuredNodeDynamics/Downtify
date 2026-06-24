@@ -1,4 +1,3 @@
-from pathlib import Path
 
 import pytest
 from mutagen.id3 import ID3, TALB, TCON, TIT2, TPE1

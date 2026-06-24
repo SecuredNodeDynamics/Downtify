@@ -40,7 +40,9 @@
       <!-- Player + queue -->
       <div v-else class="player-shell min-h-0 lg:flex-1">
         <!-- Now playing -->
-        <section class="player-now surface rounded-3xl p-3 sm:p-8 flex flex-col items-center text-center">
+        <section
+          class="player-now surface rounded-3xl p-3 sm:p-8 flex flex-col items-center text-center"
+        >
           <p
             class="mb-3 w-full text-left text-xs font-semibold uppercase tracking-wider text-base-content/50 lg:hidden"
           >
@@ -53,7 +55,9 @@
             :class="{ 'pulse-glow': player.isPlaying.value }"
           >
             <CoverImage
-              v-if="currentCoverSources.src || currentCoverSources.fallbacks.length"
+              v-if="
+                currentCoverSources.src || currentCoverSources.fallbacks.length
+              "
               :key="player.currentTrack.value?.file || 'player-cover'"
               :src="currentCoverSources.src"
               :fallbacks="currentCoverSources.fallbacks"
@@ -61,7 +65,10 @@
               img-class="absolute inset-0 h-full w-full object-cover"
             >
               <template #fallback>
-                <Icon icon="clarity:music-note-line" class="h-16 w-16 sm:h-24 sm:w-24" />
+                <Icon
+                  icon="clarity:music-note-line"
+                  class="h-16 w-16 sm:h-24 sm:w-24"
+                />
               </template>
             </CoverImage>
             <Icon
@@ -116,7 +123,9 @@
           </div>
 
           <!-- Transport -->
-          <div class="mt-3 flex items-center justify-center gap-2 sm:mt-5 sm:gap-3">
+          <div
+            class="mt-3 flex items-center justify-center gap-2 sm:mt-5 sm:gap-3"
+          >
             <button
               class="icon-btn h-9 w-9 sm:h-10 sm:w-10"
               :class="{ 'icon-btn-active': player.shuffle.value }"
@@ -195,8 +204,8 @@
                   player.isMuted.value || player.volume.value === 0
                     ? 'clarity:volume-mute-line'
                     : player.volume.value < 0.5
-                      ? 'clarity:volume-down-line'
-                      : 'clarity:volume-up-line'
+                    ? 'clarity:volume-down-line'
+                    : 'clarity:volume-up-line'
                 "
                 class="h-5 w-5"
               />
@@ -218,7 +227,9 @@
         <aside
           class="player-queue surface flex flex-col rounded-3xl p-3 sm:p-5 lg:max-h-[640px] lg:overflow-y-auto"
         >
-          <div class="mb-2 flex items-center justify-between gap-2 px-1 sm:mb-3">
+          <div
+            class="mb-2 flex items-center justify-between gap-2 px-1 sm:mb-3"
+          >
             <div class="min-w-0">
               <h2
                 class="text-xs font-semibold uppercase tracking-wider text-base-content/50"
@@ -262,7 +273,10 @@
             v-if="libraryFilter"
             class="mb-2 flex items-center gap-2 rounded-xl bg-primary/10 px-3 py-2 text-xs"
           >
-            <Icon icon="clarity:search-line" class="h-4 w-4 shrink-0 text-primary" />
+            <Icon
+              icon="clarity:search-line"
+              class="h-4 w-4 shrink-0 text-primary"
+            />
             <span class="min-w-0 flex-1 truncate text-base-content/80">
               {{ libraryFilter }}
             </span>
@@ -301,13 +315,14 @@
               v-if="loading && libraryItems.length === 0"
               class="player-browse-grid"
             >
-              <div v-for="n in 6" :key="n" class="skeleton aspect-[4/5] rounded-2xl" />
+              <div
+                v-for="n in 6"
+                :key="n"
+                class="skeleton aspect-[4/5] rounded-2xl"
+              />
             </div>
 
-            <ul
-              v-else-if="browseView === 'artists'"
-              class="player-browse-grid"
-            >
+            <ul v-else-if="browseView === 'artists'" class="player-browse-grid">
               <li v-for="artist in filteredArtists" :key="artist.name">
                 <article
                   class="player-browse-card"
@@ -319,7 +334,10 @@
                 >
                   <div class="player-browse-card-cover">
                     <CoverImage
-                      v-if="artistCoverFor(artist).src || artistCoverFor(artist).fallbacks.length"
+                      v-if="
+                        artistCoverFor(artist).src ||
+                        artistCoverFor(artist).fallbacks.length
+                      "
                       :key="`artist:${artist.name}`"
                       :src="artistCoverFor(artist).src"
                       :fallbacks="artistCoverFor(artist).fallbacks"
@@ -363,13 +381,12 @@
             </ul>
 
             <ul
-              v-else-if="browseView === 'albums' || browseView === 'artist-albums'"
+              v-else-if="
+                browseView === 'albums' || browseView === 'artist-albums'
+              "
               class="player-browse-grid"
             >
-              <li
-                v-for="album in visibleAlbums"
-                :key="album.key"
-              >
+              <li v-for="album in visibleAlbums" :key="album.key">
                 <article
                   class="player-browse-card"
                   role="button"
@@ -406,17 +423,16 @@
                     <p class="player-browse-card-title">{{ album.name }}</p>
                     <p class="player-browse-card-sub">{{ album.artist }}</p>
                     <p class="player-browse-card-meta">
-                      {{ t('library.albumMeta', { tracks: album.files.length }) }}
+                      {{
+                        t('library.albumMeta', { tracks: album.files.length })
+                      }}
                     </p>
                   </div>
                 </article>
               </li>
             </ul>
 
-            <ul
-              v-else-if="browseView === 'genres'"
-              class="player-browse-grid"
-            >
+            <ul v-else-if="browseView === 'genres'" class="player-browse-grid">
               <li v-for="genre in filteredGenres" :key="genre.name">
                 <article
                   class="player-browse-card"
@@ -454,22 +470,25 @@
             </ul>
 
             <ul
-              v-else-if="browseView === 'tracks' && visibleTrackItems.length > 0"
+              v-else-if="
+                browseView === 'tracks' && visibleTrackItems.length > 0
+              "
               class="player-browse-grid"
             >
-              <li
-                v-for="item in visibleTrackItems"
-                :key="item.file"
-              >
+              <li v-for="item in visibleTrackItems" :key="item.file">
                 <button
                   type="button"
                   class="player-browse-card"
-                  :class="{ 'player-browse-card-active': isCurrentFile(item.file) }"
+                  :class="{
+                    'player-browse-card-active': isCurrentFile(item.file),
+                  }"
                   @click="playFiles(visibleTrackFiles, item.file)"
                 >
                   <div
                     class="player-browse-card-cover"
-                    :class="{ 'ring-2 ring-primary/50': isCurrentFile(item.file) }"
+                    :class="{
+                      'ring-2 ring-primary/50': isCurrentFile(item.file),
+                    }"
                   >
                     <CoverImage
                       :key="item.file"
@@ -504,17 +523,16 @@
               </li>
             </ul>
 
-            <div
-              v-else-if="libraryFilter"
-              class="py-10 text-center"
-            >
+            <div v-else-if="libraryFilter" class="py-10 text-center">
               <p class="text-sm text-base-content/50">
                 {{ t('player.noFilterResults') }}
               </p>
             </div>
 
             <div v-else class="py-10 text-center">
-              <p class="text-sm text-base-content/50">{{ t('player.empty') }}</p>
+              <p class="text-sm text-base-content/50">
+                {{ t('player.empty') }}
+              </p>
             </div>
           </div>
         </aside>
@@ -636,9 +654,7 @@ const filteredArtists = computed(() => {
 
 const visibleAlbums = computed(() => {
   const source =
-    browseView.value === 'artist-albums'
-      ? artistAlbums.value
-      : albums.value
+    browseView.value === 'artist-albums' ? artistAlbums.value : albums.value
   const q = libraryFilter.value
   if (!q) return source
   return source.filter((album) =>
@@ -674,8 +690,7 @@ const visibleTrackItems = computed(() => {
     items = items.filter((item) => item.artist === selectedArtistName.value)
   } else if (selectedGenreName.value) {
     items = items.filter((item) => {
-      const genre =
-        item.browse_genre || item.genre || unknownGenreLabel.value
+      const genre = item.browse_genre || item.genre || unknownGenreLabel.value
       return genre === selectedGenreName.value
     })
   }
@@ -697,13 +712,12 @@ const browsePlayFiles = computed(() => {
   return visibleTrackFiles.value
 })
 
-const canBrowseBack = computed(
-  () =>
-    Boolean(
-      selectedAlbumKey.value ||
-        selectedArtistName.value ||
-        selectedGenreName.value
-    )
+const canBrowseBack = computed(() =>
+  Boolean(
+    selectedAlbumKey.value ||
+      selectedArtistName.value ||
+      selectedGenreName.value
+  )
 )
 
 const browseHeading = computed(() => {
@@ -730,7 +744,8 @@ const browseSubtitle = computed(() => {
 })
 
 const browseBackLabel = computed(() => {
-  if (selectedAlbumKey.value) return selectedArtistName.value || t('library.albums')
+  if (selectedAlbumKey.value)
+    return selectedArtistName.value || t('library.albums')
   if (selectedGenreName.value) return t('player.genres')
   return t('library.backToArtists')
 })

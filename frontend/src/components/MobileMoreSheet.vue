@@ -15,10 +15,7 @@
         >
           <Icon icon="clarity:download-line" class="h-5 w-5 shrink-0" />
           <span class="flex-1 text-left">{{ t('nav.queue') }}</span>
-          <span
-            v-if="pt.activeDownloadCount.value > 0"
-            class="more-menu-badge"
-          >
+          <span v-if="pt.activeDownloadCount.value > 0" class="more-menu-badge">
             {{ pt.activeDownloadCount.value }}
           </span>
           <Icon
@@ -38,14 +35,13 @@
         >
           <Icon :icon="item.icon" class="h-5 w-5 shrink-0" />
           <span class="flex-1 text-left">{{ t(item.labelKey) }}</span>
-          <Icon icon="clarity:angle-line" class="h-4 w-4 -rotate-90 opacity-40" />
+          <Icon
+            icon="clarity:angle-line"
+            class="h-4 w-4 -rotate-90 opacity-40"
+          />
         </button>
 
-        <button
-          type="button"
-          class="mobile-more-item"
-          @click="toggleTheme"
-        >
+        <button type="button" class="mobile-more-item" @click="toggleTheme">
           <Icon
             :icon="
               themeMgr.currentTheme.value === 'dark'
@@ -63,11 +59,7 @@
           </span>
         </button>
 
-        <button
-          type="button"
-          class="mobile-more-item"
-          @click="openSettings"
-        >
+        <button type="button" class="mobile-more-item" @click="openSettings">
           <Icon icon="clarity:cog-line" class="h-5 w-5 shrink-0" />
           <span class="flex-1 text-left">{{ t('nav.settings') }}</span>
         </button>
@@ -100,7 +92,11 @@ const themeMgr = useBinaryThemeManager({
 
 const menuItems = [
   { name: 'Monitor', labelKey: 'nav.monitor', icon: 'clarity:eye-line' },
-  { name: 'Health', labelKey: 'nav.health', icon: 'clarity:info-standard-line' },
+  {
+    name: 'Health',
+    labelKey: 'nav.health',
+    icon: 'clarity:info-standard-line',
+  },
   { name: 'Metadata', labelKey: 'nav.metadata', icon: 'clarity:tag-line' },
 ]
 

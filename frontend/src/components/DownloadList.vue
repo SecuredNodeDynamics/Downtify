@@ -1,7 +1,9 @@
 <template>
   <div class="mx-auto max-w-4xl px-4 py-4 sm:py-8 sm:px-6 overflow-x-hidden">
     <!-- Header -->
-    <div class="mb-6 sm:mb-8 flex flex-wrap items-end justify-between gap-4 mobile-page-header">
+    <div
+      class="mb-6 sm:mb-8 flex flex-wrap items-end justify-between gap-4 mobile-page-header"
+    >
       <div>
         <h1 class="text-2xl font-bold tracking-tight">
           {{ t('queue.title') }}
@@ -54,7 +56,9 @@
             img-class="h-full w-full object-cover"
           >
             <template #fallback>
-              <div class="h-full w-full flex items-center justify-center text-base-content/30">
+              <div
+                class="h-full w-full flex items-center justify-center text-base-content/30"
+              >
                 <Icon icon="clarity:music-note-line" class="h-6 w-6" />
               </div>
             </template>

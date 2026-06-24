@@ -44,8 +44,7 @@ export default {
     placeholder:
       'Busque uma música ou cole um link do Spotify ou YouTube Music…',
     libraryPlaceholder: 'Busque sua música baixada…',
-    libraryHint:
-      'Filtra a fila do player para a música já neste servidor.',
+    libraryHint: 'Filtra a fila do player para a música já neste servidor.',
     title: 'Resultados da busca',
     matchesFor: 'Mostrando resultados para',
     resultsCount: '- {count} resultado',
@@ -57,8 +56,7 @@ export default {
     emptyHint: 'Tente outra busca — artista + título costuma funcionar melhor.',
     emptyAlbums: 'Nenhum álbum encontrado.',
     emptyTracks: 'Nenhuma faixa encontrada.',
-    emptyFilterHint:
-      'Tente mudar o filtro acima para Ambos ou outro tipo.',
+    emptyFilterHint: 'Tente mudar o filtro acima para Ambos ou outro tipo.',
     filterLabel: 'Tipo de resultado',
     filterBoth: 'Ambos',
     filterAlbums: 'Álbuns',
@@ -300,8 +298,7 @@ export default {
     urlPlaceholderPlaylist: 'Cole uma URL de playlist do Spotify…',
     urlPlaceholderArtist: 'Cole uma URL de artista do Spotify…',
     watch: 'Monitorar',
-    failedAdd:
-      'Falha ao adicionar. Verifique a URL e tente novamente.',
+    failedAdd: 'Falha ao adicionar. Verifique a URL e tente novamente.',
     empty: 'Nada está sendo monitorado ainda.',
     emptyHint:
       'Cole um link de playlist ou artista do Spotify acima para começar.',
@@ -463,8 +460,7 @@ export default {
     serverRequiredHint:
       'O app movel precisa do endereco do servidor antes de carregar fila, saude e outros dados. Abra Configuracoes → API e informe seu IP local ou URL do tunel.',
     serverUrl: 'Endereco do servidor',
-    serverUrlPlaceholder:
-      'https://downtify.exemplo.com ou 192.168.1.50:8765',
+    serverUrlPlaceholder: 'https://downtify.exemplo.com ou 192.168.1.50:8765',
     serverUrlCurrent: 'Conectado a',
     serverUrlDefault: 'Esta pagina (mesmo host)',
     serverTest: 'Testar conexao',

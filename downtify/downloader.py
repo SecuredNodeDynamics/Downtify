@@ -33,9 +33,9 @@ from mutagen.oggopus import OggOpus
 from mutagen.oggvorbis import OggVorbis
 
 from . import lyrics as lyrics_mod
+from .genres import canonical_genre
 from .jellyfin_meta import format_for_jellyfin
 from .m3u import sanitize_playlist_name
-from .genres import canonical_genre
 from .musicbrainz import enrich_song_metadata
 from .providers import enrich_from_match, find_match, find_match_for_video
 

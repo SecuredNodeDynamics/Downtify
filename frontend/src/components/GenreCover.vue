@@ -5,11 +5,7 @@
       class="genre-cover-mosaic"
       :class="mosaicClass"
     >
-      <div
-        v-for="file in coverFiles"
-        :key="file"
-        class="genre-cover-tile"
-      >
+      <div v-for="file in coverFiles" :key="file" class="genre-cover-tile">
         <CoverImage
           :key="file"
           :src="coverSourceFor(file).src"

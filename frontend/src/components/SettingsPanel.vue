@@ -2,689 +2,663 @@
   <div
     class="settings-panel surface-strong rounded-2xl sm:rounded-3xl overflow-hidden"
   >
-      <!-- Tabs -->
-      <div class="settings-tabs-wrap px-4 sm:px-6">
-        <div
-          ref="tabShellRef"
-          class="settings-tab-shell tab-glow-shell"
-          role="tablist"
-          :aria-label="t('settings.title')"
+    <!-- Tabs -->
+    <div class="settings-tabs-wrap px-4 sm:px-6">
+      <div
+        ref="tabShellRef"
+        class="settings-tab-shell tab-glow-shell"
+        role="tablist"
+        :aria-label="t('settings.title')"
+      >
+        <button
+          v-for="tab in settingsTabs"
+          :key="tab.id"
+          type="button"
+          role="tab"
+          class="settings-tab-btn"
+          :class="{ 'settings-tab-btn-active': activeTab === tab.id }"
+          :aria-selected="activeTab === tab.id"
+          @click="setActiveTab(tab.id)"
         >
+          {{ t(tab.labelKey) }}
+        </button>
+      </div>
+    </div>
+
+    <div v-if="activeTab === 'general'" class="px-4 pb-5 space-y-6 sm:px-6">
+      <!-- Language -->
+      <div>
+        <label
+          class="block text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2"
+        >
+          {{ t('settings.language') }}
+        </label>
+        <select
+          class="select w-full rounded-xl bg-base-100/85 border border-white/10 focus:border-primary/60"
+          :value="locale"
+          @change="setLocale($event.target.value)"
+        >
+          <option v-for="l in locales" :key="l.code" :value="l.code">
+            {{ l.name }}
+          </option>
+        </select>
+        <p class="text-[11px] text-base-content/40 mt-1.5">
+          {{ t('settings.languageHint') }}
+        </p>
+      </div>
+
+      <!-- Download destination -->
+      <div>
+        <label
+          class="block text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2"
+        >
+          {{ t('settings.downloadDestination') }}
+        </label>
+        <div class="grid grid-cols-2 gap-2">
           <button
-            v-for="tab in settingsTabs"
-            :key="tab.id"
             type="button"
-            role="tab"
-            class="settings-tab-btn"
-            :class="{ 'settings-tab-btn-active': activeTab === tab.id }"
-            :aria-selected="activeTab === tab.id"
-            @click="setActiveTab(tab.id)"
+            class="rounded-xl border px-3 py-2 text-sm transition-colors text-left"
+            :class="[
+              destination === 'server'
+                ? 'border-primary/50 bg-primary/10 text-primary'
+                : 'border-white/10 hover:border-white/20 hover:bg-white/5',
+            ]"
+            @click="setDestination('server')"
           >
-            {{ t(tab.labelKey) }}
+            {{ t('settings.downloadDestinationServer') }}
+          </button>
+          <button
+            type="button"
+            class="rounded-xl border px-3 py-2 text-sm transition-colors text-left"
+            :class="[
+              destination === 'local'
+                ? 'border-primary/50 bg-primary/10 text-primary'
+                : 'border-white/10 hover:border-white/20 hover:bg-white/5',
+            ]"
+            @click="selectLocalDestination"
+          >
+            {{ t('settings.downloadDestinationLocal') }}
+          </button>
+        </div>
+        <p class="text-[11px] text-base-content/40 mt-1.5">
+          {{
+            destination === 'local'
+              ? localDestinationHint
+              : t('settings.downloadDestinationServerHint')
+          }}
+        </p>
+        <div v-if="destination === 'server'" class="mt-3">
+          <label class="block text-xs text-base-content/50 mb-1.5">
+            {{ t('settings.serverMediaLocation') }}
+          </label>
+          <input
+            v-model="sm.settings.value.server_media_location"
+            type="text"
+            class="input-modern h-10 w-full text-sm"
+            :placeholder="t('settings.serverMediaLocationPlaceholder')"
+          />
+          <p class="text-[11px] text-base-content/40 mt-1.5">
+            {{ t('settings.serverMediaLocationHint') }}
+          </p>
+        </div>
+        <p
+          v-if="localFolderBlockReason"
+          class="text-[11px] text-base-content/40 mt-1.5"
+        >
+          {{ localFolderBlockMessage }}
+        </p>
+        <div
+          v-if="isLocal"
+          class="mt-3 rounded-xl border border-white/10 bg-base-100/85 px-3 py-3 space-y-2"
+        >
+          <div class="flex items-start gap-3">
+            <Icon
+              icon="clarity:folder-open-line"
+              class="mt-0.5 h-5 w-5 shrink-0 text-primary"
+            />
+            <div class="min-w-0 flex-1">
+              <p class="text-sm font-medium">
+                {{ t('settings.localFolderLabel') }}
+              </p>
+              <p class="truncate text-sm text-base-content/80">
+                {{ localFolderName }}
+              </p>
+              <p class="mt-1 text-[11px] text-base-content/40">
+                {{
+                  usesBrowserDownloads
+                    ? t('settings.browserDownloadsHint')
+                    : t('settings.localFolderNameHint')
+                }}
+              </p>
+            </div>
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <button
+              v-if="!usesBrowserDownloads"
+              type="button"
+              class="btn btn-sm h-9 rounded-full border-white/10 bg-base-100/85 hover:bg-base-100"
+              @click="changeLocalFolder"
+            >
+              {{ t('settings.changeLocalFolder') }}
+            </button>
+          </div>
+          <p v-if="!localFolderReady" class="text-[11px] text-warning">
+            {{ t('settings.localFolderPermissionNeeded') }}
+          </p>
+        </div>
+        <p v-if="folderPickerError" class="text-[11px] text-error mt-2">
+          {{ folderPickerError }}
+        </p>
+      </div>
+
+      <!-- Audio source -->
+      <div>
+        <label
+          class="block text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2"
+        >
+          {{ t('settings.audioSource') }}
+        </label>
+        <div class="grid grid-cols-2 gap-2">
+          <button
+            v-for="provider in sm.settingsOptions.audio_providers"
+            :key="provider"
+            type="button"
+            class="rounded-xl border px-3 py-2 text-sm transition-colors text-left"
+            :class="[
+              sm.settings.value.audio_providers[0] === provider
+                ? 'border-primary/50 bg-primary/10 text-primary'
+                : 'border-white/10 hover:border-white/20 hover:bg-white/5',
+            ]"
+            @click="sm.settings.value.audio_providers = [provider]"
+          >
+            {{ providerLabel(provider) }}
           </button>
         </div>
       </div>
 
-      <div v-if="activeTab === 'general'" class="px-4 pb-5 space-y-6 sm:px-6">
-        <!-- Language -->
+      <!-- Lyrics source -->
+      <div>
+        <label
+          class="block text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2"
+        >
+          {{ t('settings.lyricsSource') }}
+        </label>
+        <label
+          class="flex items-start gap-3 rounded-xl border border-white/10 bg-base-100/85 px-3 py-2.5 cursor-pointer hover:border-white/20 mb-2"
+        >
+          <input
+            type="checkbox"
+            class="checkbox checkbox-sm checkbox-primary mt-0.5"
+            v-model="sm.settings.value.download_lyrics"
+          />
+          <span class="flex-1 text-sm">
+            <span class="block">{{ t('settings.downloadLyrics') }}</span>
+            <span class="block text-[11px] text-base-content/50">
+              {{ t('settings.downloadLyricsHint') }}
+            </span>
+          </span>
+        </label>
+        <div class="flex items-baseline justify-between mb-1.5">
+          <span class="text-xs text-base-content/50">
+            {{ t('settings.lyricsProvider') }}
+          </span>
+          <span class="text-[10px] text-base-content/40">
+            {{ t('settings.lyricsHint') }}
+          </span>
+        </div>
+        <select
+          class="select w-full rounded-xl bg-base-100/85 border border-white/10 focus:border-primary/60 disabled:opacity-40"
+          v-model="sm.settings.value.lyrics_providers[0]"
+          :disabled="!sm.settings.value.download_lyrics"
+        >
+          <option
+            v-for="provider in sm.settingsOptions.lyrics_providers"
+            :key="provider"
+            :value="provider"
+          >
+            {{ provider }}
+          </option>
+        </select>
+      </div>
+
+      <!-- Format & bitrate -->
+      <div class="grid grid-cols-2 gap-3">
         <div>
           <label
             class="block text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2"
           >
-            {{ t('settings.language') }}
+            {{ t('settings.format') }}
           </label>
           <select
             class="select w-full rounded-xl bg-base-100/85 border border-white/10 focus:border-primary/60"
-            :value="locale"
-            @change="setLocale($event.target.value)"
+            v-model="sm.settings.value.format"
           >
-            <option v-for="l in locales" :key="l.code" :value="l.code">
-              {{ l.name }}
+            <option
+              v-for="fmt in sm.settingsOptions.format"
+              :key="fmt"
+              :value="fmt"
+            >
+              {{ fmt.toUpperCase() }}
             </option>
           </select>
-          <p class="text-[11px] text-base-content/40 mt-1.5">
-            {{ t('settings.languageHint') }}
-          </p>
         </div>
-
-        <!-- Download destination -->
         <div>
-          <label
-            class="block text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2"
-          >
-            {{ t('settings.downloadDestination') }}
-          </label>
-          <div class="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              class="rounded-xl border px-3 py-2 text-sm transition-colors text-left"
-              :class="[
-                destination === 'server'
-                  ? 'border-primary/50 bg-primary/10 text-primary'
-                  : 'border-white/10 hover:border-white/20 hover:bg-white/5',
-              ]"
-              @click="setDestination('server')"
+          <div class="flex items-baseline justify-between mb-2">
+            <label
+              class="block text-xs font-semibold uppercase tracking-wider text-base-content/50"
             >
-              {{ t('settings.downloadDestinationServer') }}
-            </button>
-            <button
-              type="button"
-              class="rounded-xl border px-3 py-2 text-sm transition-colors text-left"
-              :class="[
-                destination === 'local'
-                  ? 'border-primary/50 bg-primary/10 text-primary'
-                  : 'border-white/10 hover:border-white/20 hover:bg-white/5',
-              ]"
-              @click="selectLocalDestination"
-            >
-              {{ t('settings.downloadDestinationLocal') }}
-            </button>
-          </div>
-          <p class="text-[11px] text-base-content/40 mt-1.5">
-            {{
-              destination === 'local'
-                ? localDestinationHint
-                : t('settings.downloadDestinationServerHint')
-            }}
-          </p>
-          <div v-if="destination === 'server'" class="mt-3">
-            <label class="block text-xs text-base-content/50 mb-1.5">
-              {{ t('settings.serverMediaLocation') }}
+              {{ t('settings.quality') }}
             </label>
-            <input
-              v-model="sm.settings.value.server_media_location"
-              type="text"
-              class="input-modern h-10 w-full text-sm"
-              :placeholder="t('settings.serverMediaLocationPlaceholder')"
-            />
-            <p class="text-[11px] text-base-content/40 mt-1.5">
-              {{ t('settings.serverMediaLocationHint') }}
-            </p>
-          </div>
-          <p
-            v-if="localFolderBlockReason"
-            class="text-[11px] text-base-content/40 mt-1.5"
-          >
-            {{ localFolderBlockMessage }}
-          </p>
-          <div
-            v-if="isLocal"
-            class="mt-3 rounded-xl border border-white/10 bg-base-100/85 px-3 py-3 space-y-2"
-          >
-            <div class="flex items-start gap-3">
-              <Icon
-                icon="clarity:folder-open-line"
-                class="mt-0.5 h-5 w-5 shrink-0 text-primary"
-              />
-              <div class="min-w-0 flex-1">
-                <p class="text-sm font-medium">
-                  {{ t('settings.localFolderLabel') }}
-                </p>
-                <p class="truncate text-sm text-base-content/80">
-                  {{ localFolderName }}
-                </p>
-                <p class="mt-1 text-[11px] text-base-content/40">
-                  {{
-                    usesBrowserDownloads
-                      ? t('settings.browserDownloadsHint')
-                      : t('settings.localFolderNameHint')
-                  }}
-                </p>
-              </div>
-            </div>
-            <div class="flex flex-wrap items-center gap-2">
-              <button
-                v-if="!usesBrowserDownloads"
-                type="button"
-                class="btn btn-sm h-9 rounded-full border-white/10 bg-base-100/85 hover:bg-base-100"
-                @click="changeLocalFolder"
-              >
-                {{ t('settings.changeLocalFolder') }}
-              </button>
-            </div>
-            <p v-if="!localFolderReady" class="text-[11px] text-warning">
-              {{ t('settings.localFolderPermissionNeeded') }}
-            </p>
-          </div>
-          <p v-if="folderPickerError" class="text-[11px] text-error mt-2">
-            {{ folderPickerError }}
-          </p>
-        </div>
-
-        <!-- Audio source -->
-        <div>
-          <label
-            class="block text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2"
-          >
-            {{ t('settings.audioSource') }}
-          </label>
-          <div class="grid grid-cols-2 gap-2">
-            <button
-              v-for="provider in sm.settingsOptions.audio_providers"
-              :key="provider"
-              type="button"
-              class="rounded-xl border px-3 py-2 text-sm transition-colors text-left"
-              :class="[
-                sm.settings.value.audio_providers[0] === provider
-                  ? 'border-primary/50 bg-primary/10 text-primary'
-                  : 'border-white/10 hover:border-white/20 hover:bg-white/5',
-              ]"
-              @click="sm.settings.value.audio_providers = [provider]"
+            <span
+              v-if="sm.settings.value.format === 'flac'"
+              class="text-[10px] text-base-content/40"
             >
-              {{ providerLabel(provider) }}
-            </button>
-          </div>
-        </div>
-
-        <!-- Lyrics source -->
-        <div>
-          <label
-            class="block text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2"
-          >
-            {{ t('settings.lyricsSource') }}
-          </label>
-          <label
-            class="flex items-start gap-3 rounded-xl border border-white/10 bg-base-100/85 px-3 py-2.5 cursor-pointer hover:border-white/20 mb-2"
-          >
-            <input
-              type="checkbox"
-              class="checkbox checkbox-sm checkbox-primary mt-0.5"
-              v-model="sm.settings.value.download_lyrics"
-            />
-            <span class="flex-1 text-sm">
-              <span class="block">{{ t('settings.downloadLyrics') }}</span>
-              <span class="block text-[11px] text-base-content/50">
-                {{ t('settings.downloadLyricsHint') }}
-              </span>
-            </span>
-          </label>
-          <div class="flex items-baseline justify-between mb-1.5">
-            <span class="text-xs text-base-content/50">
-              {{ t('settings.lyricsProvider') }}
-            </span>
-            <span class="text-[10px] text-base-content/40">
-              {{ t('settings.lyricsHint') }}
+              {{ t('settings.qualityIgnored') }}
             </span>
           </div>
           <select
-            class="select w-full rounded-xl bg-base-100/85 border border-white/10 focus:border-primary/60 disabled:opacity-40"
-            v-model="sm.settings.value.lyrics_providers[0]"
-            :disabled="!sm.settings.value.download_lyrics"
+            class="select w-full rounded-xl bg-base-100/85 border border-white/10 focus:border-primary/60"
+            v-model="sm.settings.value.bitrate"
+            :disabled="sm.settings.value.format === 'flac'"
           >
             <option
-              v-for="provider in sm.settingsOptions.lyrics_providers"
-              :key="provider"
-              :value="provider"
+              v-for="bitrate in sm.settingsOptions.bitrate"
+              :key="bitrate"
+              :value="bitrate"
             >
-              {{ provider }}
+              {{ bitrate }} kbps
             </option>
           </select>
         </div>
-
-        <!-- Format & bitrate -->
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label
-              class="block text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2"
-            >
-              {{ t('settings.format') }}
-            </label>
-            <select
-              class="select w-full rounded-xl bg-base-100/85 border border-white/10 focus:border-primary/60"
-              v-model="sm.settings.value.format"
-            >
-              <option
-                v-for="fmt in sm.settingsOptions.format"
-                :key="fmt"
-                :value="fmt"
-              >
-                {{ fmt.toUpperCase() }}
-              </option>
-            </select>
-          </div>
-          <div>
-            <div class="flex items-baseline justify-between mb-2">
-              <label
-                class="block text-xs font-semibold uppercase tracking-wider text-base-content/50"
-              >
-                {{ t('settings.quality') }}
-              </label>
-              <span
-                v-if="sm.settings.value.format === 'flac'"
-                class="text-[10px] text-base-content/40"
-              >
-                {{ t('settings.qualityIgnored') }}
-              </span>
-            </div>
-            <select
-              class="select w-full rounded-xl bg-base-100/85 border border-white/10 focus:border-primary/60"
-              v-model="sm.settings.value.bitrate"
-              :disabled="sm.settings.value.format === 'flac'"
-            >
-              <option
-                v-for="bitrate in sm.settingsOptions.bitrate"
-                :key="bitrate"
-                :value="bitrate"
-              >
-                {{ bitrate }} kbps
-              </option>
-            </select>
-          </div>
-        </div>
-
-        <!-- Metadata -->
-        <div>
-          <label
-            class="block text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2"
-          >
-            {{ t('settings.metadataSection') }}
-          </label>
-          <label
-            class="flex items-start gap-3 rounded-xl border border-white/10 bg-base-100/85 px-3 py-2.5 cursor-pointer hover:border-white/20"
-          >
-            <input
-              type="checkbox"
-              class="checkbox checkbox-sm checkbox-primary mt-0.5"
-              v-model="sm.settings.value.enhance_metadata"
-            />
-            <span class="flex-1 text-sm">
-              <span class="block">{{ t('settings.enhanceMetadata') }}</span>
-              <span class="block text-[11px] text-base-content/50">
-                {{ t('settings.enhanceMetadataHint') }}
-              </span>
-            </span>
-          </label>
-          <label class="mt-3 block text-xs text-base-content/55">
-            <span class="mb-1 block font-semibold text-base-content/70">
-              {{ t('settings.artistFolderPolicy') }}
-            </span>
-            <select
-              class="select h-10 w-full rounded-xl border-white/10 bg-base-100/85 text-sm"
-              v-model="sm.settings.value.artist_folder_policy"
-            >
-              <option value="artwork_available">
-                {{ t('settings.artistFolderPolicyArtwork') }}
-              </option>
-              <option value="primary_only">
-                {{ t('settings.artistFolderPolicyPrimary') }}
-              </option>
-              <option value="existing_only">
-                {{ t('settings.artistFolderPolicyExisting') }}
-              </option>
-            </select>
-            <span class="mt-1 block text-[11px] text-base-content/50">
-              {{ t('settings.artistFolderPolicyHint') }}
-            </span>
-          </label>
-        </div>
-
-        <!-- Playlists -->
-        <div>
-          <label
-            class="block text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2"
-          >
-            {{ t('settings.playlistsSection') }}
-          </label>
-          <label
-            class="flex items-start gap-3 rounded-xl border border-white/10 bg-base-100/85 px-3 py-2.5 cursor-pointer hover:border-white/20"
-          >
-            <input
-              type="checkbox"
-              class="checkbox checkbox-sm checkbox-primary mt-0.5"
-              v-model="sm.settings.value.generate_m3u"
-            />
-            <span class="flex-1 text-sm">
-              <span class="block">{{ t('settings.generateM3u') }}</span>
-              <span class="block text-[11px] text-base-content/50">
-                {{ t('settings.generateM3uHint') }}
-              </span>
-            </span>
-          </label>
-        </div>
-
-        <!-- File organization -->
-        <div>
-          <label
-            class="block text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2"
-          >
-            {{ t('settings.organizationSection') }}
-          </label>
-          <div class="space-y-2">
-            <label
-              class="flex items-start gap-3 rounded-xl border border-white/10 bg-base-100/85 px-3 py-2.5 cursor-pointer hover:border-white/20"
-            >
-              <input
-                type="checkbox"
-                class="checkbox checkbox-sm checkbox-primary mt-0.5"
-                v-model="sm.settings.value.organize_by_artist"
-              />
-              <span class="flex-1 text-sm">
-                <span class="block">{{ t('settings.organizeByArtist') }}</span>
-                <span class="block text-[11px] text-base-content/50">
-                  {{ t('settings.organizeByArtistHint') }}
-                </span>
-              </span>
-            </label>
-            <label
-              class="flex items-start gap-3 rounded-xl border border-white/10 bg-base-100/85 px-3 py-2.5 transition-colors"
-              :class="
-                sm.settings.value.organize_by_artist
-                  ? 'cursor-pointer hover:border-white/20'
-                  : 'cursor-not-allowed opacity-50'
-              "
-            >
-              <input
-                type="checkbox"
-                class="checkbox checkbox-sm checkbox-primary mt-0.5"
-                v-model="sm.settings.value.organize_by_album"
-                :disabled="!sm.settings.value.organize_by_artist"
-              />
-              <span class="flex-1 text-sm">
-                <span class="block">{{ t('settings.organizeByAlbum') }}</span>
-                <span class="block text-[11px] text-base-content/50">
-                  {{ t('settings.organizeByAlbumHint') }}
-                </span>
-              </span>
-            </label>
-          </div>
-        </div>
-
-        <!-- Parallel downloads -->
-        <div>
-          <label
-            class="block text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2"
-          >
-            {{ t('settings.parallelDownloads') }}
-          </label>
-          <div class="grid grid-cols-3 gap-1.5 sm:grid-cols-6">
-            <button
-              v-for="n in sm.settingsOptions.max_parallel_downloads"
-              :key="n"
-              type="button"
-              class="rounded-xl border px-2 py-2 text-sm font-medium transition-colors text-center"
-              :class="[
-                sm.settings.value.max_parallel_downloads === n
-                  ? 'border-primary/50 bg-primary/10 text-primary'
-                  : 'border-white/10 hover:border-white/20 hover:bg-white/5',
-              ]"
-              @click="sm.settings.value.max_parallel_downloads = n"
-            >
-              {{ n }}
-            </button>
-          </div>
-          <p class="text-[11px] text-base-content/40 mt-1.5">
-            {{ t('settings.parallelDownloadsHint') }}
-          </p>
-        </div>
-
-        <!-- Save status -->
-        <transition
-          enter-active-class="transition duration-200"
-          enter-from-class="opacity-0 -translate-y-1"
-          enter-to-class="opacity-100 translate-y-0"
-          leave-active-class="transition duration-200"
-          leave-from-class="opacity-100"
-          leave-to-class="opacity-0"
-        >
-          <div
-            v-if="sm.isSaved.value === true"
-            class="surface rounded-xl p-3 flex items-center gap-2 text-sm text-primary"
-          >
-            <Icon icon="clarity:check-line" class="h-4 w-4 shrink-0" />
-            {{ t('settings.saved') }}
-          </div>
-          <div
-            v-else-if="sm.isSaved.value === false"
-            class="surface rounded-xl p-3 flex items-center gap-2 text-sm text-error"
-          >
-            <Icon
-              icon="clarity:exclamation-circle-line"
-              class="h-4 w-4 shrink-0"
-            />
-            {{ t('settings.saveError') }}
-          </div>
-        </transition>
       </div>
 
-      <div v-else-if="activeTab === 'api'" class="px-4 pb-5 space-y-5 sm:px-6">
-        <div>
-          <label
-            class="block text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2"
+      <!-- Metadata -->
+      <div>
+        <label
+          class="block text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2"
+        >
+          {{ t('settings.metadataSection') }}
+        </label>
+        <label
+          class="flex items-start gap-3 rounded-xl border border-white/10 bg-base-100/85 px-3 py-2.5 cursor-pointer hover:border-white/20"
+        >
+          <input
+            type="checkbox"
+            class="checkbox checkbox-sm checkbox-primary mt-0.5"
+            v-model="sm.settings.value.enhance_metadata"
+          />
+          <span class="flex-1 text-sm">
+            <span class="block">{{ t('settings.enhanceMetadata') }}</span>
+            <span class="block text-[11px] text-base-content/50">
+              {{ t('settings.enhanceMetadataHint') }}
+            </span>
+          </span>
+        </label>
+        <label class="mt-3 block text-xs text-base-content/55">
+          <span class="mb-1 block font-semibold text-base-content/70">
+            {{ t('settings.artistFolderPolicy') }}
+          </span>
+          <select
+            class="select h-10 w-full rounded-xl border-white/10 bg-base-100/85 text-sm"
+            v-model="sm.settings.value.artist_folder_policy"
           >
-            {{ t('settings.serverConnectionSection') }}
+            <option value="artwork_available">
+              {{ t('settings.artistFolderPolicyArtwork') }}
+            </option>
+            <option value="primary_only">
+              {{ t('settings.artistFolderPolicyPrimary') }}
+            </option>
+            <option value="existing_only">
+              {{ t('settings.artistFolderPolicyExisting') }}
+            </option>
+          </select>
+          <span class="mt-1 block text-[11px] text-base-content/50">
+            {{ t('settings.artistFolderPolicyHint') }}
+          </span>
+        </label>
+      </div>
+
+      <!-- Playlists -->
+      <div>
+        <label
+          class="block text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2"
+        >
+          {{ t('settings.playlistsSection') }}
+        </label>
+        <label
+          class="flex items-start gap-3 rounded-xl border border-white/10 bg-base-100/85 px-3 py-2.5 cursor-pointer hover:border-white/20"
+        >
+          <input
+            type="checkbox"
+            class="checkbox checkbox-sm checkbox-primary mt-0.5"
+            v-model="sm.settings.value.generate_m3u"
+          />
+          <span class="flex-1 text-sm">
+            <span class="block">{{ t('settings.generateM3u') }}</span>
+            <span class="block text-[11px] text-base-content/50">
+              {{ t('settings.generateM3uHint') }}
+            </span>
+          </span>
+        </label>
+      </div>
+
+      <!-- File organization -->
+      <div>
+        <label
+          class="block text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2"
+        >
+          {{ t('settings.organizationSection') }}
+        </label>
+        <div class="space-y-2">
+          <label
+            class="flex items-start gap-3 rounded-xl border border-white/10 bg-base-100/85 px-3 py-2.5 cursor-pointer hover:border-white/20"
+          >
+            <input
+              type="checkbox"
+              class="checkbox checkbox-sm checkbox-primary mt-0.5"
+              v-model="sm.settings.value.organize_by_artist"
+            />
+            <span class="flex-1 text-sm">
+              <span class="block">{{ t('settings.organizeByArtist') }}</span>
+              <span class="block text-[11px] text-base-content/50">
+                {{ t('settings.organizeByArtistHint') }}
+              </span>
+            </span>
           </label>
-          <p class="mb-3 text-sm text-base-content/60">
-            {{ t('settings.serverConnectionHint') }}
-          </p>
-          <div class="space-y-3">
-            <div class="surface rounded-xl px-3 py-2.5 text-sm">
-              <span class="text-base-content/50">
-                {{ t('settings.serverUrlCurrent') }}:
+          <label
+            class="flex items-start gap-3 rounded-xl border border-white/10 bg-base-100/85 px-3 py-2.5 transition-colors"
+            :class="
+              sm.settings.value.organize_by_artist
+                ? 'cursor-pointer hover:border-white/20'
+                : 'cursor-not-allowed opacity-50'
+            "
+          >
+            <input
+              type="checkbox"
+              class="checkbox checkbox-sm checkbox-primary mt-0.5"
+              v-model="sm.settings.value.organize_by_album"
+              :disabled="!sm.settings.value.organize_by_artist"
+            />
+            <span class="flex-1 text-sm">
+              <span class="block">{{ t('settings.organizeByAlbum') }}</span>
+              <span class="block text-[11px] text-base-content/50">
+                {{ t('settings.organizeByAlbumHint') }}
               </span>
-              <span class="ml-1 font-medium text-base-content">
-                {{
-                  usesCustomServer
-                    ? activeServerDisplay
-                    : t('settings.serverUrlDefault')
-                }}
-              </span>
-            </div>
-            <div>
-              <label class="block text-xs text-base-content/50 mb-1.5">
-                {{ t('settings.serverUrl') }}
-              </label>
-              <input
-                v-model="serverUrlInput"
-                type="url"
-                inputmode="url"
-                autocapitalize="off"
-                autocorrect="off"
-                spellcheck="false"
-                class="input-modern h-10 w-full text-sm"
-                :placeholder="t('settings.serverUrlPlaceholder')"
+            </span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Parallel downloads -->
+      <div>
+        <label
+          class="block text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2"
+        >
+          {{ t('settings.parallelDownloads') }}
+        </label>
+        <div class="grid grid-cols-3 gap-1.5 sm:grid-cols-6">
+          <button
+            v-for="n in sm.settingsOptions.max_parallel_downloads"
+            :key="n"
+            type="button"
+            class="rounded-xl border px-2 py-2 text-sm font-medium transition-colors text-center"
+            :class="[
+              sm.settings.value.max_parallel_downloads === n
+                ? 'border-primary/50 bg-primary/10 text-primary'
+                : 'border-white/10 hover:border-white/20 hover:bg-white/5',
+            ]"
+            @click="sm.settings.value.max_parallel_downloads = n"
+          >
+            {{ n }}
+          </button>
+        </div>
+        <p class="text-[11px] text-base-content/40 mt-1.5">
+          {{ t('settings.parallelDownloadsHint') }}
+        </p>
+      </div>
+
+      <!-- Save status -->
+      <transition
+        enter-active-class="transition duration-200"
+        enter-from-class="opacity-0 -translate-y-1"
+        enter-to-class="opacity-100 translate-y-0"
+        leave-active-class="transition duration-200"
+        leave-from-class="opacity-100"
+        leave-to-class="opacity-0"
+      >
+        <div
+          v-if="sm.isSaved.value === true"
+          class="surface rounded-xl p-3 flex items-center gap-2 text-sm text-primary"
+        >
+          <Icon icon="clarity:check-line" class="h-4 w-4 shrink-0" />
+          {{ t('settings.saved') }}
+        </div>
+        <div
+          v-else-if="sm.isSaved.value === false"
+          class="surface rounded-xl p-3 flex items-center gap-2 text-sm text-error"
+        >
+          <Icon
+            icon="clarity:exclamation-circle-line"
+            class="h-4 w-4 shrink-0"
+          />
+          {{ t('settings.saveError') }}
+        </div>
+      </transition>
+    </div>
+
+    <div v-else-if="activeTab === 'api'" class="px-4 pb-5 space-y-5 sm:px-6">
+      <div>
+        <label
+          class="block text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2"
+        >
+          {{ t('settings.serverConnectionSection') }}
+        </label>
+        <p class="mb-3 text-sm text-base-content/60">
+          {{ t('settings.serverConnectionHint') }}
+        </p>
+        <div class="space-y-3">
+          <div class="surface rounded-xl px-3 py-2.5 text-sm">
+            <span class="text-base-content/50">
+              {{ t('settings.serverUrlCurrent') }}:
+            </span>
+            <span class="ml-1 font-medium text-base-content">
+              {{
+                usesCustomServer
+                  ? activeServerDisplay
+                  : t('settings.serverUrlDefault')
+              }}
+            </span>
+          </div>
+          <div>
+            <label class="block text-xs text-base-content/50 mb-1.5">
+              {{ t('settings.serverUrl') }}
+            </label>
+            <input
+              v-model="serverUrlInput"
+              type="url"
+              inputmode="url"
+              autocapitalize="off"
+              autocorrect="off"
+              spellcheck="false"
+              class="input-modern h-10 w-full text-sm"
+              :placeholder="t('settings.serverUrlPlaceholder')"
+            />
+            <p class="text-[11px] text-base-content/40 mt-1.5">
+              {{ t('settings.serverSaveHint') }}
+            </p>
+          </div>
+          <div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+            <button
+              v-if="canConnectDevice"
+              type="button"
+              class="btn btn-primary btn-sm h-10 w-full rounded-full px-4 sm:w-auto"
+              :disabled="connectedToThisDevice || serverTestLoading"
+              @click="connectToThisDevice"
+            >
+              {{ t('settings.serverConnectDevice') }}
+            </button>
+            <button
+              type="button"
+              class="btn btn-sm h-10 w-full rounded-full px-4 sm:w-auto"
+              :class="
+                canConnectDevice
+                  ? 'border border-white/10 bg-base-100/85 text-base-content hover:bg-base-100'
+                  : 'btn-primary'
+              "
+              :disabled="serverTestLoading || !serverUrlInput.trim()"
+              @click="testServerConnection"
+            >
+              <span
+                v-if="serverTestLoading"
+                class="loading loading-spinner loading-xs mr-2"
               />
-              <p class="text-[11px] text-base-content/40 mt-1.5">
-                {{ t('settings.serverSaveHint') }}
-              </p>
-            </div>
-            <div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+              {{
+                serverTestLoading
+                  ? t('settings.serverTesting')
+                  : t('settings.serverTest')
+              }}
+            </button>
+            <button
+              type="button"
+              class="btn btn-sm h-10 w-full rounded-full border border-white/10 bg-base-100/85 px-4 text-base-content hover:bg-base-100 sm:w-auto"
+              :disabled="!canSaveServerUrl || serverTestLoading"
+              @click="saveServerConnection"
+            >
+              {{ t('settings.serverSave') }}
+            </button>
+            <button
+              v-if="usesCustomServer && !connectedToThisDevice"
+              type="button"
+              class="btn btn-sm h-10 w-full rounded-full border border-white/10 bg-base-100/85 px-4 text-base-content hover:bg-base-100 sm:w-auto"
+              @click="resetServerConnection"
+            >
+              {{ t('settings.serverClear') }}
+            </button>
+          </div>
+          <p
+            v-if="serverTestMessage"
+            class="text-[11px]"
+            :class="serverTestError ? 'text-error' : 'text-primary'"
+          >
+            {{ serverTestMessage }}
+          </p>
+        </div>
+      </div>
+
+      <div>
+        <label
+          class="block text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2"
+        >
+          {{ t('settings.jellyfinSection') }}
+        </label>
+        <div class="space-y-3">
+          <label
+            class="flex items-start gap-3 rounded-xl border border-white/10 bg-base-100/85 px-3 py-2.5 cursor-pointer hover:border-white/20"
+          >
+            <input
+              type="checkbox"
+              class="checkbox checkbox-sm checkbox-primary mt-0.5"
+              v-model="sm.settings.value.enable_jellyfin_tools"
+            />
+            <span class="flex-1 text-sm">
+              <span class="block">{{ t('settings.enableJellyfinTools') }}</span>
+              <span class="block text-[11px] text-base-content/50">
+                {{ t('settings.enableJellyfinToolsHint') }}
+              </span>
+            </span>
+          </label>
+          <div>
+            <label class="block text-xs text-base-content/50 mb-1.5">
+              {{ t('settings.jellyfinUrl') }}
+            </label>
+            <input
+              v-model="sm.settings.value.jellyfin_url"
+              type="url"
+              class="input-modern h-10 w-full text-sm"
+              :placeholder="t('settings.jellyfinUrlPlaceholder')"
+              @change="onJellyfinConfigChange"
+            />
+            <p
+              class="mt-1.5 text-center text-[11px] leading-snug text-base-content/40"
+            >
+              {{ t('settings.jellyfinUrlHint') }}
+            </p>
+          </div>
+          <div>
+            <label class="block text-xs text-base-content/50 mb-1.5">
+              {{ t('settings.jellyfinApiKey') }}
+            </label>
+            <div class="flex items-start gap-2">
+              <div class="flex min-w-0 flex-1 flex-col">
+                <input
+                  v-model="sm.settings.value.jellyfin_api_key"
+                  type="password"
+                  autocomplete="off"
+                  class="input-modern h-10 w-full text-sm"
+                  :placeholder="t('settings.jellyfinApiKeyPlaceholder')"
+                  @change="onJellyfinConfigChange"
+                />
+                <p
+                  class="mt-1.5 text-center text-[11px] leading-snug text-base-content/40"
+                >
+                  {{ t('settings.jellyfinApiKeyHint') }}
+                </p>
+              </div>
               <button
-                v-if="canConnectDevice"
                 type="button"
-                class="btn btn-primary btn-sm h-10 w-full rounded-full px-4 sm:w-auto"
-                :disabled="connectedToThisDevice || serverTestLoading"
-                @click="connectToThisDevice"
-              >
-                {{ t('settings.serverConnectDevice') }}
-              </button>
-              <button
-                type="button"
-                class="btn btn-sm h-10 w-full rounded-full px-4 sm:w-auto"
-                :class="
-                  canConnectDevice
-                    ? 'border border-white/10 bg-base-100/85 text-base-content hover:bg-base-100'
-                    : 'btn-primary'
+                class="btn btn-sm h-10 shrink-0 px-3 rounded-lg border-white/10 bg-base-100/85 hover:bg-base-100"
+                :disabled="
+                  jellyfinTestLoading ||
+                  !sm.settings.value.jellyfin_url?.trim() ||
+                  !sm.settings.value.jellyfin_api_key?.trim()
                 "
-                :disabled="serverTestLoading || !serverUrlInput.trim()"
-                @click="testServerConnection"
+                @click="testJellyfinApi"
               >
                 <span
-                  v-if="serverTestLoading"
-                  class="loading loading-spinner loading-xs mr-2"
-                />
+                  v-if="jellyfinTestLoading"
+                  class="loading loading-spinner loading-xs"
+                ></span>
                 {{
-                  serverTestLoading
-                    ? t('settings.serverTesting')
-                    : t('settings.serverTest')
+                  jellyfinTestLoading
+                    ? t('settings.jellyfinTesting')
+                    : t('settings.jellyfinTest')
                 }}
-              </button>
-              <button
-                type="button"
-                class="btn btn-sm h-10 w-full rounded-full border border-white/10 bg-base-100/85 px-4 text-base-content hover:bg-base-100 sm:w-auto"
-                :disabled="!canSaveServerUrl || serverTestLoading"
-                @click="saveServerConnection"
-              >
-                {{ t('settings.serverSave') }}
-              </button>
-              <button
-                v-if="usesCustomServer && !connectedToThisDevice"
-                type="button"
-                class="btn btn-sm h-10 w-full rounded-full border border-white/10 bg-base-100/85 px-4 text-base-content hover:bg-base-100 sm:w-auto"
-                @click="resetServerConnection"
-              >
-                {{ t('settings.serverClear') }}
               </button>
             </div>
             <p
-              v-if="serverTestMessage"
-              class="text-[11px]"
-              :class="serverTestError ? 'text-error' : 'text-primary'"
+              v-if="jellyfinTestMessage"
+              class="mt-1.5 text-center text-[11px]"
+              :class="jellyfinTestError ? 'text-error' : 'text-primary'"
             >
-              {{ serverTestMessage }}
+              {{ jellyfinTestMessage }}
             </p>
           </div>
-        </div>
-
-        <div>
-          <label
-            class="block text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2"
-          >
-            {{ t('settings.jellyfinSection') }}
-          </label>
-          <div class="space-y-3">
-            <label
-              class="flex items-start gap-3 rounded-xl border border-white/10 bg-base-100/85 px-3 py-2.5 cursor-pointer hover:border-white/20"
-            >
-              <input
-                type="checkbox"
-                class="checkbox checkbox-sm checkbox-primary mt-0.5"
-                v-model="sm.settings.value.enable_jellyfin_tools"
-              />
-              <span class="flex-1 text-sm">
-                <span class="block">{{
-                  t('settings.enableJellyfinTools')
-                }}</span>
-                <span class="block text-[11px] text-base-content/50">
-                  {{ t('settings.enableJellyfinToolsHint') }}
-                </span>
-              </span>
+          <div>
+            <label class="block text-xs text-base-content/50 mb-1.5">
+              {{ t('settings.jellyfinMusicLibrary') }}
             </label>
-            <div>
-              <label class="block text-xs text-base-content/50 mb-1.5">
-                {{ t('settings.jellyfinUrl') }}
-              </label>
-              <input
-                v-model="sm.settings.value.jellyfin_url"
-                type="url"
-                class="input-modern h-10 w-full text-sm"
-                :placeholder="t('settings.jellyfinUrlPlaceholder')"
-                @change="onJellyfinConfigChange"
-              />
-              <p class="mt-1.5 text-center text-[11px] leading-snug text-base-content/40">
-                {{ t('settings.jellyfinUrlHint') }}
-              </p>
-            </div>
-            <div>
-              <label class="block text-xs text-base-content/50 mb-1.5">
-                {{ t('settings.jellyfinApiKey') }}
-              </label>
-              <div class="flex items-start gap-2">
-                <div class="flex min-w-0 flex-1 flex-col">
-                  <input
-                    v-model="sm.settings.value.jellyfin_api_key"
-                    type="password"
-                    autocomplete="off"
-                    class="input-modern h-10 w-full text-sm"
-                    :placeholder="t('settings.jellyfinApiKeyPlaceholder')"
-                    @change="onJellyfinConfigChange"
-                  />
-                  <p
-                    class="mt-1.5 text-center text-[11px] leading-snug text-base-content/40"
-                  >
-                    {{ t('settings.jellyfinApiKeyHint') }}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  class="btn btn-sm h-10 shrink-0 px-3 rounded-lg border-white/10 bg-base-100/85 hover:bg-base-100"
-                  :disabled="
-                    jellyfinTestLoading ||
-                    !sm.settings.value.jellyfin_url?.trim() ||
-                    !sm.settings.value.jellyfin_api_key?.trim()
-                  "
-                  @click="testJellyfinApi"
-                >
-                  <span
-                    v-if="jellyfinTestLoading"
-                    class="loading loading-spinner loading-xs"
-                  ></span>
-                  {{
-                    jellyfinTestLoading
-                      ? t('settings.jellyfinTesting')
-                      : t('settings.jellyfinTest')
-                  }}
-                </button>
+            <div v-if="jellyfinLibraryLoading" class="flex flex-col">
+              <div
+                class="h-10 w-full rounded-xl bg-base-100/85 border border-white/10 flex items-center px-3"
+              >
+                <span class="text-sm text-base-content/60">{{
+                  t('settings.jellyfinLibraryLoading')
+                }}</span>
               </div>
               <p
-                v-if="jellyfinTestMessage"
-                class="mt-1.5 text-center text-[11px]"
-                :class="jellyfinTestError ? 'text-error' : 'text-primary'"
+                class="mt-1.5 text-center text-[11px] leading-snug text-base-content/40"
               >
-                {{ jellyfinTestMessage }}
+                {{ t('settings.jellyfinMusicLibraryHint') }}
               </p>
             </div>
-            <div>
-              <label class="block text-xs text-base-content/50 mb-1.5">
-                {{ t('settings.jellyfinMusicLibrary') }}
-              </label>
-              <div
-                v-if="jellyfinLibraryLoading"
-                class="flex flex-col"
-              >
-                <div
-                  class="h-10 w-full rounded-xl bg-base-100/85 border border-white/10 flex items-center px-3"
-                >
-                  <span class="text-sm text-base-content/60">{{
-                    t('settings.jellyfinLibraryLoading')
-                  }}</span>
-                </div>
-                <p class="mt-1.5 text-center text-[11px] leading-snug text-base-content/40">
-                  {{ t('settings.jellyfinMusicLibraryHint') }}
-                </p>
-              </div>
-              <div v-else-if="jellyfinLibraryError" class="space-y-1.5">
-                <div class="flex items-start gap-2">
-                  <div class="flex min-w-0 flex-1 flex-col">
-                    <ThemedSelect
-                      v-model="sm.settings.value.jellyfin_music_library"
-                      :options="jellyfinLibraryOptions"
-                      :placeholder="t('settings.jellyfinMusicLibraryPlaceholder')"
-                      disabled
-                    />
-                    <p
-                      class="mt-1.5 text-center text-[11px] leading-snug text-base-content/40"
-                    >
-                      {{ t('settings.jellyfinMusicLibraryHint') }}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    class="btn btn-sm h-10 shrink-0 px-3 rounded-lg border-white/10 bg-base-100/85 hover:bg-base-100"
-                    @click="onJellyfinConfigChange"
-                    :disabled="jellyfinLibraryLoading"
-                  >
-                    {{ t('common.refresh') }}
-                  </button>
-                </div>
-                <p class="text-[11px] text-error">{{ jellyfinLibraryError }}</p>
-              </div>
-              <div v-else class="flex items-start gap-2">
+            <div v-else-if="jellyfinLibraryError" class="space-y-1.5">
+              <div class="flex items-start gap-2">
                 <div class="flex min-w-0 flex-1 flex-col">
                   <ThemedSelect
                     v-model="sm.settings.value.jellyfin_music_library"
                     :options="jellyfinLibraryOptions"
                     :placeholder="t('settings.jellyfinMusicLibraryPlaceholder')"
-                    :disabled="uniqueJellyfinLibraries.length === 0"
+                    disabled
                   />
                   <p
                     class="mt-1.5 text-center text-[11px] leading-snug text-base-content/40"
@@ -701,391 +675,409 @@
                   {{ t('common.refresh') }}
                 </button>
               </div>
+              <p class="text-[11px] text-error">{{ jellyfinLibraryError }}</p>
             </div>
-          </div>
-        </div>
-
-        <transition
-          enter-active-class="transition duration-200"
-          enter-from-class="opacity-0 -translate-y-1"
-          enter-to-class="opacity-100 translate-y-0"
-          leave-active-class="transition duration-200"
-          leave-from-class="opacity-100"
-          leave-to-class="opacity-0"
-        >
-          <div
-            v-if="sm.isSaved.value === true"
-            class="surface rounded-xl p-3 flex items-center gap-2 text-sm text-primary"
-          >
-            <Icon icon="clarity:check-line" class="h-4 w-4 shrink-0" />
-            {{ t('settings.saved') }}
-          </div>
-          <div
-            v-else-if="sm.isSaved.value === false"
-            class="surface rounded-xl p-3 flex items-center gap-2 text-sm text-error"
-          >
-            <Icon
-              icon="clarity:exclamation-circle-line"
-              class="h-4 w-4 shrink-0"
-            />
-            {{ t('settings.saveError') }}
-          </div>
-        </transition>
-      </div>
-
-      <div v-else-if="activeTab === 'logs'" class="px-4 pb-5 space-y-5 sm:px-6">
-        <div class="flex items-center justify-between gap-3">
-          <div>
-            <label
-              class="block text-xs font-semibold uppercase tracking-wider text-base-content/50"
-            >
-              {{ t('metadata.repairLog') }}
-            </label>
-            <p class="mt-1 text-[11px] text-base-content/45">
-              {{ t('settings.logsHint') }}
-            </p>
-          </div>
-          <button
-            type="button"
-            class="btn btn-sm h-9 rounded-full border-white/10 bg-base-100/85 hover:bg-base-100"
-            :disabled="repairLogLoading"
-            @click="loadRepairLog"
-          >
-            <span
-              v-if="repairLogLoading"
-              class="loading loading-spinner loading-xs mr-2"
-            />
-            <Icon v-else icon="clarity:refresh-line" class="h-4 w-4 mr-2" />
-            {{ t('common.refresh') }}
-          </button>
-        </div>
-
-        <div
-          v-if="repairLogError"
-          class="surface rounded-xl p-3 flex items-center gap-2 text-sm text-error"
-        >
-          <Icon
-            icon="clarity:exclamation-circle-line"
-            class="h-4 w-4 shrink-0"
-          />
-          {{ repairLogError }}
-        </div>
-
-        <div
-          v-if="repairLog.length === 0 && !repairLogLoading"
-          class="surface rounded-2xl p-8 text-center text-sm text-base-content/50"
-        >
-          <Icon
-            icon="clarity:history-line"
-            class="mx-auto mb-3 h-9 w-9 text-base-content/20"
-          />
-          {{ t('metadata.emptyRepairLog') }}
-        </div>
-
-        <ul v-else class="max-h-[24rem] space-y-3 overflow-y-auto pr-1">
-          <li
-            v-for="entry in repairLog"
-            :key="`${entry.created_at}-${entry.kind}-${entry.target}`"
-            class="surface rounded-2xl p-4"
-          >
-            <div class="flex items-start justify-between gap-3">
-              <div class="min-w-0">
-                <p class="truncate text-sm font-semibold">
-                  {{ entry.target }}
-                </p>
-                <p class="mt-1 text-xs text-base-content/45">
-                  {{ logKindLabel(entry.kind) }} ·
-                  {{ entry.detail || entry.created_at }}
+            <div v-else class="flex items-start gap-2">
+              <div class="flex min-w-0 flex-1 flex-col">
+                <ThemedSelect
+                  v-model="sm.settings.value.jellyfin_music_library"
+                  :options="jellyfinLibraryOptions"
+                  :placeholder="t('settings.jellyfinMusicLibraryPlaceholder')"
+                  :disabled="uniqueJellyfinLibraries.length === 0"
+                />
+                <p
+                  class="mt-1.5 text-center text-[11px] leading-snug text-base-content/40"
+                >
+                  {{ t('settings.jellyfinMusicLibraryHint') }}
                 </p>
               </div>
-              <span
-                class="pill shrink-0"
-                :class="
-                  entry.status === 'success'
-                    ? 'badge-soft'
-                    : 'bg-error/10 text-error'
-                "
-              >
-                {{ entry.status }}
-              </span>
-            </div>
-          </li>
-        </ul>
-      </div>
-
-      <div v-else-if="activeTab === 'about'" class="px-4 pb-5 space-y-5 sm:px-6">
-        <div>
-          <label
-            class="block text-xs font-semibold uppercase tracking-wider text-base-content/50"
-          >
-            {{ t('settings.aboutTitle') }}
-          </label>
-          <p class="mt-1 text-sm text-base-content/60">
-            {{ t('settings.aboutSubtitle') }}
-          </p>
-        </div>
-
-        <div class="grid gap-3 md:grid-cols-2">
-          <div
-            v-for="section in aboutSections"
-            :key="section.title"
-            class="surface rounded-2xl p-4"
-          >
-            <div class="flex items-start gap-3">
-              <Icon
-                :icon="section.icon"
-                class="mt-0.5 h-5 w-5 shrink-0 text-primary"
-              />
-              <div class="min-w-0">
-                <p class="text-sm font-semibold">
-                  {{ section.title }}
-                </p>
-                <p class="mt-1 text-xs leading-relaxed text-base-content/55">
-                  {{ section.text }}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="surface rounded-2xl p-4">
-          <div class="flex items-start gap-3">
-            <Icon
-              icon="clarity:flow-chart-line"
-              class="mt-0.5 h-5 w-5 shrink-0 text-primary"
-            />
-            <div>
-              <p class="text-sm font-semibold">
-                {{ t('settings.aboutWorkflowTitle') }}
-              </p>
-              <p class="mt-1 text-xs leading-relaxed text-base-content/55">
-                {{ t('settings.aboutWorkflowText') }}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div v-else-if="activeTab === 'help'" class="px-4 pb-5 space-y-5 sm:px-6">
-        <div class="flex items-start justify-between gap-3">
-          <div>
-            <label
-              class="block text-xs font-semibold uppercase tracking-wider text-base-content/50"
-            >
-              {{ t('settings.helpTitle') }}
-            </label>
-            <p class="mt-1 text-sm text-base-content/60">
-              {{ t('settings.helpSubtitle') }}
-            </p>
-          </div>
-          <button
-            type="button"
-            class="btn btn-sm h-9 rounded-full border-white/10 bg-base-100/85 hover:bg-base-100"
-            :disabled="helpLoading"
-            @click="loadUpdateStatus(true)"
-          >
-            <span
-              v-if="helpLoading"
-              class="loading loading-spinner loading-xs mr-2"
-            />
-            <Icon v-else icon="clarity:refresh-line" class="h-4 w-4 mr-2" />
-            {{ t('settings.checkUpdates') }}
-          </button>
-        </div>
-
-        <div class="grid gap-3 md:grid-cols-2">
-          <div class="surface rounded-2xl p-4">
-            <p class="text-xs uppercase tracking-wider text-base-content/45">
-              {{ t('settings.currentVersion') }}
-            </p>
-            <p class="mt-2 text-2xl font-bold text-base-content">
-              v{{ currentAppVersion }}
-            </p>
-          </div>
-          <div class="surface rounded-2xl p-4">
-            <p class="text-xs uppercase tracking-wider text-base-content/45">
-              {{ t('settings.latestVersion') }}
-            </p>
-            <p class="mt-2 text-2xl font-bold text-base-content">
-              {{ latestVersionLabel }}
-            </p>
-          </div>
-        </div>
-
-        <div
-          v-if="helpError"
-          class="surface rounded-xl p-3 flex items-center gap-2 text-sm text-error"
-        >
-          <Icon
-            icon="clarity:exclamation-circle-line"
-            class="h-4 w-4 shrink-0"
-          />
-          {{ helpError }}
-        </div>
-
-        <div class="surface rounded-2xl p-4">
-          <div class="flex items-start gap-3">
-            <Icon
-              :icon="updateStatusIcon"
-              class="mt-0.5 h-5 w-5 shrink-0 text-primary"
-            />
-            <div class="min-w-0 flex-1">
-              <p class="text-sm font-semibold">
-                {{ updateStatusTitle }}
-              </p>
-              <p class="mt-1 text-xs leading-relaxed text-base-content/55">
-                {{ updateStatusMessage }}
-              </p>
-              <a
-                v-if="updateStatus?.release_url"
-                :href="updateStatus.release_url"
-                target="_blank"
-                rel="noreferrer"
-                class="mt-2 inline-flex text-xs font-medium text-primary hover:text-primary-focus"
-              >
-                {{ t('settings.viewRelease') }}
-              </a>
-            </div>
-          </div>
-        </div>
-
-        <div class="flex flex-wrap items-center gap-2">
-          <button
-            v-if="!updateRunning"
-            type="button"
-            class="btn btn-primary btn-sm h-10 rounded-full px-5"
-            :disabled="!canRunUpdate"
-            @click="runUpdate"
-          >
-            <Icon
-              icon="clarity:download-cloud-line"
-              class="h-4 w-4 mr-2"
-            />
-            {{ t('settings.updateApp') }}
-          </button>
-          <p class="text-xs text-base-content/45">
-            {{ t('settings.updateHint') }}
-          </p>
-        </div>
-
-        <div
-          v-if="updateWaiting"
-          class="surface rounded-2xl border border-primary/30 bg-primary/10 p-5"
-        >
-          <div class="flex items-start gap-3">
-            <span
-              class="loading loading-spinner loading-md shrink-0 text-primary mt-0.5"
-            />
-            <div class="min-w-0">
-              <p class="font-semibold text-primary">
-                {{ t('settings.updateInProgress') }}
-              </p>
-              <p class="mt-1 text-sm text-base-content/70">
-                {{ t('settings.updateInProgressHint') }}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div
-          v-if="updateFailed"
-          class="surface rounded-2xl border border-error/30 bg-error/10 p-5"
-        >
-          <div class="flex items-start gap-3">
-            <Icon
-              icon="clarity:exclamation-circle-line"
-              class="mt-0.5 h-6 w-6 shrink-0 text-error"
-            />
-            <div class="min-w-0">
-              <p class="font-semibold text-error">
-                {{ t('settings.updateFailed') }}
-              </p>
-              <p class="mt-1 text-sm text-base-content/70">
-                {{ updateFailureMessage }}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div
-          v-if="updateCompleted"
-          class="surface rounded-2xl border border-success/30 bg-success/10 p-5"
-        >
-          <div class="flex items-start gap-3">
-            <Icon
-              icon="clarity:success-standard-line"
-              class="mt-0.5 h-6 w-6 shrink-0 text-success"
-            />
-            <div>
-              <p class="font-semibold text-success">
-                {{ t('settings.updateFinished') }}
-              </p>
-              <p class="mt-1 text-sm text-base-content/70">
-                {{ t('settings.refreshAfterUpdate') }}
-              </p>
               <button
                 type="button"
-                class="btn btn-success btn-sm mt-4 h-10 rounded-full px-5"
-                @click="refreshPage"
+                class="btn btn-sm h-10 shrink-0 px-3 rounded-lg border-white/10 bg-base-100/85 hover:bg-base-100"
+                @click="onJellyfinConfigChange"
+                :disabled="jellyfinLibraryLoading"
               >
-                <Icon icon="clarity:refresh-line" class="mr-2 h-4 w-4" />
-                {{ t('settings.refreshPage') }}
+                {{ t('common.refresh') }}
               </button>
             </div>
           </div>
         </div>
+      </div>
 
+      <transition
+        enter-active-class="transition duration-200"
+        enter-from-class="opacity-0 -translate-y-1"
+        enter-to-class="opacity-100 translate-y-0"
+        leave-active-class="transition duration-200"
+        leave-from-class="opacity-100"
+        leave-to-class="opacity-0"
+      >
         <div
-          v-if="updateResult && !updateCompleted && !updateWaiting && !updateFailed"
-          class="surface rounded-2xl p-4"
-          :class="updateResult.success ? 'text-base-content' : 'text-error'"
+          v-if="sm.isSaved.value === true"
+          class="surface rounded-xl p-3 flex items-center gap-2 text-sm text-primary"
         >
-          <p class="text-sm font-semibold">
-            {{ updateResult.message || t('settings.updateFinished') }}
-          </p>
-          <p
-            v-if="updateResult.requires_restart"
-            class="mt-1 text-xs text-base-content/55"
+          <Icon icon="clarity:check-line" class="h-4 w-4 shrink-0" />
+          {{ t('settings.saved') }}
+        </div>
+        <div
+          v-else-if="sm.isSaved.value === false"
+          class="surface rounded-xl p-3 flex items-center gap-2 text-sm text-error"
+        >
+          <Icon
+            icon="clarity:exclamation-circle-line"
+            class="h-4 w-4 shrink-0"
+          />
+          {{ t('settings.saveError') }}
+        </div>
+      </transition>
+    </div>
+
+    <div v-else-if="activeTab === 'logs'" class="px-4 pb-5 space-y-5 sm:px-6">
+      <div class="flex items-center justify-between gap-3">
+        <div>
+          <label
+            class="block text-xs font-semibold uppercase tracking-wider text-base-content/50"
           >
-            {{ t('settings.restartRequired') }}
+            {{ t('metadata.repairLog') }}
+          </label>
+          <p class="mt-1 text-[11px] text-base-content/45">
+            {{ t('settings.logsHint') }}
           </p>
-          <p
-            v-if="updateResult.restart_scheduled"
-            class="mt-1 text-xs text-success"
-          >
-            {{ t('settings.restartScheduled') }}
-          </p>
-          <div v-if="updateResult.commands?.length" class="mt-3 space-y-2">
-            <p class="text-xs text-base-content/55">
-              {{ t('settings.manualUpdateCommands') }}
-            </p>
-            <code
-              v-for="command in updateResult.commands"
-              :key="command"
-              class="block rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-xs text-base-content"
+        </div>
+        <button
+          type="button"
+          class="btn btn-sm h-9 rounded-full border-white/10 bg-base-100/85 hover:bg-base-100"
+          :disabled="repairLogLoading"
+          @click="loadRepairLog"
+        >
+          <span
+            v-if="repairLogLoading"
+            class="loading loading-spinner loading-xs mr-2"
+          />
+          <Icon v-else icon="clarity:refresh-line" class="h-4 w-4 mr-2" />
+          {{ t('common.refresh') }}
+        </button>
+      </div>
+
+      <div
+        v-if="repairLogError"
+        class="surface rounded-xl p-3 flex items-center gap-2 text-sm text-error"
+      >
+        <Icon icon="clarity:exclamation-circle-line" class="h-4 w-4 shrink-0" />
+        {{ repairLogError }}
+      </div>
+
+      <div
+        v-if="repairLog.length === 0 && !repairLogLoading"
+        class="surface rounded-2xl p-8 text-center text-sm text-base-content/50"
+      >
+        <Icon
+          icon="clarity:history-line"
+          class="mx-auto mb-3 h-9 w-9 text-base-content/20"
+        />
+        {{ t('metadata.emptyRepairLog') }}
+      </div>
+
+      <ul v-else class="max-h-[24rem] space-y-3 overflow-y-auto pr-1">
+        <li
+          v-for="entry in repairLog"
+          :key="`${entry.created_at}-${entry.kind}-${entry.target}`"
+          class="surface rounded-2xl p-4"
+        >
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+              <p class="truncate text-sm font-semibold">
+                {{ entry.target }}
+              </p>
+              <p class="mt-1 text-xs text-base-content/45">
+                {{ logKindLabel(entry.kind) }} ·
+                {{ entry.detail || entry.created_at }}
+              </p>
+            </div>
+            <span
+              class="pill shrink-0"
+              :class="
+                entry.status === 'success'
+                  ? 'badge-soft'
+                  : 'bg-error/10 text-error'
+              "
             >
-              {{ command }}
-            </code>
+              {{ entry.status }}
+            </span>
           </div>
-          <pre
-            v-if="updateResult.terminal_output || updateResult.pull_output"
-            class="mt-3 max-h-40 overflow-auto rounded-xl border border-white/10 bg-black/30 p-3 text-xs text-base-content/70"
-            >{{ updateResult.terminal_output || updateResult.pull_output }}</pre
-          >
+        </li>
+      </ul>
+    </div>
+
+    <div v-else-if="activeTab === 'about'" class="px-4 pb-5 space-y-5 sm:px-6">
+      <div>
+        <label
+          class="block text-xs font-semibold uppercase tracking-wider text-base-content/50"
+        >
+          {{ t('settings.aboutTitle') }}
+        </label>
+        <p class="mt-1 text-sm text-base-content/60">
+          {{ t('settings.aboutSubtitle') }}
+        </p>
+      </div>
+
+      <div class="grid gap-3 md:grid-cols-2">
+        <div
+          v-for="section in aboutSections"
+          :key="section.title"
+          class="surface rounded-2xl p-4"
+        >
+          <div class="flex items-start gap-3">
+            <Icon
+              :icon="section.icon"
+              class="mt-0.5 h-5 w-5 shrink-0 text-primary"
+            />
+            <div class="min-w-0">
+              <p class="text-sm font-semibold">
+                {{ section.title }}
+              </p>
+              <p class="mt-1 text-xs leading-relaxed text-base-content/55">
+                {{ section.text }}
+              </p>
+            </div>
+          </div>
         </div>
       </div>
 
-      <!-- Footer -->
-      <div
-        class="flex items-center justify-end gap-2 px-4 py-4 border-t border-white/5 sm:px-6"
-      >
+      <div class="surface rounded-2xl p-4">
+        <div class="flex items-start gap-3">
+          <Icon
+            icon="clarity:flow-chart-line"
+            class="mt-0.5 h-5 w-5 shrink-0 text-primary"
+          />
+          <div>
+            <p class="text-sm font-semibold">
+              {{ t('settings.aboutWorkflowTitle') }}
+            </p>
+            <p class="mt-1 text-xs leading-relaxed text-base-content/55">
+              {{ t('settings.aboutWorkflowText') }}
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div v-else-if="activeTab === 'help'" class="px-4 pb-5 space-y-5 sm:px-6">
+      <div class="flex items-start justify-between gap-3">
+        <div>
+          <label
+            class="block text-xs font-semibold uppercase tracking-wider text-base-content/50"
+          >
+            {{ t('settings.helpTitle') }}
+          </label>
+          <p class="mt-1 text-sm text-base-content/60">
+            {{ t('settings.helpSubtitle') }}
+          </p>
+        </div>
         <button
-          class="btn btn-primary btn-sm h-10 px-6 rounded-full"
-          @click="sm.saveSettings()"
+          type="button"
+          class="btn btn-sm h-9 rounded-full border-white/10 bg-base-100/85 hover:bg-base-100"
+          :disabled="helpLoading"
+          @click="loadUpdateStatus(true)"
         >
-          {{ t('common.save') }}
+          <span
+            v-if="helpLoading"
+            class="loading loading-spinner loading-xs mr-2"
+          />
+          <Icon v-else icon="clarity:refresh-line" class="h-4 w-4 mr-2" />
+          {{ t('settings.checkUpdates') }}
         </button>
       </div>
+
+      <div class="grid gap-3 md:grid-cols-2">
+        <div class="surface rounded-2xl p-4">
+          <p class="text-xs uppercase tracking-wider text-base-content/45">
+            {{ t('settings.currentVersion') }}
+          </p>
+          <p class="mt-2 text-2xl font-bold text-base-content">
+            v{{ currentAppVersion }}
+          </p>
+        </div>
+        <div class="surface rounded-2xl p-4">
+          <p class="text-xs uppercase tracking-wider text-base-content/45">
+            {{ t('settings.latestVersion') }}
+          </p>
+          <p class="mt-2 text-2xl font-bold text-base-content">
+            {{ latestVersionLabel }}
+          </p>
+        </div>
+      </div>
+
+      <div
+        v-if="helpError"
+        class="surface rounded-xl p-3 flex items-center gap-2 text-sm text-error"
+      >
+        <Icon icon="clarity:exclamation-circle-line" class="h-4 w-4 shrink-0" />
+        {{ helpError }}
+      </div>
+
+      <div class="surface rounded-2xl p-4">
+        <div class="flex items-start gap-3">
+          <Icon
+            :icon="updateStatusIcon"
+            class="mt-0.5 h-5 w-5 shrink-0 text-primary"
+          />
+          <div class="min-w-0 flex-1">
+            <p class="text-sm font-semibold">
+              {{ updateStatusTitle }}
+            </p>
+            <p class="mt-1 text-xs leading-relaxed text-base-content/55">
+              {{ updateStatusMessage }}
+            </p>
+            <a
+              v-if="updateStatus?.release_url"
+              :href="updateStatus.release_url"
+              target="_blank"
+              rel="noreferrer"
+              class="mt-2 inline-flex text-xs font-medium text-primary hover:text-primary-focus"
+            >
+              {{ t('settings.viewRelease') }}
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-2">
+        <button
+          v-if="!updateRunning"
+          type="button"
+          class="btn btn-primary btn-sm h-10 rounded-full px-5"
+          :disabled="!canRunUpdate"
+          @click="runUpdate"
+        >
+          <Icon icon="clarity:download-cloud-line" class="h-4 w-4 mr-2" />
+          {{ t('settings.updateApp') }}
+        </button>
+        <p class="text-xs text-base-content/45">
+          {{ t('settings.updateHint') }}
+        </p>
+      </div>
+
+      <div
+        v-if="updateWaiting"
+        class="surface rounded-2xl border border-primary/30 bg-primary/10 p-5"
+      >
+        <div class="flex items-start gap-3">
+          <span
+            class="loading loading-spinner loading-md shrink-0 text-primary mt-0.5"
+          />
+          <div class="min-w-0">
+            <p class="font-semibold text-primary">
+              {{ t('settings.updateInProgress') }}
+            </p>
+            <p class="mt-1 text-sm text-base-content/70">
+              {{ t('settings.updateInProgressHint') }}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div
+        v-if="updateFailed"
+        class="surface rounded-2xl border border-error/30 bg-error/10 p-5"
+      >
+        <div class="flex items-start gap-3">
+          <Icon
+            icon="clarity:exclamation-circle-line"
+            class="mt-0.5 h-6 w-6 shrink-0 text-error"
+          />
+          <div class="min-w-0">
+            <p class="font-semibold text-error">
+              {{ t('settings.updateFailed') }}
+            </p>
+            <p class="mt-1 text-sm text-base-content/70">
+              {{ updateFailureMessage }}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div
+        v-if="updateCompleted"
+        class="surface rounded-2xl border border-success/30 bg-success/10 p-5"
+      >
+        <div class="flex items-start gap-3">
+          <Icon
+            icon="clarity:success-standard-line"
+            class="mt-0.5 h-6 w-6 shrink-0 text-success"
+          />
+          <div>
+            <p class="font-semibold text-success">
+              {{ t('settings.updateFinished') }}
+            </p>
+            <p class="mt-1 text-sm text-base-content/70">
+              {{ t('settings.refreshAfterUpdate') }}
+            </p>
+            <button
+              type="button"
+              class="btn btn-success btn-sm mt-4 h-10 rounded-full px-5"
+              @click="refreshPage"
+            >
+              <Icon icon="clarity:refresh-line" class="mr-2 h-4 w-4" />
+              {{ t('settings.refreshPage') }}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div
+        v-if="
+          updateResult && !updateCompleted && !updateWaiting && !updateFailed
+        "
+        class="surface rounded-2xl p-4"
+        :class="updateResult.success ? 'text-base-content' : 'text-error'"
+      >
+        <p class="text-sm font-semibold">
+          {{ updateResult.message || t('settings.updateFinished') }}
+        </p>
+        <p
+          v-if="updateResult.requires_restart"
+          class="mt-1 text-xs text-base-content/55"
+        >
+          {{ t('settings.restartRequired') }}
+        </p>
+        <p
+          v-if="updateResult.restart_scheduled"
+          class="mt-1 text-xs text-success"
+        >
+          {{ t('settings.restartScheduled') }}
+        </p>
+        <div v-if="updateResult.commands?.length" class="mt-3 space-y-2">
+          <p class="text-xs text-base-content/55">
+            {{ t('settings.manualUpdateCommands') }}
+          </p>
+          <code
+            v-for="command in updateResult.commands"
+            :key="command"
+            class="block rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-xs text-base-content"
+          >
+            {{ command }}
+          </code>
+        </div>
+        <pre
+          v-if="updateResult.terminal_output || updateResult.pull_output"
+          class="mt-3 max-h-40 overflow-auto rounded-xl border border-white/10 bg-black/30 p-3 text-xs text-base-content/70"
+          >{{ updateResult.terminal_output || updateResult.pull_output }}</pre
+        >
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div
+      class="flex items-center justify-end gap-2 px-4 py-4 border-t border-white/5 sm:px-6"
+    >
+      <button
+        class="btn btn-primary btn-sm h-10 px-6 rounded-full"
+        @click="sm.saveSettings()"
+      >
+        {{ t('common.save') }}
+      </button>
+    </div>
   </div>
 </template>
 
@@ -1168,7 +1160,9 @@ const serverTestLoading = ref(false)
 const serverTestMessage = ref('')
 const serverTestError = ref(false)
 const usesCustomServer = computed(() => usesCustomServerUrl())
-const activeServerDisplay = computed(() => formatServerDisplay(getServerConfig()))
+const activeServerDisplay = computed(() =>
+  formatServerDisplay(getServerConfig())
+)
 const canConnectDevice = computed(() => canConnectToCurrentPage())
 const connectedToThisDevice = computed(() => isConnectedToCurrentPage())
 const canSaveServerUrl = computed(() =>
@@ -1479,9 +1473,7 @@ async function runUpdate() {
       markUpdateFailed(data.message || t('settings.updateFailed'))
     }
   } catch (err) {
-    markUpdateFailed(
-      err?.response?.data?.detail || t('settings.updateError')
-    )
+    markUpdateFailed(err?.response?.data?.detail || t('settings.updateError'))
   } finally {
     if (!updateWaiting.value) {
       updateRunning.value = false
@@ -1621,7 +1613,9 @@ async function onJellyfinConfigChange() {
     console.error('Failed to fetch Jellyfin libraries:', err)
     const errorDetail =
       err.response?.data?.detail || err.message || 'Unknown error'
-    jellyfinLibraryError.value = `${t('settings.jellyfinLibraryError')}: ${errorDetail}`
+    jellyfinLibraryError.value = `${t(
+      'settings.jellyfinLibraryError'
+    )}: ${errorDetail}`
   } finally {
     jellyfinLibraryLoading.value = false
   }

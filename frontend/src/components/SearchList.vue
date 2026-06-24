@@ -56,11 +56,7 @@
         class="h-12 w-12 text-base-content/20 mb-4"
       />
       <p class="text-base-content/50 text-sm">
-        {{
-          hasUnfilteredResults
-            ? emptyFilterMessage
-            : t('search.empty')
-        }}
+        {{ hasUnfilteredResults ? emptyFilterMessage : t('search.empty') }}
       </p>
       <p class="text-base-content/40 text-xs mt-1">
         {{
@@ -79,49 +75,51 @@
         class="surface rounded-2xl p-3 sm:p-4 flex flex-col gap-3 sm:flex-row sm:items-center"
       >
         <div class="flex min-w-0 flex-1 items-center gap-3 sm:gap-4">
-        <!-- Cover -->
-        <div class="track-cover w-14 sm:w-16">
-          <CoverImage
-            v-if="song.cover_url"
-            :src="coverSrc(song.cover_url)"
-            :alt="song.name"
-            img-class="h-full w-full object-cover"
-          >
-            <template #fallback>
-              <div class="h-full w-full flex items-center justify-center text-base-content/30">
-                <Icon icon="clarity:music-note-line" class="h-6 w-6" />
-              </div>
-            </template>
-          </CoverImage>
-          <div
-            v-else
-            class="h-full w-full flex items-center justify-center text-base-content/30"
-          >
-            <Icon icon="clarity:music-note-line" class="h-6 w-6" />
-          </div>
-        </div>
-
-        <!-- Info -->
-        <div class="flex-1 min-w-0">
-          <div class="flex items-center gap-2 mb-0.5">
-            <span class="font-semibold truncate">{{ song.name }}</span>
-            <span v-if="song.explicit" class="badge-error-soft shrink-0"
-              >E</span
+          <!-- Cover -->
+          <div class="track-cover w-14 sm:w-16">
+            <CoverImage
+              v-if="song.cover_url"
+              :src="coverSrc(song.cover_url)"
+              :alt="song.name"
+              img-class="h-full w-full object-cover"
             >
+              <template #fallback>
+                <div
+                  class="h-full w-full flex items-center justify-center text-base-content/30"
+                >
+                  <Icon icon="clarity:music-note-line" class="h-6 w-6" />
+                </div>
+              </template>
+            </CoverImage>
+            <div
+              v-else
+              class="h-full w-full flex items-center justify-center text-base-content/30"
+            >
+              <Icon icon="clarity:music-note-line" class="h-6 w-6" />
+            </div>
           </div>
-          <p class="text-xs text-base-content/70 truncate">
-            {{ artistsOf(song) }}
-          </p>
-          <p
-            v-if="song.album_name"
-            class="text-xs text-base-content/40 truncate"
-          >
-            {{ song.album_name }}
-            <span v-if="song.year" class="text-base-content/30">
-              · {{ song.year }}
-            </span>
-          </p>
-        </div>
+
+          <!-- Info -->
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 mb-0.5">
+              <span class="font-semibold truncate">{{ song.name }}</span>
+              <span v-if="song.explicit" class="badge-error-soft shrink-0"
+                >E</span
+              >
+            </div>
+            <p class="text-xs text-base-content/70 truncate">
+              {{ artistsOf(song) }}
+            </p>
+            <p
+              v-if="song.album_name"
+              class="text-xs text-base-content/40 truncate"
+            >
+              {{ song.album_name }}
+              <span v-if="song.year" class="text-base-content/30">
+                · {{ song.year }}
+              </span>
+            </p>
+          </div>
         </div>
 
         <!-- Actions -->
@@ -196,7 +194,7 @@
           page === currentPage
             ? 'bg-primary text-primary-content shadow-glow-sm'
             : page === '…'
-              ? 'cursor-default text-base-content/30'
+            ? 'cursor-default text-base-content/30'
             : 'text-base-content/70 hover:text-base-content hover:bg-white/10'
         "
         :disabled="page === '…'"
@@ -225,16 +223,24 @@
           <div
             class="surface-strong w-full max-w-3xl overflow-hidden rounded-t-3xl shadow-2xl sm:rounded-3xl"
           >
-            <div class="flex items-center justify-between border-b border-white/5 px-5 py-4">
+            <div
+              class="flex items-center justify-between border-b border-white/5 px-5 py-4"
+            >
               <div class="min-w-0">
-                <p class="text-xs font-semibold uppercase tracking-wider text-base-content/50">
+                <p
+                  class="text-xs font-semibold uppercase tracking-wider text-base-content/50"
+                >
                   {{ demoTypeLabel }}
                 </p>
                 <h2 class="truncate text-lg font-bold tracking-tight">
                   {{ demoTitle }}
                 </h2>
               </div>
-              <button class="icon-btn shrink-0" @click="closeDemo" :title="t('common.close')">
+              <button
+                class="icon-btn shrink-0"
+                @click="closeDemo"
+                :title="t('common.close')"
+              >
                 <Icon icon="clarity:close-line" class="h-5 w-5" />
               </button>
             </div>
@@ -255,7 +261,9 @@
 
             <template v-else>
               <div class="grid gap-5 p-5 sm:grid-cols-[160px_1fr]">
-                <div class="relative aspect-square overflow-hidden rounded-2xl bg-base-content/10 shadow-lg">
+                <div
+                  class="relative aspect-square overflow-hidden rounded-2xl bg-base-content/10 shadow-lg"
+                >
                   <CoverImage
                     v-if="activeDemoTrack?.cover_url"
                     :src="coverSrc(activeDemoTrack?.cover_url)"
@@ -263,8 +271,13 @@
                     img-class="h-full w-full object-cover"
                   >
                     <template #fallback>
-                      <div class="flex h-full w-full items-center justify-center text-base-content/30">
-                        <Icon icon="clarity:music-note-line" class="h-12 w-12" />
+                      <div
+                        class="flex h-full w-full items-center justify-center text-base-content/30"
+                      >
+                        <Icon
+                          icon="clarity:music-note-line"
+                          class="h-12 w-12"
+                        />
                       </div>
                     </template>
                   </CoverImage>
@@ -290,7 +303,9 @@
                 </div>
 
                 <div class="min-w-0">
-                  <h3 class="truncate text-xl font-bold">{{ activeDemoTrack?.name }}</h3>
+                  <h3 class="truncate text-xl font-bold">
+                    {{ activeDemoTrack?.name }}
+                  </h3>
                   <p class="truncate text-sm text-base-content/60">
                     {{ activeDemoTrack ? artistsOf(activeDemoTrack) : '' }}
                   </p>
@@ -299,11 +314,15 @@
                     class="mt-1 truncate text-xs text-base-content/40"
                   >
                     {{ activeDemoTrack.album_name }}
-                    <span v-if="activeDemoTrack.year"> · {{ activeDemoTrack.year }}</span>
+                    <span v-if="activeDemoTrack.year">
+                      · {{ activeDemoTrack.year }}</span
+                    >
                   </p>
 
                   <div class="mt-5 flex items-center gap-2">
-                    <span class="w-9 text-right text-xs tabular-nums text-base-content/40">
+                    <span
+                      class="w-9 text-right text-xs tabular-nums text-base-content/40"
+                    >
                       {{ formatDuration(Math.floor(demoProgress)) }}
                     </span>
                     <input
@@ -321,7 +340,9 @@
                     <div ref="demoVolumeRoot" class="relative shrink-0">
                       <button
                         class="icon-btn h-8 w-8 text-base-content/60 hover:text-base-content"
-                        :class="{ 'bg-white/10 text-base-content': demoVolumeOpen }"
+                        :class="{
+                          'bg-white/10 text-base-content': demoVolumeOpen,
+                        }"
                         type="button"
                         :aria-label="t('player.volume')"
                         :aria-expanded="demoVolumeOpen"
@@ -368,13 +389,18 @@
                   </p>
 
                   <p
-                    v-else-if="!isDemoTrackReady(activeDemoTrack) && !isDemoTrackFailed(activeDemoTrack)"
+                    v-else-if="
+                      !isDemoTrackReady(activeDemoTrack) &&
+                      !isDemoTrackFailed(activeDemoTrack)
+                    "
                     class="mt-3 text-xs italic text-base-content/40"
                   >
                     Preview will be available shortly.
                   </p>
 
-                  <div class="mt-5 flex flex-wrap items-center gap-2 lg:flex-nowrap">
+                  <div
+                    class="mt-5 flex flex-wrap items-center gap-2 lg:flex-nowrap"
+                  >
                     <button
                       v-if="demoType === 'album' && demoSourceItem"
                       class="btn btn-primary btn-sm gap-2 rounded-full"
@@ -423,7 +449,10 @@
                   v-for="(track, index) in demoTracks"
                   :key="track.song_id || index"
                   class="flex w-full cursor-pointer items-center gap-3 rounded-xl px-2 py-2 text-left transition-colors hover:bg-white/5"
-                  :class="{ 'bg-primary/10 text-primary': activeDemoTrack?.song_id === track.song_id }"
+                  :class="{
+                    'bg-primary/10 text-primary':
+                      activeDemoTrack?.song_id === track.song_id,
+                  }"
                   @click="selectDemoTrack(track)"
                   role="button"
                   tabindex="0"
@@ -437,7 +466,9 @@
                     img-class="h-10 w-10 shrink-0 rounded-lg object-cover"
                   >
                     <template #fallback>
-                      <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-base-content/10">
+                      <div
+                        class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-base-content/10"
+                      >
                         <Icon icon="clarity:music-note-line" class="h-4 w-4" />
                       </div>
                     </template>
@@ -590,8 +621,7 @@ const paginatedData = computed(() => {
 })
 
 const hasUnfilteredResults = computed(
-  () =>
-    (sm.results.value?.length || 0) > 0 && (props.data?.length || 0) === 0
+  () => (sm.results.value?.length || 0) > 0 && (props.data?.length || 0) === 0
 )
 
 const emptyFilterMessage = computed(() => {
@@ -610,8 +640,8 @@ const demoTitle = computed(() => {
   return first?.name || ''
 })
 
-const activeDemoAudioUrl = computed(
-  () => playableAudioUrlForTrack(activeDemoTrack.value)
+const activeDemoAudioUrl = computed(() =>
+  playableAudioUrlForTrack(activeDemoTrack.value)
 )
 
 const playButtonTitle = computed(() =>
@@ -688,7 +718,8 @@ function isYoutubeMusicUrl(url) {
 function youtubeMusicUrlFor(item) {
   if (!item) return ''
   if (isYoutubeMusicUrl(item.url)) return item.url
-  if (item.browse_id) return `https://music.youtube.com/browse/${item.browse_id}`
+  if (item.browse_id)
+    return `https://music.youtube.com/browse/${item.browse_id}`
 
   const youtubeId =
     item.youtube_id ||
@@ -705,7 +736,11 @@ function youtubeMusicUrlFor(item) {
 function externalServiceUrl(item) {
   if (!item) return ''
   if (isSpotifyUrl(item.url)) return item.url
-  if (item.source === 'youtube' || isYoutubeMusicUrl(item.url) || item.browse_id) {
+  if (
+    item.source === 'youtube' ||
+    isYoutubeMusicUrl(item.url) ||
+    item.browse_id
+  ) {
     return youtubeMusicUrlFor(item)
   }
   return item.url || ''
@@ -801,7 +836,10 @@ async function toggleDemoPlay(track) {
     return
   }
 
-  if (demoTrackKey(activeDemoTrack.value) === demoTrackKey(track) && demoAudio.src) {
+  if (
+    demoTrackKey(activeDemoTrack.value) === demoTrackKey(track) &&
+    demoAudio.src
+  ) {
     if (demoPlaying.value) {
       demoAudio.pause()
       demoPlaying.value = false
@@ -872,7 +910,9 @@ function downloadAlbumFromDemo() {
 
 function demoTrackKey(track) {
   if (!track) return ''
-  return String(track.song_id || track.url || `${track.name || ''}:${artistsOf(track)}`)
+  return String(
+    track.song_id || track.url || `${track.name || ''}:${artistsOf(track)}`
+  )
 }
 
 function playableAudioUrlForTrack(track) {
@@ -907,7 +947,10 @@ function isDemoPlayDisabled(track) {
 function playIconForTrack(track) {
   if (isDemoTrackFailed(track)) return 'clarity:times-circle-solid'
   if (isDemoTrackResolving(track)) return 'clarity:refresh-line'
-  if (demoTrackKey(activeDemoTrack.value) === demoTrackKey(track) && demoPlaying.value) {
+  if (
+    demoTrackKey(activeDemoTrack.value) === demoTrackKey(track) &&
+    demoPlaying.value
+  ) {
     return 'clarity:pause-solid'
   }
   return 'clarity:play-solid'
@@ -959,10 +1002,9 @@ function warmDemoAudio(track) {
     return
   }
 
-  resolveDemoAudio(track, key)
-    .catch((err) => {
-      console.log('Preview warmup failed:', err.message)
-    })
+  resolveDemoAudio(track, key).catch((err) => {
+    console.log('Preview warmup failed:', err.message)
+  })
 }
 
 function warmNextDemoTrack(track) {
@@ -1037,7 +1079,6 @@ function formatDuration(seconds) {
   const remaining = Math.floor(seconds % 60)
   return `${minutes}:${remaining.toString().padStart(2, '0')}`
 }
-
 </script>
 
 <style scoped>
@@ -1051,9 +1092,7 @@ function formatDuration(seconds) {
 }
 .demo-modal-enter-active > div,
 .demo-modal-leave-active > div {
-  transition:
-    transform 0.2s ease,
-    opacity 0.2s ease;
+  transition: transform 0.2s ease, opacity 0.2s ease;
 }
 .demo-modal-enter-from > div,
 .demo-modal-leave-to > div {

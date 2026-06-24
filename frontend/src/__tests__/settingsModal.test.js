@@ -43,7 +43,10 @@ describe('settingsModal', () => {
 
   it('opens a specific settings tab via query', () => {
     openSettingsModal('api')
-    expect(push).toHaveBeenCalledWith({ name: 'Settings', query: { tab: 'api' } })
+    expect(push).toHaveBeenCalledWith({
+      name: 'Settings',
+      query: { tab: 'api' },
+    })
   })
 
   it('dispatches downtify:open-settings when a tab is provided', () => {

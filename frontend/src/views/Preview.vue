@@ -3,7 +3,6 @@
     <Navbar />
 
     <div class="mx-auto max-w-4xl px-4 py-8 sm:px-6">
-
       <!-- Loading -->
       <div v-if="loading" class="space-y-3">
         <div class="skeleton h-32 rounded-2xl" />
@@ -15,30 +14,45 @@
         v-else-if="error"
         class="surface rounded-2xl p-8 flex flex-col items-center text-center gap-3"
       >
-        <Icon icon="clarity:exclamation-circle-line" class="h-10 w-10 text-error" />
+        <Icon
+          icon="clarity:exclamation-circle-line"
+          class="h-10 w-10 text-error"
+        />
         <p class="text-sm text-error">{{ error }}</p>
-        <button class="btn btn-sm btn-ghost mt-2" @click="router.back()">Go back</button>
+        <button class="btn btn-sm btn-ghost mt-2" @click="router.back()">
+          Go back
+        </button>
       </div>
 
       <template v-else-if="tracks.length">
-
         <!-- Album / Playlist header -->
-        <div v-if="type !== 'track'" class="surface rounded-2xl p-5 mb-6 flex gap-5 items-center">
+        <div
+          v-if="type !== 'track'"
+          class="surface rounded-2xl p-5 mb-6 flex gap-5 items-center"
+        >
           <img
             v-if="tracks[0]?.cover_url"
             :src="coverSrc(tracks[0]?.cover_url)"
             class="h-20 w-20 rounded-xl object-cover shrink-0 shadow-lg"
           />
           <div class="flex-1 min-w-0">
-            <p class="text-xs text-base-content/40 uppercase tracking-widest mb-1">
+            <p
+              class="text-xs text-base-content/40 uppercase tracking-widest mb-1"
+            >
               {{ type === 'album' ? 'Album' : 'Playlist' }}
             </p>
-            <h1 class="text-xl font-bold truncate">{{ tracks[0]?.album_name || 'Unknown' }}</h1>
+            <h1 class="text-xl font-bold truncate">
+              {{ tracks[0]?.album_name || 'Unknown' }}
+            </h1>
             <p class="text-sm text-base-content/60 truncate mt-0.5">
               {{ tracks[0]?.artist }}
-              <span v-if="tracks[0]?.year" class="text-base-content/30"> · {{ tracks[0].year }}</span>
+              <span v-if="tracks[0]?.year" class="text-base-content/30">
+                · {{ tracks[0].year }}</span
+              >
             </p>
-            <p class="text-xs text-base-content/40 mt-1">{{ tracks.length }} tracks</p>
+            <p class="text-xs text-base-content/40 mt-1">
+              {{ tracks.length }} tracks
+            </p>
           </div>
           <!-- Download all -->
           <button
@@ -57,7 +71,10 @@
             v-for="(song, index) in tracks"
             :key="song.song_id || index"
             class="surface rounded-2xl flex items-center gap-3 p-3 transition-all"
-            :class="{ 'ring-1 ring-primary/30': currentTrack?.song_id === song.song_id && isPlaying }"
+            :class="{
+              'ring-1 ring-primary/30':
+                currentTrack?.song_id === song.song_id && isPlaying,
+            }"
           >
             <!-- Cover (single track view shows larger) -->
             <div
@@ -82,13 +99,17 @@
               <button
                 v-if="song.preview_url || embedUrlFor(song)"
                 class="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 hover:opacity-100 transition-opacity"
-                :class="{ 'opacity-100': currentTrack?.song_id === song.song_id }"
+                :class="{
+                  'opacity-100': currentTrack?.song_id === song.song_id,
+                }"
                 @click="togglePlay(song)"
               >
                 <Icon
-                  :icon="currentTrack?.song_id === song.song_id && isPlaying
-                    ? 'clarity:pause-solid'
-                    : 'clarity:play-solid'"
+                  :icon="
+                    currentTrack?.song_id === song.song_id && isPlaying
+                      ? 'clarity:pause-solid'
+                      : 'clarity:play-solid'
+                  "
                   class="h-6 w-6 text-white drop-shadow"
                 />
               </button>
@@ -97,15 +118,29 @@
             <!-- Info -->
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2 mb-0.5">
-                <span class="font-semibold truncate text-sm">{{ song.name }}</span>
-                <span v-if="song.explicit" class="badge-error-soft shrink-0 text-xs">E</span>
+                <span class="font-semibold truncate text-sm">{{
+                  song.name
+                }}</span>
+                <span
+                  v-if="song.explicit"
+                  class="badge-error-soft shrink-0 text-xs"
+                  >E</span
+                >
               </div>
-              <p class="text-xs text-base-content/60 truncate">{{ artistsOf(song) }}</p>
-              <p v-if="type !== 'track' && song.album_name" class="text-xs text-base-content/40 truncate">
+              <p class="text-xs text-base-content/60 truncate">
+                {{ artistsOf(song) }}
+              </p>
+              <p
+                v-if="type !== 'track' && song.album_name"
+                class="text-xs text-base-content/40 truncate"
+              >
                 {{ song.album_name }}
               </p>
               <!-- No preview notice -->
-              <p v-if="!song.preview_url && !embedUrlFor(song)" class="text-xs text-base-content/30 mt-0.5 italic">
+              <p
+                v-if="!song.preview_url && !embedUrlFor(song)"
+                class="text-xs text-base-content/30 mt-0.5 italic"
+              >
                 No playable preview available
               </p>
             </div>
@@ -146,7 +181,6 @@
             </div>
           </li>
         </ul>
-
       </template>
     </div>
 
@@ -166,7 +200,9 @@
         <!-- Info -->
         <div class="flex-1 min-w-0">
           <p class="text-sm font-semibold truncate">{{ currentTrack.name }}</p>
-          <p class="text-xs text-base-content/60 truncate">{{ artistsOf(currentTrack) }}</p>
+          <p class="text-xs text-base-content/60 truncate">
+            {{ artistsOf(currentTrack) }}
+          </p>
         </div>
 
         <!-- Progress -->
@@ -174,7 +210,10 @@
           v-if="currentTrack.preview_url"
           class="hidden sm:flex flex-1 items-center gap-2 max-w-sm"
         >
-          <span class="text-xs text-base-content/40 tabular-nums w-8 text-right">{{ formatDuration(Math.floor(audioProgress)) }}</span>
+          <span
+            class="text-xs text-base-content/40 tabular-nums w-8 text-right"
+            >{{ formatDuration(Math.floor(audioProgress)) }}</span
+          >
           <input
             type="range"
             min="0"
@@ -183,7 +222,9 @@
             class="flex-1 h-1 accent-primary cursor-pointer"
             @input="seek($event.target.value)"
           />
-          <span class="text-xs text-base-content/40 tabular-nums w-8">{{ formatDuration(Math.floor(audioDuration)) }}</span>
+          <span class="text-xs text-base-content/40 tabular-nums w-8">{{
+            formatDuration(Math.floor(audioDuration))
+          }}</span>
         </div>
         <div
           v-else-if="currentEmbedUrl"
@@ -288,7 +329,8 @@ onMounted(async () => {
     type.value = res.data.type
     tracks.value = res.data.tracks || []
   } catch (err) {
-    error.value = err?.response?.data?.detail || err.message || 'Failed to load preview.'
+    error.value =
+      err?.response?.data?.detail || err.message || 'Failed to load preview.'
   } finally {
     loading.value = false
   }
@@ -347,7 +389,7 @@ function downloadOne(song) {
 
 const allQueued = ref(false)
 function downloadAll() {
-  tracks.value.forEach(song => dm.queue(song))
+  tracks.value.forEach((song) => dm.queue(song))
   allQueued.value = true
   router.push({ name: 'Download' })
 }
@@ -362,7 +404,8 @@ function downloadState(song) {
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function artistsOf(song) {
-  if (Array.isArray(song.artists) && song.artists.length) return song.artists.join(', ')
+  if (Array.isArray(song.artists) && song.artists.length)
+    return song.artists.join(', ')
   return song.artist || 'Unknown Artist'
 }
 
@@ -386,7 +429,11 @@ function embedUrlFor(song) {
     song.song_id ||
     song.url.match(/[?&]v=([A-Za-z0-9_-]{6,})/)?.[1] ||
     song.url.match(/youtu\.be\/([A-Za-z0-9_-]{6,})/)?.[1]
-  if (song.source === 'youtube' && youtubeId && !String(youtubeId).startsWith('album:')) {
+  if (
+    song.source === 'youtube' &&
+    youtubeId &&
+    !String(youtubeId).startsWith('album:')
+  ) {
     return `https://www.youtube.com/embed/${youtubeId}`
   }
   return ''

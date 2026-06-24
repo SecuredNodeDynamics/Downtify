@@ -25,110 +25,110 @@
         <DownloadCounterPill />
 
         <div class="flex items-center gap-1 sm:gap-2">
-        <button
-          class="icon-btn"
-          :class="{ 'icon-btn-active': route.name === 'List' }"
-          @click="router.push({ name: 'List' })"
-          :title="t('nav.library')"
-        >
-          <Icon icon="clarity:library-line" class="h-5 w-5" />
-        </button>
+          <button
+            class="icon-btn"
+            :class="{ 'icon-btn-active': route.name === 'List' }"
+            @click="router.push({ name: 'List' })"
+            :title="t('nav.library')"
+          >
+            <Icon icon="clarity:library-line" class="h-5 w-5" />
+          </button>
 
-        <button
-          class="icon-btn"
-          :class="{ 'icon-btn-active': route.name === 'Player' }"
-          @click="router.push({ name: 'Player' })"
-          :title="t('nav.player')"
-        >
-          <Icon icon="clarity:headphones-line" class="h-5 w-5" />
-        </button>
+          <button
+            class="icon-btn"
+            :class="{ 'icon-btn-active': route.name === 'Player' }"
+            @click="router.push({ name: 'Player' })"
+            :title="t('nav.player')"
+          >
+            <Icon icon="clarity:headphones-line" class="h-5 w-5" />
+          </button>
 
-        <button
-          class="icon-btn"
-          :class="{ 'icon-btn-active': route.name === 'Monitor' }"
-          @click="router.push({ name: 'Monitor' })"
-          :title="t('nav.monitor')"
-        >
-          <Icon icon="clarity:eye-line" class="h-5 w-5" />
-        </button>
+          <button
+            class="icon-btn"
+            :class="{ 'icon-btn-active': route.name === 'Monitor' }"
+            @click="router.push({ name: 'Monitor' })"
+            :title="t('nav.monitor')"
+          >
+            <Icon icon="clarity:eye-line" class="h-5 w-5" />
+          </button>
 
-        <button
-          class="icon-btn"
-          :class="{ 'icon-btn-active': route.name === 'Health' }"
-          @click="router.push({ name: 'Health' })"
-          :title="t('nav.health')"
-        >
-          <Icon icon="clarity:info-standard-line" class="h-5 w-5" />
-        </button>
+          <button
+            class="icon-btn"
+            :class="{ 'icon-btn-active': route.name === 'Health' }"
+            @click="router.push({ name: 'Health' })"
+            :title="t('nav.health')"
+          >
+            <Icon icon="clarity:info-standard-line" class="h-5 w-5" />
+          </button>
 
-        <button
-          class="icon-btn"
-          :class="{ 'icon-btn-active': route.name === 'Metadata' }"
-          @click="router.push({ name: 'Metadata' })"
-          :title="t('nav.metadata')"
-        >
-          <Icon icon="clarity:tag-line" class="h-5 w-5" />
-        </button>
+          <button
+            class="icon-btn"
+            :class="{ 'icon-btn-active': route.name === 'Metadata' }"
+            @click="router.push({ name: 'Metadata' })"
+            :title="t('nav.metadata')"
+          >
+            <Icon icon="clarity:tag-line" class="h-5 w-5" />
+          </button>
 
-        <button
-          class="icon-btn"
-          :class="{ 'icon-btn-active': route.name === 'Download' }"
-          @click="
-            route.name === 'Download'
-              ? router.push({
-                  name: 'Search',
-                  params: { query: sm.searchTerm.value || ' ' },
-                })
-              : router.push({ name: 'Download' })
-          "
-          :title="t('nav.queue')"
-        >
-          <Icon icon="clarity:download-line" class="h-5 w-5" />
-        </button>
+          <button
+            class="icon-btn"
+            :class="{ 'icon-btn-active': route.name === 'Download' }"
+            @click="
+              route.name === 'Download'
+                ? router.push({
+                    name: 'Search',
+                    params: { query: sm.searchTerm.value || ' ' },
+                  })
+                : router.push({ name: 'Download' })
+            "
+            :title="t('nav.queue')"
+          >
+            <Icon icon="clarity:download-line" class="h-5 w-5" />
+          </button>
 
-        <button
-          v-if="route.name === 'Health'"
-          class="icon-btn"
-          :title="t('common.refresh')"
-          :disabled="healthRefreshLoading"
-          @click="refreshHealth()"
-        >
-          <span
-            v-if="healthRefreshLoading"
-            class="loading loading-spinner loading-sm text-primary"
-          />
-          <Icon v-else icon="clarity:refresh-line" class="h-5 w-5" />
-        </button>
+          <button
+            v-if="route.name === 'Health'"
+            class="icon-btn"
+            :title="t('common.refresh')"
+            :disabled="healthRefreshLoading"
+            @click="refreshHealth()"
+          >
+            <span
+              v-if="healthRefreshLoading"
+              class="loading loading-spinner loading-sm text-primary"
+            />
+            <Icon v-else icon="clarity:refresh-line" class="h-5 w-5" />
+          </button>
 
-        <button
-          class="icon-btn"
-          @click="
-            themeMgr.setTheme(
-              themeMgr.currentTheme.value === 'dark' ? 'light' : 'dark'
-            )
-          "
-          :title="
-            themeMgr.currentTheme.value === 'dark'
-              ? t('nav.switchToLight')
-              : t('nav.switchToDark')
-          "
-        >
-          <Icon
-            v-if="themeMgr.currentTheme.value === 'dark'"
-            icon="clarity:sun-line"
-            class="h-5 w-5"
-          />
-          <Icon v-else icon="clarity:moon-line" class="h-5 w-5" />
-        </button>
+          <button
+            class="icon-btn"
+            @click="
+              themeMgr.setTheme(
+                themeMgr.currentTheme.value === 'dark' ? 'light' : 'dark'
+              )
+            "
+            :title="
+              themeMgr.currentTheme.value === 'dark'
+                ? t('nav.switchToLight')
+                : t('nav.switchToDark')
+            "
+          >
+            <Icon
+              v-if="themeMgr.currentTheme.value === 'dark'"
+              icon="clarity:sun-line"
+              class="h-5 w-5"
+            />
+            <Icon v-else icon="clarity:moon-line" class="h-5 w-5" />
+          </button>
 
-        <button
-          type="button"
-          class="icon-btn cursor-pointer"
-          :title="t('nav.settings')"
-          @click="openSettingsModal()"
-        >
-          <Icon icon="clarity:cog-line" class="h-5 w-5" />
-        </button>
+          <button
+            type="button"
+            class="icon-btn cursor-pointer"
+            :title="t('nav.settings')"
+            @click="openSettingsModal()"
+          >
+            <Icon icon="clarity:cog-line" class="h-5 w-5" />
+          </button>
         </div>
       </div>
     </div>
@@ -156,5 +156,6 @@ const themeMgr = useBinaryThemeManager({
 })
 const sm = useSearchManager()
 const { t } = useI18n()
-const { loading: healthRefreshLoading, refresh: refreshHealth } = useHealthRefresh()
+const { loading: healthRefreshLoading, refresh: refreshHealth } =
+  useHealthRefresh()
 </script>

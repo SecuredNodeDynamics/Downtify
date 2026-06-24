@@ -1,4 +1,3 @@
-from downtify import artist_art
 from downtify import artist_image_options as options
 from downtify.metadata_repair import artist_search_names
 

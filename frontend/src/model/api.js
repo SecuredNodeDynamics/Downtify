@@ -216,7 +216,7 @@ function applyArtistImage(item, selection = {}) {
       image_url: selection.image_url || '',
       selected_option_id: selection.id || '',
     },
-    { timeout: 120000 },
+    { timeout: 120000 }
   )
 }
 
@@ -252,7 +252,9 @@ function coverFolderURL(folderPath) {
   const folder = String(folderPath || '').trim()
   if (!folder) return ''
   return apiAssetUrl(
-    `/api/metadata/artist-images/folder-preview?${new URLSearchParams({ folder })}`
+    `/api/metadata/artist-images/folder-preview?${new URLSearchParams({
+      folder,
+    })}`
   )
 }
 
@@ -374,7 +376,9 @@ function apiAssetUrl(path) {
   if (!value) return ''
   if (/^https?:\/\//i.test(value)) return value
   if (isCapacitorNative() || usesCustomServerUrl()) {
-    return `${buildApiBaseUrl(getServerConfig())}${value.startsWith('/') ? value : `/${value}`}`
+    return `${buildApiBaseUrl(getServerConfig())}${
+      value.startsWith('/') ? value : `/${value}`
+    }`
   }
   return value.startsWith('/') ? value : `/${value}`
 }

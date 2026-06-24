@@ -14,82 +14,82 @@
         <DownloadCounterPill />
 
         <div class="flex items-center gap-1 sm:gap-2">
-        <button
-          class="icon-btn"
-          @click="router.push({ name: 'List' })"
-          :title="t('nav.library')"
-        >
-          <Icon icon="clarity:library-line" class="h-5 w-5" />
-        </button>
+          <button
+            class="icon-btn"
+            @click="router.push({ name: 'List' })"
+            :title="t('nav.library')"
+          >
+            <Icon icon="clarity:library-line" class="h-5 w-5" />
+          </button>
 
-        <button
-          class="icon-btn"
-          @click="router.push({ name: 'Player' })"
-          :title="t('nav.player')"
-        >
-          <Icon icon="clarity:headphones-line" class="h-5 w-5" />
-        </button>
+          <button
+            class="icon-btn"
+            @click="router.push({ name: 'Player' })"
+            :title="t('nav.player')"
+          >
+            <Icon icon="clarity:headphones-line" class="h-5 w-5" />
+          </button>
 
-        <button
-          class="icon-btn"
-          @click="router.push({ name: 'Monitor' })"
-          :title="t('nav.monitor')"
-        >
-          <Icon icon="clarity:eye-line" class="h-5 w-5" />
-        </button>
+          <button
+            class="icon-btn"
+            @click="router.push({ name: 'Monitor' })"
+            :title="t('nav.monitor')"
+          >
+            <Icon icon="clarity:eye-line" class="h-5 w-5" />
+          </button>
 
-        <button
-          class="icon-btn"
-          @click="router.push({ name: 'Health' })"
-          :title="t('nav.health')"
-        >
-          <Icon icon="clarity:info-standard-line" class="h-5 w-5" />
-        </button>
+          <button
+            class="icon-btn"
+            @click="router.push({ name: 'Health' })"
+            :title="t('nav.health')"
+          >
+            <Icon icon="clarity:info-standard-line" class="h-5 w-5" />
+          </button>
 
-        <button
-          class="icon-btn"
-          @click="router.push({ name: 'Metadata' })"
-          :title="t('nav.metadata')"
-        >
-          <Icon icon="clarity:tag-line" class="h-5 w-5" />
-        </button>
+          <button
+            class="icon-btn"
+            @click="router.push({ name: 'Metadata' })"
+            :title="t('nav.metadata')"
+          >
+            <Icon icon="clarity:tag-line" class="h-5 w-5" />
+          </button>
 
-        <button
-          class="icon-btn"
-          @click="router.push({ name: 'Download' })"
-          :title="t('nav.queue')"
-        >
-          <Icon icon="clarity:download-line" class="h-5 w-5" />
-        </button>
+          <button
+            class="icon-btn"
+            @click="router.push({ name: 'Download' })"
+            :title="t('nav.queue')"
+          >
+            <Icon icon="clarity:download-line" class="h-5 w-5" />
+          </button>
 
-        <button
-          class="icon-btn"
-          @click="
-            themeMgr.setTheme(
-              themeMgr.currentTheme.value === 'dark' ? 'light' : 'dark'
-            )
-          "
-          :title="
-            themeMgr.currentTheme.value === 'dark'
-              ? t('nav.switchToLight')
-              : t('nav.switchToDark')
-          "
-        >
-          <Icon
-            v-if="themeMgr.currentTheme.value === 'dark'"
-            icon="clarity:sun-line"
-            class="h-5 w-5"
-          />
-          <Icon v-else icon="clarity:moon-line" class="h-5 w-5" />
-        </button>
-        <button
-          type="button"
-          class="icon-btn cursor-pointer"
-          :title="t('nav.settings')"
-          @click="openSettingsModal()"
-        >
-          <Icon icon="clarity:cog-line" class="h-5 w-5" />
-        </button>
+          <button
+            class="icon-btn"
+            @click="
+              themeMgr.setTheme(
+                themeMgr.currentTheme.value === 'dark' ? 'light' : 'dark'
+              )
+            "
+            :title="
+              themeMgr.currentTheme.value === 'dark'
+                ? t('nav.switchToLight')
+                : t('nav.switchToDark')
+            "
+          >
+            <Icon
+              v-if="themeMgr.currentTheme.value === 'dark'"
+              icon="clarity:sun-line"
+              class="h-5 w-5"
+            />
+            <Icon v-else icon="clarity:moon-line" class="h-5 w-5" />
+          </button>
+          <button
+            type="button"
+            class="icon-btn cursor-pointer"
+            :title="t('nav.settings')"
+            @click="openSettingsModal()"
+          >
+            <Icon icon="clarity:cog-line" class="h-5 w-5" />
+          </button>
         </div>
       </div>
     </div>

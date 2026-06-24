@@ -453,8 +453,7 @@ export default {
     serverRequiredHint:
       'The mobile app needs your server address before it can load queue, health, and other server data. Open Settings → API and enter your home IP or tunnel URL.',
     serverUrl: 'Server address',
-    serverUrlPlaceholder:
-      'https://downtify.example.com or 192.168.1.50:8765',
+    serverUrlPlaceholder: 'https://downtify.example.com or 192.168.1.50:8765',
     serverUrlCurrent: 'Connected to',
     serverUrlDefault: 'This page (same host)',
     serverTest: 'Test connection',

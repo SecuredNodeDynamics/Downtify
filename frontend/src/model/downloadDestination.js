@@ -247,9 +247,7 @@ async function writeBlobToFolder(relativePath, blob) {
   if (!segments.length) return false
 
   const fileName = segments.pop()
-  const dir = segments.length
-    ? await ensureDirHandle(handle, segments)
-    : handle
+  const dir = segments.length ? await ensureDirHandle(handle, segments) : handle
   const fileHandle = await dir.getFileHandle(fileName, { create: true })
   const writable = await fileHandle.createWritable()
   await writable.write(blob)

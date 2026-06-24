@@ -26,12 +26,12 @@ run:
 	uv run python main.py web
 
 format:
-	uv run ruff format .; ruff check . --fix
-	prettier --write frontend/src/.
+	uv run ruff format .; uv run ruff check . --fix
+	./frontend/node_modules/.bin/prettier --write frontend/src/.
 
 lint:
-	prettier --check frontend/src/.
-	uv run ruff check .; ruff check . --diff
+	./frontend/node_modules/.bin/prettier --check frontend/src/.
+	uv run ruff check .; uv run ruff check . --diff
 
 export:
 	uv export --no-hashes --no-dev -o requirements.txt
@@ -57,8 +57,8 @@ version:
 	node version.js $$VERSION
 	npm install --prefix frontend
 	npm run build --prefix frontend
-	uv run ruff format .; ruff check . --fix
-	prettier --write frontend/src/.
+	uv run ruff format .; uv run ruff check . --fix
+	./frontend/node_modules/.bin/prettier --write frontend/src/.
 
 doc:
 	uv run zensical serve

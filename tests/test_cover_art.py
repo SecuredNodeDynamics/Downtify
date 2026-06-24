@@ -1,4 +1,3 @@
-from pathlib import Path
 
 from downtify.cover_art import resolve_cover_bytes
 

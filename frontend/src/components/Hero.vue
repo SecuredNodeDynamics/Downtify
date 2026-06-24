@@ -20,7 +20,9 @@
         </div>
       </div>
 
-      <h1 class="text-balance text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight">
+      <h1
+        class="text-balance text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight"
+      >
         Down<span class="text-primary">tify</span>
       </h1>
       <div class="mt-3 flex items-center justify-center gap-2">

@@ -1,6 +1,8 @@
 <template>
   <StarField />
-  <div class="app-shell flex min-h-dvh flex-col overflow-x-hidden text-base-content lg:min-h-dvh lg:overflow-visible">
+  <div
+    class="app-shell flex min-h-dvh flex-col overflow-x-hidden text-base-content lg:min-h-dvh lg:overflow-visible"
+  >
     <MobileAppBar />
     <main class="mobile-main flex-1 overflow-x-hidden">
       <router-view v-slot="{ Component, route }">
@@ -46,7 +48,10 @@ onMounted(async () => {
           return
         }
       }
-      if (window.history.length > 1 && router.currentRoute.value.name !== 'Home') {
+      if (
+        window.history.length > 1 &&
+        router.currentRoute.value.name !== 'Home'
+      ) {
         router.back()
         return
       }
@@ -61,9 +66,7 @@ onMounted(async () => {
 <style>
 .page-enter-active,
 .page-leave-active {
-  transition:
-    opacity 0.25s ease,
-    transform 0.25s ease;
+  transition: opacity 0.25s ease, transform 0.25s ease;
 }
 .page-enter-from,
 .page-leave-to {

@@ -16,10 +16,11 @@ const STATUS = {
 
 const downloadQueue = ref([])
 const historyRevision = ref(0)
-const activeDownloadCount = computed(() =>
-  downloadQueue.value.filter(
-    (item) => !item.isDownloaded() && !item.isErrored()
-  ).length
+const activeDownloadCount = computed(
+  () =>
+    downloadQueue.value.filter(
+      (item) => !item.isDownloaded() && !item.isErrored()
+    ).length
 )
 
 class DownloadItem {
@@ -102,7 +103,10 @@ export function useProgressTracker() {
 const progressTracker = useProgressTracker()
 
 function maybeSaveToLocalMachine(item) {
-  if (!item?.web_download_url || downloadDestination.destination.value !== 'local') {
+  if (
+    !item?.web_download_url ||
+    downloadDestination.destination.value !== 'local'
+  ) {
     return
   }
   downloadDestination

@@ -14,7 +14,9 @@
       </div>
 
       <!-- Add form -->
-      <div class="surface rounded-2xl p-4 sm:p-5 mb-6 sm:mb-8 min-w-0 overflow-hidden">
+      <div
+        class="surface rounded-2xl p-4 sm:p-5 mb-6 sm:mb-8 min-w-0 overflow-hidden"
+      >
         <h2
           class="text-sm font-semibold uppercase tracking-wider text-base-content/50 mb-4"
         >
@@ -171,7 +173,9 @@
           </div>
 
           <!-- Actions -->
-          <div class="flex flex-wrap items-center justify-end gap-2 shrink-0 w-full sm:w-auto">
+          <div
+            class="flex flex-wrap items-center justify-end gap-2 shrink-0 w-full sm:w-auto"
+          >
             <!-- Interval selector -->
             <select
               :value="pl.interval_minutes"
@@ -349,14 +353,20 @@ function formatInterval(minutes) {
   if (minutes < 1440) return `${minutes / 60} ${t('monitor.hourSuffix')}`
   if (minutes < 10080) {
     const days = minutes / 1440
-    return `${days} ${days === 1 ? t('monitor.daySuffix') : t('monitor.daysSuffix')}`
+    return `${days} ${
+      days === 1 ? t('monitor.daySuffix') : t('monitor.daysSuffix')
+    }`
   }
   if (minutes < 43200) {
     const weeks = minutes / 10080
-    return `${weeks} ${weeks === 1 ? t('monitor.weekSuffix') : t('monitor.weeksSuffix')}`
+    return `${weeks} ${
+      weeks === 1 ? t('monitor.weekSuffix') : t('monitor.weeksSuffix')
+    }`
   }
   const months = Math.round(minutes / 43200)
-  return `${months} ${months === 1 ? t('monitor.monthSuffix') : t('monitor.monthsSuffix')}`
+  return `${months} ${
+    months === 1 ? t('monitor.monthSuffix') : t('monitor.monthsSuffix')
+  }`
 }
 
 function timeAgo(isoString) {

@@ -4,7 +4,9 @@
 
     <div class="mx-auto max-w-4xl px-4 py-4 sm:py-8 sm:px-6">
       <!-- Header -->
-      <div class="mb-6 sm:mb-8 flex flex-wrap items-end justify-between gap-4 mobile-page-header">
+      <div
+        class="mb-6 sm:mb-8 flex flex-wrap items-end justify-between gap-4 mobile-page-header"
+      >
         <div>
           <h1 class="text-2xl font-bold tracking-tight">
             {{ t('library.title') }}
@@ -222,9 +224,7 @@
           >
             <Icon icon="clarity:angle-line" class="h-4 w-4 rotate-[-90deg]" />
             {{
-              selectedArtist
-                ? t('library.backToAlbums')
-                : t('library.albums')
+              selectedArtist ? t('library.backToAlbums') : t('library.albums')
             }}
           </button>
           <div class="min-w-0 text-right">
@@ -233,7 +233,9 @@
             </h2>
             <p class="truncate text-xs text-base-content/50">
               {{ selectedAlbum.artist }} -
-              {{ t('library.albumMeta', { tracks: selectedAlbum.files.length }) }}
+              {{
+                t('library.albumMeta', { tracks: selectedAlbum.files.length })
+              }}
             </p>
           </div>
         </div>
@@ -241,7 +243,8 @@
         <!-- Album cards -->
         <div
           v-if="
-            (viewMode === 'albums' || (viewMode === 'artists' && selectedArtist)) &&
+            (viewMode === 'albums' ||
+              (viewMode === 'artists' && selectedArtist)) &&
             !selectedAlbum
           "
           class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
@@ -325,7 +328,9 @@
                 img-class="absolute inset-0 h-full w-full object-cover"
               >
                 <template #fallback>
-                  <div class="flex h-full w-full items-center justify-center text-base-content/35">
+                  <div
+                    class="flex h-full w-full items-center justify-center text-base-content/35"
+                  >
                     <Icon icon="clarity:music-note-line" class="h-5 w-5" />
                   </div>
                 </template>
@@ -403,7 +408,7 @@
             page === currentPage
               ? 'bg-primary text-primary-content shadow-glow-sm'
               : page === '…'
-                ? 'cursor-default text-base-content/30'
+              ? 'cursor-default text-base-content/30'
               : 'text-base-content/70 hover:text-base-content hover:bg-white/10'
           "
           :disabled="page === '…'"
@@ -489,8 +494,7 @@ const albums = computed(() => {
       coverFile: album.files[0],
     }))
     .sort(
-      (a, b) =>
-        a.artist.localeCompare(b.artist) || a.name.localeCompare(b.name)
+      (a, b) => a.artist.localeCompare(b.artist) || a.name.localeCompare(b.name)
     )
 })
 
@@ -518,9 +522,7 @@ const artists = computed(() => {
       name: artist.name,
       files: artist.files,
       albumCount: artist.albums.size,
-      albumNames: Array.from(artist.albums).sort((a, b) =>
-        a.localeCompare(b)
-      ),
+      albumNames: Array.from(artist.albums).sort((a, b) => a.localeCompare(b)),
       previewFiles: artist.files.slice(0, 3),
     }))
     .sort((a, b) => a.name.localeCompare(b.name))
@@ -549,7 +551,7 @@ const visibleFiles = computed(() =>
   selectedAlbum.value
     ? selectedAlbum.value.files
     : selectedArtist.value
-      ? selectedArtist.value.files
+    ? selectedArtist.value.files
     : files.value
 )
 
@@ -564,7 +566,7 @@ const totalPages = computed(() => {
   const count = browsingArtists
     ? artists.value.length
     : browsingAlbums || browsingArtistAlbums
-      ? visibleAlbums.value.length
+    ? visibleAlbums.value.length
     : visibleFiles.value.length
   const pageSize =
     browsingArtists || browsingAlbums || browsingArtistAlbums

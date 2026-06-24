@@ -4,9 +4,7 @@
     type="button"
     class="download-counter-pill"
     :class="{ 'download-counter-pill-compact': compact }"
-    :title="
-      t('nav.downloadCounter', { count: pt.activeDownloadCount.value })
-    "
+    :title="t('nav.downloadCounter', { count: pt.activeDownloadCount.value })"
     @click="router.push({ name: 'Download' })"
   >
     <Icon icon="clarity:download-line" class="h-4 w-4 shrink-0" />

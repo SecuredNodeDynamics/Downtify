@@ -1,6 +1,9 @@
 <template>
   <input id="mobile-search-sheet" type="checkbox" class="modal-toggle" />
-  <div class="modal modal-top mobile-search-modal lg:hidden" @click.self="close">
+  <div
+    class="modal modal-top mobile-search-modal lg:hidden"
+    @click.self="close"
+  >
     <div class="modal-box mobile-search-sheet">
       <form class="flex items-center" @submit.prevent="submit">
         <div class="relative min-w-0 flex-1">
@@ -68,7 +71,9 @@ const query = ref('')
 const isPlayerSearch = computed(() => route.name === 'Player')
 
 const placeholder = computed(() =>
-  isPlayerSearch.value ? t('search.libraryPlaceholder') : t('search.placeholder')
+  isPlayerSearch.value
+    ? t('search.libraryPlaceholder')
+    : t('search.placeholder')
 )
 
 const showDownloadIcon = computed(

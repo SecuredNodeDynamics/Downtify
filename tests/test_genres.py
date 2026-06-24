@@ -1,4 +1,3 @@
-from downtify import genres
 from downtify.genres import browse_genre, canonical_genre, pick_genre_from_tags
 
 

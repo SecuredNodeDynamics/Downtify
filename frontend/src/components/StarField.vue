@@ -174,10 +174,9 @@ function draw(now) {
   updateStars(now)
 
   stars.forEach((star) => {
-    const fade =
-      reduceMotion
-        ? 0
-        : (Math.sin(now * star.twinkleSpeed + star.phase) + 1) * 0.5
+    const fade = reduceMotion
+      ? 0
+      : (Math.sin(now * star.twinkleSpeed + star.phase) + 1) * 0.5
     const twinkle = fade * star.twinkle
     const themeAlpha = theme === 'light' ? 0.48 : 0.9
     const alpha = Math.max(0.05, (star.alpha + twinkle) * themeAlpha)

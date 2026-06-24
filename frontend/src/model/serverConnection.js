@@ -102,19 +102,19 @@ function envOrLocation() {
   const hasWindow = typeof window !== 'undefined'
   return {
     PROTOCOL:
-      process.env.PROTOCOL ||
-      (hasWindow ? window.location.protocol : 'http:'),
+      process.env.PROTOCOL || (hasWindow ? window.location.protocol : 'http:'),
     WS_PROTOCOL:
       process.env.WS_PROTOCOL ||
       (hasWindow && window.location.protocol === 'https:' ? 'wss:' : 'ws:'),
     BACKEND:
-      process.env.BACKEND || (hasWindow ? window.location.hostname : 'localhost'),
+      process.env.BACKEND ||
+      (hasWindow ? window.location.hostname : 'localhost'),
     PORT:
       process.env.PORT !== undefined
         ? process.env.PORT
         : hasWindow
-          ? window.location.port
-          : '',
+        ? window.location.port
+        : '',
     BASEURL: process.env.BASEURL || '',
   }
 }
@@ -132,7 +132,9 @@ export function buildApiBaseUrl(cfg = getServerConfig()) {
 
 export function buildWsUrl(cfg, clientId) {
   const port = cfg.PORT ? `:${cfg.PORT}` : ''
-  return `${cfg.WS_PROTOCOL}//${cfg.BACKEND}${port}${cfg.BASEURL || ''}/api/ws?client_id=${clientId}`
+  return `${cfg.WS_PROTOCOL}//${cfg.BACKEND}${port}${
+    cfg.BASEURL || ''
+  }/api/ws?client_id=${clientId}`
 }
 
 export function formatServerDisplay(cfg = getServerConfig()) {
@@ -174,7 +176,10 @@ export function configuredServerBaseUrl() {
   return buildApiBaseUrl(getServerConfig())
 }
 
-export function canSaveServerUrlInput(input, { native = isCapacitorNative() } = {}) {
+export function canSaveServerUrlInput(
+  input,
+  { native = isCapacitorNative() } = {}
+) {
   const trimmed = String(input || '').trim()
   const parsed = parseServerUrl(trimmed)
   if (!parsed) return false

@@ -43,7 +43,8 @@ export default {
   search: {
     placeholder: 'Busca o pega un enlace de Spotify o YouTube Music…',
     libraryPlaceholder: 'Busca tu música descargada…',
-    libraryHint: 'Filtra la cola del reproductor a la música ya en este servidor.',
+    libraryHint:
+      'Filtra la cola del reproductor a la música ya en este servidor.',
     title: 'Resultados de búsqueda',
     matchesFor: 'Mostrando coincidencias para',
     resultsCount: '- {count} resultado',
@@ -56,8 +57,7 @@ export default {
       'Prueba con otra búsqueda — artista + título suele funcionar mejor.',
     emptyAlbums: 'No se encontraron álbumes.',
     emptyTracks: 'No se encontraron pistas.',
-    emptyFilterHint:
-      'Prueba cambiar el filtro de arriba a Ambos u otro tipo.',
+    emptyFilterHint: 'Prueba cambiar el filtro de arriba a Ambos u otro tipo.',
     filterLabel: 'Tipo de resultado',
     filterBoth: 'Ambos',
     filterAlbums: 'Álbumes',
@@ -266,7 +266,8 @@ export default {
     chooseCoverLoadingSlow:
       'Aún buscando en YouTube Music, Discogs y MusicBrainz; puede tardar hasta un minuto.',
     chooseCoverPreviewUnavailable: 'Vista previa no disponible',
-    chooseCoverEmpty: 'No se encontraron opciones de portada para este artista.',
+    chooseCoverEmpty:
+      'No se encontraron opciones de portada para este artista.',
     chooseCoverFailed: 'No se pudieron cargar las opciones de portada.',
     applySelectedCover: 'Aplicar portada seleccionada',
     fixFailed: 'Reparación fallida',
@@ -300,8 +301,7 @@ export default {
     urlPlaceholderPlaylist: 'Pega una URL de lista de Spotify…',
     urlPlaceholderArtist: 'Pega una URL de artista de Spotify…',
     watch: 'Vigilar',
-    failedAdd:
-      'No se pudo añadir. Comprueba la URL e inténtalo de nuevo.',
+    failedAdd: 'No se pudo añadir. Comprueba la URL e inténtalo de nuevo.',
     empty: 'Aún no hay nada vigilado.',
     emptyHint:
       'Pega un enlace de lista o artista de Spotify arriba para empezar.',
@@ -463,8 +463,7 @@ export default {
     serverRequiredHint:
       'La app movil necesita la direccion del servidor antes de cargar cola, salud y otros datos. Abre Ajustes → API e introduce tu IP local o URL del tunel.',
     serverUrl: 'Direccion del servidor',
-    serverUrlPlaceholder:
-      'https://downtify.ejemplo.com o 192.168.1.50:8765',
+    serverUrlPlaceholder: 'https://downtify.ejemplo.com o 192.168.1.50:8765',
     serverUrlCurrent: 'Conectado a',
     serverUrlDefault: 'Esta pagina (mismo host)',
     serverTest: 'Probar conexion',

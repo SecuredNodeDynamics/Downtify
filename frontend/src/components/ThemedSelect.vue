@@ -31,7 +31,9 @@
           :key="option.value"
           type="button"
           class="themed-select-option"
-          :class="{ 'themed-select-option-active': option.value === modelValue }"
+          :class="{
+            'themed-select-option-active': option.value === modelValue,
+          }"
           role="option"
           :aria-selected="option.value === modelValue"
           @click="select(option.value)"

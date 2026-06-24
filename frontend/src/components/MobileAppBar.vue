@@ -49,7 +49,8 @@ import DownloadCounterPill from './DownloadCounterPill.vue'
 
 const route = useRoute()
 const { t } = useI18n()
-const { loading: healthRefreshLoading, refresh: refreshHealth } = useHealthRefresh()
+const { loading: healthRefreshLoading, refresh: refreshHealth } =
+  useHealthRefresh()
 
 const showHealthRefresh = computed(() => route.name === 'Health')
 
