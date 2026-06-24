@@ -415,6 +415,12 @@ export default {
       'The update did not finish in time. The container may still be restarting, or the update may have failed. Check your Docker host or try again.',
     updateHint:
       'Docker installs update in place when the Docker socket is mounted; the app will restart.',
+    updateHintApk:
+      'Downloads the latest APK from GitHub and opens the Android installer.',
+    updateInProgressHintApk:
+      'Downloading the update from GitHub. The Android installer will open when the download finishes.',
+    updateApkInstallerOpened:
+      'Installer opened. Complete the installation on your device, then reopen Downtify.',
     updateError: 'Could not update Downtify.',
     updateFinished: 'Update finished',
     refreshAfterUpdate:

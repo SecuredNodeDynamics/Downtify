@@ -954,7 +954,7 @@
           {{ t('settings.updateApp') }}
         </button>
         <p class="text-xs text-base-content/45">
-          {{ t('settings.updateHint') }}
+          {{ updateHintText }}
         </p>
       </div>
 
@@ -971,7 +971,7 @@
               {{ t('settings.updateInProgress') }}
             </p>
             <p class="mt-1 text-sm text-base-content/70">
-              {{ t('settings.updateInProgressHint') }}
+              {{ updateInProgressHintText }}
             </p>
           </div>
         </div>
@@ -1104,6 +1104,7 @@ import {
 } from '../model/serverConnection'
 import { useI18n } from '../i18n'
 import API from '../model/api'
+import { checkApkUpdate, installApkUpdate } from '../model/apkUpdate'
 import ThemedSelect from './ThemedSelect.vue'
 
 const route = useRoute()
@@ -1313,8 +1314,24 @@ const latestVersionLabel = computed(() => {
 })
 
 const canRunUpdate = computed(() => {
+  if (isCapacitorNative()) {
+    return Boolean(
+      updateStatus.value?.update_available &&
+        updateStatus.value?.apk_download_url
+    )
+  }
   return Boolean(updateStatus.value?.update_available)
 })
+
+const updateHintText = computed(() =>
+  isCapacitorNative() ? t('settings.updateHintApk') : t('settings.updateHint')
+)
+
+const updateInProgressHintText = computed(() =>
+  isCapacitorNative()
+    ? t('settings.updateInProgressHintApk')
+    : t('settings.updateInProgressHint')
+)
 
 const updateStatusIcon = computed(() => {
   if (helpLoading.value) return 'clarity:refresh-line'
@@ -1432,13 +1449,45 @@ async function loadUpdateStatus(refresh = false) {
   helpLoading.value = true
   helpError.value = ''
   try {
+    if (isCapacitorNative()) {
+      updateStatus.value = await checkApkUpdate({ refresh })
+      if (updateStatus.value?.error && !updateStatus.value?.latest_version) {
+        helpError.value = updateStatus.value.error
+      }
+      return
+    }
     const res = await API.check_for_update(refresh)
     updateStatus.value = res.data || null
   } catch (err) {
     helpError.value =
-      err?.response?.data?.detail || t('settings.updateCheckError')
+      err?.response?.data?.detail ||
+      err?.message ||
+      t('settings.updateCheckError')
   } finally {
     helpLoading.value = false
+  }
+}
+
+async function runNativeApkUpdate() {
+  const downloadUrl = updateStatus.value?.apk_download_url
+  if (!downloadUrl) {
+    markUpdateFailed(t('settings.updateError'))
+    return
+  }
+
+  updateWaiting.value = true
+  try {
+    await installApkUpdate(downloadUrl)
+    updateResult.value = {
+      success: true,
+      mode: 'apk',
+      message: t('settings.updateApkInstallerOpened'),
+    }
+  } catch (err) {
+    markUpdateFailed(err?.message || t('settings.updateError'))
+  } finally {
+    updateWaiting.value = false
+    updateRunning.value = false
   }
 }
 
@@ -1448,6 +1497,12 @@ async function runUpdate() {
   updateWaiting.value = false
   updateRunning.value = true
   helpError.value = ''
+
+  if (isCapacitorNative()) {
+    await runNativeApkUpdate()
+    return
+  }
+
   try {
     const res = await API.updateApp()
     const data = res.data || {}

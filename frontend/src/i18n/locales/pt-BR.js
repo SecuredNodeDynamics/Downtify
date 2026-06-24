@@ -422,6 +422,12 @@ export default {
       'A atualizacao nao terminou a tempo. O conteiner pode ainda estar reiniciando ou a atualizacao pode ter falido. Verifique o host Docker ou tente novamente.',
     updateHint:
       'Instalacoes Docker atualizam pelo app quando o socket Docker esta montado; o app sera reiniciado.',
+    updateHintApk:
+      'Baixa o APK mais recente do GitHub e abre o instalador do Android.',
+    updateInProgressHintApk:
+      'Baixando a atualizacao do GitHub. O instalador do Android abrira quando o download terminar.',
+    updateApkInstallerOpened:
+      'Instalador aberto. Conclua a instalacao no dispositivo e abra o Downtify novamente.',
     updateError: 'Nao foi possivel atualizar o Downtify.',
     updateFinished: 'Atualizacao concluida',
     refreshAfterUpdate:

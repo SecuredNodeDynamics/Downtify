@@ -25,7 +25,7 @@ cd android
 ./gradlew assembleDebug
 
 APK_SRC="$FRONTEND/android/app/build/outputs/apk/debug/app-debug.apk"
-APK_DST="$FRONTEND/dist/downtify-${VERSION}-debug.apk"
+APK_DST="$FRONTEND/dist/downtify-${VERSION}.apk"
 
 mkdir -p "$FRONTEND/dist"
 cp "$APK_SRC" "$APK_DST"

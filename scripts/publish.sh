@@ -103,7 +103,7 @@ npm run build --prefix frontend
 echo "==> Building Android APK"
 bash "$ROOT/scripts/build-android-apk.sh"
 
-APK_PATH="frontend/dist/downtify-${VERSION}-debug.apk"
+APK_PATH="frontend/dist/downtify-${VERSION}.apk"
 if [[ ! -f "$APK_PATH" ]]; then
   echo "APK not found: $APK_PATH" >&2
   exit 1

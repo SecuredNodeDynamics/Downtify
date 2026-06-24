@@ -89,7 +89,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          apk="frontend/dist/downtify-${{ steps.version.outputs.version }}-debug.apk"
+          apk="frontend/dist/downtify-${{ steps.version.outputs.version }}.apk"
           test -f "$apk"
           gh release upload "${{ steps.version.outputs.tag }}" "$apk" --clobber
 
@@ -97,6 +97,6 @@ jobs:
         if: github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
-          name: downtify-${{ steps.version.outputs.version }}-debug-apk
-          path: frontend/dist/downtify-${{ steps.version.outputs.version }}-debug.apk
+          name: downtify-${{ steps.version.outputs.version }}-apk
+          path: frontend/dist/downtify-${{ steps.version.outputs.version }}.apk
           if-no-files-found: error
