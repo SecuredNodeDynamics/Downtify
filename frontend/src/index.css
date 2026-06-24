@@ -407,12 +407,13 @@
   }
 
   .settings-tabs-wrap {
-    @apply mb-5 flex justify-center pt-4 sm:pt-5;
+    @apply mb-5 w-full min-w-0 pt-4 sm:pt-5;
   }
 
   .settings-tab-shell {
-    @apply mx-auto flex w-max max-w-full min-w-0 gap-1 overflow-x-auto rounded-2xl border border-white/10 bg-base-100/75 p-1;
+    @apply mx-auto flex w-full max-w-full min-w-0 gap-1 overflow-x-auto rounded-full border border-white/10 bg-base-100/75 p-1;
     -webkit-overflow-scrolling: touch;
+    scroll-padding-inline: 0.75rem;
     scrollbar-width: none;
   }
 
@@ -421,7 +422,7 @@
   }
 
   .settings-tab-btn {
-    @apply shrink-0 rounded-full px-4 py-2.5 text-sm font-medium text-base-content/60 transition-colors hover:text-base-content;
+    @apply shrink-0 rounded-full px-3.5 py-2.5 text-sm font-medium text-base-content/60 transition-colors hover:text-base-content sm:px-4;
   }
 
   .settings-tab-btn-active {
@@ -430,7 +431,7 @@
 
   @media (min-width: 640px) {
     .settings-tab-shell {
-      @apply grid w-max max-w-full grid-cols-5 overflow-visible rounded-full;
+      @apply grid w-full max-w-full grid-cols-5 overflow-visible;
     }
 
     .settings-tab-btn {
@@ -445,7 +446,7 @@
   }
 
   .settings-panel {
-    @apply overflow-hidden;
+    @apply overflow-x-hidden;
   }
 
   #mobile-more-sheet:checked + .modal .modal-backdrop {

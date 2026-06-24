@@ -52,12 +52,12 @@ describe('appUpdate flows', () => {
     expect(usesApkUpdateFlow()).toBe(true)
   })
 
-  it('uses the server/docker update flow when the native app targets a remote server', () => {
+  it('uses the APK update flow when the native app targets a remote server', () => {
     Capacitor.isNativePlatform.mockReturnValue(true)
     setStoredServerUrl('http://10.128.1.63:8000')
 
-    expect(usesServerUpdateFlow()).toBe(true)
-    expect(usesApkUpdateFlow()).toBe(false)
+    expect(usesServerUpdateFlow()).toBe(false)
+    expect(usesApkUpdateFlow()).toBe(true)
     expect(getStoredServerUrl()).toBe('http://10.128.1.63:8000')
   })
 })

@@ -1,9 +1,9 @@
-import { isCapacitorNative, usesCustomServerUrl } from './serverConnection.js'
+import { isCapacitorNative } from './serverConnection.js'
 
 export function usesServerUpdateFlow() {
-  return !isCapacitorNative() || usesCustomServerUrl()
+  return !isCapacitorNative()
 }
 
 export function usesApkUpdateFlow() {
-  return isCapacitorNative() && !usesCustomServerUrl()
+  return isCapacitorNative()
 }

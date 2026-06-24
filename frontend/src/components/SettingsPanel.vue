@@ -1,6 +1,6 @@
 <template>
   <div
-    class="settings-panel surface-strong rounded-2xl sm:rounded-3xl overflow-hidden"
+    class="settings-panel surface-strong rounded-2xl sm:rounded-3xl overflow-x-hidden"
   >
     <!-- Tabs -->
     <div class="settings-tabs-wrap px-4 sm:px-6">
