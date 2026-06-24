@@ -349,6 +349,7 @@ export default {
     pause: 'Pausar vigilancia',
     resume: 'Reanudar vigilancia',
     checkNow: 'Revisar ahora',
+    checkFailed: 'Fallo la revision del monitor.',
     stop: 'Dejar de vigilar',
     applyInterval: 'Aplicar',
     failedApplyInterval: 'No se pudo actualizar la frecuencia de revision.',

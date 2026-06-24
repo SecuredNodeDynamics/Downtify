@@ -548,6 +548,7 @@ import {
 import {
   fetchLibraryItems,
   getInitialLibrarySnapshot,
+  onLibraryChanged,
 } from '/src/model/librarySession'
 import { buildApiBaseUrl, getServerConfig } from '/src/model/serverConnection'
 import { useI18n } from '/src/i18n'
@@ -791,7 +792,7 @@ async function refreshFromHeader() {
   }
 }
 
-async function refresh({ background = false } = {}) {
+async function refresh({ background = false, force = false } = {}) {
   const hadCache = files.value.length > 0 || hydrateLibraryFromSession()
   if (!background) {
     loading.value = !hadCache
@@ -800,7 +801,7 @@ async function refresh({ background = false } = {}) {
   error.value = ''
   try {
     if (background) {
-      const items = await API.refreshLibraryInBackground(false)
+      const items = await API.refreshLibraryInBackground(force)
       if (items.length) applyLibraryData(items)
       return
     }
@@ -957,11 +958,16 @@ function queueOnlineDownload(song) {
   dm.queue(song)
 }
 
+let stopLibraryListener = null
+
 onMounted(() => {
   if (libraryItems.value.length) {
     API.warmLibraryCovers(libraryItems.value)
   }
   void refresh()
+  stopLibraryListener = onLibraryChanged(() => {
+    void refresh({ background: true, force: true })
+  })
 })
 
 onActivated(() => {
@@ -978,6 +984,7 @@ onDeactivated(() => {
 })
 
 onUnmounted(() => {
+  stopLibraryListener?.()
   libraryRefresh.unregister()
 })
 </script>

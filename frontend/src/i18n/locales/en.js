@@ -335,6 +335,7 @@ export default {
     pause: 'Pause monitoring',
     resume: 'Resume monitoring',
     checkNow: 'Check now',
+    checkFailed: 'Monitor check failed.',
     stop: 'Stop monitoring',
     applyInterval: 'Apply',
     failedApplyInterval: 'Failed to update check frequency.',

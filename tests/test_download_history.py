@@ -5,6 +5,50 @@ from datetime import datetime, timedelta, timezone
 from downtify.history import DownloadHistoryDB
 
 
+def test_history_list_orders_newest_completed_first(tmp_path):
+    db = DownloadHistoryDB(tmp_path / 'history.db')
+    first_id = db.create({'name': 'First'}, status='queued')
+    second_id = db.create({'name': 'Second'}, status='queued')
+    third_id = db.create({'name': 'Third'}, status='queued')
+
+    db.mark_done(first_id, 'First.mp3')
+    db.mark_done(second_id, 'Second.mp3')
+    db.mark_done(third_id, 'Third.mp3')
+
+    rows = db.list()
+    assert [row['id'] for row in rows] == [third_id, second_id, first_id]
+    assert [row['title'] for row in rows] == ['Third', 'Second', 'First']
+
+
+def test_history_list_uses_completed_at_over_updated_at(tmp_path):
+    db = DownloadHistoryDB(tmp_path / 'history.db')
+    older_id = db.create({'name': 'Older'}, status='queued')
+    newer_id = db.create({'name': 'Newer'}, status='queued')
+
+    db.mark_done(older_id, 'Older.mp3')
+    db.mark_done(newer_id, 'Newer.mp3')
+
+    older_completed = (
+        datetime.now(timezone.utc) - timedelta(hours=2)
+    ).strftime('%Y-%m-%dT%H:%M:%S.%fZ')
+    newer_completed = (
+        datetime.now(timezone.utc) - timedelta(minutes=5)
+    ).strftime('%Y-%m-%dT%H:%M:%S.%fZ')
+    with db._connect() as conn:
+        conn.execute(
+            'UPDATE download_history SET completed_at = ? WHERE id = ?',
+            (older_completed, older_id),
+        )
+        conn.execute(
+            'UPDATE download_history SET completed_at = ? WHERE id = ?',
+            (newer_completed, newer_id),
+        )
+
+    rows = db.list()
+    assert rows[0]['id'] == newer_id
+    assert rows[1]['id'] == older_id
+
+
 def test_history_records_and_lists_download_attempts(tmp_path):
     db = DownloadHistoryDB(tmp_path / 'history.db')
     song = {

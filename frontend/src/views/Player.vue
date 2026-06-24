@@ -583,6 +583,7 @@ import {
 import {
   fetchLibraryItems,
   getInitialLibrarySnapshot,
+  onLibraryChanged,
 } from '/src/model/librarySession'
 import { usePlayer, formatTime, trackInfoFromFile } from '/src/model/player'
 import {
@@ -628,6 +629,7 @@ const displayProgressPct = computed(() =>
   isScrubbing.value ? scrubPct.value : player.progressPct.value
 )
 let genreRefreshTimers = []
+let stopLibraryListener = null
 
 const unknownGenreLabel = computed(() => t('player.unknownGenre'))
 const libraryGroupOptions = computed(() => ({
@@ -886,9 +888,9 @@ async function applyFetchedLibrary(items) {
   }
 }
 
-async function refreshLibraryMetadataInBackground() {
+async function refreshLibraryMetadataInBackground(force = false) {
   try {
-    const items = await API.refreshLibraryInBackground(false)
+    const items = await API.refreshLibraryInBackground(force)
     if (items.length > 0 && !libraryItemsUnchanged(items)) {
       applyLibraryItems(items)
       scheduleGenreRefresh(items)
@@ -903,15 +905,16 @@ async function refreshLibraryMetadataInBackground() {
 function libraryItemsUnchanged(nextItems) {
   const current = libraryItems.value
   if (nextItems.length !== current.length) return false
-  return nextItems.every((item, index) => {
-    const existing = current[index]
+  const currentByFile = new Map(current.map((item) => [item.file, item]))
+  return nextItems.every((item) => {
+    const existing = currentByFile.get(item.file)
+    if (!existing) return false
     return (
-      existing?.file === item.file &&
-      existing?.title === item.title &&
-      existing?.artist === item.artist &&
-      existing?.album === item.album &&
-      existing?.genre === item.genre &&
-      existing?.browse_genre === item.browse_genre
+      existing.title === item.title &&
+      existing.artist === item.artist &&
+      existing.album === item.album &&
+      existing.genre === item.genre &&
+      existing.browse_genre === item.browse_genre
     )
   })
 }
@@ -1210,6 +1213,9 @@ onMounted(() => {
     API.warmLibraryCovers(libraryItems.value)
   }
   load()
+  stopLibraryListener = onLibraryChanged(() => {
+    void refreshLibraryMetadataInBackground(true)
+  })
 })
 
 onActivated(() => {
@@ -1222,6 +1228,7 @@ onActivated(() => {
 })
 
 onUnmounted(() => {
+  stopLibraryListener?.()
   clearGenreRefreshTimers()
   onSeekEnd()
   if (seekRaf) {

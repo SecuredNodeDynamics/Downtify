@@ -10,7 +10,8 @@ from typing import Any, Optional
 
 
 def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    # Fixed-width UTC timestamps sort correctly as TEXT in SQLite.
+    return datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%fZ')
 
 
 def _song_title(song: dict[str, Any]) -> str:
@@ -93,7 +94,7 @@ class DownloadHistoryDB:
         with self._connect() as conn:
             rows = conn.execute(
                 """SELECT * FROM download_history
-                   ORDER BY updated_at DESC, id DESC
+                   ORDER BY COALESCE(completed_at, updated_at) DESC, id DESC
                    LIMIT ?""",
                 (max(1, min(limit, 500)),),
             ).fetchall()

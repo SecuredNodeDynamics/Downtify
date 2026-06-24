@@ -39,7 +39,10 @@ function deleteMonitoredPlaylist(id) {
 }
 
 function checkMonitoredPlaylist(id) {
-  return API.post(`/api/monitor/playlists/${id}/check`)
+  return API.post(`/api/monitor/playlists/${id}/check`, null, {
+    timeout: 300000,
+    headers: { 'Content-Type': 'application/json' },
+  })
 }
 
 export default {

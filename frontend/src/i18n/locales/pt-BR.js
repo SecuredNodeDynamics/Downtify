@@ -346,6 +346,7 @@ export default {
     pause: 'Pausar monitoramento',
     resume: 'Retomar monitoramento',
     checkNow: 'Verificar agora',
+    checkFailed: 'Falha na verificacao do monitor.',
     stop: 'Parar de monitorar',
     applyInterval: 'Aplicar',
     failedApplyInterval: 'Falha ao atualizar a frequencia de verificacao.',

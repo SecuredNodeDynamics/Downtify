@@ -13,6 +13,7 @@ from loguru import logger
 
 from . import m3u, spotify
 from .downloader import Downloader
+from .library_index import notify_library_changed
 
 MONITOR_LOOP_INTERVAL = 60  # seconds between loop sweeps
 
@@ -353,10 +354,24 @@ async def check_monitored(
                     s, _make_cb(s, pl_name), subdir=pl_subdir
                 ),
             )
-            await asyncio.to_thread(
-                db.mark_track_downloaded, item.id, track_id, filename
-            )
+            try:
+                await asyncio.to_thread(
+                    db.mark_track_downloaded, item.id, track_id, filename
+                )
+            except sqlite3.IntegrityError:
+                logger.warning(
+                    'Monitor item {} removed during check; stopping',
+                    item.id,
+                )
+                return downloaded
             downloaded += 1
+            await broadcast({
+                'song': song,
+                'progress': 100,
+                'message': 'Done',
+                'status': 'done',
+                'filename': filename,
+            })
         except Exception:
             logger.exception('Failed to auto-download track {}', track_id)
 
@@ -366,6 +381,9 @@ async def check_monitored(
         last_checked=_now_iso(),
         last_track_count=len(tracks),
     )
+
+    if downloaded > 0:
+        notify_library_changed()
 
     if downloaded > 0 and (
         settings is None or settings.get('generate_m3u', True)

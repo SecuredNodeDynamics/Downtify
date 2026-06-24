@@ -66,6 +66,7 @@ from .image_proxy import fetch_remote_image, is_allowed_image_url
 from .library_index import (
     list_library_files,
     list_library_files_fast,
+    notify_library_changed,
     warm_library_genres,
 )
 from .monitor import MonitoredPlaylist, PlaylistMonitorDB, check_playlist
@@ -2944,8 +2945,7 @@ async def _run_download(
     job['progress'] = 100
     if history_id is not None and state.history_db is not None:
         state.history_db.mark_done(history_id, filename)
-    invalidate_library_files_cache()
-    schedule_library_files_cache_refresh()
+    library_index.notify_library_changed()
     await state.connections.broadcast({
         'song': song,
         'progress': 100,
@@ -4277,25 +4277,34 @@ async def manual_check_playlist(playlist_id: int) -> dict[str, Any]:
         raise HTTPException(status_code=500, detail='Downloader not ready')
 
     loop = state.loop or asyncio.get_running_loop()
+    try:
+        downloaded = await check_playlist(
+            playlist,
+            db,
+            state.downloader,
+            state.connections.broadcast,
+            loop,
+            state.settings,
+        )
+    except Exception as exc:
+        logger.exception('Manual check failed for playlist {}', playlist_id)
+        raise HTTPException(
+            status_code=502,
+            detail=f'Monitor check failed: {exc}',
+        ) from exc
 
-    async def _run() -> None:
-        try:
-            count = await check_playlist(
-                playlist,  # type: ignore[arg-type]
-                db,
-                state.downloader,  # type: ignore[arg-type]
-                state.connections.broadcast,
-                loop,
-            )
-            logger.info(
-                'Manual check: downloaded {} new track(s) from "{}"',
-                count,
-                playlist.name,
-            )  # type: ignore[union-attr]
-        except Exception:
-            logger.exception(
-                'Manual check failed for playlist {}', playlist_id
-            )
+    updated = await asyncio.to_thread(db.get_playlist, playlist_id)
+    if updated is None:
+        raise HTTPException(
+            status_code=404, detail='Monitored item not found'
+        )
 
-    asyncio.create_task(_run())
-    return {'status': 'check_started', 'id': playlist_id}
+    logger.info(
+        'Manual check: downloaded {} new track(s) from "{}"',
+        downloaded,
+        updated.name,
+    )
+    result = _monitor_playlist_dict(updated, fetch_image=False)
+    result['status'] = 'completed'
+    result['downloaded'] = downloaded
+    return result

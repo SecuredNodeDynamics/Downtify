@@ -25,7 +25,7 @@ from load_dotenv import load_dotenv
 from loguru import logger
 from uvicorn import Config, Server
 
-from downtify import __version__, api, cover_art
+from downtify import __version__, api, cover_art, library_index
 from downtify.downloader import Downloader
 from downtify.history import DownloadHistoryDB
 from downtify.monitor import PlaylistMonitorDB, monitor_loop
@@ -151,6 +151,12 @@ def build_app() -> FastAPI:
     )
     app.include_router(api.router)
 
+    def _on_library_changed() -> None:
+        api.invalidate_library_files_cache()
+        api.schedule_library_files_cache_refresh()
+
+    library_index.register_library_changed_callback(_on_library_changed)
+
     @app.on_event('startup')
     async def _startup() -> None:
         loop = asyncio.get_running_loop()
@@ -205,7 +211,7 @@ def build_app() -> FastAPI:
             full.unlink()
         except Exception as exc:
             return {'deleted': False, 'error': str(exc)}
-        api.invalidate_library_files_cache()
+        library_index.notify_library_changed()
         return {'deleted': True}
 
     def _cover_response(file: str):

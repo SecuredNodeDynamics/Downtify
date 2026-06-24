@@ -455,17 +455,27 @@ async function onApplyInterval(pl) {
 
 async function onCheck(pl) {
   checking.value = { ...checking.value, [pl.id]: true }
+  actionErrors.value = { ...actionErrors.value, [pl.id]: '' }
   try {
-    await monitorAPI.checkMonitoredPlaylist(pl.id)
-    setTimeout(async () => {
-      try {
-        const res = await monitorAPI.listMonitoredPlaylists()
-        setPlaylists(res.data || [])
-      } finally {
-        checking.value = { ...checking.value, [pl.id]: false }
+    const res = await monitorAPI.checkMonitoredPlaylist(pl.id)
+    const data = res.data || {}
+    const { status: _status, downloaded: _downloaded, ...playlist } = data
+    if (playlist.id) {
+      Object.assign(pl, playlist)
+      intervalDrafts.value = {
+        ...intervalDrafts.value,
+        [pl.id]: Number(pl.interval_minutes),
       }
-    }, 3000)
-  } catch {
+    } else {
+      await load()
+    }
+  } catch (err) {
+    actionErrors.value = {
+      ...actionErrors.value,
+      [pl.id]:
+        err?.response?.data?.detail || t('monitor.checkFailed'),
+    }
+  } finally {
     checking.value = { ...checking.value, [pl.id]: false }
   }
 }

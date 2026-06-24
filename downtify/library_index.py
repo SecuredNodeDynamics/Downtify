@@ -215,6 +215,8 @@ def read_library_entry(
     song = _song_from_file_safe(path)
     artist = _artist_name(relative, song) or 'Unknown Artist'
     album = _album_name(relative, song)
+    if not album:
+        album = _album_name_from_tags(path)
     genre = _genre_for_entry(
         path,
         song,
@@ -232,17 +234,42 @@ def read_library_entry(
     }
 
 
+def _album_name_from_tags(path: Path) -> str:
+    try:
+        from mutagen.id3 import ID3
+
+        tags = ID3(str(path))
+        frame = tags.get('TALB')
+        if frame is None:
+            return ''
+        text = getattr(frame, 'text', None)
+        if text:
+            return str(text[0]).strip()
+        return str(frame).strip()
+    except Exception:
+        return ''
+
+
 def read_library_entry_fast(
     root: Path,
     relative: str,
 ) -> dict[str, str]:
-    """Build a browse entry from folder paths only (no tag reads)."""
+    """Build a browse entry from paths, reading tags only when needed."""
 
     path = safe_library_path(root, relative)
-    artist = _artist_name(relative, {}) or 'Unknown Artist'
-    album = _album_name(relative, {})
+    parts = _path_parts(relative)
+    song: dict[str, Any] = {}
+    if len(parts) <= 2:
+        song = _song_from_file_safe(path)
+    artist = _artist_name(relative, song) or 'Unknown Artist'
+    album = _album_name(relative, song)
+    if not album:
+        album = _album_name_from_tags(path)
     stem = path.stem
-    title = stem.split(' - ', 1)[-1].strip() if ' - ' in stem else stem
+    tagged_title = str(song.get('name') or '').strip()
+    title = tagged_title or (
+        stem.split(' - ', 1)[-1].strip() if ' - ' in stem else stem
+    )
     return {
         'file': relative,
         'title': title or stem,
@@ -380,3 +407,18 @@ def schedule_artist_genre_warmup(root: Path) -> None:
     """Warm the artist genre cache for artists missing file tags."""
 
     warm_library_genres(root)
+
+
+_library_changed_callbacks: list[Callable[[], None]] = []
+
+
+def register_library_changed_callback(callback: Callable[[], None]) -> None:
+    _library_changed_callbacks.append(callback)
+
+
+def notify_library_changed() -> None:
+    for callback in list(_library_changed_callbacks):
+        try:
+            callback()
+        except Exception:
+            pass

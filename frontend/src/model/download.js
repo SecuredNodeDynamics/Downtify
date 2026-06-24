@@ -4,6 +4,7 @@ import API from '/src/model/api'
 import { useDownloadDestination } from '/src/model/downloadDestination'
 import { useSettingsManager } from '/src/model/settings'
 import { needsServerConnection } from '/src/model/serverConnection'
+import { notifyLibraryChanged } from '/src/model/librarySession'
 
 const downloadDestination = useDownloadDestination()
 
@@ -135,11 +136,13 @@ API.ws_onmessage((event) => {
       }
       item.setDownloaded()
       historyRevision.value += 1
+      notifyLibraryChanged()
       maybeSaveToLocalMachine(item)
     } else if (data.status === 'error') {
       item.wsUpdate(data)
       item.setError()
       historyRevision.value += 1
+      notifyLibraryChanged()
     } else if (data.status === 'queued') {
       item.message = data.message || ''
     } else {

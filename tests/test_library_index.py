@@ -74,6 +74,25 @@ def test_list_library_files_fast_skips_tag_reads(tmp_path):
     assert items[0]['genre'] == ''
 
 
+def test_list_library_files_fast_reads_album_tags_for_artist_only_paths(tmp_path):
+    artist_dir = tmp_path / 'Alan Silvestri'
+    artist_dir.mkdir(parents=True)
+    path = artist_dir / 'Alan Silvestri - Main Title.mp3'
+    path.write_bytes(b'audio')
+    tags = ID3()
+    tags.add(TIT2(encoding=3, text='Main Title'))
+    tags.add(TPE1(encoding=3, text='Alan Silvestri'))
+    tags.add(TALB(encoding=3, text='Back to the Future'))
+    tags.save(path)
+
+    items = library_index.list_library_files_fast(tmp_path)
+
+    assert len(items) == 1
+    assert items[0]['artist'] == 'Alan Silvestri'
+    assert items[0]['album'] == 'Back to the Future'
+    assert items[0]['title'] == 'Main Title'
+
+
 def test_read_library_entry_rejects_traversal(tmp_path):
     with pytest.raises(ValueError, match='Invalid library path'):
         library_index.read_library_entry(

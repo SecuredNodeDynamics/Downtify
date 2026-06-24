@@ -219,7 +219,7 @@
 
               <ul v-else class="queue-list">
                 <li
-                  v-for="item in history"
+                  v-for="item in sortedHistory"
                   :key="item.id"
                   class="queue-item"
                   :class="{ 'queue-item-playable': canOpenHistoryInPlayer(item) }"
@@ -265,7 +265,7 @@
                         {{ item.artists || t('common.unknownArtist') }}
                       </p>
                       <p class="truncate text-xs text-base-content/40">
-                        {{ formatDate(item.updated_at) }}
+                        {{ formatDate(historyDate(item)) }}
                       </p>
                     </div>
                   </button>
@@ -305,7 +305,7 @@
                         {{ item.artists || t('common.unknownArtist') }}
                       </p>
                       <p class="truncate text-xs text-base-content/40">
-                        {{ formatDate(item.updated_at) }}
+                        {{ formatDate(historyDate(item)) }}
                         <span v-if="item.error">- {{ item.error }}</span>
                       </p>
                     </div>
@@ -347,7 +347,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import API from '../model/api'
@@ -409,6 +409,24 @@ function historyStatusLabel(item) {
   return t('history.queued')
 }
 
+function historyDate(item) {
+  return item.completed_at || item.updated_at || item.created_at || ''
+}
+
+function historySortKey(item) {
+  return historyDate(item)
+}
+
+function sortHistoryItems(items) {
+  return [...items].sort((a, b) => {
+    const cmp = historySortKey(b).localeCompare(historySortKey(a))
+    if (cmp !== 0) return cmp
+    return (b.id || 0) - (a.id || 0)
+  })
+}
+
+const sortedHistory = computed(() => sortHistoryItems(history.value))
+
 function formatDate(value) {
   if (!value) return ''
   try {
@@ -426,7 +444,9 @@ async function refreshHistory() {
   historyError.value = ''
   try {
     const res = await API.getHistory()
-    history.value = Array.isArray(res.data) ? res.data : []
+    history.value = sortHistoryItems(
+      Array.isArray(res.data) ? res.data : []
+    )
   } catch {
     historyError.value = t('history.failedLoad')
   } finally {
@@ -477,6 +497,10 @@ watch(
     refreshHistory()
   }
 )
+
+watch(activeTab, (tab) => {
+  if (tab === 'history') refreshHistory()
+})
 
 onMounted(refreshHistory)
 </script>

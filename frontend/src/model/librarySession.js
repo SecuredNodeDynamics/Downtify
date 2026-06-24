@@ -4,10 +4,32 @@ let cachedServerKey = ''
 let prefetchPromise = null
 let backgroundRefreshPromise = null
 let lastBackgroundRefreshAt = 0
+let libraryRevision = 0
+const libraryChangeListeners = new Set()
 
 const PERSIST_KEY = 'downtify-library-cache-v1'
 const PERSIST_MAX_AGE_MS = 24 * 60 * 60 * 1000
 export const LIBRARY_BACKGROUND_REFRESH_MS = 30_000
+
+export function getLibraryRevision() {
+  return libraryRevision
+}
+
+export function onLibraryChanged(listener) {
+  libraryChangeListeners.add(listener)
+  return () => libraryChangeListeners.delete(listener)
+}
+
+export function notifyLibraryChanged() {
+  libraryRevision += 1
+  for (const listener of libraryChangeListeners) {
+    try {
+      listener(libraryRevision)
+    } catch {
+      // Ignore listener failures.
+    }
+  }
+}
 
 export function getCachedLibraryPaths() {
   return cachedPaths ? [...cachedPaths] : null
