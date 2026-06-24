@@ -446,6 +446,10 @@ state = AppState()
 router = APIRouter()
 
 
+async def _broadcast_history_changed() -> None:
+    await state.connections.broadcast({'event': 'history_changed'})
+
+
 def _load_settings(path: Path) -> dict[str, Any]:
     """Load saved settings from *path*, merging with DEFAULT_SETTINGS as base."""
     try:
@@ -2886,6 +2890,7 @@ async def _run_download(
             job['message'] = 'Already downloaded'
             if history_id is not None and state.history_db is not None:
                 state.history_db.mark_skipped(history_id, existing)
+            await _broadcast_history_changed()
             await state.connections.broadcast({
                 'song': song,
                 'progress': 100,
@@ -2932,6 +2937,7 @@ async def _run_download(
         job['message'] = f'Error: {exc}'
         if history_id is not None and state.history_db is not None:
             state.history_db.mark_error(history_id, str(exc))
+        await _broadcast_history_changed()
         await state.connections.broadcast({
             'song': song,
             'progress': 0,
@@ -2946,6 +2952,7 @@ async def _run_download(
     if history_id is not None and state.history_db is not None:
         state.history_db.mark_done(history_id, filename)
     library_index.notify_library_changed()
+    await _broadcast_history_changed()
     await state.connections.broadcast({
         'song': song,
         'progress': 100,
@@ -2988,6 +2995,7 @@ async def download_endpoint(
     )
     if history_id is not None:
         state.download_jobs[song_id]['history_id'] = history_id
+        await _broadcast_history_changed()
 
     try:
         filename = await _run_download(song, song_id, history_id=history_id)
@@ -3118,6 +3126,9 @@ async def download_batch_endpoint(request: Request) -> dict[str, Any]:
             'status': 'queued',
         })
 
+    if valid_songs:
+        await _broadcast_history_changed()
+
     if not valid_songs:
         raise HTTPException(status_code=400, detail='No valid songs in batch')
 
@@ -3165,9 +3176,10 @@ def list_history(limit: int = Query(100)) -> list[dict[str, Any]]:
 
 
 @router.delete('/api/history')
-def clear_history() -> dict:
+async def clear_history() -> dict:
     if state.history_db is not None:
         state.history_db.clear()
+    await _broadcast_history_changed()
     return {'cleared': True}
 
 

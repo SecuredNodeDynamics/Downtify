@@ -347,7 +347,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onActivated, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import API from '../model/api'
@@ -372,6 +372,8 @@ const history = ref([])
 const historyLoading = ref(false)
 const historyError = ref('')
 const retrying = ref({})
+let historyRefreshTimer = 0
+let historyFetchSeq = 0
 
 function coverSrc(url) {
   return API.mediaUrl(url)
@@ -440,18 +442,33 @@ function formatDate(value) {
 }
 
 async function refreshHistory() {
+  const seq = ++historyFetchSeq
   historyLoading.value = true
   historyError.value = ''
   try {
     const res = await API.getHistory()
+    if (seq !== historyFetchSeq) return
     history.value = sortHistoryItems(
       Array.isArray(res.data) ? res.data : []
     )
   } catch {
+    if (seq !== historyFetchSeq) return
     historyError.value = t('history.failedLoad')
   } finally {
-    historyLoading.value = false
+    if (seq === historyFetchSeq) {
+      historyLoading.value = false
+    }
   }
+}
+
+function scheduleRefreshHistory() {
+  if (historyRefreshTimer) {
+    clearTimeout(historyRefreshTimer)
+  }
+  historyRefreshTimer = setTimeout(() => {
+    historyRefreshTimer = 0
+    void refreshHistory()
+  }, 250)
 }
 
 async function retryHistory(item) {
@@ -494,15 +511,19 @@ function openHistoryInPlayer(item) {
 watch(
   () => pt.historyRevision.value,
   () => {
-    refreshHistory()
+    scheduleRefreshHistory()
   }
 )
 
 watch(activeTab, (tab) => {
-  if (tab === 'history') refreshHistory()
+  if (tab === 'history') void refreshHistory()
 })
 
 onMounted(refreshHistory)
+
+onActivated(() => {
+  void refreshHistory()
+})
 </script>
 
 <style scoped>

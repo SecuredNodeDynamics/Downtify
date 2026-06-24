@@ -68,9 +68,15 @@ class DownloadItem {
 }
 
 export function useProgressTracker() {
+  function songKey(song) {
+    return String(song?.song_id || song?.url || '')
+  }
+
   function _findIndex(song) {
+    const key = songKey(song)
+    if (!key) return -1
     return downloadQueue.value.findIndex(
-      (downloadItem) => downloadItem.song.song_id === song.song_id
+      (downloadItem) => songKey(downloadItem.song) === key
     )
   }
   function appendSong(song) {
@@ -120,6 +126,16 @@ function maybeSaveToLocalMachine(item) {
 API.ws_onmessage((event) => {
   try {
     const data = JSON.parse(event.data)
+    if (data?.event === 'history_changed') {
+      historyRevision.value += 1
+      return
+    }
+
+    const status = data?.status
+    if (status === 'done' || status === 'error' || status === 'queued') {
+      historyRevision.value += 1
+    }
+
     if (!data?.song) return
     let item = progressTracker.getBySong(data.song)
     if (!item) {
@@ -135,13 +151,11 @@ API.ws_onmessage((event) => {
         item.setFilename(data.filename)
       }
       item.setDownloaded()
-      historyRevision.value += 1
       notifyLibraryChanged()
       maybeSaveToLocalMachine(item)
     } else if (data.status === 'error') {
       item.wsUpdate(data)
       item.setError()
-      historyRevision.value += 1
       notifyLibraryChanged()
     } else if (data.status === 'queued') {
       item.message = data.message || ''
@@ -207,7 +221,12 @@ export function useDownloadManager() {
       songs,
       playlist_url: playlistUrl,
       generate_m3u: generateM3u,
-    }).catch((err) => {
+    })
+      .then((res) => {
+        historyRevision.value += 1
+        return res
+      })
+      .catch((err) => {
       console.log('Batch submit failed:', err.message)
     })
   }
@@ -270,6 +289,7 @@ export function useDownloadManager() {
           progressTracker.getBySong(song).setFilename(filename)
           progressTracker.getBySong(song).setDownloaded()
           maybeSaveToLocalMachine(progressTracker.getBySong(song))
+          historyRevision.value += 1
           return { song, filename }
         } else {
           console.log('Error:', res)
