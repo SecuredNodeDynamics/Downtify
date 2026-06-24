@@ -1,6 +1,6 @@
 #!make
 
-DOWNTIFY_VERSION := 2.10.51
+DOWNTIFY_VERSION := 2.10.52
 TARGET := ghcr.io/securednodedynamics/downtify
 
 all: build latest
