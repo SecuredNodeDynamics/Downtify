@@ -329,11 +329,23 @@ const urlPlaceholder = computed(() =>
 )
 
 async function load() {
-  loading.value = true
   loadError.value = ''
+  if (!playlists.value.length) {
+    loading.value = true
+  }
   try {
     const res = await monitorAPI.listMonitoredPlaylists()
     setPlaylists(res.data || [])
+    if (res.fromCache && res.refresh) {
+      loading.value = false
+      try {
+        const fresh = await res.refresh
+        setPlaylists(fresh.data || [])
+      } catch {
+        // Keep the cached list when the live refresh fails.
+      }
+      return
+    }
   } catch (err) {
     loadError.value =
       err?.response?.data?.detail || err?.message || t('monitor.failedLoad')

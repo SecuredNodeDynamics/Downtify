@@ -42,6 +42,21 @@ def test_monitor_db_stores_kind(tmp_path: Path) -> None:
     assert db.get_by_spotify_id('ar456', 'artist') is not None
 
 
+def test_monitor_db_stores_image_url(tmp_path: Path) -> None:
+    db = PlaylistMonitorDB(tmp_path / 'monitor.db')
+    playlist = db.add_playlist(
+        'pl999',
+        'Cover Test',
+        'https://open.spotify.com/playlist/pl999',
+        image_url='https://example.test/cover.jpg',
+    )
+
+    assert playlist.image_url == 'https://example.test/cover.jpg'
+    assert db.list_playlists()[0].to_dict()['image_url'] == (
+        'https://example.test/cover.jpg'
+    )
+
+
 @pytest.mark.asyncio
 async def test_list_monitor_playlists_does_not_block_on_spotify_images(
     tmp_path: Path,
@@ -67,5 +82,6 @@ async def test_list_monitor_playlists_does_not_block_on_spotify_images(
         assert len(payload) == 1
         assert payload[0]['name'] == 'Test Playlist'
         assert payload[0]['kind'] == 'playlist'
+        assert payload[0]['image_url'] == ''
     finally:
         api.state.monitor_db = old_monitor_db

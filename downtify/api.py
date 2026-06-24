@@ -4184,15 +4184,16 @@ def _monitor_item_image_url(kind: str, spotify_id: str) -> str:
 def _monitor_playlist_dict(
     playlist: MonitoredPlaylist,
     *,
-    fetch_image: bool = True,
+    fetch_image: bool = False,
 ) -> dict[str, Any]:
     data = playlist.to_dict()
+    if data.get('image_url') or not fetch_image:
+        return data
     cache_key = f'{playlist.kind}:{playlist.spotify_id}'
-    if fetch_image and cache_key not in _MONITOR_IMAGE_CACHE:
-        _MONITOR_IMAGE_CACHE[cache_key] = _monitor_item_image_url(
-            playlist.kind, playlist.spotify_id
-        )
-    data['image_url'] = _MONITOR_IMAGE_CACHE.get(cache_key, '')
+    image_url = _MONITOR_IMAGE_CACHE.get(cache_key, '')
+    if not image_url:
+        image_url = _monitor_item_image_url(playlist.kind, playlist.spotify_id)
+    data['image_url'] = image_url
     return data
 
 
@@ -4214,42 +4215,13 @@ async def _apply_monitor_playlist_update(
         raise HTTPException(
             status_code=404, detail='Monitored item not found'
         )
-    return await asyncio.to_thread(
-        lambda: _monitor_playlist_dict(updated, fetch_image=False)
-    )
+    return _monitor_playlist_dict(updated, fetch_image=False)
 
 
 @router.get('/api/monitor/playlists')
 async def list_monitor_playlists() -> list[dict[str, Any]]:
     db = _require_monitor_db()
-    playlists = await asyncio.to_thread(db.list_playlists)
-    result = await asyncio.to_thread(
-        lambda: [
-            _monitor_playlist_dict(playlist, fetch_image=False)
-            for playlist in playlists
-        ]
-    )
-    asyncio.create_task(_prefetch_monitor_images(playlists))
-    return result
-
-
-async def _prefetch_monitor_images(playlists: list[MonitoredPlaylist]) -> None:
-    for playlist in playlists:
-        cache_key = f'{playlist.kind}:{playlist.spotify_id}'
-        if cache_key in _MONITOR_IMAGE_CACHE:
-            continue
-        try:
-            await asyncio.to_thread(
-                _monitor_item_image_url,
-                playlist.kind,
-                playlist.spotify_id,
-            )
-        except Exception:
-            logger.opt(exception=True).debug(
-                'Background monitor cover prefetch failed for {} {}',
-                playlist.kind,
-                playlist.spotify_id,
-            )
+    return [playlist.to_dict() for playlist in db.list_playlists()]
 
 
 @router.get('/api/monitor/artists/lookup')
@@ -4320,6 +4292,18 @@ async def add_monitor_playlist(request: Request) -> dict[str, Any]:
         logger.exception('Failed to resolve {} {}', kind, spotify_id)
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
+    image_url = ''
+    try:
+        image_url = await asyncio.to_thread(
+            spotify.embed_image_url, kind, spotify_id
+        )
+    except Exception:
+        logger.opt(exception=True).debug(
+            'Monitor cover lookup failed while adding {} {}',
+            kind,
+            spotify_id,
+        )
+
     playlist = await asyncio.to_thread(
         db.add_playlist,
         spotify_id,
@@ -4327,6 +4311,7 @@ async def add_monitor_playlist(request: Request) -> dict[str, Any]:
         url,
         interval_minutes,
         kind,
+        image_url,
     )
 
     # Kick off the first download pass immediately so the user does not have
@@ -4353,9 +4338,39 @@ async def add_monitor_playlist(request: Request) -> dict[str, Any]:
 
         asyncio.create_task(_initial_check())
 
-    return await asyncio.to_thread(
-        lambda: _monitor_playlist_dict(playlist, fetch_image=False)
-    )
+    return _monitor_playlist_dict(playlist, fetch_image=False)
+
+
+async def backfill_monitor_images_on_startup() -> None:
+    await asyncio.sleep(3)
+    db = state.monitor_db
+    if db is None:
+        return
+    for playlist in db.list_playlists():
+        if playlist.image_url:
+            continue
+        try:
+            image_url = await asyncio.to_thread(
+                spotify.embed_image_url,
+                playlist.kind,
+                playlist.spotify_id,
+            )
+        except Exception:
+            logger.opt(exception=True).debug(
+                'Monitor cover backfill failed for {} {}',
+                playlist.kind,
+                playlist.spotify_id,
+            )
+            continue
+        if not image_url:
+            continue
+        await asyncio.to_thread(
+            db.update_playlist,
+            playlist.id,
+            image_url=image_url,
+        )
+        cache_key = f'{playlist.kind}:{playlist.spotify_id}'
+        _MONITOR_IMAGE_CACHE[cache_key] = image_url
 
 
 @router.patch('/api/monitor/playlists/{playlist_id}')

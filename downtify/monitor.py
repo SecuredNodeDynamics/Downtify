@@ -49,6 +49,7 @@ class MonitoredPlaylist:
     last_checked: Optional[str]
     last_track_count: int
     created_at: str
+    image_url: str = ''
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -103,6 +104,12 @@ class PlaylistMonitorDB:
                 )
             except Exception:
                 pass
+            try:
+                conn.execute(
+                    'ALTER TABLE monitored_playlists ADD COLUMN image_url TEXT NOT NULL DEFAULT \'\''
+                )
+            except Exception:
+                pass
 
     def add_playlist(
         self,
@@ -111,13 +118,23 @@ class PlaylistMonitorDB:
         url: str,
         interval_minutes: int = 60,
         kind: str = 'playlist',
+        image_url: str = '',
     ) -> MonitoredPlaylist:
         with self._connect() as conn:
             cur = conn.execute(
                 """INSERT INTO monitored_playlists
-                   (spotify_id, name, url, kind, interval_minutes, enabled, created_at)
-                   VALUES (?, ?, ?, ?, ?, 1, ?)""",
-                (spotify_id, name, url, kind, interval_minutes, _now_iso()),
+                   (spotify_id, name, url, kind, interval_minutes, enabled,
+                    created_at, image_url)
+                   VALUES (?, ?, ?, ?, ?, 1, ?, ?)""",
+                (
+                    spotify_id,
+                    name,
+                    url,
+                    kind,
+                    interval_minutes,
+                    _now_iso(),
+                    image_url or '',
+                ),
             )
             row = conn.execute(
                 'SELECT * FROM monitored_playlists WHERE id = ?',
@@ -173,6 +190,7 @@ class PlaylistMonitorDB:
             'last_checked',
             'last_track_count',
             'name',
+            'image_url',
         }
         updates = {k: v for k, v in kwargs.items() if k in allowed}
         if not updates:
@@ -233,6 +251,7 @@ def _row_to_playlist(row: sqlite3.Row) -> MonitoredPlaylist:
         last_checked=row['last_checked'],
         last_track_count=row['last_track_count'],
         created_at=row['created_at'],
+        image_url=str(row['image_url'] or '') if 'image_url' in keys else '',
     )
 
 

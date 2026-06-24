@@ -178,6 +178,7 @@ def build_app() -> FastAPI:
             )
         )
         asyncio.create_task(api.reconcile_history_on_startup())
+        asyncio.create_task(api.backfill_monitor_images_on_startup())
         asyncio.create_task(api.start_genre_warmup())
         asyncio.create_task(api.warm_library_files_cache())
 
