@@ -1052,24 +1052,24 @@ def _docker_start_recreate_helper(
     spec = _docker_container_spec(docker, container)
     temp_name = f'{container}-update-{int(datetime.now(timezone.utc).timestamp())}'
     create_command = _docker_build_create_command(
-        docker,
+        'docker',
         spec,
         name=temp_name,
         image=image,
     )
     script = ' && '.join(
         [
-            _shell_join([docker, 'stop', '-t', '15', container]),
+            _shell_join(['docker', 'stop', '-t', '15', container]),
             _shell_join(create_command),
-            f'{_shell_join([docker, "rm", container])} || true',
-            _shell_join([docker, 'rename', temp_name, container]),
-            _shell_join([docker, 'start', container]),
+            f'{_shell_join(["docker", "rm", container])} || true',
+            _shell_join(['docker', 'rename', temp_name, container]),
+            _shell_join(['docker', 'start', container]),
         ]
     )
     helper_image = os.getenv(
         'DOWNTIFY_SELF_UPDATE_RECREATE_IMAGE',
-        'alpine:3.20',
-    ).strip() or 'alpine:3.20'
+        'docker:29-cli',
+    ).strip() or 'docker:29-cli'
     return _run_docker_command(
         [
             docker,
@@ -1080,8 +1080,6 @@ def _docker_start_recreate_helper(
             '--rm',
             '-v',
             '/var/run/docker.sock:/var/run/docker.sock',
-            '-v',
-            f'{docker}:{docker}:ro',
             helper_image,
             'sh',
             '-c',

@@ -675,7 +675,7 @@ def test_docker_self_update_recreates_version_pinned_container(monkeypatch):
     ]
     recreate_cmd = next(cmd for cmd in captured['commands'] if cmd[1] == 'run')
     assert recreate_cmd[:4] == ['/usr/bin/docker', 'run', '-d', '--name']
-    assert 'alpine:3.20' in recreate_cmd
+    assert 'docker:29-cli' in recreate_cmd
     assert 'docker stop -t 15 downtify' in recreate_cmd[-1]
     assert 'ghcr.io/securednodedynamics/downtify:2.10.58' in recreate_cmd[-1]
 
