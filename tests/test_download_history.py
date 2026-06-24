@@ -108,6 +108,23 @@ def test_history_can_mark_duplicate_as_skipped(tmp_path):
     assert row['completed_at'] is not None
 
 
+def test_history_list_excludes_in_progress_rows(tmp_path):
+    db = DownloadHistoryDB(tmp_path / 'history.db')
+    done_id = db.create({'name': 'Finished'}, status='queued')
+    db.mark_done(done_id, 'Finished.mp3')
+
+    for idx in range(120):
+        db.create({'name': f'Pending {idx}'}, status='queued')
+
+    rows = db.list(limit=100, terminal_only=True)
+    assert len(rows) == 1
+    assert rows[0]['id'] == done_id
+    assert rows[0]['status'] == 'done'
+
+    all_rows = db.list(limit=100, terminal_only=False)
+    assert len(all_rows) == 100
+
+
 def test_history_counts_recent_completed_rows(tmp_path):
     db = DownloadHistoryDB(tmp_path / 'history.db')
     done_id = db.create({'name': 'Done'}, status='downloading')

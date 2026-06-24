@@ -8,6 +8,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
+TERMINAL_STATUSES = frozenset({'done', 'skipped', 'error'})
+
 
 def _now_iso() -> str:
     # Fixed-width UTC timestamps sort correctly as TEXT in SQLite.
@@ -90,14 +92,29 @@ class DownloadHistoryDB:
             ).fetchone()
             return _row_to_dict(row) if row else None
 
-    def list(self, limit: int = 100) -> list[dict[str, Any]]:
+    def list(
+        self,
+        limit: int = 100,
+        *,
+        terminal_only: bool = True,
+    ) -> list[dict[str, Any]]:
+        limit = max(1, min(limit, 500))
         with self._connect() as conn:
-            rows = conn.execute(
-                """SELECT * FROM download_history
-                   ORDER BY COALESCE(completed_at, updated_at) DESC, id DESC
-                   LIMIT ?""",
-                (max(1, min(limit, 500)),),
-            ).fetchall()
+            if terminal_only:
+                rows = conn.execute(
+                    """SELECT * FROM download_history
+                       WHERE status IN ('done', 'skipped', 'error')
+                       ORDER BY COALESCE(completed_at, updated_at) DESC, id DESC
+                       LIMIT ?""",
+                    (limit,),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    """SELECT * FROM download_history
+                       ORDER BY COALESCE(completed_at, updated_at) DESC, id DESC
+                       LIMIT ?""",
+                    (limit,),
+                ).fetchall()
             return [_row_to_dict(row) for row in rows]
 
     def mark_running(self, history_id: int) -> None:

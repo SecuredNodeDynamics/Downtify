@@ -459,8 +459,8 @@ function clearQueue() {
   return API.delete('/api/queue')
 }
 
-function getHistory() {
-  return API.get('/api/history')
+function getHistory(limit = 500) {
+  return API.get('/api/history', { params: { limit } })
 }
 
 function retryHistoryItem(historyId) {

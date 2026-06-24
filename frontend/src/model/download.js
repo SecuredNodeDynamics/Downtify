@@ -5,6 +5,10 @@ import { useDownloadDestination } from '/src/model/downloadDestination'
 import { useSettingsManager } from '/src/model/settings'
 import { needsServerConnection } from '/src/model/serverConnection'
 import { notifyLibraryChanged } from '/src/model/librarySession'
+import {
+  notifyDownloadHistory,
+  upsertHistoryItem,
+} from '/src/model/downloadHistory'
 
 const downloadDestination = useDownloadDestination()
 
@@ -16,7 +20,6 @@ const STATUS = {
 }
 
 const downloadQueue = ref([])
-const historyRevision = ref(0)
 const activeQueue = computed(() =>
   [...downloadQueue.value].sort(
     (a, b) => (b.queuedAt || 0) - (a.queuedAt || 0)
@@ -113,7 +116,6 @@ export function useProgressTracker() {
     downloadQueue,
     activeQueue,
     activeDownloadCount,
-    historyRevision,
   }
 }
 
@@ -145,13 +147,20 @@ API.ws_onmessage((event) => {
   try {
     const data = JSON.parse(event.data)
     if (data?.event === 'history_changed') {
-      historyRevision.value += 1
+      if (data.history_item) upsertHistoryItem(data.history_item)
+      notifyDownloadHistory({ immediate: true })
       return
     }
 
+    if (data.history_item) {
+      upsertHistoryItem(data.history_item)
+    }
+
     const status = data?.status
-    if (status === 'done' || status === 'error' || status === 'queued') {
-      historyRevision.value += 1
+    if (status === 'done' || status === 'error') {
+      notifyDownloadHistory({ immediate: true })
+    } else if (status === 'queued') {
+      notifyDownloadHistory()
     }
 
     if (!data?.song) return
@@ -239,7 +248,7 @@ export function useDownloadManager() {
       generate_m3u: generateM3u,
     })
       .then((res) => {
-        historyRevision.value += 1
+        notifyDownloadHistory({ immediate: true })
         return res
       })
       .catch((err) => {
@@ -305,7 +314,7 @@ export function useDownloadManager() {
             item.setFilename(filename)
           }
           completeQueueItem(song, item)
-          historyRevision.value += 1
+          notifyDownloadHistory({ immediate: true })
           return { song, filename }
         } else {
           console.log('Error:', res)
@@ -346,9 +355,11 @@ export function useDownloadManager() {
             it.setFilename(filename)
           }
           completeQueueItem(overriddenSong, it)
+          notifyDownloadHistory({ immediate: true })
           return { song: overriddenSong, filename }
         }
         completeQueueItem(overriddenSong, it)
+        notifyDownloadHistory({ immediate: true })
         return { song: overriddenSong, filename: null }
       })
       .catch((err) => {

@@ -13,6 +13,7 @@ from loguru import logger
 
 from . import m3u, spotify
 from .downloader import Downloader
+from .history import DownloadHistoryDB
 from .library_index import notify_library_changed
 
 MONITOR_LOOP_INTERVAL = 60  # seconds between loop sweeps
@@ -254,6 +255,8 @@ async def check_monitored(
     broadcast: Callable[[dict[str, Any]], Any],
     loop: asyncio.AbstractEventLoop,
     settings: Optional[dict[str, Any]] = None,
+    history_db: Optional[DownloadHistoryDB] = None,
+    history_changed: Optional[Callable[[Optional[int]], Any]] = None,
 ) -> int:
     """Fetch a monitored playlist or artist, download new tracks."""
 
@@ -348,6 +351,13 @@ async def check_monitored(
             return _cb
 
         try:
+            history_id: Optional[int] = None
+            if history_db is not None:
+                history_id = await asyncio.to_thread(
+                    history_db.create, song, 'downloading'
+                )
+                if history_changed is not None:
+                    await history_changed(history_id)
             filename = await loop.run_in_executor(
                 None,
                 lambda s=song: downloader.download(
@@ -364,15 +374,32 @@ async def check_monitored(
                     item.id,
                 )
                 return downloaded
+            if history_id is not None and history_db is not None:
+                await asyncio.to_thread(
+                    history_db.mark_done, history_id, filename
+                )
             downloaded += 1
-            await broadcast({
+            done_payload: dict[str, Any] = {
                 'song': song,
                 'progress': 100,
                 'message': 'Done',
                 'status': 'done',
                 'filename': filename,
-            })
-        except Exception:
+            }
+            if history_id is not None and history_db is not None:
+                item_row = await asyncio.to_thread(history_db.get, history_id)
+                if item_row is not None:
+                    done_payload['history_item'] = item_row
+            await broadcast(done_payload)
+            if history_changed is not None:
+                await history_changed(history_id)
+        except Exception as exc:
+            if history_id is not None and history_db is not None:
+                await asyncio.to_thread(
+                    history_db.mark_error, history_id, str(exc)
+                )
+                if history_changed is not None:
+                    await history_changed(history_id)
             logger.exception('Failed to auto-download track {}', track_id)
 
     await asyncio.to_thread(
@@ -399,10 +426,19 @@ async def check_playlist(
     broadcast: Callable[[dict[str, Any]], Any],
     loop: asyncio.AbstractEventLoop,
     settings: Optional[dict[str, Any]] = None,
+    history_db: Optional[DownloadHistoryDB] = None,
+    history_changed: Optional[Callable[[Optional[int]], Any]] = None,
 ) -> int:
     """Backward-compatible alias for monitored item checks."""
     return await check_monitored(
-        playlist, db, downloader, broadcast, loop, settings
+        playlist,
+        db,
+        downloader,
+        broadcast,
+        loop,
+        settings,
+        history_db=history_db,
+        history_changed=history_changed,
     )
 
 
@@ -451,6 +487,8 @@ async def monitor_loop(
     broadcast: Callable[[dict[str, Any]], Any],
     loop: asyncio.AbstractEventLoop,
     settings: Optional[dict[str, Any]] = None,
+    get_history_db: Optional[Callable[[], Optional[DownloadHistoryDB]]] = None,
+    history_changed: Optional[Callable[[Optional[int]], Any]] = None,
 ) -> None:
     """Background task: sweep all enabled items that are due for checking."""
     while True:
@@ -465,8 +503,18 @@ async def monitor_loop(
                 if downloader is None:
                     continue
                 try:
+                    history_db = (
+                        get_history_db() if get_history_db is not None else None
+                    )
                     count = await check_monitored(
-                        pl, db, downloader, broadcast, loop, settings
+                        pl,
+                        db,
+                        downloader,
+                        broadcast,
+                        loop,
+                        settings,
+                        history_db=history_db,
+                        history_changed=history_changed,
                     )
                     if count > 0:
                         logger.info(

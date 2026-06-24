@@ -64,7 +64,7 @@
             <span class="hidden sm:inline">{{ t('common.refresh') }}</span>
           </button>
           <button
-            v-if="history.length > 0"
+            v-if="sortedHistory.length > 0"
             type="button"
             class="queue-action-btn text-error/70 hover:text-error"
             @click="onClearHistory"
@@ -187,7 +187,10 @@
                 <span>{{ historyError }}</span>
               </div>
 
-              <div v-if="historyLoading && history.length === 0" class="space-y-2">
+              <div
+                v-if="historyLoading && sortedHistory.length === 0"
+                class="space-y-2"
+              >
                 <div
                   v-for="n in 4"
                   :key="n"
@@ -195,7 +198,7 @@
                 />
               </div>
 
-              <div v-else-if="history.length === 0" class="queue-empty">
+              <div v-else-if="sortedHistory.length === 0" class="queue-empty">
                 <Icon
                   icon="clarity:history-line"
                   class="mb-4 h-10 w-10 text-base-content/20"
@@ -338,13 +341,14 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onActivated, watch } from 'vue'
+import { ref, onMounted, onActivated, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import API from '../model/api'
 import CoverImage from './CoverImage.vue'
 import ServerConnectionPrompt from './ServerConnectionPrompt.vue'
 import { useProgressTracker, useDownloadManager } from '../model/download'
+import { useDownloadHistory } from '../model/downloadHistory'
 import {
   canOpenHistoryInPlayer,
   setPlayerNavigation,
@@ -355,13 +359,18 @@ const router = useRouter()
 
 const pt = useProgressTracker()
 const dm = useDownloadManager()
+const {
+  sortedHistory,
+  historyRevision,
+  refreshDownloadHistory,
+  clearDownloadHistoryState,
+  historyDate,
+} = useDownloadHistory()
 const { t } = useI18n()
 const activeTab = ref('queue')
-const history = ref([])
 const historyLoading = ref(false)
 const historyError = ref('')
 const retrying = ref({})
-let historyRefreshTimer = 0
 let historyFetchSeq = 0
 
 function coverSrc(url) {
@@ -400,70 +409,19 @@ function historyStatusLabel(item) {
   return t('history.queued')
 }
 
-function historyDate(item) {
-  return item.completed_at || item.updated_at || item.created_at || ''
-}
-
-function historySortKey(item) {
-  return historyDate(item)
-}
-
-function sortHistoryItems(items) {
-  return [...items].sort((a, b) => {
-    const cmp = historySortKey(b).localeCompare(historySortKey(a))
-    if (cmp !== 0) return cmp
-    return (b.id || 0) - (a.id || 0)
-  })
-}
-
-const sortedHistory = computed(() =>
-  sortHistoryItems(
-    history.value.filter((item) =>
-      ['done', 'skipped', 'error'].includes(item.status)
-    )
-  )
-)
-
-function formatDate(value) {
-  if (!value) return ''
-  try {
-    return new Intl.DateTimeFormat(undefined, {
-      dateStyle: 'medium',
-      timeStyle: 'short',
-    }).format(new Date(value))
-  } catch {
-    return value
-  }
-}
-
 async function refreshHistory() {
   const seq = ++historyFetchSeq
   historyLoading.value = true
   historyError.value = ''
   try {
-    const res = await API.getHistory()
+    const ok = await refreshDownloadHistory()
     if (seq !== historyFetchSeq) return
-    history.value = sortHistoryItems(
-      Array.isArray(res.data) ? res.data : []
-    )
-  } catch {
-    if (seq !== historyFetchSeq) return
-    historyError.value = t('history.failedLoad')
+    if (!ok) historyError.value = t('history.failedLoad')
   } finally {
     if (seq === historyFetchSeq) {
       historyLoading.value = false
     }
   }
-}
-
-function scheduleRefreshHistory() {
-  if (historyRefreshTimer) {
-    clearTimeout(historyRefreshTimer)
-  }
-  historyRefreshTimer = setTimeout(() => {
-    historyRefreshTimer = 0
-    void refreshHistory()
-  }, 250)
 }
 
 async function retryHistory(item) {
@@ -481,7 +439,19 @@ async function retryHistory(item) {
 async function onClearHistory() {
   if (!confirm(t('history.clearPrompt'))) return
   await API.clearHistory()
-  history.value = []
+  clearDownloadHistoryState()
+}
+
+function formatDate(value) {
+  if (!value) return ''
+  try {
+    return new Intl.DateTimeFormat(undefined, {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    }).format(new Date(value))
+  } catch {
+    return value
+  }
 }
 
 function openHistoryInPlayer(item) {
@@ -494,16 +464,16 @@ function openHistoryInPlayer(item) {
   router.push({ name: 'Player' })
 }
 
-watch(
-  () => pt.historyRevision.value,
-  () => {
-    scheduleRefreshHistory()
-  }
-)
-
 watch(activeTab, (tab) => {
   if (tab === 'history') void refreshHistory()
 })
+
+watch(
+  () => historyRevision.value,
+  () => {
+    void refreshHistory()
+  }
+)
 
 onMounted(refreshHistory)
 

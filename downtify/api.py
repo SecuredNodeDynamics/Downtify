@@ -446,8 +446,17 @@ state = AppState()
 router = APIRouter()
 
 
-async def _broadcast_history_changed() -> None:
-    await state.connections.broadcast({'event': 'history_changed'})
+def _history_item_for_ws(history_id: Optional[int]) -> dict[str, Any]:
+    if history_id is None or state.history_db is None:
+        return {}
+    item = state.history_db.get(history_id)
+    return {'history_item': item} if item is not None else {}
+
+
+async def _broadcast_history_changed(history_id: Optional[int] = None) -> None:
+    payload: dict[str, Any] = {'event': 'history_changed'}
+    payload.update(_history_item_for_ws(history_id))
+    await state.connections.broadcast(payload)
 
 
 def _drop_queue_job(song_id: str) -> None:
@@ -2882,6 +2891,9 @@ async def _run_download(
 
     if history_id is None:
         history_id = job.get('history_id')
+    if history_id is None and state.history_db is not None:
+        history_id = state.history_db.create(song, status='downloading')
+        job['history_id'] = history_id
     if history_id is not None and state.history_db is not None:
         state.history_db.mark_running(history_id)
 
@@ -2894,13 +2906,14 @@ async def _run_download(
             job['message'] = 'Already downloaded'
             if history_id is not None and state.history_db is not None:
                 state.history_db.mark_skipped(history_id, existing)
-            await _broadcast_history_changed()
+            await _broadcast_history_changed(history_id)
             await state.connections.broadcast({
                 'song': song,
                 'progress': 100,
                 'message': 'Already downloaded',
                 'status': 'done',
                 'filename': existing,
+                **_history_item_for_ws(history_id),
             })
             _drop_queue_job(song_id)
             return existing
@@ -2942,12 +2955,13 @@ async def _run_download(
         job['message'] = f'Error: {exc}'
         if history_id is not None and state.history_db is not None:
             state.history_db.mark_error(history_id, str(exc))
-        await _broadcast_history_changed()
+        await _broadcast_history_changed(history_id)
         await state.connections.broadcast({
             'song': song,
             'progress': 0,
             'message': f'Error: {exc}',
             'status': 'error',
+            **_history_item_for_ws(history_id),
         })
         _drop_queue_job(song_id)
         raise
@@ -2957,14 +2971,15 @@ async def _run_download(
     job['progress'] = 100
     if history_id is not None and state.history_db is not None:
         state.history_db.mark_done(history_id, filename)
-    library_index.notify_library_changed()
-    await _broadcast_history_changed()
+    notify_library_changed()
+    await _broadcast_history_changed(history_id)
     await state.connections.broadcast({
         'song': song,
         'progress': 100,
         'message': 'Done',
         'status': 'done',
         'filename': filename,
+        **_history_item_for_ws(history_id),
     })
     _drop_queue_job(song_id)
     return filename
@@ -3002,7 +3017,7 @@ async def download_endpoint(
     )
     if history_id is not None:
         state.download_jobs[song_id]['history_id'] = history_id
-        await _broadcast_history_changed()
+        await _broadcast_history_changed(history_id)
 
     try:
         filename = await _run_download(song, song_id, history_id=history_id)
@@ -3131,10 +3146,13 @@ async def download_batch_endpoint(request: Request) -> dict[str, Any]:
             'progress': 0,
             'message': '',
             'status': 'queued',
+            **_history_item_for_ws(history_id),
         })
 
     if valid_songs:
-        await _broadcast_history_changed()
+        await _broadcast_history_changed(
+            history_ids[-1] if history_ids else None
+        )
 
     if not valid_songs:
         raise HTTPException(status_code=400, detail='No valid songs in batch')
@@ -3180,17 +3198,23 @@ def remove_queue_item(song_id: str = Query(...)) -> dict:
 
 
 @router.get('/api/history')
-def list_history(limit: int = Query(100)) -> list[dict[str, Any]]:
+def list_history(
+    limit: int = Query(500),
+    include_active: bool = Query(False),
+) -> list[dict[str, Any]]:
     if state.history_db is None:
         return []
-    return state.history_db.list(limit=limit)
+    return state.history_db.list(
+        limit=limit,
+        terminal_only=not include_active,
+    )
 
 
 @router.delete('/api/history')
 async def clear_history() -> dict:
     if state.history_db is not None:
         state.history_db.clear()
-    await _broadcast_history_changed()
+    await _broadcast_history_changed(None)
     return {'cleared': True}
 
 
@@ -3215,7 +3239,9 @@ async def retry_history_item(history_id: int) -> dict[str, Any]:
         'progress': 0,
         'message': 'Queued',
         'status': 'queued',
+        **_history_item_for_ws(history_id),
     })
+    await _broadcast_history_changed(history_id)
 
     async def _retry() -> None:
         try:
@@ -4242,6 +4268,8 @@ async def add_monitor_playlist(request: Request) -> dict[str, Any]:
                     state.connections.broadcast,
                     loop,
                     state.settings,
+                    history_db=state.history_db,
+                    history_changed=_broadcast_history_changed,
                 )
             except Exception:
                 logger.exception(
@@ -4308,6 +4336,8 @@ async def manual_check_playlist(playlist_id: int) -> dict[str, Any]:
             state.connections.broadcast,
             loop,
             state.settings,
+            history_db=state.history_db,
+            history_changed=_broadcast_history_changed,
         )
     except Exception as exc:
         logger.exception('Manual check failed for playlist {}', playlist_id)

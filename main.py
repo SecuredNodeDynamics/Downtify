@@ -173,6 +173,8 @@ def build_app() -> FastAPI:
                 broadcast=api.state.connections.broadcast,
                 loop=loop,
                 settings=api.state.settings,
+                get_history_db=lambda: api.state.history_db,
+                history_changed=api._broadcast_history_changed,
             )
         )
         asyncio.create_task(api.start_genre_warmup())
