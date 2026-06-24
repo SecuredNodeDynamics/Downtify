@@ -9,6 +9,13 @@ function listMonitoredPlaylists() {
   return API.get('/api/monitor/playlists')
 }
 
+function lookupSpotifyArtists(artistName, limit = 5) {
+  return API.get('/api/monitor/artists/lookup', {
+    params: { artist: artistName, limit },
+    timeout: 30000,
+  })
+}
+
 function addMonitoredPlaylist(url, intervalMinutes = 60, kind = 'playlist') {
   return API.post('/api/monitor/playlists', {
     url,
@@ -31,6 +38,7 @@ function checkMonitoredPlaylist(id) {
 
 export default {
   listMonitoredPlaylists,
+  lookupSpotifyArtists,
   addMonitoredPlaylist,
   updateMonitoredPlaylist,
   deleteMonitoredPlaylist,

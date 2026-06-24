@@ -909,6 +909,14 @@
       </div>
 
       <div
+        v-if="versionMismatch"
+        class="surface rounded-xl border border-warning/30 bg-warning/10 p-3 flex gap-3 items-start text-sm text-warning"
+      >
+        <Icon icon="clarity:warning-standard-line" class="h-5 w-5 shrink-0" />
+        <span>{{ versionMismatchMessage }}</span>
+      </div>
+
+      <div
         v-if="helpError"
         class="surface rounded-xl p-3 flex items-center gap-2 text-sm text-error"
       >
@@ -1104,8 +1112,9 @@ import {
 } from '../model/serverConnection'
 import { useI18n } from '../i18n'
 import API from '../model/api'
-import { usesApkUpdateFlow, usesServerUpdateFlow } from '../model/appUpdate'
-import { checkApkUpdate, installApkUpdate } from '../model/apkUpdate'
+import { usesApkUpdateFlow } from '../model/appUpdate'
+import { checkDowntifyVersion } from '../model/appVersion'
+import { installApkUpdate } from '../model/apkUpdate'
 import ThemedSelect from './ThemedSelect.vue'
 
 const route = useRoute()
@@ -1305,10 +1314,22 @@ const aboutSections = computed(() => [
 ])
 
 const currentAppVersion = computed(() => {
-  if (usesServerUpdateFlow()) {
-    return updateStatus.value?.current_version || t('settings.unknownVersion')
-  }
-  return updateStatus.value?.current_version || __APP_VERSION__ || '0.0.0'
+  const version = updateStatus.value?.current_version
+  return version || t('settings.unknownVersion')
+})
+
+const versionMismatch = computed(() =>
+  Boolean(updateStatus.value?.version_mismatch)
+)
+
+const versionMismatchMessage = computed(() => {
+  const status = updateStatus.value
+  if (!status?.version_mismatch) return ''
+  return t('settings.versionMismatchHint', {
+    app: status.current_version,
+    server: status.connected_server_version,
+    latest: status.latest_version || status.connected_server_version,
+  })
 })
 
 const latestVersionLabel = computed(() => {
@@ -1320,16 +1341,22 @@ const latestVersionLabel = computed(() => {
 const canRunUpdate = computed(() => {
   if (usesApkUpdateFlow()) {
     return Boolean(
-      updateStatus.value?.update_available &&
+      updateStatus.value?.needs_apk_update &&
         updateStatus.value?.apk_download_url
     )
   }
   return Boolean(updateStatus.value?.update_available)
 })
 
-const updateHintText = computed(() =>
-  usesApkUpdateFlow() ? t('settings.updateHintApk') : t('settings.updateHint')
-)
+const updateHintText = computed(() => {
+  if (usesApkUpdateFlow()) {
+    if (updateStatus.value?.needs_server_update) {
+      return t('settings.updateHintServerBehind')
+    }
+    return t('settings.updateHintApk')
+  }
+  return t('settings.updateHint')
+})
 
 const updateInProgressHintText = computed(() =>
   usesApkUpdateFlow()
@@ -1453,16 +1480,10 @@ async function loadUpdateStatus(refresh = false) {
   helpLoading.value = true
   helpError.value = ''
   try {
-    if (usesApkUpdateFlow()) {
-      updateStatus.value = await checkApkUpdate({ refresh })
-      if (updateStatus.value?.error && !updateStatus.value?.latest_version) {
-        helpError.value = updateStatus.value.error
-      }
-      return
+    updateStatus.value = await checkDowntifyVersion({ refresh })
+    if (updateStatus.value?.error && !updateStatus.value?.latest_version) {
+      helpError.value = updateStatus.value.error
     }
-
-    const res = await API.check_for_update(refresh)
-    updateStatus.value = res.data || null
   } catch (err) {
     helpError.value =
       err?.response?.data?.detail ||
@@ -1542,6 +1563,8 @@ async function runUpdate() {
 }
 
 function waitForUpdatedApp(expectedVersion, attempts = 0) {
+  if (usesApkUpdateFlow()) return
+
   const maxAttempts = 60
   if (attempts >= maxAttempts) {
     markUpdateFailed(t('settings.updateWaitTimeout'))
@@ -1558,7 +1581,11 @@ function waitForUpdatedApp(expectedVersion, attempts = 0) {
           ...(updateStatus.value || {}),
           current_version: version,
           latest_version: version,
+          connected_server_version: version,
+          version_mismatch: false,
           update_available: false,
+          needs_apk_update: false,
+          needs_server_update: false,
         }
         return
       }

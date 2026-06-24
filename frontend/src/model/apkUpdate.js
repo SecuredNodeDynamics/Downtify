@@ -1,5 +1,11 @@
 import { Capacitor, registerPlugin } from '@capacitor/core'
 
+import {
+  getBundledAppVersion,
+  getInstalledClientVersionSync,
+  resolveNativeInstalledVersion,
+} from './appVersion.js'
+
 const GITHUB_REPO = 'SecuredNodeDynamics/Downtify'
 const GITHUB_RELEASES_URL = `https://github.com/${GITHUB_REPO}/releases`
 const GITHUB_API_BASE = `https://api.github.com/repos/${GITHUB_REPO}`
@@ -97,7 +103,7 @@ async function fetchLatestRelease() {
   const response = await fetch(`${GITHUB_API_BASE}/releases/latest`, {
     headers: {
       Accept: 'application/vnd.github+json',
-      'User-Agent': `Downtify-Android/${__APP_VERSION__ || '0.0.0'}`,
+      'User-Agent': `Downtify-Android/${getBundledAppVersion()}`,
     },
   })
 
@@ -113,11 +119,12 @@ async function fetchLatestRelease() {
 }
 
 export function getInstalledApkVersion() {
-  return String(__APP_VERSION__ || '0.0.0').trim()
+  return getInstalledClientVersionSync() || getBundledAppVersion()
 }
 
 export async function checkApkUpdate({ refresh = false } = {}) {
-  const currentVersion = getInstalledApkVersion()
+  const currentVersion =
+    (await resolveNativeInstalledVersion()) || getInstalledApkVersion()
   const now = Date.now()
 
   if (!refresh && cachedStatus && now - cachedAt < CACHE_TTL_MS) {

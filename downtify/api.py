@@ -3858,6 +3858,22 @@ async def list_monitor_playlists() -> list[dict[str, Any]]:
     return [p.to_dict() for p in playlists]
 
 
+@router.get('/api/monitor/artists/lookup')
+async def lookup_monitor_artists(
+    artist: str = Query(...),
+    limit: int = Query(5, ge=1, le=10),
+) -> dict[str, Any]:
+    artist_name = str(artist or '').strip()
+    if not artist_name:
+        raise HTTPException(status_code=400, detail='artist is required')
+    matches = await asyncio.to_thread(
+        artist_image_options.list_spotify_artist_matches,
+        artist_name,
+        limit=limit,
+    )
+    return {'artist': artist_name, 'matches': matches}
+
+
 @router.post('/api/monitor/playlists')
 async def add_monitor_playlist(request: Request) -> dict[str, Any]:
     db = _require_monitor_db()

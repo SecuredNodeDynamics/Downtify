@@ -183,21 +183,45 @@ export function itemMap(items) {
   return new Map(items.map((item) => [item.file, item]))
 }
 
-export function matchesLibraryFilter(item, query) {
-  const q = String(query || '')
-    .trim()
-    .toLowerCase()
+export function normalizeLibrarySearchQuery(query) {
+  return String(query || '').trim().toLowerCase()
+}
+
+export function matchesLibraryField(field, query) {
+  const q = normalizeLibrarySearchQuery(query)
   if (!q) return true
-  return [
-    item.title,
-    item.artist,
-    item.album,
-    item.genre,
-    item.browse_genre,
-    item.file,
-  ].some((part) =>
-    String(part || '')
-      .toLowerCase()
-      .includes(q)
+  return String(field || '')
+    .toLowerCase()
+    .includes(q)
+}
+
+export function matchesLibraryArtistName(artistName, query) {
+  return matchesLibraryField(artistName, query)
+}
+
+export function matchesLibraryAlbumEntry(album, query) {
+  const q = normalizeLibrarySearchQuery(query)
+  if (!q) return true
+  return (
+    matchesLibraryField(album.name, q) ||
+    matchesLibraryField(album.artist, q)
   )
+}
+
+export function matchesLibraryTrackItem(item, query) {
+  const q = normalizeLibrarySearchQuery(query)
+  if (!q) return true
+  return (
+    matchesLibraryField(item.title, q) ||
+    matchesLibraryField(item.artist, q) ||
+    matchesLibraryField(item.album, q)
+  )
+}
+
+export function matchesLibraryGenreName(genreName, query) {
+  return matchesLibraryField(genreName, query)
+}
+
+export function matchesLibraryFilter(item, query) {
+  return matchesLibraryTrackItem(item, query)
 }

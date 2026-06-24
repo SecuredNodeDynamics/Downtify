@@ -15,6 +15,7 @@ export default {
     unknownTrack: 'Unknown track',
     previousPage: 'Previous page',
     nextPage: 'Next page',
+    loading: 'Loading',
   },
   nav: {
     home: 'Home',
@@ -75,6 +76,7 @@ export default {
     nextPage: 'Next page',
   },
   queue: {
+    tab: 'Queue',
     title: 'Download Queue',
     subtitle:
       "Songs you've queued. Progress, status and quick actions live here.",
@@ -90,6 +92,7 @@ export default {
     invalidYouTubeURL: 'Invalid YouTube URL',
   },
   history: {
+    tab: 'History',
     title: 'Download History',
     subtitle: 'Recent download attempts, saved across restarts.',
     empty: 'No download history yet.',
@@ -103,6 +106,7 @@ export default {
     clear: 'Clear history',
     clearPrompt: 'Clear all download history?',
     downloadFile: 'Download file',
+    openInPlayer: 'Open in player',
     failedLoad: 'Failed to load download history.',
     failedRetry: 'Failed to retry this download.',
   },
@@ -152,9 +156,24 @@ export default {
     artists: 'Artists',
     tracks: 'Tracks',
     albums: 'Albums',
+    genres: 'Genres',
+    searchPlaceholder: 'Search your library or find music to download…',
+    clearSearch: 'Clear search',
+    noSearchResults: 'No matches in your library.',
+    notInLibrary: 'Not in your library yet',
+    notInLibraryHint: 'Download any match below and it will appear here when finished.',
+    downloadTrack: 'Download',
+    downloadAlbum: 'Download album',
+    downloadFromLink: 'Download from link',
+    downloadFromLinkHint: 'This link is not in your library yet. Start the download now.',
+    onlineSearchLoading: 'Searching online…',
+    onlineSearchEmpty: 'Nothing found online for this search.',
+    onlineSearchError: 'Could not search online. Check your server connection.',
+    onlineSearchMore: '{count} more results available on the Search page.',
     artistCount: '{artists} artists - {albums} albums - {tracks} tracks',
     artistMeta: '{tracks} tracks - {albums} albums',
     albumMeta: '{tracks} tracks',
+    genreMeta: '{tracks} tracks',
     openArtist: 'Open artist',
     openAlbum: 'Open album',
     playArtist: 'Play artist',
@@ -162,6 +181,17 @@ export default {
     playGenre: 'Play genre',
     backToArtists: 'Artists',
     backToAlbums: 'Albums',
+    backToGenres: 'Genres',
+    monitorArtist: 'Monitor artist',
+    monitoringArtist: 'Monitoring',
+    monitorPaused: 'Monitor paused',
+    monitorArtistPickTitle: 'Choose Spotify artist',
+    monitorArtistPickSubtitle:
+      'Pick the Spotify artist to watch for new tracks and albums.',
+    monitorArtistMatchScore: '{score}% name match',
+    monitorArtistNotFound: 'No matching Spotify artist found.',
+    monitorArtistLookupFailed: 'Could not look up this artist on Spotify.',
+    monitorArtistAddFailed: 'Failed to add artist to monitor.',
   },
   metadata: {
     title: 'Metadata',
@@ -177,7 +207,7 @@ export default {
     resultLimit: 'Fixes to show',
     scanned: 'Scanned',
     matches: 'Matches',
-    needsFix: 'Needs Fix',
+    needsFix: 'Repair',
     total: 'Total files',
     serverOnly:
       'This scans files on the Downtify server download location. Local browser-only download folders are not available to the backend yet.',
@@ -190,8 +220,8 @@ export default {
     fixing: 'Fixing...',
     fixed: 'Fixed',
     completed: 'Completed',
-    clean: 'No Repair Needed',
-    cleanShort: 'No fix',
+    clean: 'Up to date',
+    cleanShort: 'Good',
     listView: 'List view',
     gridView: 'Card grid view',
     repairFailed: 'Repair Failed',
@@ -417,6 +447,10 @@ export default {
       'Docker installs update in place when the Docker socket is mounted; the app will restart.',
     updateHintApk:
       'Downloads the latest APK from GitHub and opens the Android installer.',
+    updateHintServerBehind:
+      'This app is newer than the connected server. Deploy the same Downtify release on the server, then reopen the app.',
+    versionMismatchHint:
+      'This app is v{app} but the connected server is v{server}. Downtify uses one version everywhere — update both to v{latest}.',
     updateInProgressHintApk:
       'Downloading the update from GitHub. The Android installer will open when the download finishes.',
     updateApkInstallerOpened:
@@ -575,6 +609,8 @@ export default {
     genreBrowseCount: '{count} genres',
     noFilterResults: 'No downloaded tracks match your search.',
     clearFilter: 'Clear filter',
+    browseSearchPlaceholder: 'Search artists, albums, tracks, genres…',
+    seek: 'Seek',
   },
   footer: {
     tagline: 'Open source music downloader',

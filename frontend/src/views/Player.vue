@@ -3,7 +3,7 @@
     <Navbar />
 
     <div
-      class="player-page mx-auto flex w-full max-w-5xl flex-col px-4 py-2 sm:flex-1 sm:px-6 sm:py-8 min-h-0"
+      class="player-page mx-auto flex w-full max-w-5xl min-h-0 flex-1 flex-col px-4 py-2 sm:px-6 sm:py-8"
     >
       <!-- Header -->
       <div class="mb-4 sm:mb-8 mobile-page-header shrink-0">
@@ -41,17 +41,12 @@
       </div>
 
       <!-- Player + queue -->
-      <div v-else class="player-shell min-h-0 lg:flex-1">
+      <div v-else class="player-shell min-h-0 flex-1">
         <!-- Now playing -->
-        <section
-          class="player-now surface rounded-3xl p-3 sm:p-8 flex flex-col items-center text-center"
-        >
-          <p
-            class="mb-3 w-full text-left text-xs font-semibold uppercase tracking-wider text-base-content/50 lg:hidden"
+        <section class="panel-glow-shell surface shrink-0 grow-0 rounded-3xl">
+          <div
+            class="player-now flex flex-col items-center rounded-3xl p-3 text-center sm:p-8"
           >
-            {{ t('player.nowPlaying') }}
-          </p>
-
           <!-- Cover -->
           <div
             class="player-cover relative flex items-center justify-center overflow-hidden rounded-2xl bg-primary/10 text-primary shadow-glow sm:rounded-3xl"
@@ -102,18 +97,26 @@
           <div class="mt-3 w-full sm:mt-6">
             <div
               class="player-progress"
+              :class="{ 'player-progress--scrubbing': isScrubbing }"
               ref="progressBar"
-              @click="onSeekClick"
+              role="slider"
+              tabindex="0"
+              :aria-label="t('player.seek')"
+              :aria-valuemin="0"
+              :aria-valuemax="Math.floor(player.duration.value || 0)"
+              :aria-valuenow="Math.floor(player.currentTime.value || 0)"
+              :aria-valuetext="`${formatTime(player.currentTime.value)} / ${formatTime(player.duration.value)}`"
               @pointerdown="onSeekStart"
+              @keydown="onSeekKeydown"
             >
-              <div class="player-progress-track">
+              <div class="player-progress-track" ref="progressTrack">
                 <div
                   class="player-progress-fill"
-                  :style="`width: ${player.progressPct.value}%`"
+                  :style="{ width: `${displayProgressPct}%` }"
                 />
                 <div
                   class="player-progress-thumb"
-                  :style="`left: calc(${player.progressPct.value}% - 7px)`"
+                  :style="{ left: `${displayProgressPct}%` }"
                 />
               </div>
             </div>
@@ -224,31 +227,20 @@
               :title="t('player.volume')"
             />
           </div>
+          </div>
         </section>
 
         <!-- Library browser -->
-        <aside
-          class="player-queue surface flex flex-col rounded-3xl p-3 sm:p-5 lg:max-h-[640px] lg:overflow-y-auto"
-        >
+        <aside class="panel-glow-shell panel-glow-shell-grow surface min-h-0 rounded-3xl">
           <div
-            class="mb-2 flex items-center justify-between gap-2 px-1 sm:mb-3"
+            class="player-queue panel-glow-inner flex flex-col gap-3 p-3 sm:gap-3 sm:p-5"
           >
-            <div class="min-w-0">
-              <h2
-                class="text-xs font-semibold uppercase tracking-wider text-base-content/50"
-              >
-                {{ browseHeading }}
-              </h2>
-              <p
-                v-if="browseSubtitle"
-                class="mt-0.5 truncate text-[11px] text-base-content/45"
-              >
-                {{ browseSubtitle }}
-              </p>
-            </div>
-            <div class="flex shrink-0 items-center gap-2">
+          <div class="player-browse-chrome shrink-0 space-y-2 sm:space-y-3">
+            <div
+              v-if="browsePlayFiles.length"
+              class="flex justify-end px-1"
+            >
               <button
-                v-if="browsePlayFiles.length"
                 type="button"
                 class="btn btn-primary btn-xs h-8 rounded-full px-3"
                 @click="playFiles(browsePlayFiles)"
@@ -256,67 +248,72 @@
                 <Icon icon="clarity:play-line" class="h-3.5 w-3.5" />
                 {{ t('player.playAll') }}
               </button>
-              <span class="text-[11px] text-base-content/40">
-                {{ browseCountText }}
-              </span>
             </div>
-          </div>
 
-          <button
-            v-if="canBrowseBack"
-            type="button"
-            class="mb-2 inline-flex max-w-full items-center gap-1 rounded-full bg-white/5 px-3 py-1.5 text-xs font-medium text-primary"
-            @click="browseBack"
-          >
-            <Icon icon="clarity:arrow-line" class="h-3.5 w-3.5 -scale-x-100" />
-            <span class="truncate">{{ browseBackLabel }}</span>
-          </button>
-
-          <div
-            v-if="libraryFilter"
-            class="mb-2 flex items-center gap-2 rounded-xl bg-primary/10 px-3 py-2 text-xs"
-          >
-            <Icon
-              icon="clarity:search-line"
-              class="h-4 w-4 shrink-0 text-primary"
-            />
-            <span class="min-w-0 flex-1 truncate text-base-content/80">
-              {{ libraryFilter }}
-            </span>
             <button
+              v-if="canBrowseBack"
               type="button"
-              class="shrink-0 font-medium text-primary"
-              @click="clearLibraryFilter"
+              class="inline-flex max-w-full items-center gap-1 rounded-full bg-white/5 px-3 py-1.5 text-xs font-medium text-primary"
+              @click="browseBack"
             >
-              {{ t('player.clearFilter') }}
+              <Icon
+                icon="clarity:arrow-line"
+                class="h-3.5 w-3.5 -scale-x-100"
+              />
+              <span class="truncate">{{ browseBackLabel }}</span>
             </button>
-          </div>
 
-          <div
-            v-if="!canBrowseBack"
-            class="player-browse-tabs tab-glow-shell"
-            role="tablist"
-            :aria-label="t('player.browse')"
-          >
-            <button
-              v-for="tab in browseTabs"
-              :key="tab.id"
-              type="button"
-              role="tab"
-              class="player-browse-tab-btn"
-              :class="
-                browseMode === tab.id
-                  ? 'player-browse-tab-btn-active'
-                  : 'player-browse-tab-btn-inactive'
-              "
-              :aria-selected="browseMode === tab.id"
-              @click="setBrowseMode(tab.id)"
+            <div
+              v-if="!canBrowseBack"
+              class="player-browse-tabs"
+              role="tablist"
+              :aria-label="t('player.browse')"
             >
-              <span class="player-browse-tab-label-short">{{
-                tab.shortLabel
-              }}</span>
-              <span class="player-browse-tab-label-full">{{ tab.label }}</span>
-            </button>
+              <button
+                v-for="tab in browseTabs"
+                :key="tab.id"
+                type="button"
+                role="tab"
+                class="player-browse-tab-btn"
+                :class="
+                  browseMode === tab.id
+                    ? 'player-browse-tab-btn-active'
+                    : 'player-browse-tab-btn-inactive'
+                "
+                :aria-selected="browseMode === tab.id"
+                @click="setBrowseMode(tab.id)"
+              >
+                {{ tab.shortLabel }}
+              </button>
+            </div>
+
+            <form
+              class="player-browse-search"
+              @submit.prevent
+            >
+              <div class="relative min-w-0 flex-1">
+                <input
+                  v-model="browseSearchQuery"
+                  type="text"
+                  inputmode="search"
+                  enterkeyhint="search"
+                  autocomplete="off"
+                  autocapitalize="off"
+                  autocorrect="off"
+                  spellcheck="false"
+                  class="input-modern h-12 w-full text-sm"
+                  :placeholder="t('player.browseSearchPlaceholder')"
+                  :aria-label="t('player.browseSearchPlaceholder')"
+                />
+                <button
+                  type="submit"
+                  class="absolute right-1.5 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-primary text-primary-content shadow-glow-sm"
+                  :disabled="!browseFilter"
+                >
+                  <Icon icon="clarity:search-line" class="h-4 w-4" />
+                </button>
+              </div>
+            </form>
           </div>
 
           <div class="player-browse-body min-h-0 flex-1 overflow-y-auto">
@@ -332,7 +329,7 @@
             </div>
 
             <ul v-else-if="browseView === 'artists'" class="player-browse-grid">
-              <li v-for="artist in filteredArtists" :key="artist.name">
+              <li v-for="artist in filteredArtists" :key="artist.name" class="browse-tile-shell">
                 <article
                   class="player-browse-card"
                   role="button"
@@ -395,7 +392,7 @@
               "
               class="player-browse-grid"
             >
-              <li v-for="album in visibleAlbums" :key="album.key">
+              <li v-for="album in visibleAlbums" :key="album.key" class="browse-tile-shell">
                 <article
                   class="player-browse-card"
                   role="button"
@@ -442,7 +439,7 @@
             </ul>
 
             <ul v-else-if="browseView === 'genres'" class="player-browse-grid">
-              <li v-for="genre in filteredGenres" :key="genre.name">
+              <li v-for="genre in filteredGenres" :key="genre.name" class="browse-tile-shell">
                 <article
                   class="player-browse-card"
                   role="button"
@@ -484,7 +481,7 @@
               "
               class="player-browse-grid"
             >
-              <li v-for="item in visibleTrackItems" :key="item.file">
+              <li v-for="item in visibleTrackItems" :key="item.file" class="browse-tile-shell">
                 <button
                   type="button"
                   class="player-browse-card"
@@ -532,7 +529,18 @@
               </li>
             </ul>
 
-            <div v-else-if="libraryFilter" class="py-10 text-center">
+            <div v-else-if="browseFilter && playerBrowseEmptyWithFilter">
+              <ServerConnectionPrompt v-if="needsServerConnection()" />
+              <LibraryDownloadOffers
+                v-else
+                :items="playerOnlineResults"
+                :loading="playerOnlineLoading"
+                :error="playerOnlineError"
+                @download="queueOnlineDownload"
+              />
+            </div>
+
+            <div v-else-if="browseFilter" class="py-10 text-center">
               <p class="text-sm text-base-content/50">
                 {{ t('player.noFilterResults') }}
               </p>
@@ -544,6 +552,7 @@
               </p>
             </div>
           </div>
+          </div>
         </aside>
       </div>
     </div>
@@ -551,17 +560,24 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, onActivated, computed } from 'vue'
+import { ref, onMounted, onUnmounted, onActivated, computed, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import Navbar from '/src/components/Navbar.vue'
 import CoverImage from '/src/components/CoverImage.vue'
 import GenreCover from '/src/components/GenreCover.vue'
+import LibraryDownloadOffers from '/src/components/LibraryDownloadOffers.vue'
+import ServerConnectionPrompt from '/src/components/ServerConnectionPrompt.vue'
 import API from '/src/model/api'
+import { beginAppLoading, endAppLoading } from '/src/model/appLoading'
+import { useDownloadManager } from '/src/model/download'
 import {
   groupAlbums,
   groupArtists,
   groupGenres,
-  matchesLibraryFilter,
+  matchesLibraryAlbumEntry,
+  matchesLibraryArtistName,
+  matchesLibraryGenreName,
+  matchesLibraryTrackItem,
   normalizeLibraryItem,
 } from '/src/model/library'
 import {
@@ -569,7 +585,14 @@ import {
   getInitialLibrarySnapshot,
 } from '/src/model/librarySession'
 import { usePlayer, formatTime, trackInfoFromFile } from '/src/model/player'
+import {
+  consumePlayerNavigation,
+  resolvePlayerBrowseState,
+} from '/src/model/playerNavigation'
 import { useMobileSearch } from '/src/model/mobileSearch'
+import { useLibraryOnlineSearch } from '/src/model/libraryOnlineSearch'
+import { useSearchManager } from '/src/model/search'
+import { needsServerConnection } from '/src/model/serverConnection'
 import { buildApiBaseUrl, getServerConfig } from '/src/model/serverConnection'
 import { useI18n } from '/src/i18n'
 
@@ -582,6 +605,10 @@ const { t } = useI18n()
 const player = usePlayer()
 const mobileSearch = useMobileSearch()
 const libraryFilter = mobileSearch.libraryFilter
+const browseSearchQuery = ref(libraryFilter.value || '')
+const browseFilter = computed(() => browseSearchQuery.value.trim())
+const dm = useDownloadManager()
+const sm = useSearchManager()
 
 const files = ref(initialPlayerSnapshot.paths)
 const libraryItems = ref(initialPlayerSnapshot.items)
@@ -591,7 +618,15 @@ const selectedArtistName = ref('')
 const selectedAlbumKey = ref('')
 const selectedGenreName = ref('')
 const progressBar = ref(null)
-let dragging = false
+const progressTrack = ref(null)
+const isScrubbing = ref(false)
+const scrubPct = ref(0)
+let seekRaf = 0
+let pendingSeekRatio = null
+
+const displayProgressPct = computed(() =>
+  isScrubbing.value ? scrubPct.value : player.progressPct.value
+)
 let genreRefreshTimers = []
 
 const unknownGenreLabel = computed(() => t('player.unknownGenre'))
@@ -661,38 +696,25 @@ const browseView = computed(() => {
 })
 
 const filteredArtists = computed(() => {
-  const q = libraryFilter.value
+  const q = browseFilter.value
   if (!q) return artists.value
   return artists.value.filter((artist) =>
-    artist.files.some((file) => {
-      const item = libraryItems.value.find((entry) => entry.file === file)
-      return item ? matchesLibraryFilter(item, q) : false
-    })
+    matchesLibraryArtistName(artist.name, q)
   )
 })
 
 const visibleAlbums = computed(() => {
   const source =
     browseView.value === 'artist-albums' ? artistAlbums.value : albums.value
-  const q = libraryFilter.value
+  const q = browseFilter.value
   if (!q) return source
-  return source.filter((album) =>
-    album.files.some((file) => {
-      const item = libraryItems.value.find((entry) => entry.file === file)
-      return item ? matchesLibraryFilter(item, q) : false
-    })
-  )
+  return source.filter((album) => matchesLibraryAlbumEntry(album, q))
 })
 
 const filteredGenres = computed(() => {
-  const q = libraryFilter.value
+  const q = browseFilter.value
   const source = q
-    ? genres.value.filter((genre) =>
-        genre.files.some((file) => {
-          const item = libraryItems.value.find((entry) => entry.file === file)
-          return item ? matchesLibraryFilter(item, q) : false
-        })
-      )
+    ? genres.value.filter((genre) => matchesLibraryGenreName(genre.name, q))
     : genres.value
   const unknown = unknownGenreLabel.value
   const tagged = source.filter((genre) => genre.name !== unknown)
@@ -714,9 +736,9 @@ const visibleTrackItems = computed(() => {
     })
   }
 
-  const q = libraryFilter.value
+  const q = browseFilter.value
   if (q) {
-    items = items.filter((item) => matchesLibraryFilter(item, q))
+    items = items.filter((item) => matchesLibraryTrackItem(item, q))
   }
 
   return items
@@ -725,6 +747,38 @@ const visibleTrackItems = computed(() => {
 const visibleTrackFiles = computed(() =>
   visibleTrackItems.value.map((item) => item.file)
 )
+
+const playerBrowseEmptyWithFilter = computed(() => {
+  if (!browseFilter.value) return false
+  if (browseView.value === 'artists') return filteredArtists.value.length === 0
+  if (browseView.value === 'albums' || browseView.value === 'artist-albums') {
+    return visibleAlbums.value.length === 0
+  }
+  if (browseView.value === 'genres') return filteredGenres.value.length === 0
+  return visibleTrackItems.value.length === 0
+})
+
+const playerOnlineSearchEnabled = computed(
+  () =>
+    Boolean(browseFilter.value) &&
+    playerBrowseEmptyWithFilter.value &&
+    !needsServerConnection() &&
+    !sm.isValidURL(browseFilter.value)
+)
+
+const {
+  results: playerOnlineResults,
+  loading: playerOnlineLoading,
+  error: playerOnlineError,
+} = useLibraryOnlineSearch(
+  browseFilter,
+  browseView,
+  playerOnlineSearchEnabled
+)
+
+function queueOnlineDownload(song) {
+  dm.queue(song)
+}
 
 const browsePlayFiles = computed(() => {
   if (browseView.value !== 'tracks') return []
@@ -739,56 +793,11 @@ const canBrowseBack = computed(() =>
   )
 )
 
-const browseHeading = computed(() => {
-  if (selectedAlbum.value) return selectedAlbum.value.name
-  if (selectedGenreName.value) return selectedGenreName.value
-  if (selectedArtistName.value) return selectedArtistName.value
-  return t('player.browse')
-})
-
-const browseSubtitle = computed(() => {
-  if (selectedAlbum.value) return selectedAlbum.value.artist
-  if (selectedGenreName.value) {
-    return t('player.genreMeta', {
-      count: visibleTrackItems.value.length,
-    })
-  }
-  if (selectedArtistName.value && artistAlbums.value.length > 0) {
-    return t('library.artistMeta', {
-      tracks: selectedArtist.value?.files.length || 0,
-      albums: artistAlbums.value.length,
-    })
-  }
-  return ''
-})
-
 const browseBackLabel = computed(() => {
   if (selectedAlbumKey.value)
     return selectedArtistName.value || t('library.albums')
   if (selectedGenreName.value) return t('player.genres')
   return t('library.backToArtists')
-})
-
-const browseCountText = computed(() => {
-  if (browseView.value === 'artists') {
-    return t('player.artistBrowseCount', {
-      count: filteredArtists.value.length,
-    })
-  }
-  if (browseView.value === 'albums' || browseView.value === 'artist-albums') {
-    return t('player.albumBrowseCount', {
-      count: visibleAlbums.value.length,
-    })
-  }
-  if (browseView.value === 'genres') {
-    return t('player.genreBrowseCount', {
-      count: filteredGenres.value.length,
-    })
-  }
-  const count = visibleTrackItems.value.length
-  return count === 1
-    ? t('player.countOne', { count })
-    : t('player.countMany', { count })
 })
 
 const currentCoverSources = computed(() => {
@@ -944,9 +953,13 @@ function scheduleGenreRefresh(items) {
 }
 
 async function load({ background = false } = {}) {
-  const hadCache = hydrateLibraryFromSession()
+  const hadCache =
+    hydrateLibraryFromSession() ||
+    files.value.length > 0 ||
+    libraryItems.value.length > 0
   if (!background) {
     loading.value = !hadCache
+    if (!hadCache) beginAppLoading()
   }
 
   try {
@@ -975,6 +988,8 @@ async function load({ background = false } = {}) {
     }
   } finally {
     loading.value = false
+    if (!background && !hadCache) endAppLoading()
+    applyPlayerNavigationIntent()
   }
 
   if (countUnknownGenres(libraryItems.value) > 0) {
@@ -1027,12 +1042,48 @@ function playFiles(fileList, startFile = null) {
   player.setPlaylist(list, { startIndex })
 }
 
+function applyPlayerNavigationIntent() {
+  const intent = consumePlayerNavigation()
+  if (!intent) return
+
+  const state = resolvePlayerBrowseState(
+    libraryItems.value,
+    intent,
+    libraryGroupOptions.value
+  )
+  if (!state) return
+
+  browseMode.value = state.browseMode
+  selectedArtistName.value = state.selectedArtistName
+  selectedAlbumKey.value = state.selectedAlbumKey
+  selectedGenreName.value = state.selectedGenreName
+  playFiles(state.playlistFiles, state.startFile)
+}
+
 function isCurrentFile(file) {
   return player.currentTrack.value?.file === file
 }
 
-function clearLibraryFilter() {
+function clearBrowseSearch() {
+  browseSearchQuery.value = ''
   mobileSearch.clearLibraryFilter()
+}
+
+watch(libraryFilter, (value) => {
+  if (value !== browseSearchQuery.value.trim()) {
+    browseSearchQuery.value = value
+  }
+})
+
+watch(browseSearchQuery, (value) => {
+  const trimmed = value.trim()
+  if (trimmed === libraryFilter.value) return
+  if (trimmed) mobileSearch.setLibraryFilter(trimmed)
+  else mobileSearch.clearLibraryFilter()
+})
+
+function clearLibraryFilter() {
+  clearBrowseSearch()
 }
 
 const trackTitle = computed(() => {
@@ -1059,32 +1110,98 @@ function onVolume(e) {
 }
 
 function ratioFromEvent(e) {
-  const el = progressBar.value
+  const el = progressTrack.value || progressBar.value
   if (!el) return 0
   const rect = el.getBoundingClientRect()
-  const x = (e.clientX || 0) - rect.left
+  if (rect.width <= 0) return 0
+  const x = (e.clientX ?? 0) - rect.left
   return Math.max(0, Math.min(1, x / rect.width))
 }
 
-function onSeekClick(e) {
-  player.seekRatio(ratioFromEvent(e))
+function flushPendingSeek() {
+  if (pendingSeekRatio === null) return
+  player.seekRatio(pendingSeekRatio)
+  pendingSeekRatio = null
+}
+
+function queueSeek(ratio) {
+  pendingSeekRatio = ratio
+  if (seekRaf) return
+  seekRaf = requestAnimationFrame(() => {
+    seekRaf = 0
+    flushPendingSeek()
+  })
+}
+
+function applyScrub(e, { commitAudio = true } = {}) {
+  const ratio = ratioFromEvent(e)
+  scrubPct.value = ratio * 100
+  if (commitAudio) {
+    queueSeek(ratio)
+  }
 }
 
 function onSeekStart(e) {
-  dragging = true
-  player.seekRatio(ratioFromEvent(e))
+  if (e.pointerType === 'mouse' && e.button !== 0) return
+  e.preventDefault()
+  isScrubbing.value = true
+  const el = progressBar.value
+  if (el?.setPointerCapture) {
+    try {
+      el.setPointerCapture(e.pointerId)
+    } catch {
+      // ignore
+    }
+  }
+  applyScrub(e)
   window.addEventListener('pointermove', onSeekDrag)
-  window.addEventListener('pointerup', onSeekEnd, { once: true })
+  window.addEventListener('pointerup', onSeekEnd)
+  window.addEventListener('pointercancel', onSeekEnd)
 }
 
 function onSeekDrag(e) {
-  if (!dragging) return
-  player.seekRatio(ratioFromEvent(e))
+  if (!isScrubbing.value) return
+  applyScrub(e)
 }
 
-function onSeekEnd() {
-  dragging = false
+function onSeekEnd(e) {
+  if (!isScrubbing.value) return
+  isScrubbing.value = false
+  if (e) {
+    applyScrub(e)
+  }
+  flushPendingSeek()
   window.removeEventListener('pointermove', onSeekDrag)
+  window.removeEventListener('pointerup', onSeekEnd)
+  window.removeEventListener('pointercancel', onSeekEnd)
+  const el = progressBar.value
+  if (el?.releasePointerCapture && e?.pointerId !== undefined) {
+    try {
+      el.releasePointerCapture(e.pointerId)
+    } catch {
+      // ignore
+    }
+  }
+}
+
+function onSeekKeydown(e) {
+  if (!player.duration.value) return
+  const step = e.shiftKey ? 10 : 5
+  if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
+    e.preventDefault()
+    player.seek(Math.max(0, player.currentTime.value - step))
+  } else if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
+    e.preventDefault()
+    player.seek(
+      Math.min(player.duration.value, player.currentTime.value + step)
+    )
+  } else if (e.key === 'Home') {
+    e.preventDefault()
+    player.seek(0)
+  } else if (e.key === 'End') {
+    e.preventDefault()
+    player.seek(player.duration.value)
+  }
 }
 
 onMounted(() => {
@@ -1097,6 +1214,7 @@ onMounted(() => {
 
 onActivated(() => {
   if (libraryItems.value.length > 0) {
+    applyPlayerNavigationIntent()
     void refreshLibraryMetadataInBackground()
     return
   }
@@ -1105,30 +1223,47 @@ onActivated(() => {
 
 onUnmounted(() => {
   clearGenreRefreshTimers()
-  window.removeEventListener('pointermove', onSeekDrag)
+  onSeekEnd()
+  if (seekRaf) {
+    cancelAnimationFrame(seekRaf)
+    seekRaf = 0
+  }
 })
 </script>
 
 <style scoped>
+.player-view {
+  @apply flex min-h-0 flex-col overflow-x-hidden;
+}
+
 @media (max-width: 1023px) {
   .player-view {
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
-    height: auto;
-    overflow: visible;
+    height: calc(
+      100dvh - var(--app-header-height) - var(--app-safe-top) -
+        var(--app-bottom-nav-height) - var(--app-safe-bottom)
+    );
+    max-height: calc(
+      100dvh - var(--app-header-height) - var(--app-safe-top) -
+        var(--app-bottom-nav-height) - var(--app-safe-bottom)
+    );
+    overflow: hidden;
   }
 
   .player-page {
     min-height: 0;
-    flex: 1 1 auto;
   }
 
   .player-shell {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
-    min-height: auto;
+    gap: 0.875rem;
+    min-height: 0;
+    flex: 1 1 auto;
+  }
+
+  .player-shell > .panel-glow-shell-grow {
+    flex: 1 1 auto;
+    min-height: 0;
   }
 
   .player-now {
@@ -1146,22 +1281,37 @@ onUnmounted(() => {
   }
 
   .player-queue {
+    display: flex;
     flex: 1 1 auto;
-    min-height: min(62vh, 38rem);
-    overflow: hidden;
+    flex-direction: column;
+    min-height: 0;
   }
 
   .player-browse-body {
-    min-height: min(52vh, 32rem);
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
     -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
   }
 }
 
 @media (min-width: 1024px) {
+  .player-view {
+    height: auto;
+    max-height: none;
+    overflow: visible;
+  }
+
   .player-shell {
     display: grid;
     grid-template-columns: 1fr 360px;
     gap: 1.5rem;
+  }
+
+  .player-queue {
+    max-height: 640px;
   }
 
   .player-cover {
@@ -1178,9 +1328,16 @@ onUnmounted(() => {
 .player-progress {
   position: relative;
   width: 100%;
-  padding: 0.625rem 0;
+  padding: 0.875rem 0;
   cursor: pointer;
   touch-action: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  outline: none;
+}
+
+.player-progress:focus-visible .player-progress-track {
+  box-shadow: 0 0 0 2px rgba(26, 208, 92, 0.35);
 }
 
 .player-progress-track {
@@ -1188,10 +1345,16 @@ onUnmounted(() => {
   height: 4px;
   border-radius: 9999px;
   background: rgba(255, 255, 255, 0.1);
+  transition: height 160ms ease;
 }
 
 [data-theme='downtify-light'] .player-progress-track {
   background: rgba(0, 0, 0, 0.1);
+}
+
+.player-progress:hover .player-progress-track,
+.player-progress--scrubbing .player-progress-track {
+  height: 6px;
 }
 
 .player-progress-fill {
@@ -1199,19 +1362,62 @@ onUnmounted(() => {
   inset: 0 auto 0 0;
   border-radius: 9999px;
   background: #1ad05c;
-  transition: width 150ms ease;
+  transition: width 100ms linear;
+  will-change: width;
 }
 
 .player-progress-thumb {
   position: absolute;
   top: 50%;
+  left: 0;
   height: 14px;
   width: 14px;
   border-radius: 9999px;
   background: #1ad05c;
   box-shadow: 0 0 12px rgba(26, 208, 92, 0.45);
-  transform: translateY(-50%);
-  transition: left 150ms ease;
+  transform: translate(-50%, -50%) scale(0.9);
+  opacity: 0;
+  transition:
+    left 100ms linear,
+    opacity 160ms ease,
+    transform 160ms ease,
+    width 160ms ease,
+    height 160ms ease;
+  will-change: left, transform;
+}
+
+.player-progress:hover .player-progress-thumb,
+.player-progress--scrubbing .player-progress-thumb,
+.player-progress:focus-visible .player-progress-thumb {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+.player-progress--scrubbing .player-progress-fill,
+.player-progress--scrubbing .player-progress-thumb {
+  transition: none;
+}
+
+@media (hover: none), (pointer: coarse) {
+  .player-progress {
+    padding: 1rem 0;
+  }
+
+  .player-progress-track {
+    height: 5px;
+  }
+
+  .player-progress-thumb {
+    opacity: 1;
+    height: 18px;
+    width: 18px;
+    transform: translate(-50%, -50%) scale(1);
+  }
+
+  .player-progress--scrubbing .player-progress-thumb {
+    height: 20px;
+    width: 20px;
+  }
 }
 
 .player-range {
@@ -1258,11 +1464,11 @@ onUnmounted(() => {
 }
 
 .player-browse-tabs {
-  @apply mb-3 grid w-full max-w-full grid-cols-2 gap-1 rounded-2xl border border-white/10 bg-base-100/75 p-1;
+  @apply inline-flex min-w-0 w-full gap-1 overflow-x-auto rounded-full border border-white/10 bg-base-100/75 p-1;
 }
 
 .player-browse-tab-btn {
-  @apply inline-flex min-w-0 items-center justify-center rounded-xl px-2 py-2.5 text-center text-[11px] font-medium leading-tight transition-colors;
+  @apply flex-1 whitespace-nowrap rounded-full px-2 py-2 text-center text-xs font-medium transition-colors sm:px-3 sm:text-sm;
 }
 
 .player-browse-tab-btn-active {
@@ -1270,48 +1476,25 @@ onUnmounted(() => {
 }
 
 .player-browse-tab-btn-inactive {
-  @apply text-base-content/60 hover:bg-white/5 hover:text-base-content;
+  @apply text-base-content/60 hover:text-base-content;
 }
 
-.player-browse-tab-label-short {
-  @apply sm:hidden;
-}
-
-.player-browse-tab-label-full {
-  @apply hidden sm:inline;
-}
-
-@media (min-width: 640px) {
-  .player-browse-tabs {
-    display: flex;
-    border-radius: 9999px;
-  }
-
-  .player-browse-tab-btn {
-    @apply flex-1 rounded-full px-2 py-2 text-xs;
-  }
-}
-
-@media (min-width: 1024px) {
-  .player-browse-tabs {
-    @apply rounded-2xl;
-  }
-
-  .player-browse-tab-btn {
-    @apply rounded-xl py-2 text-[11px];
-  }
-
-  .player-browse-tab-label-short {
-    @apply inline;
-  }
-
-  .player-browse-tab-label-full {
-    @apply hidden;
-  }
+.player-browse-search {
+  @apply flex w-full items-center;
 }
 
 .player-browse-body {
-  @apply min-h-0;
+  @apply min-h-0 flex-1 overflow-x-hidden overflow-y-auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.player-browse-body::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 .player-browse-grid {

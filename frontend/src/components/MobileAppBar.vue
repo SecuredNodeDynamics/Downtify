@@ -19,6 +19,20 @@
       <div class="ml-auto flex shrink-0 items-center gap-1">
         <DownloadCounterPill compact />
         <button
+          v-if="showLibraryRefresh"
+          type="button"
+          class="mobile-app-bar-icon shrink-0"
+          :title="t('common.refresh')"
+          :disabled="libraryRefreshLoading"
+          @click="refreshLibrary()"
+        >
+          <span
+            v-if="libraryRefreshLoading"
+            class="loading loading-spinner loading-sm text-primary"
+          />
+          <Icon v-else icon="clarity:refresh-line" class="h-5 w-5" />
+        </button>
+        <button
           v-if="showHealthRefresh"
           type="button"
           class="mobile-app-bar-icon shrink-0"
@@ -44,6 +58,7 @@ import { useRoute } from 'vue-router'
 
 import router from '../router'
 import { useHealthRefresh } from '../model/healthRefresh'
+import { useLibraryRefresh } from '../model/libraryRefresh'
 import { useI18n } from '../i18n'
 import DownloadCounterPill from './DownloadCounterPill.vue'
 
@@ -51,8 +66,11 @@ const route = useRoute()
 const { t } = useI18n()
 const { loading: healthRefreshLoading, refresh: refreshHealth } =
   useHealthRefresh()
+const { loading: libraryRefreshLoading, refresh: refreshLibrary } =
+  useLibraryRefresh()
 
 const showHealthRefresh = computed(() => route.name === 'Health')
+const showLibraryRefresh = computed(() => route.name === 'List')
 
 const pageTitle = computed(() => {
   const key = route.meta?.mobileTitleKey

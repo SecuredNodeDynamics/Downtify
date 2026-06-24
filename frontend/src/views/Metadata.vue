@@ -188,7 +188,8 @@
             "
             @click="activeTab = 'clean'"
           >
-            {{ t('metadata.clean') }}
+            <span class="sm:hidden">{{ t('metadata.cleanShort') }}</span>
+            <span class="hidden sm:inline">{{ t('metadata.clean') }}</span>
             <span
               class="ml-2 rounded-full bg-current/10 px-2 py-0.5 text-sm font-bold"
             >
@@ -424,9 +425,7 @@
           </div>
         </section>
 
-        <div
-          class="metadata-tab-shell metadata-filter-tab-shell tab-glow-shell"
-        >
+        <div class="metadata-tab-shell tab-glow-shell">
           <button
             class="metadata-tab-btn"
             :class="
@@ -696,14 +695,7 @@
               {{ t('metadata.jellyfinArtists') }}
             </p>
             <p class="metadata-stat-value text-primary">
-              {{ jellyfinCounts.jellyfin }}
-            </p>
-            <p class="metadata-stat-hint">
-              {{
-                t('metadata.bulkFixAvailable', {
-                  count: jellyfinRepairableBucketItems('missing_images').length,
-                })
-              }}
+              {{ jellyfinRepairableItems.length }}
             </p>
           </div>
           <div class="metadata-stat-card surface rounded-2xl">
@@ -2422,7 +2414,7 @@ async function syncJellyfinAfterImageRepairs(repairedCount) {
 }
 
 .metadata-tab-shell {
-  @apply mb-5 mx-auto flex w-max max-w-full min-w-0 gap-1 overflow-x-auto rounded-2xl border bg-base-100/75 p-1 sm:mb-6 sm:rounded-full;
+  @apply mb-5 mx-auto flex w-max max-w-full min-w-0 gap-1 overflow-x-auto rounded-full border border-white/10 bg-base-100/75 p-1 sm:mb-6;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
 }
@@ -2432,19 +2424,11 @@ async function syncJellyfinAfterImageRepairs(repairedCount) {
 }
 
 .metadata-tab-btn {
-  @apply max-w-full shrink-0 whitespace-nowrap rounded-full px-3 py-2 text-sm font-medium transition-colors sm:px-4;
-}
-
-.metadata-filter-tab-shell {
-  @apply mb-5 w-full max-w-full grid grid-cols-2 gap-1 rounded-2xl sm:mb-6 sm:mx-auto sm:flex sm:w-max sm:max-w-full sm:rounded-full;
-}
-
-.metadata-filter-tab-shell .metadata-tab-btn {
-  @apply inline-flex w-full items-center justify-center gap-1 whitespace-normal px-2 py-2.5 text-center text-[11px] leading-tight sm:w-auto sm:gap-0 sm:whitespace-nowrap sm:px-4 sm:py-2 sm:text-left sm:text-sm sm:leading-normal;
+  @apply inline-flex max-w-full shrink-0 items-center justify-center whitespace-nowrap rounded-full px-3 py-2 text-sm font-medium transition-colors sm:px-4;
 }
 
 .metadata-tab-badge {
-  @apply ml-1 inline-flex min-w-[1.1rem] shrink-0 items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none sm:ml-2 sm:min-w-0 sm:px-2 sm:text-sm;
+  @apply ml-1.5 inline-flex min-w-[1.1rem] shrink-0 items-center justify-center rounded-full px-1.5 py-0.5 text-[11px] font-bold leading-none sm:ml-2 sm:min-w-0 sm:px-2 sm:text-xs;
   background-color: color-mix(in srgb, currentColor 10%, transparent);
 }
 
@@ -2510,10 +2494,6 @@ async function syncJellyfinAfterImageRepairs(repairedCount) {
 .metadata-stat-value-text {
   @apply normal-case leading-tight line-clamp-2 text-sm sm:text-lg;
   overflow-wrap: anywhere;
-}
-
-.metadata-stat-hint {
-  @apply mt-1 line-clamp-2 text-[10px] font-normal normal-case leading-tight text-base-content/45 sm:text-[11px];
 }
 
 .metadata-stat-action {

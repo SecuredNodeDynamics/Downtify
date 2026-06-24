@@ -16,6 +16,13 @@ import {
   startLibraryPrefetch,
 } from './librarySession.js'
 import { preloadCoverSourcesBatch } from './imageLoader.js'
+import {
+  getBundledAppVersion,
+  getInstalledClientVersionSync,
+  resolveNativeInstalledVersion,
+  sanitizeStoredVersions,
+  writeCachedServerVersion,
+} from './appVersion.js'
 
 import { v4 as uuidv4 } from 'uuid'
 
@@ -43,10 +50,7 @@ function isJsonObject(value) {
 }
 
 function sanitizeStoredVersion() {
-  const stored = localStorage.getItem('version')
-  if (stored && !isValidVersion(stored)) {
-    localStorage.removeItem('version')
-  }
+  sanitizeStoredVersions()
 }
 
 function attachWebSocketHandlers(socket) {
@@ -105,10 +109,15 @@ function getVersion() {
         )
         return
       }
+      if (isCapacitorNative()) {
+        writeCachedServerVersion(version)
+        prefetchLibrary()
+        return
+      }
       const prevItem = localStorage.getItem('version')
       console.log('Backend version: ', version)
       localStorage.setItem('version', version)
-      if (prevItem != version && !isCapacitorNative()) {
+      if (prevItem != version) {
         location.reload()
       }
       prefetchLibrary()
@@ -122,6 +131,9 @@ function getVersion() {
 
 sanitizeStoredVersion()
 if (!needsServerConnection()) {
+  if (isCapacitorNative()) {
+    resolveNativeInstalledVersion()
+  }
   getVersion()
   ensureWebSocket()
   prefetchLibrary()

@@ -31,9 +31,11 @@ module.exports = {
         ],
       },
       boxShadow: {
-        'glow-sm': '0 0 24px rgba(26, 208, 92, 0.18)',
-        glow: '0 0 36px rgba(26, 208, 92, 0.30)',
-        'glow-lg': '0 0 60px rgba(26, 208, 92, 0.45)',
+        'glow-sm':
+          '0 4px 16px -4px rgba(26, 208, 92, 0.14), 0 8px 28px -8px rgba(26, 208, 92, 0.1)',
+        glow: '0 6px 24px -6px rgba(26, 208, 92, 0.2), 0 14px 40px -10px rgba(26, 208, 92, 0.14)',
+        'glow-lg':
+          '0 8px 32px -8px rgba(26, 208, 92, 0.28), 0 20px 56px -14px rgba(26, 208, 92, 0.2)',
       },
       animation: {
         'fade-in': 'fadeIn 0.35s ease-out',

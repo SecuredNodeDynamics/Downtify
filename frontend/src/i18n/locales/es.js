@@ -15,6 +15,7 @@ export default {
     unknownTrack: 'Pista desconocida',
     previousPage: 'Página anterior',
     nextPage: 'Página siguiente',
+    loading: 'Cargando',
   },
   nav: {
     home: 'Inicio',
@@ -77,6 +78,7 @@ export default {
     nextPage: 'Página siguiente',
   },
   queue: {
+    tab: 'Cola',
     title: 'Cola de descargas',
     subtitle:
       'Canciones que has añadido a la cola. Progreso, estado y acciones rápidas aquí.',
@@ -92,6 +94,7 @@ export default {
     invalidYouTubeURL: 'URL de YouTube no válida',
   },
   history: {
+    tab: 'Historial',
     title: 'Historial de descargas',
     subtitle: 'Intentos recientes de descarga, guardados entre reinicios.',
     empty: 'Aún no hay historial de descargas.',
@@ -105,6 +108,7 @@ export default {
     clear: 'Limpiar historial',
     clearPrompt: '¿Limpiar todo el historial de descargas?',
     downloadFile: 'Descargar archivo',
+    openInPlayer: 'Abrir en el reproductor',
     failedLoad: 'No se pudo cargar el historial de descargas.',
     failedRetry: 'No se pudo reintentar esta descarga.',
   },
@@ -156,9 +160,27 @@ export default {
     artists: 'Artistas',
     tracks: 'Pistas',
     albums: 'Albumes',
+    genres: 'Géneros',
+    searchPlaceholder: 'Busca en tu biblioteca o música para descargar…',
+    clearSearch: 'Borrar búsqueda',
+    noSearchResults: 'No hay coincidencias en tu biblioteca.',
+    notInLibrary: 'Aún no está en tu biblioteca',
+    notInLibraryHint:
+      'Descarga cualquier resultado abajo y aparecerá aquí al terminar.',
+    downloadTrack: 'Descargar',
+    downloadAlbum: 'Descargar álbum',
+    downloadFromLink: 'Descargar desde enlace',
+    downloadFromLinkHint:
+      'Este enlace aún no está en tu biblioteca. Inicia la descarga ahora.',
+    onlineSearchLoading: 'Buscando en línea…',
+    onlineSearchEmpty: 'No se encontró nada en línea para esta búsqueda.',
+    onlineSearchError:
+      'No se pudo buscar en línea. Revisa la conexión con el servidor.',
+    onlineSearchMore: '{count} resultados más en la página de búsqueda.',
     artistCount: '{artists} artistas - {albums} albumes - {tracks} pistas',
     artistMeta: '{tracks} pistas - {albums} albumes',
     albumMeta: '{tracks} pistas',
+    genreMeta: '{tracks} pistas',
     openArtist: 'Abrir artista',
     openAlbum: 'Abrir album',
     playArtist: 'Reproducir artista',
@@ -166,6 +188,18 @@ export default {
     playGenre: 'Reproducir genero',
     backToArtists: 'Artistas',
     backToAlbums: 'Albumes',
+    backToGenres: 'Géneros',
+    monitorArtist: 'Monitorear artista',
+    monitoringArtist: 'Monitoreando',
+    monitorPaused: 'Monitor en pausa',
+    monitorArtistPickTitle: 'Elegir artista de Spotify',
+    monitorArtistPickSubtitle:
+      'Elige el artista de Spotify para vigilar nuevas pistas y álbumes.',
+    monitorArtistMatchScore: '{score}% coincidencia de nombre',
+    monitorArtistNotFound: 'No se encontró un artista coincidente en Spotify.',
+    monitorArtistLookupFailed:
+      'No se pudo buscar este artista en Spotify.',
+    monitorArtistAddFailed: 'No se pudo agregar el artista al monitor.',
   },
   metadata: {
     title: 'Metadatos',
@@ -181,7 +215,7 @@ export default {
     resultLimit: 'Correcciones a mostrar',
     scanned: 'Escaneados',
     matches: 'Coincidencias',
-    needsFix: 'Necesita correccion',
+    needsFix: 'Reparar',
     total: 'Archivos totales',
     serverOnly:
       'Esto escanea archivos en la ubicacion de descarga del servidor Downtify. Las carpetas locales del navegador aun no estan disponibles para el backend.',
@@ -194,8 +228,8 @@ export default {
     fixing: 'Corrigiendo...',
     fixed: 'Corregido',
     completed: 'Completado',
-    clean: 'No necesita correccion',
-    cleanShort: 'Sin fix',
+    clean: 'Al día',
+    cleanShort: 'Bien',
     listView: 'Vista de lista',
     gridView: 'Vista de tarjetas',
     repairFailed: 'Correccion fallida',
@@ -427,6 +461,10 @@ export default {
       'Las instalaciones Docker se actualizan desde la app si el socket Docker esta montado; la app se reiniciara.',
     updateHintApk:
       'Descarga el APK mas reciente desde GitHub y abre el instalador de Android.',
+    updateHintServerBehind:
+      'Esta app es mas nueva que el servidor conectado. Despliega la misma version de Downtify en el servidor y vuelve a abrir la app.',
+    versionMismatchHint:
+      'Esta app es v{app} pero el servidor conectado es v{server}. Downtify usa una sola version en todos lados; actualiza ambos a v{latest}.',
     updateInProgressHintApk:
       'Descargando la actualizacion desde GitHub. El instalador de Android se abrira al terminar.',
     updateApkInstallerOpened:
@@ -585,6 +623,8 @@ export default {
     genreBrowseCount: '{count} generos',
     noFilterResults: 'Ninguna pista descargada coincide con tu búsqueda.',
     clearFilter: 'Quitar filtro',
+    browseSearchPlaceholder: 'Buscar artistas, álbumes, pistas, géneros…',
+    seek: 'Buscar posición',
   },
   footer: {
     tagline: 'Descargador de música de código abierto',

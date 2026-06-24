@@ -25,5 +25,7 @@ import ServerConnectionPrompt from '../components/ServerConnectionPrompt.vue'
 import SettingsPanel from '../components/SettingsPanel.vue'
 import { useI18n } from '../i18n'
 
+defineOptions({ name: 'Settings' })
+
 const { t } = useI18n()
 </script>

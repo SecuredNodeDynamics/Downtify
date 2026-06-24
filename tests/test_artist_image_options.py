@@ -134,6 +134,72 @@ def test_list_spotify_artist_image_options_filters_low_matches(monkeypatch):
     assert result[0]['image_url'] == 'https://i.scdn.co/image/good.jpg'
 
 
+def test_list_spotify_artist_matches_returns_urls_and_scores(monkeypatch):
+    monkeypatch.setattr(
+        options.artist_image_sources,
+        '_spotify_access_token',
+        lambda: 'token',
+    )
+
+    class FakeResponse:
+        status_code = 200
+
+        @staticmethod
+        def raise_for_status():
+            return None
+
+        @staticmethod
+        def json():
+            return {
+                'artists': {
+                    'items': [
+                        {
+                            'id': 'abc123',
+                            'name': 'Jane Murdoch',
+                            'images': [
+                                {'url': 'https://i.scdn.co/image/good.jpg', 'width': 640}
+                            ],
+                        }
+                    ]
+                }
+            }
+
+    monkeypatch.setattr(options.requests, 'get', lambda *args, **kwargs: FakeResponse())
+
+    result = options.list_spotify_artist_matches('Jane Murdoch')
+
+    assert len(result) == 1
+    assert result[0]['spotify_id'] == 'abc123'
+    assert result[0]['url'] == 'https://open.spotify.com/artist/abc123'
+    assert result[0]['match_score'] >= 0.99
+
+
+def test_list_spotify_artist_matches_falls_back_to_musicbrainz(monkeypatch):
+    monkeypatch.setattr(
+        options,
+        '_spotify_artist_items',
+        lambda *_args, **_kwargs: [],
+    )
+    monkeypatch.setattr(
+        options,
+        '_musicbrainz_spotify_artist_matches',
+        lambda *_args, **_kwargs: [
+            {
+                'spotify_id': 'abc123',
+                'name': 'Alex North',
+                'url': 'https://open.spotify.com/artist/abc123',
+                'image_url': '',
+                'match_score': 1.0,
+            }
+        ],
+    )
+
+    result = options.list_spotify_artist_matches('Alex North')
+
+    assert len(result) == 1
+    assert result[0]['spotify_id'] == 'abc123'
+
+
 def test_list_youtube_music_artist_image_options(monkeypatch):
     monkeypatch.setattr(
         options.artist_image_sources,

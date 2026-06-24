@@ -29,8 +29,9 @@ _APPLE_OG_IMAGE_RE = re.compile(
     re.I,
 )
 _MZSTATIC_SIZE_RE = re.compile(r'/\d+x\d+(?:bb|sr)?\.(?:jpg|jpeg|png|webp)\b', re.I)
+_EMBED_BOOTSTRAP_ARTIST_ID = '4NJhFmfw43RLBLjQvxDuRS'
 
-_SPOTIFY_TOKEN: dict[str, Any] = {'blocked': False}
+_SPOTIFY_TOKEN: dict[str, Any] = {}
 _NAME_IMAGE_CACHE: dict[str, tuple[bytes | None, str]] = {}
 
 
@@ -79,8 +80,51 @@ def _upgrade_mzstatic_url(url: str, size: int = 600) -> str:
     return url
 
 
-def _spotify_access_token() -> str:
-    if _SPOTIFY_TOKEN.get('blocked'):
+def _spotify_embed_access_token() -> str:
+    embed_cache = _SPOTIFY_TOKEN.get('embed')
+    if isinstance(embed_cache, dict):
+        token = str(embed_cache.get('token') or '').strip()
+        expires_at = float(embed_cache.get('expires_at') or 0)
+        if token and expires_at > time.time() + 30:
+            return token
+
+    try:
+        from . import spotify as spotify_module
+
+        payload = spotify_module._fetch_embed_json(
+            'artist', _EMBED_BOOTSTRAP_ARTIST_ID
+        )
+        token = spotify_module._token_from_embed_payload(payload)
+        if not token:
+            return ''
+        session = (
+            payload.get('props', {})
+            .get('pageProps', {})
+            .get('state', {})
+            .get('settings', {})
+            .get('session', {})
+        )
+        expires_ms = int(session.get('accessTokenExpirationTimestampMs') or 0)
+        expires_at = (
+            expires_ms / 1000 if expires_ms > 0 else time.time() + 3600
+        )
+        _SPOTIFY_TOKEN['embed'] = {
+            'token': token,
+            'expires_at': expires_at,
+        }
+        return token
+    except Exception:
+        logger.opt(exception=True).debug(
+            'Spotify embed access token bootstrap failed'
+        )
+        return ''
+
+
+def _spotify_transport_access_token() -> str:
+    transport_blocked_until = float(
+        _SPOTIFY_TOKEN.get('transport_blocked_until') or 0
+    )
+    if transport_blocked_until > time.time():
         return ''
 
     cached = str(_SPOTIFY_TOKEN.get('token') or '').strip()
@@ -96,9 +140,9 @@ def _spotify_access_token() -> str:
             timeout=12,
         )
         if response.status_code in {401, 403, 429}:
-            _SPOTIFY_TOKEN['blocked'] = True
+            _SPOTIFY_TOKEN['transport_blocked_until'] = time.time() + 3600
             logger.info(
-                'Spotify artist image lookup unavailable (HTTP {})',
+                'Spotify transport token unavailable (HTTP {})',
                 response.status_code,
             )
             return ''
@@ -106,9 +150,9 @@ def _spotify_access_token() -> str:
         payload = response.json()
     except Exception:
         logger.opt(exception=True).debug(
-            'Spotify access token request failed; skipping Spotify lookups'
+            'Spotify transport access token request failed'
         )
-        _SPOTIFY_TOKEN['blocked'] = True
+        _SPOTIFY_TOKEN['transport_blocked_until'] = time.time() + 300
         return ''
 
     token = str(payload.get('accessToken') or '').strip()
@@ -121,6 +165,13 @@ def _spotify_access_token() -> str:
         - time.time(),
     )
     return token
+
+
+def _spotify_access_token() -> str:
+    token = _spotify_transport_access_token()
+    if token:
+        return token
+    return _spotify_embed_access_token()
 
 
 def fetch_spotify_artist_image(artist_name: str) -> tuple[bytes | None, str]:

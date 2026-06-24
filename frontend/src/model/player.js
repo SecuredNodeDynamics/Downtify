@@ -17,6 +17,29 @@ const shuffle = ref(false)
 let audio = null
 let shuffleOrder = []
 let shufflePos = 0
+let progressRaf = 0
+
+function tickProgress() {
+  if (audio && !audio.paused) {
+    currentTime.value = audio.currentTime
+    progressRaf = requestAnimationFrame(tickProgress)
+  } else {
+    progressRaf = 0
+  }
+}
+
+function startProgressTicker() {
+  if (!progressRaf) {
+    progressRaf = requestAnimationFrame(tickProgress)
+  }
+}
+
+function stopProgressTicker() {
+  if (progressRaf) {
+    cancelAnimationFrame(progressRaf)
+    progressRaf = 0
+  }
+}
 
 function ensureAudio() {
   if (audio) return audio
@@ -24,7 +47,9 @@ function ensureAudio() {
   audio.preload = 'metadata'
   audio.volume = volume.value
   audio.addEventListener('timeupdate', () => {
-    currentTime.value = audio.currentTime
+    if (!progressRaf) {
+      currentTime.value = audio.currentTime
+    }
   })
   audio.addEventListener('loadedmetadata', () => {
     duration.value = isFinite(audio.duration) ? audio.duration : 0
@@ -35,9 +60,12 @@ function ensureAudio() {
   audio.addEventListener('ended', onEnded)
   audio.addEventListener('play', () => {
     isPlaying.value = true
+    startProgressTicker()
   })
   audio.addEventListener('pause', () => {
     isPlaying.value = false
+    stopProgressTicker()
+    if (audio) currentTime.value = audio.currentTime
   })
   return audio
 }

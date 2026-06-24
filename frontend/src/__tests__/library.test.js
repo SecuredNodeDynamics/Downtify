@@ -5,8 +5,18 @@ import {
   groupAlbums,
   groupGenres,
   libraryCoverFolders,
+  matchesLibraryAlbumEntry,
+  matchesLibraryArtistName,
+  matchesLibraryField,
+  matchesLibraryFilter,
+  matchesLibraryGenreName,
+  matchesLibraryTrackItem,
   normalizeLibraryItem,
 } from '../model/library.js'
+import {
+  filterOnlineResultsForLibraryView,
+  onlineArtistsLabel,
+} from '../model/libraryOnlineSearch.js'
 import { genreCoverIcon, genreCoverStyle } from '../model/genreArt.js'
 
 describe('library path helpers', () => {
@@ -77,5 +87,98 @@ describe('library path helpers', () => {
     expect(libraryCoverFolders('Aaron Copland/track.mp3')).toEqual([
       'Aaron Copland',
     ])
+  })
+
+  it('matches library search only on primary artist, album, and track fields', () => {
+    const kennyTrack = normalizeLibraryItem({
+      file: 'Michael Bolton/The Essential Kenny G/01 - Song.mp3',
+      title: 'Song',
+      artist: 'Michael Bolton',
+      album: 'The Essential Kenny G',
+      genre: 'Kenny G',
+    })
+    const kennyArtist = normalizeLibraryItem({
+      file: 'Kenny G/Breathless/01 - Track.mp3',
+      title: 'Track',
+      artist: 'Kenny G',
+      album: 'Breathless',
+    })
+
+    expect(matchesLibraryArtistName('Kenny G', 'Kenny G')).toBe(true)
+    expect(matchesLibraryArtistName('Michael Bolton', 'Kenny G')).toBe(false)
+    expect(matchesLibraryArtistName('Matué', 'Kenny G')).toBe(false)
+
+    expect(
+      matchesLibraryAlbumEntry(
+        { name: 'The Essential Kenny G', artist: 'Michael Bolton' },
+        'Kenny G'
+      )
+    ).toBe(true)
+    expect(
+      matchesLibraryAlbumEntry(
+        { name: 'Breathless', artist: 'Kenny G' },
+        'Kenny G'
+      )
+    ).toBe(true)
+    expect(
+      matchesLibraryAlbumEntry({ name: 'Random', artist: 'Rip Kane' }, 'Kenny G')
+    ).toBe(false)
+
+    expect(matchesLibraryTrackItem(kennyArtist, 'Kenny G')).toBe(true)
+    expect(matchesLibraryTrackItem(kennyTrack, 'Kenny G')).toBe(true)
+    expect(
+      matchesLibraryFilter(
+        normalizeLibraryItem({
+          file: 'Rip Kane/Album/track.mp3',
+          title: 'Unrelated',
+          artist: 'Rip Kane',
+          album: 'Album',
+          genre: 'Kenny G',
+        }),
+        'Kenny G'
+      )
+    ).toBe(false)
+  })
+
+  it('filters online download offers by library tab', () => {
+    const items = [
+      {
+        media_type: 'album',
+        name: 'Breathless',
+        artists: ['Kenny G'],
+        browse_id: 'album:1',
+      },
+      {
+        media_type: 'track',
+        name: 'Song',
+        artists: ['Michael Bolton'],
+        album_name: 'The Essential Kenny G',
+        song_id: 'track:1',
+      },
+      {
+        media_type: 'track',
+        name: 'Honey',
+        artists: ['Kenny G'],
+        album_name: 'Breathless',
+        song_id: 'track:2',
+      },
+    ]
+
+    const artistMatches = filterOnlineResultsForLibraryView(
+      items,
+      'artists',
+      'Kenny G'
+    )
+    expect(artistMatches.map((item) => onlineArtistsLabel(item))).toEqual([
+      'Kenny G',
+      'Kenny G',
+    ])
+
+    expect(
+      filterOnlineResultsForLibraryView(items, 'albums', 'Kenny G')
+    ).toHaveLength(1)
+    expect(
+      filterOnlineResultsForLibraryView(items, 'tracks', 'Kenny G')
+    ).toHaveLength(2)
   })
 })

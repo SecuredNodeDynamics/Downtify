@@ -193,7 +193,7 @@ def test_fetch_spotify_artist_image_uses_search_results(monkeypatch):
     assert source == 'Spotify'
 
 
-def test_spotify_access_token_marks_blocked_on_forbidden(monkeypatch):
+def test_spotify_access_token_falls_back_to_embed_on_forbidden(monkeypatch):
     class FakeResponse:
         status_code = 403
 
@@ -201,12 +201,20 @@ def test_spotify_access_token_marks_blocked_on_forbidden(monkeypatch):
         def raise_for_status():
             return None
 
-    monkeypatch.setattr(sources.requests, 'get', lambda *args, **kwargs: FakeResponse())
+    monkeypatch.setattr(
+        sources.requests,
+        'get',
+        lambda *args, **kwargs: FakeResponse(),
+    )
+    monkeypatch.setattr(
+        sources,
+        '_spotify_embed_access_token',
+        lambda: 'embed-token',
+    )
     sources._SPOTIFY_TOKEN.clear()
 
-    assert sources._spotify_access_token() == ''
-    assert sources._spotify_access_token() == ''
-    assert sources._SPOTIFY_TOKEN.get('blocked') is True
+    assert sources._spotify_access_token() == 'embed-token'
+    assert float(sources._SPOTIFY_TOKEN.get('transport_blocked_until') or 0) > 0
 
 
 def test_fetch_youtube_music_artist_image_uses_search_results(monkeypatch):

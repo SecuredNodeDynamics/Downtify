@@ -87,6 +87,20 @@
           </button>
 
           <button
+            v-if="route.name === 'List'"
+            class="icon-btn"
+            :title="t('common.refresh')"
+            :disabled="libraryRefreshLoading"
+            @click="refreshLibrary()"
+          >
+            <span
+              v-if="libraryRefreshLoading"
+              class="loading loading-spinner loading-sm text-primary"
+            />
+            <Icon v-else icon="clarity:refresh-line" class="h-5 w-5" />
+          </button>
+
+          <button
             v-if="route.name === 'Health'"
             class="icon-btn"
             :title="t('common.refresh')"
@@ -143,6 +157,7 @@ import router from '../router'
 import { useBinaryThemeManager } from '../model/theme'
 import { useSearchManager } from '../model/search'
 import { useHealthRefresh } from '../model/healthRefresh'
+import { useLibraryRefresh } from '../model/libraryRefresh'
 import { useI18n } from '../i18n'
 
 import SearchInput from './SearchInput.vue'
@@ -158,4 +173,6 @@ const sm = useSearchManager()
 const { t } = useI18n()
 const { loading: healthRefreshLoading, refresh: refreshHealth } =
   useHealthRefresh()
+const { loading: libraryRefreshLoading, refresh: refreshLibrary } =
+  useLibraryRefresh()
 </script>
