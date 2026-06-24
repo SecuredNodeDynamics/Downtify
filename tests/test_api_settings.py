@@ -585,7 +585,9 @@ def test_docker_self_update_fails_when_image_pull_fails(monkeypatch):
     assert result['pull_output'] == 'manifest unknown'
 
 
-def test_docker_self_update_rejects_version_pinned_container(monkeypatch):
+def test_docker_self_update_rejects_version_pinned_container_without_target(
+    monkeypatch,
+):
     class FakeResult:
         returncode = 0
         stderr = ''
@@ -611,6 +613,71 @@ def test_docker_self_update_rejects_version_pinned_container(monkeypatch):
     assert (
         'docker compose up -d --force-recreate downtify' in result['commands']
     )
+
+
+def test_docker_self_update_recreates_version_pinned_container(monkeypatch):
+    captured = {'commands': []}
+
+    class FakeResult:
+        def __init__(self, stdout='', returncode=0):
+            self.stdout = stdout
+            self.returncode = returncode
+            self.stderr = ''
+
+    inspect_payload = [
+        {
+            'Name': '/downtify',
+            'HostConfig': {
+                'Binds': ['./docker/downloads:/downloads'],
+                'PortBindings': {
+                    '30321/tcp': [{'HostIp': '', 'HostPort': '8000'}]
+                },
+                'RestartPolicy': {'Name': 'unless-stopped'},
+                'NetworkMode': 'bridge',
+            },
+            'Config': {
+                'Env': ['DOWNTIFY_PORT=30321'],
+                'Labels': {'com.docker.compose.service': 'downtify'},
+            },
+        }
+    ]
+
+    def fake_run(command, **_kwargs):
+        captured['commands'].append(command)
+        if command[1:3] == ['inspect', '--format']:
+            return FakeResult('ghcr.io/securednodedynamics/downtify:2.10.11\n')
+        if command[1] == 'inspect':
+            return FakeResult(json.dumps(inspect_payload))
+        if command[1] == 'pull':
+            return FakeResult('2.10.58: Pulling from securednodedynamics/downtify\n')
+        if command[1] == 'run':
+            return FakeResult('recreate-helper-id\n')
+        return FakeResult()
+
+    monkeypatch.setattr(api.shutil, 'which', lambda _name: '/usr/bin/docker')
+    monkeypatch.setattr(api.Path, 'exists', lambda _self: True)
+    monkeypatch.setenv('DOWNTIFY_SELF_UPDATE_CONTAINER', 'downtify')
+    monkeypatch.setattr(api, '_run_docker_command', fake_run)
+
+    result = _start_docker_self_update('2.10.58')
+
+    assert result['success'] is True
+    assert result['updated'] is True
+    assert result['restart_scheduled'] is True
+    assert (
+        result['target_image']
+        == 'ghcr.io/securednodedynamics/downtify:2.10.58'
+    )
+    assert captured['commands'][1] == [
+        '/usr/bin/docker',
+        'pull',
+        'ghcr.io/securednodedynamics/downtify:2.10.58',
+    ]
+    recreate_cmd = next(cmd for cmd in captured['commands'] if cmd[1] == 'run')
+    assert recreate_cmd[:4] == ['/usr/bin/docker', 'run', '-d', '--name']
+    assert 'alpine:3.20' in recreate_cmd
+    assert 'docker stop -t 15 downtify' in recreate_cmd[-1]
+    assert 'ghcr.io/securednodedynamics/downtify:2.10.58' in recreate_cmd[-1]
 
 
 def test_load_settings_empty_object_returns_defaults(tmp_path):

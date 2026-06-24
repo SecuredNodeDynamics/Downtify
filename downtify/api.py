@@ -25,6 +25,7 @@ import contextlib
 import json
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -962,6 +963,134 @@ def _run_docker_command(
     )
 
 
+def _docker_image_with_tag(image: str, tag: str) -> str:
+    tag = str(tag or '').strip()
+    if not tag:
+        return image
+    reference = image.split('@', 1)[0]
+    if ':' in reference.rsplit('/', 1)[-1]:
+        reference = reference.rsplit(':', 1)[0]
+    return f'{reference}:{tag}'
+
+
+def _docker_container_spec(docker: str, container: str) -> dict[str, Any]:
+    result = _run_docker_command([docker, 'inspect', container], timeout=15)
+    if result.returncode != 0:
+        output = (result.stdout or result.stderr or '').strip()
+        raise RuntimeError(
+            output or f'Could not inspect Docker container {container}'
+        )
+    payload = json.loads(result.stdout or '[]')
+    if not payload:
+        raise RuntimeError(f'Could not inspect Docker container {container}')
+    spec = payload[0]
+    if not isinstance(spec, dict):
+        raise RuntimeError(f'Could not inspect Docker container {container}')
+    return spec
+
+
+def _docker_build_create_command(
+    docker: str,
+    spec: dict[str, Any],
+    *,
+    name: str,
+    image: str,
+) -> list[str]:
+    host_config = spec.get('HostConfig') or {}
+    config = spec.get('Config') or {}
+
+    command = [docker, 'create', '--name', name]
+
+    restart = host_config.get('RestartPolicy') or {}
+    restart_name = str(restart.get('Name') or 'no')
+    if restart_name and restart_name != 'no':
+        command.extend(['--restart', restart_name])
+
+    for bind in host_config.get('Binds') or []:
+        command.extend(['-v', str(bind)])
+
+    for container_port, bindings in (host_config.get('PortBindings') or {}).items():
+        container_port_num = str(container_port).split('/', 1)[0]
+        for binding in bindings or []:
+            host_port = str((binding or {}).get('HostPort') or '').strip()
+            if not host_port:
+                continue
+            host_ip = str((binding or {}).get('HostIp') or '').strip()
+            publish = f'{host_port}:{container_port_num}'
+            if host_ip:
+                publish = f'{host_ip}:{publish}'
+            command.extend(['-p', publish])
+
+    network_mode = str(host_config.get('NetworkMode') or '').strip()
+    if network_mode and network_mode not in {'default', 'bridge'}:
+        if network_mode.startswith('container:'):
+            command.extend(['--network', network_mode])
+        else:
+            command.extend(['--network', network_mode])
+
+    for env in config.get('Env') or []:
+        command.extend(['-e', str(env)])
+
+    for key, value in (config.get('Labels') or {}).items():
+        command.extend(['--label', f'{key}={value}'])
+
+    command.append(image)
+    return command
+
+
+def _shell_join(command: list[str]) -> str:
+    return ' '.join(shlex.quote(part) for part in command)
+
+
+def _docker_start_recreate_helper(
+    docker: str,
+    container: str,
+    image: str,
+    *,
+    helper_name: str,
+) -> subprocess.CompletedProcess:
+    spec = _docker_container_spec(docker, container)
+    temp_name = f'{container}-update-{int(datetime.now(timezone.utc).timestamp())}'
+    create_command = _docker_build_create_command(
+        docker,
+        spec,
+        name=temp_name,
+        image=image,
+    )
+    script = ' && '.join(
+        [
+            _shell_join([docker, 'stop', '-t', '15', container]),
+            _shell_join(create_command),
+            f'{_shell_join([docker, "rm", container])} || true',
+            _shell_join([docker, 'rename', temp_name, container]),
+            _shell_join([docker, 'start', container]),
+        ]
+    )
+    helper_image = os.getenv(
+        'DOWNTIFY_SELF_UPDATE_RECREATE_IMAGE',
+        'alpine:3.20',
+    ).strip() or 'alpine:3.20'
+    return _run_docker_command(
+        [
+            docker,
+            'run',
+            '-d',
+            '--name',
+            helper_name,
+            '--rm',
+            '-v',
+            '/var/run/docker.sock:/var/run/docker.sock',
+            '-v',
+            f'{docker}:{docker}:ro',
+            helper_image,
+            'sh',
+            '-c',
+            script,
+        ],
+        timeout=30,
+    )
+
+
 def _docker_self_update_container() -> str:
     return (
         os.getenv('DOWNTIFY_SELF_UPDATE_CONTAINER', '').strip()
@@ -1006,7 +1135,9 @@ def _docker_container_image(docker: str, container: str) -> str:
     return result.stdout.strip()
 
 
-def _start_docker_self_update() -> dict[str, Any]:
+def _start_docker_self_update(
+    latest_version: str | None = None,
+) -> dict[str, Any]:
     docker = shutil.which('docker')
     socket_path = Path('/var/run/docker.sock')
     container = _docker_self_update_container()
@@ -1059,22 +1190,100 @@ def _start_docker_self_update() -> dict[str, Any]:
     ]
 
     if not _docker_image_uses_mutable_tag(target_image):
-        return {
-            'success': False,
-            'updated': False,
-            'mode': 'docker',
-            'requires_restart': True,
-            'requires_manual': True,
-            'message': (
-                f'The running container is pinned to {target_image}. '
-                'Automatic updates require the latest image tag.'
+        version_tag = str(latest_version or '').strip()
+        if not version_tag:
+            return {
+                'success': False,
+                'updated': False,
+                'mode': 'docker',
+                'requires_restart': True,
+                'requires_manual': True,
+                'message': (
+                    f'The running container is pinned to {target_image}. '
+                    'Automatic updates require the latest image tag.'
+                ),
+                'commands': [
+                    'Set the Downtify image to '
+                    'ghcr.io/securednodedynamics/downtify:latest in Compose',
+                    'docker compose pull downtify',
+                    'docker compose up -d --force-recreate downtify',
+                ],
+            }
+        target_image = _docker_image_with_tag(target_image, version_tag)
+        commands = [
+            f'docker pull {target_image}',
+            (
+                'Recreate the Downtify container with the pulled image while '
+                'preserving mounts, ports, and environment.'
             ),
-            'commands': [
-                'Set the Downtify image to '
-                'ghcr.io/securednodedynamics/downtify:latest in Compose',
-                'docker compose pull downtify',
-                'docker compose up -d --force-recreate downtify',
-            ],
+        ]
+
+        pull = _run_docker_command([docker, 'pull', target_image], timeout=300)
+        pull_output = (pull.stdout or pull.stderr or '').strip()
+        if pull.returncode != 0:
+            return {
+                'success': False,
+                'updated': False,
+                'mode': 'docker',
+                'requires_restart': True,
+                'requires_manual': True,
+                'message': (
+                    f'Could not pull Downtify Docker image {target_image}.'
+                ),
+                'commands': commands,
+                'pull_output': pull_output,
+            }
+
+        recreate = _docker_start_recreate_helper(
+            docker,
+            container,
+            target_image,
+            helper_name=helper_name,
+        )
+        output = (recreate.stdout or recreate.stderr or '').strip()
+        if recreate.returncode != 0:
+            return {
+                'success': False,
+                'updated': False,
+                'mode': 'docker',
+                'requires_restart': True,
+                'requires_manual': True,
+                'message': 'Could not start Docker recreate helper.',
+                'commands': commands,
+                'pull_output': '\n'.join(
+                    part for part in [pull_output, output] if part
+                ),
+            }
+
+        helper_message = (
+            f'Docker recreate helper {output or helper_name} started for '
+            f'{container}. Downtify will restart on {target_image}.'
+        )
+        logger.warning(helper_message)
+        terminal_output = '\n'.join(
+            part
+            for part in [
+                f'$ docker pull {target_image}',
+                pull_output,
+                helper_message,
+            ]
+            if part
+        )
+        return {
+            'success': True,
+            'updated': True,
+            'mode': 'docker',
+            'requires_restart': False,
+            'requires_manual': False,
+            'restart_scheduled': True,
+            'message': (
+                f'Docker image {target_image} pulled. Downtify is recreating '
+                'the container and will restart shortly.'
+            ),
+            'helper_container': output,
+            'target_image': target_image,
+            'pull_output': pull_output,
+            'terminal_output': terminal_output,
         }
 
     pull = _run_docker_command([docker, 'pull', target_image], timeout=300)
@@ -1200,7 +1409,10 @@ def update_app() -> dict[str, Any]:
         }
 
     if _is_docker_runtime():
-        return {**status, **_start_docker_self_update()}
+        return {
+            **status,
+            **_start_docker_self_update(status.get('latest_version')),
+        }
 
     root = _project_root()
     if not (root / '.git').exists():
