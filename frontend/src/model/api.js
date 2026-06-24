@@ -125,7 +125,9 @@ function getVersion() {
     .catch((error) => {
       console.error(error)
       console.log('Error getting version, using 0')
-      localStorage.setItem('version', '0.0.0')
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('version', '0.0.0')
+      }
     })
 }
 
