@@ -65,10 +65,19 @@ export function pickApkAsset(assets = []) {
 
 export function buildApkUpdateStatus(release, currentVersion) {
   const apk = pickApkAsset(release?.assets)
-  const latestVersion = apk?.version || ''
+  const tagParts = parseApkVersion(release?.tag_name)
+  const tagVersion = tagParts ? tagParts.join('.') : ''
+  const latestVersion = apk?.version || tagVersion || ''
   const updateAvailable = Boolean(
     latestVersion && isNewerApkVersion(latestVersion, currentVersion)
   )
+
+  let error = ''
+  if (!latestVersion) {
+    error = 'No GitHub release version found.'
+  } else if (!apk?.download_url) {
+    error = 'Latest release found, but no APK download is attached yet.'
+  }
 
   return {
     current_version: currentVersion,
@@ -80,7 +89,7 @@ export function buildApkUpdateStatus(release, currentVersion) {
     source: 'github_apk',
     name: release?.name || release?.tag_name || '',
     published_at: release?.published_at || null,
-    error: apk ? '' : 'No APK asset found on the latest GitHub release.',
+    error,
   }
 }
 

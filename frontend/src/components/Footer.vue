@@ -26,6 +26,8 @@
 import { onMounted, ref } from 'vue'
 import { useI18n } from '../i18n'
 import API from '../model/api'
+import { usesApkUpdateFlow } from '../model/appUpdate'
+import { checkApkUpdate } from '../model/apkUpdate'
 import { openSettingsModal } from '../model/settingsModal'
 
 const { t } = useI18n()
@@ -33,6 +35,11 @@ const updateAvailable = ref(false)
 
 onMounted(async () => {
   try {
+    if (usesApkUpdateFlow()) {
+      const status = await checkApkUpdate()
+      updateAvailable.value = Boolean(status?.update_available)
+      return
+    }
     const response = await API.check_for_update()
     updateAvailable.value = Boolean(response.data?.update_available)
   } catch {

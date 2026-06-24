@@ -1104,6 +1104,7 @@ import {
 } from '../model/serverConnection'
 import { useI18n } from '../i18n'
 import API from '../model/api'
+import { usesApkUpdateFlow, usesServerUpdateFlow } from '../model/appUpdate'
 import { checkApkUpdate, installApkUpdate } from '../model/apkUpdate'
 import ThemedSelect from './ThemedSelect.vue'
 
@@ -1304,6 +1305,9 @@ const aboutSections = computed(() => [
 ])
 
 const currentAppVersion = computed(() => {
+  if (usesServerUpdateFlow()) {
+    return updateStatus.value?.current_version || t('settings.unknownVersion')
+  }
   return updateStatus.value?.current_version || __APP_VERSION__ || '0.0.0'
 })
 
@@ -1314,7 +1318,7 @@ const latestVersionLabel = computed(() => {
 })
 
 const canRunUpdate = computed(() => {
-  if (isCapacitorNative()) {
+  if (usesApkUpdateFlow()) {
     return Boolean(
       updateStatus.value?.update_available &&
         updateStatus.value?.apk_download_url
@@ -1324,11 +1328,11 @@ const canRunUpdate = computed(() => {
 })
 
 const updateHintText = computed(() =>
-  isCapacitorNative() ? t('settings.updateHintApk') : t('settings.updateHint')
+  usesApkUpdateFlow() ? t('settings.updateHintApk') : t('settings.updateHint')
 )
 
 const updateInProgressHintText = computed(() =>
-  isCapacitorNative()
+  usesApkUpdateFlow()
     ? t('settings.updateInProgressHintApk')
     : t('settings.updateInProgressHint')
 )
@@ -1449,13 +1453,14 @@ async function loadUpdateStatus(refresh = false) {
   helpLoading.value = true
   helpError.value = ''
   try {
-    if (isCapacitorNative()) {
+    if (usesApkUpdateFlow()) {
       updateStatus.value = await checkApkUpdate({ refresh })
       if (updateStatus.value?.error && !updateStatus.value?.latest_version) {
         helpError.value = updateStatus.value.error
       }
       return
     }
+
     const res = await API.check_for_update(refresh)
     updateStatus.value = res.data || null
   } catch (err) {
@@ -1498,7 +1503,7 @@ async function runUpdate() {
   updateRunning.value = true
   helpError.value = ''
 
-  if (isCapacitorNative()) {
+  if (usesApkUpdateFlow()) {
     await runNativeApkUpdate()
     return
   }

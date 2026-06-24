@@ -50,6 +50,22 @@ describe('apkUpdate', () => {
     )
   })
 
+  it('falls back to the release tag when no APK asset is attached', () => {
+    const status = buildApkUpdateStatus(
+      {
+        html_url:
+          'https://github.com/SecuredNodeDynamics/Downtify/releases/tag/v2.10.52',
+        tag_name: 'v2.10.52',
+        assets: [],
+      },
+      '2.10.51'
+    )
+
+    expect(status.latest_version).toBe('2.10.52')
+    expect(status.update_available).toBe(true)
+    expect(status.apk_download_url).toBe('')
+  })
+
   it('reports up to date when the release APK matches the installed version', () => {
     const status = buildApkUpdateStatus(
       {
