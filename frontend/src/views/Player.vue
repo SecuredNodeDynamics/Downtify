@@ -56,10 +56,10 @@
               v-if="
                 currentCoverSources.src || currentCoverSources.fallbacks.length
               "
-              :key="player.currentTrack.value?.file || 'player-cover'"
+              :key="player.currentTrack.value?.file || libraryItems[0]?.file || 'player-cover'"
               :src="currentCoverSources.src"
               :fallbacks="currentCoverSources.fallbacks"
-              :alt="player.currentTrack.value.title"
+              :alt="trackTitle"
               img-class="absolute inset-0 h-full w-full object-cover"
             >
               <template #fallback>
@@ -803,7 +803,8 @@ const browseBackLabel = computed(() => {
 })
 
 const currentCoverSources = computed(() => {
-  const file = player.currentTrack.value?.file || ''
+  const file =
+    player.currentTrack.value?.file || libraryItems.value[0]?.file || ''
   if (!file) return API.coverSourcesForFile('')
   return API.coverSourcesForFile(file)
 })
@@ -844,6 +845,24 @@ function fallbackLibraryItems(paths) {
   })
 }
 
+function syncPlayerPlaylist(fileList) {
+  const list = (fileList || []).filter(Boolean)
+  if (!list.length) return
+
+  const currentFile = player.currentTrack.value?.file
+  if (currentFile && list.includes(currentFile)) {
+    player.setPlaylist(list, {
+      startIndex: list.indexOf(currentFile),
+      autoplay: false,
+    })
+    return
+  }
+
+  if (player.playlist.value.length === 0 || player.currentIndex.value < 0) {
+    player.setPlaylist(list, { selectFirst: true })
+  }
+}
+
 function applyLibraryItems(items) {
   const options = libraryGroupOptions.value
   libraryItems.value = items.map((item) => normalizeLibraryItem(item, options))
@@ -861,7 +880,9 @@ function hydrateLibraryFromSession() {
   files.value = snapshot.paths
 
   if (player.playlist.value.length === 0 && files.value.length > 0) {
-    player.setPlaylist(files.value)
+    syncPlayerPlaylist(files.value)
+  } else if (player.currentIndex.value < 0 && files.value.length > 0) {
+    syncPlayerPlaylist(files.value)
   }
 
   API.warmLibraryCovers(libraryItems.value)
@@ -883,9 +904,7 @@ async function applyFetchedLibrary(items) {
   }
 
   applyLibraryItems(items)
-  if (player.playlist.value.length === 0) {
-    player.setPlaylist(items.map((item) => item.file))
-  }
+  syncPlayerPlaylist(items.map((item) => item.file))
 }
 
 async function refreshLibraryMetadataInBackground(force = false) {
@@ -893,6 +912,7 @@ async function refreshLibraryMetadataInBackground(force = false) {
     const items = await API.refreshLibraryInBackground(force)
     if (items.length > 0 && !libraryItemsUnchanged(items)) {
       applyLibraryItems(items)
+      syncPlayerPlaylist(items.map((item) => item.file))
       scheduleGenreRefresh(items)
     } else if (items.length > 0) {
       scheduleGenreRefresh(items)
@@ -976,9 +996,7 @@ async function load({ background = false } = {}) {
       const paths = res.data || []
       if (paths.length > 0) {
         applyLibraryItems(fallbackLibraryItems(paths))
-        if (player.playlist.value.length === 0) {
-          player.setPlaylist(paths)
-        }
+        syncPlayerPlaylist(paths)
       } else {
         files.value = []
         libraryItems.value = []
@@ -993,6 +1011,9 @@ async function load({ background = false } = {}) {
     loading.value = false
     if (!background && !hadCache) endAppLoading()
     applyPlayerNavigationIntent()
+    if (player.currentIndex.value < 0 && files.value.length > 0) {
+      syncPlayerPlaylist(files.value)
+    }
   }
 
   if (countUnknownGenres(libraryItems.value) > 0) {
@@ -1091,14 +1112,18 @@ function clearLibraryFilter() {
 
 const trackTitle = computed(() => {
   const c = player.currentTrack.value
-  if (c && c.title) return c.title
+  if (c?.title) return c.title
+  const first = libraryItems.value[0]
+  if (first?.title) return first.title
   return t('player.empty')
 })
 
 const trackArtist = computed(() => {
   const c = player.currentTrack.value
-  if (c && c.artist) return c.artist
+  if (c?.artist) return c.artist
   if (c) return t('common.unknownArtist')
+  const first = libraryItems.value[0]
+  if (first?.artist) return first.artist
   return ''
 })
 
@@ -1211,6 +1236,7 @@ onMounted(() => {
   window.scroll(0, 0)
   if (libraryItems.value.length) {
     API.warmLibraryCovers(libraryItems.value)
+    syncPlayerPlaylist(files.value)
   }
   load()
   stopLibraryListener = onLibraryChanged(() => {
@@ -1220,6 +1246,7 @@ onMounted(() => {
 
 onActivated(() => {
   if (libraryItems.value.length > 0) {
+    syncPlayerPlaylist(files.value)
     applyPlayerNavigationIntent()
     void refreshLibraryMetadataInBackground()
     return

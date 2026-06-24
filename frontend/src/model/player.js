@@ -109,6 +109,31 @@ function buildShuffleOrder() {
       : 0
 }
 
+function selectAt(index) {
+  if (index < 0 || index >= playlist.value.length) return
+  const a = ensureAudio()
+  const wasPlaying = isPlaying.value
+  currentIndex.value = index
+  if (shuffle.value) {
+    if (shuffleOrder.length !== playlist.value.length) buildShuffleOrder()
+    const pos = shuffleOrder.indexOf(index)
+    if (pos >= 0) shufflePos = pos
+  }
+  const nextUrl = playlist.value[index].url
+  if (a.src !== nextUrl) {
+    a.pause()
+    isPlaying.value = false
+    stopProgressTicker()
+    a.src = nextUrl
+    a.currentTime = 0
+    currentTime.value = 0
+    duration.value = 0
+  }
+  if (wasPlaying) {
+    a.play().catch(() => {})
+  }
+}
+
 function setPlaylist(files, options = {}) {
   const tracks = (files || []).map((f) =>
     typeof f === 'string' ? trackFromFile(f) : f
@@ -117,7 +142,13 @@ function setPlaylist(files, options = {}) {
   if (currentIndex.value >= tracks.length) currentIndex.value = -1
   if (shuffle.value) buildShuffleOrder()
   if (typeof options.startIndex === 'number') {
-    playAt(options.startIndex)
+    if (options.autoplay === false) {
+      selectAt(options.startIndex)
+    } else {
+      playAt(options.startIndex)
+    }
+  } else if (options.selectFirst && tracks.length > 0 && currentIndex.value < 0) {
+    selectAt(0)
   } else if (options.autoplay && tracks.length > 0 && currentIndex.value < 0) {
     playAt(0)
   }
@@ -305,6 +336,7 @@ export function usePlayer() {
     repeatMode,
     shuffle,
     setPlaylist,
+    selectAt,
     playAt,
     play,
     pause,
