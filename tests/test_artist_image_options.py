@@ -136,6 +136,11 @@ def test_list_spotify_artist_image_options_filters_low_matches(monkeypatch):
 
 def test_list_spotify_artist_matches_returns_urls_and_scores(monkeypatch):
     monkeypatch.setattr(
+        options,
+        '_musicbrainz_spotify_artist_matches',
+        lambda *_args, **_kwargs: [],
+    )
+    monkeypatch.setattr(
         options.artist_image_sources,
         '_spotify_access_token',
         lambda: 'token',
@@ -181,6 +186,11 @@ def test_list_spotify_artist_matches_falls_back_to_musicbrainz(monkeypatch):
         lambda *_args, **_kwargs: [],
     )
     monkeypatch.setattr(
+        options.artist_image_sources,
+        '_spotify_search_blocked',
+        lambda: False,
+    )
+    monkeypatch.setattr(
         options,
         '_musicbrainz_spotify_artist_matches',
         lambda *_args, **_kwargs: [
@@ -198,6 +208,41 @@ def test_list_spotify_artist_matches_falls_back_to_musicbrainz(monkeypatch):
 
     assert len(result) == 1
     assert result[0]['spotify_id'] == 'abc123'
+
+
+def test_list_spotify_artist_matches_skips_spotify_when_rate_limited(monkeypatch):
+    monkeypatch.setattr(
+        options.artist_image_sources,
+        '_spotify_search_blocked',
+        lambda: True,
+    )
+    monkeypatch.setattr(
+        options,
+        '_musicbrainz_spotify_artist_matches',
+        lambda *_args, **_kwargs: [
+            {
+                'spotify_id': 'abc123',
+                'name': 'Alex North',
+                'url': 'https://open.spotify.com/artist/abc123',
+                'image_url': '',
+                'match_score': 1.0,
+            }
+        ],
+    )
+    spotify_called = False
+
+    def _fake_spotify(*_args, **_kwargs):
+        nonlocal spotify_called
+        spotify_called = True
+        return []
+
+    monkeypatch.setattr(options, '_spotify_artist_items', _fake_spotify)
+
+    result = options.list_spotify_artist_matches('Alex North')
+
+    assert len(result) == 1
+    assert result[0]['spotify_id'] == 'abc123'
+    assert spotify_called is False
 
 
 def test_list_youtube_music_artist_image_options(monkeypatch):

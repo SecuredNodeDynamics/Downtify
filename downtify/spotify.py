@@ -201,6 +201,17 @@ def _cover_url(entity: dict[str, Any]) -> str:
     return _largest_image(candidates)
 
 
+def embed_image_url(kind: str, spotify_id: str) -> str:
+    """Return cover/avatar URL from Spotify embed metadata."""
+
+    spotify_id = str(spotify_id or '').strip()
+    if not spotify_id:
+        return ''
+    payload = _fetch_embed_json(kind, spotify_id)
+    entity = _entity_from(payload)
+    return _cover_url(entity)
+
+
 def _artist_names(entity: dict[str, Any]) -> list[str]:
     raw = entity.get('artists') or []
     names: list[str] = []

@@ -1,8 +1,11 @@
 import axios from 'axios'
 import { buildApiBaseUrl, getServerConfig } from './serverConnection.js'
 
-const API = axios.create({
-  baseURL: buildApiBaseUrl(getServerConfig()),
+const API = axios.create()
+
+API.interceptors.request.use((config) => {
+  config.baseURL = buildApiBaseUrl(getServerConfig())
+  return config
 })
 
 function listMonitoredPlaylists() {
@@ -25,7 +28,10 @@ function addMonitoredPlaylist(url, intervalMinutes = 60, kind = 'playlist') {
 }
 
 function updateMonitoredPlaylist(id, updates) {
-  return API.patch(`/api/monitor/playlists/${id}`, updates)
+  return API.post(`/api/monitor/playlists/${id}/update`, updates, {
+    timeout: 15000,
+    headers: { 'Content-Type': 'application/json' },
+  })
 }
 
 function deleteMonitoredPlaylist(id) {

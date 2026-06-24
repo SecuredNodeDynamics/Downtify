@@ -68,7 +68,7 @@ from .library_index import (
     list_library_files_fast,
     warm_library_genres,
 )
-from .monitor import PlaylistMonitorDB, check_playlist
+from .monitor import MonitoredPlaylist, PlaylistMonitorDB, check_playlist
 from .versioning import parse_version
 
 DEFAULT_SETTINGS: dict[str, Any] = {
@@ -4063,11 +4063,71 @@ def _require_monitor_db() -> PlaylistMonitorDB:
     return state.monitor_db
 
 
+_MONITOR_IMAGE_CACHE: dict[str, str] = {}
+
+
+def _monitor_item_image_url(kind: str, spotify_id: str) -> str:
+    cache_key = f'{kind}:{spotify_id}'
+    if cache_key in _MONITOR_IMAGE_CACHE:
+        return _MONITOR_IMAGE_CACHE[cache_key]
+    image_url = ''
+    try:
+        image_url = spotify.embed_image_url(kind, spotify_id)
+    except Exception:
+        logger.opt(exception=True).debug(
+            'Monitor cover lookup failed for {} {}',
+            kind,
+            spotify_id,
+        )
+    _MONITOR_IMAGE_CACHE[cache_key] = image_url
+    return image_url
+
+
+def _monitor_playlist_dict(
+    playlist: MonitoredPlaylist,
+    *,
+    fetch_image: bool = True,
+) -> dict[str, Any]:
+    data = playlist.to_dict()
+    cache_key = f'{playlist.kind}:{playlist.spotify_id}'
+    if fetch_image and cache_key not in _MONITOR_IMAGE_CACHE:
+        _MONITOR_IMAGE_CACHE[cache_key] = _monitor_item_image_url(
+            playlist.kind, playlist.spotify_id
+        )
+    data['image_url'] = _MONITOR_IMAGE_CACHE.get(cache_key, '')
+    return data
+
+
+async def _apply_monitor_playlist_update(
+    playlist_id: int,
+    payload: dict[str, Any],
+) -> dict[str, Any]:
+    db = _require_monitor_db()
+    kwargs: dict[str, Any] = {}
+    if 'interval_minutes' in payload:
+        kwargs['interval_minutes'] = int(payload['interval_minutes'])
+    if 'enabled' in payload:
+        kwargs['enabled'] = bool(payload['enabled'])
+
+    updated = await asyncio.to_thread(
+        db.update_playlist, playlist_id, **kwargs
+    )
+    if updated is None:
+        raise HTTPException(
+            status_code=404, detail='Monitored item not found'
+        )
+    return await asyncio.to_thread(
+        lambda: _monitor_playlist_dict(updated, fetch_image=False)
+    )
+
+
 @router.get('/api/monitor/playlists')
 async def list_monitor_playlists() -> list[dict[str, Any]]:
     db = _require_monitor_db()
     playlists = await asyncio.to_thread(db.list_playlists)
-    return [p.to_dict() for p in playlists]
+    return await asyncio.to_thread(
+        lambda: [_monitor_playlist_dict(p) for p in playlists]
+    )
 
 
 @router.get('/api/monitor/artists/lookup')
@@ -4169,33 +4229,31 @@ async def add_monitor_playlist(request: Request) -> dict[str, Any]:
 
         asyncio.create_task(_initial_check())
 
-    return playlist.to_dict()
+    return await asyncio.to_thread(
+        lambda: _monitor_playlist_dict(playlist, fetch_image=False)
+    )
 
 
 @router.patch('/api/monitor/playlists/{playlist_id}')
 async def update_monitor_playlist(
     playlist_id: int, request: Request
 ) -> dict[str, Any]:
-    db = _require_monitor_db()
     try:
         payload = await request.json()
     except Exception:
         payload = {}
+    return await _apply_monitor_playlist_update(playlist_id, payload)
 
-    kwargs: dict[str, Any] = {}
-    if 'interval_minutes' in payload:
-        kwargs['interval_minutes'] = int(payload['interval_minutes'])
-    if 'enabled' in payload:
-        kwargs['enabled'] = bool(payload['enabled'])
 
-    updated = await asyncio.to_thread(
-        db.update_playlist, playlist_id, **kwargs
-    )
-    if updated is None:
-        raise HTTPException(
-            status_code=404, detail='Monitored item not found'
-        )
-    return updated.to_dict()
+@router.post('/api/monitor/playlists/{playlist_id}/update')
+async def update_monitor_playlist_post(
+    playlist_id: int, request: Request
+) -> dict[str, Any]:
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+    return await _apply_monitor_playlist_update(playlist_id, payload)
 
 
 @router.delete('/api/monitor/playlists/{playlist_id}')

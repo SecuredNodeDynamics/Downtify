@@ -15,6 +15,7 @@ from downtify.spotify import (
     _normalize_release_date_text,
     _track_dict,
     album_tracks_from_id,
+    embed_image_url,
 )
 
 # Aliases only — no real artist / track titles
@@ -309,3 +310,38 @@ def test_album_ids_from_discography_collects_unique_albums():
         'albumB',
         'single1',
     ]
+
+
+def test_embed_image_url_reads_visual_identity_image(monkeypatch):
+    monkeypatch.setattr(
+        'downtify.spotify._fetch_embed_json',
+        lambda kind, spotify_id: {
+            'props': {
+                'pageProps': {
+                    'state': {
+                        'data': {
+                            'entity': {
+                                'visualIdentity': {
+                                    'image': [
+                                        {
+                                            'url': 'https://i.scdn.co/image/small',
+                                            'width': 160,
+                                        },
+                                        {
+                                            'url': 'https://i.scdn.co/image/large',
+                                            'width': 640,
+                                        },
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+    )
+
+    assert (
+        embed_image_url('artist', 'abc123')
+        == 'https://i.scdn.co/image/large'
+    )

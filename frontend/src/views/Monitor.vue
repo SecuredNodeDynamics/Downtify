@@ -119,68 +119,90 @@
         <li
           v-for="pl in playlists"
           :key="pl.id"
-          class="surface rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-4"
+          class="surface rounded-2xl p-4 sm:p-5"
         >
-          <!-- Info -->
-          <div class="flex-1 min-w-0">
-            <div class="flex items-center gap-2 mb-1 flex-wrap">
-              <span class="font-semibold truncate">{{ pl.name }}</span>
-              <span class="pill shrink-0 badge-neutral-soft text-xs">
-                {{
-                  pl.kind === 'artist'
-                    ? t('monitor.kindArtist')
-                    : t('monitor.kindPlaylist')
-                }}
-              </span>
-              <span
-                class="pill shrink-0"
-                :class="pl.enabled ? 'badge-soft' : 'badge-neutral-soft'"
+          <div class="flex gap-4 min-w-0">
+            <div class="shrink-0">
+              <CoverImage
+                :src="coverForItem(pl).src"
+                :fallbacks="coverForItem(pl).fallbacks"
+                :alt="pl.name"
+                img-class="h-16 w-16 sm:h-20 sm:w-20 rounded-2xl object-cover border border-white/10 bg-base-100/60"
               >
-                {{ pl.enabled ? t('monitor.active') : t('monitor.paused') }}
-              </span>
+                <template #fallback>
+                  <Icon
+                    :icon="
+                      pl.kind === 'artist'
+                        ? 'clarity:user-line'
+                        : 'clarity:music-note-line'
+                    "
+                    class="h-7 w-7 text-base-content/25"
+                  />
+                </template>
+              </CoverImage>
             </div>
-            <div
-              class="flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-base-content/50"
-            >
-              <span>
-                <Icon
-                  icon="clarity:refresh-line"
-                  class="inline h-3 w-3 mr-0.5"
-                />
-                {{
-                  t('monitor.everyInterval', {
-                    interval: formatInterval(pl.interval_minutes),
-                  })
-                }}
-              </span>
-              <span>
-                <Icon
-                  icon="clarity:music-note-line"
-                  class="inline h-3 w-3 mr-0.5"
-                />
-                {{
-                  pl.last_track_count === 1
-                    ? t('monitor.tracksOne', { count: pl.last_track_count })
-                    : t('monitor.tracksMany', { count: pl.last_track_count })
-                }}
-              </span>
-              <span v-if="pl.last_checked">
-                <Icon icon="clarity:clock-line" class="inline h-3 w-3 mr-0.5" />
-                {{ t('monitor.checked', { when: timeAgo(pl.last_checked) }) }}
-              </span>
-              <span v-else class="italic">{{ t('monitor.notChecked') }}</span>
+
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center gap-2 mb-1 flex-wrap">
+                <span class="font-semibold truncate">{{ pl.name }}</span>
+                <span class="pill shrink-0 badge-neutral-soft text-xs">
+                  {{
+                    pl.kind === 'artist'
+                      ? t('monitor.kindArtist')
+                      : t('monitor.kindPlaylist')
+                  }}
+                </span>
+                <span
+                  class="pill shrink-0"
+                  :class="pl.enabled ? 'badge-soft' : 'badge-neutral-soft'"
+                >
+                  {{ pl.enabled ? t('monitor.active') : t('monitor.paused') }}
+                </span>
+              </div>
+              <div
+                class="flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-base-content/50"
+              >
+                <span>
+                  <Icon
+                    icon="clarity:refresh-line"
+                    class="inline h-3 w-3 mr-0.5"
+                  />
+                  {{
+                    t('monitor.everyInterval', {
+                      interval: formatInterval(pl.interval_minutes),
+                    })
+                  }}
+                </span>
+                <span>
+                  <Icon
+                    icon="clarity:music-note-line"
+                    class="inline h-3 w-3 mr-0.5"
+                  />
+                  {{
+                    pl.last_track_count === 1
+                      ? t('monitor.tracksOne', { count: pl.last_track_count })
+                      : t('monitor.tracksMany', { count: pl.last_track_count })
+                  }}
+                </span>
+                <span v-if="pl.last_checked">
+                  <Icon
+                    icon="clarity:clock-line"
+                    class="inline h-3 w-3 mr-0.5"
+                  />
+                  {{ t('monitor.checked', { when: timeAgo(pl.last_checked) }) }}
+                </span>
+                <span v-else class="italic">{{ t('monitor.notChecked') }}</span>
+              </div>
             </div>
           </div>
 
-          <!-- Actions -->
           <div
-            class="flex flex-wrap items-center justify-end gap-2 shrink-0 w-full sm:w-auto"
+            class="mt-4 flex flex-wrap items-center justify-end gap-2 border-t border-white/5 pt-4"
           >
-            <!-- Interval selector -->
             <select
-              :value="pl.interval_minutes"
-              @change="onChangeInterval(pl, $event)"
-              class="select select-xs rounded-full border border-white/10 bg-base-100/60 text-xs focus:border-primary/60"
+              :value="draftInterval(pl)"
+              class="select select-sm rounded-full border border-white/10 bg-base-100/60 text-xs focus:border-primary/60 min-w-[6.5rem]"
+              @change="onIntervalDraftChange(pl, $event)"
             >
               <option :value="15">{{ t('monitor.short15') }}</option>
               <option :value="30">{{ t('monitor.short30') }}</option>
@@ -194,7 +216,24 @@
               <option :value="43200">{{ t('monitor.short1mo') }}</option>
             </select>
 
-            <!-- Toggle enabled -->
+            <button
+              type="button"
+              class="btn btn-sm h-9 rounded-full px-4"
+              :class="
+                intervalDirty(pl)
+                  ? 'btn-primary'
+                  : 'border-white/10 bg-base-100/40 text-base-content/40'
+              "
+              :disabled="!intervalDirty(pl) || applyingInterval[pl.id]"
+              @click="onApplyInterval(pl)"
+            >
+              <span
+                v-if="applyingInterval[pl.id]"
+                class="loading loading-spinner loading-xs"
+              />
+              <span v-else>{{ t('monitor.applyInterval') }}</span>
+            </button>
+
             <button
               class="icon-btn"
               :title="pl.enabled ? t('monitor.pause') : t('monitor.resume')"
@@ -206,7 +245,6 @@
               />
             </button>
 
-            <!-- Manual check -->
             <button
               class="icon-btn"
               :title="t('monitor.checkNow')"
@@ -220,7 +258,6 @@
               <Icon v-else icon="clarity:refresh-line" class="h-4 w-4" />
             </button>
 
-            <!-- Delete -->
             <button
               class="icon-btn text-error/70 hover:text-error hover:bg-error/10"
               :title="t('monitor.stop')"
@@ -229,6 +266,12 @@
               <Icon icon="clarity:trash-line" class="h-4 w-4" />
             </button>
           </div>
+          <p
+            v-if="intervalErrors[pl.id] || actionErrors[pl.id]"
+            class="mt-2 text-right text-[11px] leading-snug text-error"
+          >
+            {{ intervalErrors[pl.id] || actionErrors[pl.id] }}
+          </p>
         </li>
       </ul>
 
@@ -250,7 +293,9 @@
 import { ref, computed, onMounted } from 'vue'
 import { Icon } from '@iconify/vue'
 import Navbar from '/src/components/Navbar.vue'
+import CoverImage from '/src/components/CoverImage.vue'
 import monitorAPI from '/src/model/monitor.js'
+import API from '/src/model/api.js'
 import { useI18n } from '/src/i18n'
 
 const { t } = useI18n()
@@ -263,6 +308,10 @@ const newUrl = ref('')
 const newKind = ref('playlist')
 const newInterval = ref(60)
 const checking = ref({})
+const applyingInterval = ref({})
+const intervalDrafts = ref({})
+const intervalErrors = ref({})
+const actionErrors = ref({})
 
 const urlPlaceholder = computed(() =>
   newKind.value === 'artist'
@@ -274,10 +323,66 @@ async function load() {
   loading.value = true
   try {
     const res = await monitorAPI.listMonitoredPlaylists()
-    playlists.value = res.data || []
+    setPlaylists(res.data || [])
   } finally {
     loading.value = false
   }
+}
+
+function setPlaylists(items) {
+  playlists.value = items
+  const drafts = {}
+  const errors = {}
+  const actions = {}
+  for (const pl of items) {
+    drafts[pl.id] = Number(pl.interval_minutes) || 60
+    errors[pl.id] = ''
+    actions[pl.id] = ''
+  }
+  intervalDrafts.value = drafts
+  intervalErrors.value = errors
+  actionErrors.value = actions
+}
+
+function draftInterval(pl) {
+  const draft = intervalDrafts.value[pl.id]
+  if (draft === undefined) return Number(pl.interval_minutes) || 60
+  return Number(draft)
+}
+
+function onIntervalDraftChange(pl, event) {
+  const val = Number.parseInt(String(event.target.value || ''), 10)
+  if (!Number.isFinite(val)) return
+  intervalDrafts.value = {
+    ...intervalDrafts.value,
+    [pl.id]: val,
+  }
+  intervalErrors.value = {
+    ...intervalErrors.value,
+    [pl.id]: '',
+  }
+}
+
+function coverForItem(pl) {
+  const spotifyUrl = String(pl?.image_url || '').trim()
+  if (pl?.kind === 'artist') {
+    const local = API.coverSourcesForArtist(pl.name)
+    const fallbacks = []
+    if (spotifyUrl && local.src) fallbacks.push(local.src)
+    fallbacks.push(...local.fallbacks)
+    return {
+      src: spotifyUrl || local.src,
+      fallbacks: [...new Set(fallbacks.filter(Boolean))],
+    }
+  }
+  return {
+    src: spotifyUrl,
+    fallbacks: [],
+  }
+}
+
+function intervalDirty(pl) {
+  return draftInterval(pl) !== Number(pl.interval_minutes)
 }
 
 async function onAdd() {
@@ -289,7 +394,7 @@ async function onAdd() {
       newInterval.value,
       newKind.value
     )
-    playlists.value.unshift(res.data)
+    setPlaylists([res.data, ...playlists.value])
     newUrl.value = ''
   } catch (e) {
     addError.value = e?.response?.data?.detail || t('monitor.failedAdd')
@@ -299,25 +404,52 @@ async function onAdd() {
 }
 
 async function onToggle(pl) {
+  actionErrors.value = { ...actionErrors.value, [pl.id]: '' }
   try {
     const res = await monitorAPI.updateMonitoredPlaylist(pl.id, {
       enabled: !pl.enabled,
     })
     Object.assign(pl, res.data)
-  } catch {
-    // silently ignore
+  } catch (err) {
+    actionErrors.value = {
+      ...actionErrors.value,
+      [pl.id]:
+        err?.response?.data?.detail || t('monitor.failedUpdate'),
+    }
   }
 }
 
-async function onChangeInterval(pl, event) {
-  const val = parseInt(event.target.value, 10)
+async function onApplyInterval(pl) {
+  const val = draftInterval(pl)
+  if (!Number.isFinite(val) || val === Number(pl.interval_minutes)) return
+  applyingInterval.value = { ...applyingInterval.value, [pl.id]: true }
+  intervalErrors.value = { ...intervalErrors.value, [pl.id]: '' }
+  actionErrors.value = { ...actionErrors.value, [pl.id]: '' }
   try {
     const res = await monitorAPI.updateMonitoredPlaylist(pl.id, {
       interval_minutes: val,
     })
     Object.assign(pl, res.data)
-  } catch {
-    // silently ignore
+    intervalDrafts.value = {
+      ...intervalDrafts.value,
+      [pl.id]: Number(pl.interval_minutes),
+    }
+    intervalErrors.value = {
+      ...intervalErrors.value,
+      [pl.id]: '',
+    }
+  } catch (err) {
+    intervalDrafts.value = {
+      ...intervalDrafts.value,
+      [pl.id]: Number(pl.interval_minutes),
+    }
+    intervalErrors.value = {
+      ...intervalErrors.value,
+      [pl.id]:
+        err?.response?.data?.detail || t('monitor.failedApplyInterval'),
+    }
+  } finally {
+    applyingInterval.value = { ...applyingInterval.value, [pl.id]: false }
   }
 }
 
@@ -328,7 +460,7 @@ async function onCheck(pl) {
     setTimeout(async () => {
       try {
         const res = await monitorAPI.listMonitoredPlaylists()
-        playlists.value = res.data || []
+        setPlaylists(res.data || [])
       } finally {
         checking.value = { ...checking.value, [pl.id]: false }
       }
@@ -343,6 +475,10 @@ async function onDelete(pl) {
   try {
     await monitorAPI.deleteMonitoredPlaylist(pl.id)
     playlists.value = playlists.value.filter((p) => p.id !== pl.id)
+    const { [pl.id]: _removed, ...rest } = intervalDrafts.value
+    intervalDrafts.value = rest
+    const { [pl.id]: _removedError, ...restErrors } = intervalErrors.value
+    intervalErrors.value = restErrors
   } catch {
     // silently ignore
   }

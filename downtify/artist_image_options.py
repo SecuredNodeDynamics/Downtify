@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, TypedDict
 
@@ -12,6 +13,7 @@ from loguru import logger
 from . import artist_image_sources
 from .artist_art import _wikimedia_artist_image_url
 from .metadata_repair import artist_search_names
+from . import musicbrainz as musicbrainz_module
 from .musicbrainz import USER_AGENT, _ratio, _throttle_musicbrainz
 
 _SPOTIFY_ARTIST_URL_RE = re.compile(
@@ -62,6 +64,8 @@ def _append_option(
 
 
 def _spotify_artist_items(artist_name: str, *, limit: int = 5) -> list[dict[str, Any]]:
+    if artist_image_sources._spotify_search_blocked():
+        return []
     token = artist_image_sources._spotify_access_token()
     if not token:
         return []
@@ -79,11 +83,8 @@ def _spotify_artist_items(artist_name: str, *, limit: int = 5) -> list[dict[str,
             },
             timeout=10,
         )
-        if response.status_code in {401, 403}:
-            artist_image_sources._SPOTIFY_TOKEN.pop('token', None)
-            artist_image_sources._SPOTIFY_TOKEN.pop('embed', None)
-            return []
-        if response.status_code == 429:
+        if response.status_code in {401, 403, 429}:
+            artist_image_sources._mark_spotify_search_rate_limited(response)
             return []
         response.raise_for_status()
         return [
@@ -143,6 +144,34 @@ def _spotify_id_from_musicbrainz_artist(mbid: str) -> str:
     return ''
 
 
+def _append_spotify_artist_match(
+    results: list[dict[str, Any]],
+    seen_ids: set[str],
+    *,
+    spotify_id: str,
+    name: str,
+    artist_name: str,
+    image_url: str = '',
+) -> None:
+    spotify_id = str(spotify_id or '').strip()
+    name = str(name or '').strip()
+    if not spotify_id or not name or spotify_id in seen_ids:
+        return
+    seen_ids.add(spotify_id)
+    results.append(
+        {
+            'spotify_id': spotify_id,
+            'name': name,
+            'url': f'https://open.spotify.com/artist/{spotify_id}',
+            'image_url': image_url,
+            'match_score': round(
+                artist_image_sources._name_ratio(name, artist_name),
+                3,
+            ),
+        }
+    )
+
+
 def _musicbrainz_spotify_artist_matches(
     artist_name: str,
     *,
@@ -156,21 +185,24 @@ def _musicbrainz_spotify_artist_matches(
         if not label or not mbid:
             continue
         spotify_id = _spotify_id_from_musicbrainz_artist(mbid)
-        if not spotify_id or spotify_id in seen_ids:
-            continue
-        seen_ids.add(spotify_id)
-        results.append(
-            {
-                'spotify_id': spotify_id,
-                'name': label,
-                'url': f'https://open.spotify.com/artist/{spotify_id}',
-                'image_url': '',
-                'match_score': round(
-                    artist_image_sources._name_ratio(label, artist_name),
-                    3,
-                ),
-            }
+        _append_spotify_artist_match(
+            results,
+            seen_ids,
+            spotify_id=spotify_id,
+            name=label,
+            artist_name=artist_name,
         )
+    if not results:
+        mbid = musicbrainz_module.lookup_artist_id(artist_name) or ''
+        if mbid:
+            spotify_id = _spotify_id_from_musicbrainz_artist(mbid)
+            _append_spotify_artist_match(
+                results,
+                seen_ids,
+                spotify_id=spotify_id,
+                name=artist_name,
+                artist_name=artist_name,
+            )
     results.sort(key=lambda item: item['match_score'], reverse=True)
     return results
 
@@ -182,35 +214,28 @@ def list_spotify_artist_matches(
 ) -> list[dict[str, Any]]:
     seen_ids: set[str] = set()
     results: list[dict[str, Any]] = []
-    search_names = artist_search_names(artist_name) or [artist_name]
-    for search_name in search_names:
-        for item in _spotify_artist_items(search_name, limit=limit):
-            label = str(item.get('name') or '').strip()
-            artist_id = str(item.get('id') or '').strip()
-            if not label or not artist_id or artist_id in seen_ids:
-                continue
-            seen_ids.add(artist_id)
-            results.append(
-                {
-                    'spotify_id': artist_id,
-                    'name': label,
-                    'url': f'https://open.spotify.com/artist/{artist_id}',
-                    'image_url': _best_spotify_image_url(item),
-                    'match_score': round(
-                        artist_image_sources._name_ratio(label, artist_name),
-                        3,
-                    ),
-                }
-            )
-        if len(results) >= limit:
-            break
-    if not results:
-        for item in _musicbrainz_spotify_artist_matches(artist_name, limit=limit):
-            spotify_id = str(item.get('spotify_id') or '').strip()
-            if not spotify_id or spotify_id in seen_ids:
-                continue
-            seen_ids.add(spotify_id)
-            results.append(item)
+    for item in _musicbrainz_spotify_artist_matches(artist_name, limit=limit):
+        spotify_id = str(item.get('spotify_id') or '').strip()
+        if not spotify_id or spotify_id in seen_ids:
+            continue
+        seen_ids.add(spotify_id)
+        results.append(item)
+    if len(results) < limit and not artist_image_sources._spotify_search_blocked():
+        search_names = artist_search_names(artist_name) or [artist_name]
+        for search_name in search_names:
+            for item in _spotify_artist_items(search_name, limit=limit):
+                _append_spotify_artist_match(
+                    results,
+                    seen_ids,
+                    spotify_id=str(item.get('id') or '').strip(),
+                    name=str(item.get('name') or '').strip(),
+                    artist_name=artist_name,
+                    image_url=_best_spotify_image_url(item),
+                )
+            if len(results) >= limit:
+                break
+            if artist_image_sources._spotify_search_blocked():
+                break
     results.sort(key=lambda item: item['match_score'], reverse=True)
     return results[:limit]
 
@@ -470,29 +495,37 @@ def _musicbrainz_search_artists(
     *,
     limit: int = 3,
 ) -> list[dict[str, Any]]:
-    try:
-        response = requests.get(
-            'https://musicbrainz.org/ws/2/artist/',
-            params={
-                'query': f'artist:"{artist_name}"',
-                'fmt': 'json',
-                'limit': limit,
-            },
-            headers={'User-Agent': USER_AGENT},
-            timeout=10,
-        )
-        response.raise_for_status()
-        return [
-            item
-            for item in response.json().get('artists') or []
-            if isinstance(item, dict)
-        ]
-    except Exception:
-        logger.opt(exception=True).debug(
-            'MusicBrainz artist search failed for {!r}',
-            artist_name,
-        )
-        return []
+    for attempt in range(2):
+        try:
+            _throttle_musicbrainz()
+            response = requests.get(
+                'https://musicbrainz.org/ws/2/artist/',
+                params={
+                    'query': f'artist:"{artist_name}"',
+                    'fmt': 'json',
+                    'limit': limit,
+                },
+                headers={'User-Agent': USER_AGENT},
+                timeout=12,
+            )
+            musicbrainz_module._LAST_REQUEST_AT = time.monotonic()
+            if response.status_code == 503 and attempt == 0:
+                time.sleep(2.0)
+                continue
+            response.raise_for_status()
+            return [
+                item
+                for item in response.json().get('artists') or []
+                if isinstance(item, dict)
+            ]
+        except Exception:
+            if attempt == 0:
+                continue
+            logger.opt(exception=True).debug(
+                'MusicBrainz artist search failed for {!r}',
+                artist_name,
+            )
+    return []
 
 
 def list_musicbrainz_artist_image_options(

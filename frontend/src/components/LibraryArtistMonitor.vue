@@ -165,13 +165,27 @@ async function refreshMonitored() {
   }
 }
 
+async function lookupSpotifyArtistsWithRetry(artistName, limit = 5) {
+  const lookup = () =>
+    monitorAPI.lookupSpotifyArtists(artistName, limit).then((res) => {
+      const matches = Array.isArray(res.data?.matches) ? res.data.matches : []
+      return { res, matches }
+    })
+
+  let { res, matches } = await lookup()
+  if (matches.length === 0) {
+    await new Promise((resolve) => setTimeout(resolve, 1500))
+    ;({ res, matches } = await lookup())
+  }
+  return { res, matches }
+}
+
 async function startMonitor() {
   if (!props.artistName || busy.value) return
   busy.value = true
   error.value = ''
   try {
-    const res = await monitorAPI.lookupSpotifyArtists(props.artistName)
-    const matches = Array.isArray(res.data?.matches) ? res.data.matches : []
+    const { matches } = await lookupSpotifyArtistsWithRetry(props.artistName)
     if (matches.length === 0) {
       error.value = t('library.monitorArtistNotFound')
       return
@@ -198,7 +212,7 @@ async function startMonitor() {
 }
 
 async function addMatch(match) {
-  if (!match?.url || busy.value) return
+  if (!match?.url) return
   busy.value = true
   error.value = ''
   try {

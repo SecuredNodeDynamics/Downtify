@@ -167,6 +167,28 @@ def _spotify_transport_access_token() -> str:
     return token
 
 
+def _spotify_search_blocked() -> bool:
+    return float(_SPOTIFY_TOKEN.get('search_blocked_until') or 0) > time.time()
+
+
+def _mark_spotify_search_rate_limited(
+    response: requests.Response | None = None,
+) -> None:
+    retry_after = 60.0
+    if response is not None:
+        try:
+            retry_after = max(
+                60.0, float(response.headers.get('Retry-After', 60))
+            )
+        except (TypeError, ValueError):
+            retry_after = 60.0
+    _SPOTIFY_TOKEN['search_blocked_until'] = time.time() + retry_after
+    logger.info(
+        'Spotify artist search rate-limited; pausing search for {:.0f}s',
+        retry_after,
+    )
+
+
 def _spotify_access_token() -> str:
     token = _spotify_transport_access_token()
     if token:
