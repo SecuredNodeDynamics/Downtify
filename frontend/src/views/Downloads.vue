@@ -450,9 +450,12 @@ import CoverImage from '/src/components/CoverImage.vue'
 import API from '/src/model/api'
 import { preloadCoverSourcesBatch } from '/src/model/imageLoader'
 import {
+  fetchLibraryItems,
   getCachedLibraryPaths,
+  hydrateLibraryFromPersistence,
   setLibrarySessionPaths,
 } from '/src/model/librarySession'
+import { buildApiBaseUrl, getServerConfig } from '/src/model/serverConnection'
 import { useI18n } from '/src/i18n'
 import { usePlayer } from '/src/model/player'
 
@@ -662,6 +665,7 @@ function warmCoverCacheForPaths(paths) {
 }
 
 function hydrateLibraryFromSession() {
+  hydrateLibraryFromPersistence(buildApiBaseUrl(getServerConfig()))
   const cachedPaths = getCachedLibraryPaths()
   if (!cachedPaths?.length) return false
   files.value = cachedPaths
@@ -670,21 +674,32 @@ function hydrateLibraryFromSession() {
 }
 
 async function refresh({ background = false } = {}) {
+  const hadCache = hydrateLibraryFromSession()
   if (!background) {
-    if (hydrateLibraryFromSession()) {
-      loading.value = false
-    } else {
-      loading.value = true
-    }
+    loading.value = !hadCache
   }
   error.value = ''
   try {
+    const items = await fetchLibraryItems(
+      () => API.getLibraryFiles().then((res) => res.data || []),
+      { preferPrefetch: !background }
+    )
+    if (items.length > 0) {
+      const paths = items.map((item) => item.file)
+      files.value = paths
+      setLibrarySessionPaths(paths)
+      warmCoverCacheForPaths(paths)
+      return
+    }
+
     const res = await API.listDownloads()
     files.value = res.data || []
     setLibrarySessionPaths(files.value)
     warmCoverCacheForPaths(files.value)
   } catch {
-    error.value = t('library.failedLoad')
+    if (!hadCache) {
+      error.value = t('library.failedLoad')
+    }
   } finally {
     loading.value = false
   }

@@ -9,6 +9,11 @@ import {
   usesCustomServerUrl,
 } from './serverConnection.js'
 import { libraryCoverFolders } from './library.js'
+import {
+  persistLibraryCache,
+  resetLibraryPrefetch,
+  startLibraryPrefetch,
+} from './librarySession.js'
 
 import { v4 as uuidv4 } from 'uuid'
 
@@ -104,6 +109,7 @@ function getVersion() {
       if (prevItem != version && !isCapacitorNative()) {
         location.reload()
       }
+      prefetchLibrary()
     })
     .catch((error) => {
       console.error(error)
@@ -116,6 +122,7 @@ sanitizeStoredVersion()
 if (!needsServerConnection()) {
   getVersion()
   ensureWebSocket()
+  prefetchLibrary()
 }
 
 function search(query) {
@@ -467,9 +474,24 @@ function ws_onerror(fn) {
   return fn
 }
 
+function libraryServerKey() {
+  return buildApiBaseUrl(getServerConfig())
+}
+
+async function fetchLibraryItemsFromApi() {
+  const res = await getLibraryFiles()
+  return Array.isArray(res.data) ? res.data : []
+}
+
+function prefetchLibrary() {
+  return startLibraryPrefetch(fetchLibraryItemsFromApi, libraryServerKey())
+}
+
 function reconnectBackend() {
+  resetLibraryPrefetch()
   getVersion()
   ensureWebSocket()
+  prefetchLibrary()
 }
 
 export function isHealthPayload(data) {

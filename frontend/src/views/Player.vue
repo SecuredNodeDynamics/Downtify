@@ -31,7 +31,10 @@
       </div>
 
       <!-- Skeleton -->
-      <div v-else-if="loading && !player.currentTrack.value" class="space-y-3">
+      <div
+        v-else-if="loading && files.length === 0 && libraryItems.length === 0"
+        class="space-y-3"
+      >
         <div class="skeleton h-52 rounded-3xl lg:h-72" />
         <div class="skeleton h-16 rounded-2xl" />
         <div class="skeleton h-16 rounded-2xl" />
@@ -550,8 +553,11 @@ import GenreCover from '/src/components/GenreCover.vue'
 import API from '/src/model/api'
 import { preloadCoverSourcesBatch } from '/src/model/imageLoader'
 import {
+  fetchLibraryItems,
   getCachedLibraryItems,
   getCachedLibraryPaths,
+  hydrateLibraryFromPersistence,
+  persistLibraryCache,
   setLibrarySessionCache,
 } from '/src/model/librarySession'
 import {
@@ -563,6 +569,7 @@ import {
 } from '/src/model/library'
 import { usePlayer, formatTime, trackInfoFromFile } from '/src/model/player'
 import { useMobileSearch } from '/src/model/mobileSearch'
+import { buildApiBaseUrl, getServerConfig } from '/src/model/serverConnection'
 import { useI18n } from '/src/i18n'
 
 defineOptions({ name: 'Player' })
@@ -827,6 +834,11 @@ function applyLibraryItems(items) {
   libraryItems.value = items.map((item) => normalizeLibraryItem(item, options))
   files.value = libraryItems.value.map((item) => item.file)
   setLibrarySessionCache(files.value, libraryItems.value)
+  persistLibraryCache(
+    files.value,
+    libraryItems.value,
+    buildApiBaseUrl(getServerConfig())
+  )
   warmCoverCacheForLibrary()
 }
 
@@ -841,6 +853,10 @@ function warmCoverCacheForLibrary() {
 }
 
 function hydrateLibraryFromSession() {
+  if (!getCachedLibraryItems()?.length) {
+    hydrateLibraryFromPersistence()
+  }
+
   const cachedPaths = getCachedLibraryPaths()
   if (!cachedPaths?.length) return false
 
@@ -853,8 +869,47 @@ function hydrateLibraryFromSession() {
   } else {
     libraryItems.value = fallbackLibraryItems(cachedPaths)
   }
+
+  if (player.playlist.value.length === 0 && files.value.length > 0) {
+    player.setPlaylist(files.value)
+  }
+
   warmCoverCacheForLibrary()
   return true
+}
+
+async function fetchPlayerLibraryItems(options = {}) {
+  return fetchLibraryItems(
+    () => API.getLibraryFiles().then((res) => res.data || []),
+    options
+  )
+}
+
+async function applyFetchedLibrary(items) {
+  if (!items.length) {
+    libraryItems.value = []
+    files.value = []
+    return
+  }
+
+  applyLibraryItems(items)
+  if (player.playlist.value.length === 0) {
+    player.setPlaylist(items.map((item) => item.file))
+  }
+}
+
+async function refreshLibraryMetadataInBackground() {
+  try {
+    const items = await fetchPlayerLibraryItems({ preferPrefetch: false })
+    if (items.length > 0 && !libraryItemsUnchanged(items)) {
+      applyLibraryItems(items)
+      scheduleGenreRefresh(items)
+    } else if (items.length > 0) {
+      scheduleGenreRefresh(items)
+    }
+  } catch {
+    // Ignore background refresh failures.
+  }
 }
 
 function libraryItemsUnchanged(nextItems) {
@@ -889,16 +944,7 @@ function clearGenreRefreshTimers() {
 }
 
 async function refreshLibraryMetadata() {
-  try {
-    const res = await API.getLibraryFiles()
-    const items = Array.isArray(res.data) ? res.data : []
-    if (items.length > 0 && !libraryItemsUnchanged(items)) {
-      applyLibraryItems(items)
-      scheduleGenreRefresh(items)
-    }
-  } catch {
-    // Ignore background refresh failures.
-  }
+  await refreshLibraryMetadataInBackground()
 }
 
 async function refreshLibraryGenres() {
@@ -919,42 +965,42 @@ function scheduleGenreRefresh(items) {
 }
 
 async function load({ background = false } = {}) {
+  const hadCache = hydrateLibraryFromSession()
   if (!background) {
-    if (hydrateLibraryFromSession()) {
-      loading.value = false
-    } else {
-      loading.value = true
-    }
+    loading.value = !hadCache
   }
+
   try {
-    const listRes = await API.listDownloads()
-    const paths = listRes.data || []
-    files.value = paths
-    if (paths.length > 0) {
-      applyLibraryItems(fallbackLibraryItems(paths))
-      if (player.playlist.value.length === 0) {
-        player.setPlaylist(paths)
-      }
-    } else {
-      libraryItems.value = []
-    }
+    const items = await fetchPlayerLibraryItems({
+      preferPrefetch: !background,
+    })
+    await applyFetchedLibrary(items)
   } catch {
     try {
       const res = await API.listDownloads()
       const paths = res.data || []
-      applyLibraryItems(fallbackLibraryItems(paths))
-      files.value = paths
-      if (player.playlist.value.length === 0 && files.value.length > 0) {
-        player.setPlaylist(files.value)
+      if (paths.length > 0) {
+        applyLibraryItems(fallbackLibraryItems(paths))
+        if (player.playlist.value.length === 0) {
+          player.setPlaylist(paths)
+        }
+      } else {
+        files.value = []
+        libraryItems.value = []
       }
     } catch {
-      files.value = []
-      libraryItems.value = []
+      if (!hadCache) {
+        files.value = []
+        libraryItems.value = []
+      }
     }
   } finally {
     loading.value = false
   }
-  refreshLibraryMetadata()
+
+  if (countUnknownGenres(libraryItems.value) > 0) {
+    scheduleGenreRefresh(libraryItems.value)
+  }
 }
 
 function setBrowseMode(mode) {
@@ -1068,8 +1114,8 @@ onMounted(() => {
 })
 
 onActivated(() => {
-  if (files.value.length > 0) {
-    void load({ background: true })
+  if (libraryItems.value.length > 0) {
+    void refreshLibraryMetadataInBackground()
     return
   }
   void load()
