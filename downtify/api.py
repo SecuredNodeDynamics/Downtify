@@ -388,6 +388,7 @@ class AppState:
     loop: Optional[asyncio.AbstractEventLoop] = None
     monitor_db: Optional[PlaylistMonitorDB] = None
     history_db: Optional[DownloadHistoryDB] = None
+    history_reconcile_at: float = 0.0
     download_jobs: dict[str, dict[str, Any]] = {}
     download_semaphore: Optional[asyncio.Semaphore] = None
     metadata_scan: dict[str, Any] = {
@@ -457,6 +458,40 @@ async def _broadcast_history_changed(history_id: Optional[int] = None) -> None:
     payload: dict[str, Any] = {'event': 'history_changed'}
     payload.update(_history_item_for_ws(history_id))
     await state.connections.broadcast(payload)
+
+
+def _reconcile_download_history_sync(
+    interrupt_after: timedelta = timedelta(hours=1),
+) -> dict[str, int]:
+    if state.downloader is None or state.history_db is None:
+        return {'done': 0, 'skipped': 0, 'interrupted': 0}
+    return state.history_db.reconcile_in_progress(
+        resolve_filename=state.downloader.duplicate_filename_for,
+        interrupt_after=interrupt_after,
+    )
+
+
+async def _maybe_reconcile_download_history(
+    interrupt_after: timedelta = timedelta(hours=1),
+) -> dict[str, int]:
+    now = time.monotonic()
+    if now - state.history_reconcile_at < 60:
+        return {'done': 0, 'skipped': 0, 'interrupted': 0}
+    state.history_reconcile_at = now
+    stats = await asyncio.to_thread(
+        _reconcile_download_history_sync, interrupt_after
+    )
+    if any(stats.values()):
+        await _broadcast_history_changed(None)
+    return stats
+
+
+async def reconcile_history_on_startup() -> None:
+    await asyncio.sleep(2)
+    stats = await asyncio.to_thread(_reconcile_download_history_sync)
+    if any(stats.values()):
+        await _broadcast_history_changed(None)
+        logger.info('Reconciled download history on startup: {}', stats)
 
 
 def _drop_queue_job(song_id: str) -> None:
@@ -3198,16 +3233,32 @@ def remove_queue_item(song_id: str = Query(...)) -> dict:
 
 
 @router.get('/api/history')
-def list_history(
+async def list_history(
     limit: int = Query(500),
     include_active: bool = Query(False),
+    reconcile: bool = Query(True),
 ) -> list[dict[str, Any]]:
     if state.history_db is None:
         return []
+    if reconcile:
+        await _maybe_reconcile_download_history()
     return state.history_db.list(
         limit=limit,
         terminal_only=not include_active,
     )
+
+
+@router.post('/api/history/reconcile')
+async def reconcile_history(
+    interrupt_minutes: int = Query(15, ge=0, le=24 * 60),
+) -> dict[str, Any]:
+    stats = await asyncio.to_thread(
+        _reconcile_download_history_sync,
+        timedelta(minutes=interrupt_minutes),
+    )
+    if any(stats.values()):
+        await _broadcast_history_changed(None)
+    return stats
 
 
 @router.delete('/api/history')

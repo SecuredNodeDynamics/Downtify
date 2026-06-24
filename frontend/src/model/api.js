@@ -459,8 +459,14 @@ function clearQueue() {
   return API.delete('/api/queue')
 }
 
-function getHistory(limit = 500) {
-  return API.get('/api/history', { params: { limit } })
+function getHistory(limit = 500, reconcile = true) {
+  return API.get('/api/history', { params: { limit, reconcile } })
+}
+
+function reconcileHistory(interruptMinutes = 15) {
+  return API.post('/api/history/reconcile', null, {
+    params: { interrupt_minutes: interruptMinutes },
+  })
 }
 
 function retryHistoryItem(historyId) {
@@ -589,6 +595,7 @@ export default {
   removeQueueItem,
   clearQueue,
   getHistory,
+  reconcileHistory,
   retryHistoryItem,
   clearHistory,
   getSettings,

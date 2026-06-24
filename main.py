@@ -177,6 +177,7 @@ def build_app() -> FastAPI:
                 history_changed=api._broadcast_history_changed,
             )
         )
+        asyncio.create_task(api.reconcile_history_on_startup())
         asyncio.create_task(api.start_genre_warmup())
         asyncio.create_task(api.warm_library_files_cache())
 

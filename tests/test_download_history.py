@@ -125,6 +125,50 @@ def test_history_list_excludes_in_progress_rows(tmp_path):
     assert len(all_rows) == 100
 
 
+def test_history_reconcile_promotes_existing_files(tmp_path):
+    db = DownloadHistoryDB(tmp_path / 'history.db')
+    song = {
+        'song_id': 'track-1',
+        'name': 'Found Song',
+        'artists': ['Artist'],
+        'album_name': 'Album',
+    }
+    history_id = db.create(song, status='downloading')
+
+    stats = db.reconcile_in_progress(
+        resolve_filename=lambda _song: 'Artist/Album/Artist - Found Song.flac',
+        interrupt_after=timedelta(hours=1),
+    )
+
+    row = db.get(history_id)
+    assert stats == {'done': 1, 'skipped': 0, 'interrupted': 0}
+    assert row['status'] == 'done'
+    assert row['filename'] == 'Artist/Album/Artist - Found Song.flac'
+
+
+def test_history_reconcile_marks_stale_rows_interrupted(tmp_path):
+    db = DownloadHistoryDB(tmp_path / 'history.db')
+    history_id = db.create({'name': 'Missing Song'}, status='downloading')
+    old_updated = (
+        datetime.now(timezone.utc) - timedelta(hours=3)
+    ).strftime('%Y-%m-%dT%H:%M:%S.%fZ')
+    with db._connect() as conn:
+        conn.execute(
+            'UPDATE download_history SET updated_at = ? WHERE id = ?',
+            (old_updated, history_id),
+        )
+
+    stats = db.reconcile_in_progress(
+        resolve_filename=lambda _song: None,
+        interrupt_after=timedelta(hours=1),
+    )
+
+    row = db.get(history_id)
+    assert stats == {'done': 0, 'skipped': 0, 'interrupted': 1}
+    assert row['status'] == 'error'
+    assert row['error'] == 'Download interrupted'
+
+
 def test_history_counts_recent_completed_rows(tmp_path):
     db = DownloadHistoryDB(tmp_path / 'history.db')
     done_id = db.create({'name': 'Done'}, status='downloading')

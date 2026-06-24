@@ -52,10 +52,13 @@ export function upsertHistoryItem(item) {
   history.value = sortHistoryItems(next)
 }
 
-export async function refreshDownloadHistory() {
+export async function refreshDownloadHistory({ reconcile = true } = {}) {
   const seq = ++historyFetchSeq
   try {
-    const res = await API.getHistory()
+    if (reconcile) {
+      await API.reconcileHistory()
+    }
+    const res = await API.getHistory(500, false)
     if (seq !== historyFetchSeq) return false
     history.value = sortHistoryItems(
       Array.isArray(res.data) ? res.data : []

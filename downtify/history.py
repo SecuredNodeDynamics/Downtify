@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 TERMINAL_STATUSES = frozenset({'done', 'skipped', 'error'})
 
@@ -91,6 +91,50 @@ class DownloadHistoryDB:
                 (history_id,),
             ).fetchone()
             return _row_to_dict(row) if row else None
+
+    def list_in_progress(self, limit: int = 2000) -> list[dict[str, Any]]:
+        limit = max(1, min(limit, 5000))
+        with self._connect() as conn:
+            rows = conn.execute(
+                """SELECT * FROM download_history
+                   WHERE status IN ('queued', 'downloading')
+                   ORDER BY updated_at DESC, id DESC
+                   LIMIT ?""",
+                (limit,),
+            ).fetchall()
+            return [_row_to_dict(row) for row in rows]
+
+    def reconcile_in_progress(
+        self,
+        resolve_filename: Callable[[dict[str, Any]], Optional[str]],
+        *,
+        interrupt_after: timedelta = timedelta(hours=1),
+    ) -> dict[str, int]:
+        """Promote orphaned queue rows when files exist, or mark stale ones failed."""
+        stats = {'done': 0, 'skipped': 0, 'interrupted': 0}
+        cutoff = datetime.now(timezone.utc) - interrupt_after
+        for item in self.list_in_progress():
+            history_id = int(item['id'])
+            song = item.get('song')
+            if not isinstance(song, dict):
+                song = {}
+
+            filename = resolve_filename(song)
+            if filename:
+                if item.get('status') == 'queued':
+                    self.mark_skipped(history_id, filename)
+                    stats['skipped'] += 1
+                else:
+                    self.mark_done(history_id, filename)
+                    stats['done'] += 1
+                continue
+
+            updated_at = _parse_iso(item.get('updated_at') or item.get('created_at'))
+            if updated_at is not None and updated_at < cutoff:
+                self.mark_error(history_id, 'Download interrupted')
+                stats['interrupted'] += 1
+
+        return stats
 
     def list(
         self,
@@ -179,15 +223,30 @@ class DownloadHistoryDB:
     def count_completed_since(self, since: datetime) -> int:
         if since.tzinfo is None:
             since = since.replace(tzinfo=timezone.utc)
+        since_ts = since.astimezone(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%fZ')
         with self._connect() as conn:
             row = conn.execute(
                 """SELECT COUNT(*) AS count
                    FROM download_history
                    WHERE status IN ('done', 'skipped')
-                     AND completed_at >= ?""",
-                (since.isoformat(),),
+                     AND COALESCE(completed_at, updated_at) >= ?""",
+                (since_ts,),
             ).fetchone()
             return int(row['count'] if row else 0)
+
+
+def _parse_iso(value: Optional[str]) -> Optional[datetime]:
+    if not value:
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+    if text.endswith('Z'):
+        text = f'{text[:-1]}+00:00'
+    try:
+        return datetime.fromisoformat(text)
+    except ValueError:
+        return None
 
 
 def _row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
