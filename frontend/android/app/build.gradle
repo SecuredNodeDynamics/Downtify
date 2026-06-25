@@ -78,8 +78,10 @@ chaquopy {
         version "3.11"
         pip {
             install "pydantic<2"
-            install "fastapi==0.111.0"
-            install "uvicorn==0.30.6"
+            // Pin below 0.100 so pip does not pull orjson/ujson (Rust wheels
+            // that Chaquopy cannot build on Android).
+            install "fastapi==0.99.1"
+            install "uvicorn==0.27.1"
             install "websockets"
             install "yt-dlp"
             install "ytmusicapi"
