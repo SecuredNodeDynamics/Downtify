@@ -118,7 +118,7 @@ EOF
 
       - name: Upload APK artifact
         if: github.event_name == 'workflow_dispatch'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: downtify-${{ steps.version.outputs.version }}-apk
           path: frontend/dist/downtify-${{ steps.version.outputs.version }}.apk
