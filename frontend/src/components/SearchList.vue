@@ -24,11 +24,10 @@
     </div>
 
     <!-- Result type filter (visible on mobile + desktop) -->
-    <div
-      v-if="sm.searchTerm.value"
-      class="search-results-chrome mb-4 sm:mb-6"
-    >
-      <p class="search-results-query mb-2 text-sm text-base-content/60 lg:hidden">
+    <div v-if="sm.searchTerm.value" class="search-results-chrome mb-4 sm:mb-6">
+      <p
+        class="search-results-query mb-2 text-sm text-base-content/60 lg:hidden"
+      >
         {{ t('search.matchesFor') }}
         <span class="text-base-content/90 font-medium">
           "{{ sm.searchTerm.value }}"
