@@ -9,6 +9,12 @@ import {
 const EmbeddedServer = registerPlugin('EmbeddedServer')
 
 const READY_FLAG = 'downtify-embedded-ready'
+export const EMBEDDED_SERVER_READY_EVENT = 'downtify-embedded-server-ready'
+
+function notifyEmbeddedServerReady() {
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(new CustomEvent(EMBEDDED_SERVER_READY_EVENT))
+}
 
 export async function startEmbeddedServer() {
   if (!isEmbeddedServerAvailable()) return null
@@ -53,6 +59,8 @@ export async function bootstrapEmbeddedServer() {
     console.warn('Embedded server did not become ready in time.')
     return
   }
+
+  notifyEmbeddedServerReady()
 
   let alreadyReady = false
   try {

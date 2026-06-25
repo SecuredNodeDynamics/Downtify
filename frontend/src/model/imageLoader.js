@@ -1,9 +1,6 @@
 import { Capacitor, CapacitorHttp } from '@capacitor/core'
 
-import {
-  readPersistedImage,
-  writePersistedImage,
-} from './imageDiskCache.js'
+import { readPersistedImage, writePersistedImage } from './imageDiskCache.js'
 import {
   buildApiBaseUrl,
   getServerConfig,
@@ -125,6 +122,23 @@ export function rememberCoverDisplay(sourceKey, displaySrc, failed = false) {
     displaySrc: String(displaySrc || ''),
     failed: Boolean(failed),
   })
+}
+
+export function invalidateFailedCoverDisplays() {
+  for (const [key, value] of sourceCache.entries()) {
+    if (value?.failed) sourceCache.delete(key)
+  }
+}
+
+function onEmbeddedServerReady() {
+  invalidateFailedCoverDisplays()
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener(
+    'downtify-embedded-server-ready',
+    onEmbeddedServerReady
+  )
 }
 
 function rememberResolvedUrl(url, resolved) {

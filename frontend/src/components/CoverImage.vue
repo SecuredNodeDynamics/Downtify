@@ -22,8 +22,9 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 
+import { EMBEDDED_SERVER_READY_EVENT } from '../model/embeddedServer'
 import {
   buildCoverSourceKey,
   canLoadImageDirectly,
@@ -32,6 +33,7 @@ import {
   rememberCoverDisplay,
   resolveImageSrc,
 } from '../model/imageLoader'
+import { usesEmbeddedServer } from '../model/serverConnection'
 
 const props = defineProps({
   src: {
@@ -81,10 +83,32 @@ function restoreFromCache(key) {
     return false
   }
 
+  if (cached.failed) {
+    restoredFromCache.value = false
+    return false
+  }
+
   displaySrc.value = cached.displaySrc
   failed.value = cached.failed
   restoredFromCache.value = Boolean(cached.displaySrc && !cached.failed)
-  return restoredFromCache.value || cached.failed
+  return restoredFromCache.value
+}
+
+function retryLoad() {
+  if (!sourceKey.value) return
+  failed.value = false
+  restoredFromCache.value = false
+  resetCandidates(props.src, props.fallbacks)
+  void loadCurrentCandidate()
+}
+
+function handleEmbeddedServerReady() {
+  if (!usesEmbeddedServer()) return
+  if (!sourceKey.value) return
+  const cached = getCachedCoverDisplay(sourceKey.value)
+  if (cached?.failed || (!displaySrc.value && !failed.value)) {
+    retryLoad()
+  }
 }
 
 async function applyCandidate(url) {
@@ -112,7 +136,11 @@ async function applyCandidate(url) {
 
 function onImageLoad() {
   const url = candidateUrls[candidateIndex]
-  if (url && canLoadImageDirectly(url) && !displaySrc.value.startsWith('blob:')) {
+  if (
+    url &&
+    canLoadImageDirectly(url) &&
+    !displaySrc.value.startsWith('blob:')
+  ) {
     void persistLoadedImage(url)
   }
 }
@@ -167,4 +195,20 @@ watch(
   },
   { immediate: true }
 )
+
+onMounted(() => {
+  if (usesEmbeddedServer()) {
+    window.addEventListener(
+      EMBEDDED_SERVER_READY_EVENT,
+      handleEmbeddedServerReady
+    )
+  }
+})
+
+onUnmounted(() => {
+  window.removeEventListener(
+    EMBEDDED_SERVER_READY_EVENT,
+    handleEmbeddedServerReady
+  )
+})
 </script>

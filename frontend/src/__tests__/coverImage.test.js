@@ -4,13 +4,18 @@ import {
   buildCoverSourceKey,
   canLoadImageDirectly,
   getCachedCoverDisplay,
+  invalidateFailedCoverDisplays,
   rememberCoverDisplay,
   resolveImageSrc,
 } from '../model/imageLoader'
 
 vi.mock('../model/serverConnection.js', () => ({
   buildApiBaseUrl: () => 'http://downtify.local:8000',
-  getServerConfig: () => ({ host: 'downtify.local', port: 8000, protocol: 'http' }),
+  getServerConfig: () => ({
+    host: 'downtify.local',
+    port: 8000,
+    protocol: 'http',
+  }),
   isCapacitorNative: vi.fn(() => false),
 }))
 
@@ -34,6 +39,15 @@ describe('imageLoader cover cache', () => {
       displaySrc: 'blob:cached-cover',
       failed: false,
     })
+  })
+
+  it('drops failed cover cache entries so they can retry', () => {
+    const sourceKey = buildCoverSourceKey('https://example.com/missing.jpg', [])
+    rememberCoverDisplay(sourceKey, '', true)
+
+    invalidateFailedCoverDisplays()
+
+    expect(getCachedCoverDisplay(sourceKey)).toBeNull()
   })
 })
 

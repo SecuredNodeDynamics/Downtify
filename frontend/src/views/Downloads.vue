@@ -81,10 +81,7 @@
           class="library-drill-header"
         >
           <div class="library-drill-toolbar">
-            <button
-              class="library-drill-back"
-              @click="closeArtist"
-            >
+            <button class="library-drill-back" @click="closeArtist">
               <Icon icon="clarity:angle-line" class="h-4 w-4 rotate-[-90deg]" />
               {{ t('library.backToArtists') }}
             </button>
@@ -111,10 +108,7 @@
           v-if="viewMode === 'genres' && selectedGenreName"
           class="library-drill-header"
         >
-          <button
-            class="library-drill-back"
-            @click="closeGenre"
-          >
+          <button class="library-drill-back" @click="closeGenre">
             <Icon icon="clarity:angle-line" class="h-4 w-4 rotate-[-90deg]" />
             {{ t('library.backToGenres') }}
           </button>
@@ -133,10 +127,7 @@
         </div>
 
         <div v-if="selectedAlbum" class="library-drill-header">
-          <button
-            class="library-drill-back"
-            @click="closeAlbum"
-          >
+          <button class="library-drill-back" @click="closeAlbum">
             <Icon icon="clarity:angle-line" class="h-4 w-4 rotate-[-90deg]" />
             {{
               selectedArtist ? t('library.backToAlbums') : t('library.albums')
@@ -272,7 +263,10 @@
                   >
                     <div class="library-browse-card-cover">
                       <CoverImage
-                        v-if="artistCoverProps(artist).src || artistCoverProps(artist).fallbacks.length"
+                        v-if="
+                          artistCoverProps(artist).src ||
+                          artistCoverProps(artist).fallbacks.length
+                        "
                         :key="`artist:${artist.name}`"
                         :src="artistCoverProps(artist).src"
                         :fallbacks="artistCoverProps(artist).fallbacks"
@@ -862,6 +856,37 @@ function warmVisibleAlbumCovers(albumList = []) {
   preloadCoverSourcesBatch(entries, { limit: 100, concurrency: 8 })
 }
 
+function warmVisibleTrackCovers(trackList = []) {
+  const entries = trackList
+    .slice(0, 100)
+    .map((file) => coverSourcesFor(file))
+    .filter((entry) => entry.src || entry.fallbacks?.length)
+  preloadCoverSourcesBatch(entries, { limit: 100, concurrency: 8 })
+}
+
+function warmVisibleCoversForCurrentView() {
+  if (viewMode.value === 'artists' && !selectedArtist.value) {
+    warmVisibleArtistCovers(filteredArtists.value)
+    return
+  }
+
+  const inAlbumBrowse =
+    viewMode.value === 'albums' ||
+    (viewMode.value === 'artists' && selectedArtist.value)
+  if (inAlbumBrowse && !selectedAlbum.value) {
+    warmVisibleAlbumCovers(filteredVisibleAlbums.value)
+    return
+  }
+
+  if (
+    viewMode.value === 'tracks' ||
+    selectedAlbum.value ||
+    selectedGenreName.value
+  ) {
+    warmVisibleTrackCovers(filteredVisibleFiles.value)
+  }
+}
+
 watch(
   () =>
     viewMode.value === 'artists' && !selectedArtist.value
@@ -870,7 +895,8 @@ watch(
   () => {
     if (viewMode.value !== 'artists' || selectedArtist.value) return
     warmVisibleArtistCovers(filteredArtists.value)
-  }
+  },
+  { immediate: true }
 )
 
 watch(
@@ -890,7 +916,28 @@ watch(
       (viewMode.value === 'artists' && selectedArtist.value)
     if (!inAlbumBrowse) return
     warmVisibleAlbumCovers(filteredVisibleAlbums.value)
-  }
+  },
+  { immediate: true }
+)
+
+watch(
+  () =>
+    viewMode.value === 'tracks' ||
+    selectedAlbum.value ||
+    selectedGenreName.value
+      ? filteredVisibleFiles.value.join('\0')
+      : '',
+  () => {
+    if (
+      viewMode.value !== 'tracks' &&
+      !selectedAlbum.value &&
+      !selectedGenreName.value
+    ) {
+      return
+    }
+    warmVisibleTrackCovers(filteredVisibleFiles.value)
+  },
+  { immediate: true }
 )
 
 function applyLibraryData(items) {
@@ -900,6 +947,7 @@ function applyLibraryData(items) {
   libraryItems.value = normalized
   files.value = libraryItems.value.map((item) => item.file)
   API.warmLibraryCovers(libraryItems.value)
+  warmVisibleCoversForCurrentView()
   scheduleGenreRefresh(libraryItems.value)
   applyPendingLibraryNavigation()
 }
@@ -1171,6 +1219,7 @@ onMounted(() => {
   libraryRefresh.register(refreshFromHeader)
   if (libraryItems.value.length) {
     API.warmLibraryCovers(libraryItems.value)
+    warmVisibleCoversForCurrentView()
   }
   void refreshMonitoredArtists()
   void refresh()
@@ -1183,6 +1232,7 @@ onActivated(() => {
   libraryRefresh.register(refreshFromHeader)
   restoreBrowseScrollPosition(currentBrowseScrollKey())
   if (files.value.length > 0) {
+    warmVisibleCoversForCurrentView()
     void refresh({ background: true })
     return
   }
