@@ -144,13 +144,34 @@ export function genreCoverFiles(files) {
   return covers
 }
 
+export function normalizeGenreDisplayName(name) {
+  const raw = String(name || '').trim()
+  if (!raw) return ''
+  const folded = raw
+    .toLowerCase()
+    .replace(/&/g, ' and ')
+    .replace(/-/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  if (folded === 'r b' || folded === 'rnb') return 'R&B'
+  if (folded === 'hip hop' || folded === 'hiphop') return 'Hip-Hop'
+  return raw
+}
+
+export function libraryGenreName(item, unknownLabel = 'Unknown', options = {}) {
+  const normalized = normalizeLibraryItem(item, options)
+  const raw =
+    String(normalized.genre || normalized.browse_genre || '').trim() ||
+    unknownLabel
+  return normalizeGenreDisplayName(raw)
+}
+
 export function groupGenres(items, unknownLabel = 'Unknown', options = {}) {
   const grouped = new Map()
 
   for (const raw of items) {
     const item = normalizeLibraryItem(raw, options)
-    const name =
-      String(item.browse_genre || item.genre || '').trim() || unknownLabel
+    const name = libraryGenreName(item, unknownLabel, options)
     if (!grouped.has(name)) {
       grouped.set(name, {
         name,
@@ -160,8 +181,10 @@ export function groupGenres(items, unknownLabel = 'Unknown', options = {}) {
     }
     const bucket = grouped.get(name)
     bucket.files.push(item.file)
-    if (item.genre && item.genre !== name) {
-      bucket.subgenres.add(item.genre)
+    if (item.browse_genre && normalizeGenreDisplayName(item.browse_genre) !== name) {
+      bucket.subgenres.add(normalizeGenreDisplayName(item.browse_genre))
+    } else if (item.genre && normalizeGenreDisplayName(item.genre) !== name) {
+      bucket.subgenres.add(normalizeGenreDisplayName(item.genre))
     }
   }
 

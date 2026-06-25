@@ -435,6 +435,14 @@ function getLibraryFiles() {
   return API.get('/api/library/files')
 }
 
+function checkLibraryOwned(items) {
+  return API.post('/api/library/owned', { items })
+}
+
+function fetchAlbumTrackCounts(browseIds) {
+  return API.post('/api/songs/album-track-counts', { browse_ids: browseIds })
+}
+
 function getLibraryGenresStatus() {
   return API.get('/api/library/genres/status')
 }
@@ -588,6 +596,8 @@ export default {
   mediaUrl,
   listDownloads,
   getLibraryFiles,
+  checkLibraryOwned,
+  fetchAlbumTrackCounts,
   getLibraryGenresStatus,
   deleteDownload,
   writePlaylistM3u,

@@ -52,7 +52,7 @@ def test_list_library_files_falls_back_to_filename(monkeypatch, tmp_path):
     ]
 
 
-def test_list_library_files_fast_skips_tag_reads(tmp_path):
+def test_list_library_files_fast_reads_genre_from_tags(tmp_path):
     artist_dir = tmp_path / 'Artist One' / 'Album A'
     artist_dir.mkdir(parents=True)
     path = artist_dir / '01 - Song Title.mp3'
@@ -71,10 +71,11 @@ def test_list_library_files_fast_skips_tag_reads(tmp_path):
     assert items[0]['title'] == 'Song Title'
     assert items[0]['artist'] == 'Artist One'
     assert items[0]['album'] == 'Album A'
-    assert items[0]['genre'] == ''
+    assert items[0]['genre'] == 'Jazz'
+    assert items[0]['browse_genre'] == 'Jazz'
 
 
-def test_list_library_files_fast_reads_album_tags_for_artist_only_paths(tmp_path):
+def test_list_library_files_fast_reads_genre_from_tags_for_album_paths(tmp_path):
     artist_dir = tmp_path / 'Alan Silvestri'
     artist_dir.mkdir(parents=True)
     path = artist_dir / 'Alan Silvestri - Main Title.mp3'

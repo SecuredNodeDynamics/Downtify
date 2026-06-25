@@ -80,13 +80,18 @@
           v-if="viewMode === 'artists' && selectedArtist && !selectedAlbum"
           class="library-drill-header"
         >
-          <button
-            class="library-drill-back"
-            @click="closeArtist"
-          >
-            <Icon icon="clarity:angle-line" class="h-4 w-4 rotate-[-90deg]" />
-            {{ t('library.backToArtists') }}
-          </button>
+          <div class="library-drill-toolbar">
+            <button
+              class="library-drill-back"
+              @click="closeArtist"
+            >
+              <Icon icon="clarity:angle-line" class="h-4 w-4 rotate-[-90deg]" />
+              {{ t('library.backToArtists') }}
+            </button>
+            <div class="library-drill-actions">
+              <LibraryArtistMonitor :artist-name="selectedArtist.name" />
+            </div>
+          </div>
           <div class="library-drill-main">
             <h2 class="library-drill-title">
               {{ selectedArtist.name }}
@@ -99,9 +104,6 @@
                 })
               }}
             </p>
-          </div>
-          <div class="library-drill-actions">
-            <LibraryArtistMonitor :artist-name="selectedArtist.name" />
           </div>
         </div>
 
@@ -492,7 +494,7 @@
                       >
                         <Icon icon="clarity:play-line" class="h-4 w-4" />
                       </button>
-                      <template v-if="viewMode !== 'tracks'">
+                      <template v-if="showTrackFileActions">
                         <a
                           class="icon-btn"
                           :href="API.downloadFileURL(file)"
@@ -559,6 +561,7 @@ import {
   groupArtists,
   groupGenres,
   itemMap,
+  libraryGenreName,
   matchesLibraryAlbumEntry,
   matchesLibraryArtistName,
   matchesLibraryField,
@@ -659,10 +662,11 @@ const selectedGenreFiles = computed(() => {
   if (!selectedGenreName.value) return []
   const unknown = unknownGenreLabel.value
   return libraryItems.value
-    .filter((item) => {
-      const genre = item.browse_genre || item.genre || unknown
-      return genre === selectedGenreName.value
-    })
+    .filter(
+      (item) =>
+        libraryGenreName(item, unknown, libraryGroupOptions.value) ===
+        selectedGenreName.value
+    )
     .map((item) => item.file)
 })
 
@@ -741,6 +745,10 @@ const libraryOnlineViewMode = computed(() => {
   return viewMode.value
 })
 
+const showTrackFileActions = computed(
+  () => viewMode.value !== 'tracks' && !selectedAlbum.value
+)
+
 const librarySearchIsUrl = computed(() =>
   sm.isValidURL(librarySearchQuery.value.trim())
 )
@@ -788,6 +796,35 @@ function applyLibraryData(items) {
   libraryItems.value = items.map((item) => normalizeLibraryItem(item, options))
   files.value = libraryItems.value.map((item) => item.file)
   API.warmLibraryCovers(libraryItems.value)
+  scheduleGenreRefresh(libraryItems.value)
+}
+
+function countUnknownGenres(items) {
+  const label = unknownGenreLabel.value
+  return (items || []).filter((item) => {
+    const genre = String(item?.genre || '').trim()
+    return !genre || genre === label
+  }).length
+}
+
+function clearGenreRefreshTimers() {
+  for (const timer of genreRefreshTimers) {
+    clearTimeout(timer)
+  }
+  genreRefreshTimers = []
+}
+
+function scheduleGenreRefresh(items) {
+  clearGenreRefreshTimers()
+  if (countUnknownGenres(items) === 0) return
+
+  for (const delay of [3000, 10000, 30000, 90000, 300000]) {
+    genreRefreshTimers.push(
+      setTimeout(() => {
+        void refresh({ background: true, force: true })
+      }, delay)
+    )
+  }
 }
 
 function pathsToLibraryItems(paths) {
@@ -996,6 +1033,7 @@ function queueOnlineDownload(song) {
 }
 
 let stopLibraryListener = null
+let genreRefreshTimers = []
 
 onMounted(() => {
   libraryRefresh.register(refreshFromHeader)
@@ -1023,6 +1061,7 @@ onDeactivated(() => {
 
 onUnmounted(() => {
   stopLibraryListener?.()
+  clearGenreRefreshTimers()
   libraryRefresh.unregister()
 })
 </script>
@@ -1098,8 +1137,12 @@ onUnmounted(() => {
   @apply flex flex-col items-stretch gap-3;
 }
 
+.library-drill-toolbar {
+  @apply flex w-full flex-nowrap items-center justify-between gap-2;
+}
+
 .library-drill-back {
-  @apply btn btn-sm inline-flex h-10 w-fit shrink-0 items-center gap-1.5 rounded-full border-white/10 bg-base-100/85 hover:bg-base-100;
+  @apply btn btn-sm inline-flex h-10 min-w-0 shrink items-center gap-1.5 rounded-full border-white/10 bg-base-100/85 px-3 hover:bg-base-100 sm:px-4;
 }
 
 .library-drill-main {
@@ -1115,7 +1158,11 @@ onUnmounted(() => {
 }
 
 .library-drill-actions {
-  @apply flex w-full flex-wrap items-center justify-end gap-2;
+  @apply flex shrink-0 flex-nowrap items-center justify-end gap-2;
+}
+
+.library-drill-header :deep(.library-artist-monitor .btn) {
+  @apply h-10 whitespace-nowrap px-3 sm:px-4;
 }
 
 .library-browse-slot {

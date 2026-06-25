@@ -163,7 +163,15 @@
                 <Icon icon="clarity:pop-out-line" class="h-4 w-4" />
               </a>
               <button
-                v-if="downloadState(song) === 'queued'"
+                v-if="downloadState(song) === 'owned'"
+                class="icon-btn text-success cursor-default"
+                title="In library"
+                disabled
+              >
+                <Icon icon="clarity:check-circle-solid" class="h-5 w-5" />
+              </button>
+              <button
+                v-else-if="downloadState(song) === 'queued'"
                 class="icon-btn text-primary cursor-default"
                 title="In queue"
                 disabled
@@ -255,11 +263,17 @@
         <!-- Download from player bar -->
         <button
           class="btn btn-primary btn-sm gap-1.5 shrink-0"
-          :disabled="downloadState(currentTrack) === 'queued'"
+          :disabled="downloadState(currentTrack) !== 'idle'"
           @click="downloadOne(currentTrack)"
         >
           <Icon icon="clarity:download-line" class="h-4 w-4" />
-          {{ downloadState(currentTrack) === 'queued' ? 'Queued' : 'Download' }}
+          {{
+            downloadState(currentTrack) === 'owned'
+              ? 'In library'
+              : downloadState(currentTrack) === 'queued'
+              ? 'Queued'
+              : 'Download'
+          }}
         </button>
       </div>
     </Transition>
@@ -275,6 +289,7 @@ import { Icon } from '@iconify/vue'
 import Navbar from '/src/components/Navbar.vue'
 import { useDownloadManager } from '../model/download'
 import { useProgressTracker } from '../model/download'
+import { useLibraryOwnership } from '../model/libraryOwnership'
 import API from '../model/api'
 
 const route = useRoute()
@@ -291,6 +306,7 @@ const loading = ref(true)
 const error = ref(null)
 const tracks = ref([])
 const type = ref('track')
+const { isOwned } = useLibraryOwnership(tracks)
 
 // ── Audio ────────────────────────────────────────────────────────────────────
 const audio = new Audio()
@@ -383,6 +399,7 @@ function seek(value) {
 
 // ── Download ─────────────────────────────────────────────────────────────────
 function downloadOne(song) {
+  if (downloadState(song) !== 'idle') return
   dm.queue(song)
   router.push({ name: 'Download' })
 }
@@ -395,6 +412,8 @@ function downloadAll() {
 }
 
 function downloadState(song) {
+  if (!song) return 'idle'
+  if (isOwned(song)) return 'owned'
   const item = pt.getBySong(song)
   if (!item) return 'idle'
   if (item.isErrored()) return 'error'

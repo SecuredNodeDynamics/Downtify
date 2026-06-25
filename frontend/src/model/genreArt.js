@@ -31,6 +31,10 @@ const GENRE_ART = {
     gradient: 'linear-gradient(135deg, #c79081 0%, #dfa579 100%)',
     icon: 'mdi:saxophone',
   },
+  Swing: {
+    gradient: 'linear-gradient(135deg, #c79081 0%, #dfa579 100%)',
+    icon: 'mdi:saxophone',
+  },
   Classical: {
     gradient: 'linear-gradient(135deg, #141e30 0%, #243b55 55%, #c9a227 100%)',
     icon: 'mdi:piano',

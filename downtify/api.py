@@ -66,6 +66,8 @@ from .image_proxy import fetch_remote_image, is_allowed_image_url
 from .library_index import (
     list_library_files,
     list_library_files_fast,
+    media_in_library,
+    media_item_key,
     notify_library_changed,
     warm_library_genres,
 )
@@ -1616,6 +1618,36 @@ def get_library_files() -> list[dict[str, str]]:
     return items
 
 
+@router.post('/api/library/owned')
+def check_library_owned(payload: dict[str, Any]) -> dict[str, Any]:
+    items = payload.get('items') if isinstance(payload.get('items'), list) else []
+    download_dir = (
+        _active_download_dir()
+        if state.downloader is not None
+        else state.default_download_dir
+    )
+    root_key = str(download_dir.resolve())
+    cache = state.library_files_cache
+    if cache.get('root') == root_key and cache.get('items'):
+        library_items = list(cache['items'])
+    else:
+        library_items = list_library_files_fast(download_dir)
+
+    owned: dict[str, bool] = {}
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        key = media_item_key(item)
+        if not key:
+            continue
+        owned[key] = media_in_library(
+            item,
+            downloader=state.downloader,
+            library_items=library_items,
+        )
+    return {'owned': owned}
+
+
 def invalidate_library_files_cache() -> None:
     state.library_files_cache = {
         'root': '',
@@ -1669,6 +1701,27 @@ async def _refresh_library_files_cache() -> None:
             **state.library_files_cache,
             'building': False,
         }
+
+
+async def _refresh_genres_and_library_cache() -> None:
+    download_dir = (
+        _active_download_dir()
+        if state.downloader is not None
+        else state.default_download_dir
+    )
+    try:
+        await asyncio.to_thread(warm_library_genres, download_dir)
+    except Exception:
+        logger.opt(exception=True).warning('Library genre refresh failed')
+    invalidate_library_files_cache()
+    await _refresh_library_files_cache()
+
+
+def schedule_library_genre_refresh() -> None:
+    loop = state.loop
+    if loop is None:
+        return
+    asyncio.run_coroutine_threadsafe(_refresh_genres_and_library_cache(), loop)
 
 
 async def warm_library_files_cache() -> None:
@@ -1743,6 +1796,16 @@ def library_genres_status() -> dict[str, Any]:
 @router.get('/api/songs/search')
 def search_endpoint(query: str = Query('')) -> list[dict[str, Any]]:
     return providers.search_media(query, limit=80)
+
+
+@router.post('/api/songs/album-track-counts')
+def album_track_counts_endpoint(payload: dict[str, Any]) -> dict[str, Any]:
+    browse_ids = (
+        payload.get('browse_ids')
+        if isinstance(payload.get('browse_ids'), list)
+        else []
+    )
+    return {'counts': providers.album_track_counts(browse_ids)}
 
 
 @router.get('/api/image-proxy')

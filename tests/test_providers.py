@@ -174,6 +174,7 @@ def test_search_media_derives_albums_from_song_hits(monkeypatch):
             return []
 
     monkeypatch.setattr(providers, '_ytm', lambda: FakeYTMusic())
+    monkeypatch.setattr(providers, 'album_track_counts', lambda _ids: {})
 
     results = providers.search_media('artist album', limit=5)
 
@@ -206,6 +207,7 @@ def test_search_media_ranks_exact_track_before_unrelated_album(monkeypatch):
             return []
 
     monkeypatch.setattr(providers, '_ytm', lambda: FakeYTMusic())
+    monkeypatch.setattr(providers, 'album_track_counts', lambda _ids: {})
 
     results = providers.search_media('Perfect Ed Sheeran', limit=10)
 
@@ -234,3 +236,63 @@ def test_search_media_can_return_more_than_old_six_pages(monkeypatch):
     results = providers.search_media('Artist', limit=80)
 
     assert len(results) == 80
+
+
+def test_result_to_album_includes_track_count():
+    album = providers._result_to_album(
+        {
+            'browseId': 'MPREb_test',
+            'title': 'Test Album',
+            'artists': [{'name': 'Artist'}],
+            'year': '2020',
+            'trackCount': 12,
+            'thumbnails': [{'url': 'https://example.com/cover.jpg'}],
+        }
+    )
+
+    assert album is not None
+    assert album['track_count'] == 12
+    assert album['media_type'] == 'album'
+
+
+def test_album_track_counts_uses_cached_lookup(monkeypatch):
+    def fake_cached(browse_id: str):
+        mapping = {
+            'MPREb_a': ([], 10),
+            'MPREb_b': ([], 14),
+        }
+        return mapping.get(browse_id, ([], None))
+
+    monkeypatch.setattr(providers, '_cached_album_tracks_and_count', fake_cached)
+
+    counts = providers.album_track_counts(['MPREb_a', 'MPREb_b', 'MPREb_a', ''])
+
+    assert counts == {'MPREb_a': 10, 'MPREb_b': 14}
+
+
+def test_search_media_attaches_album_track_counts(monkeypatch):
+    class FakeYTMusic:
+        def search(self, query, filter=None, limit=20):
+            if filter == 'albums':
+                return [
+                    {
+                        'browseId': 'MPREb_test',
+                        'title': 'Test Album',
+                        'artists': [{'name': 'Artist'}],
+                        'year': '2020',
+                    }
+                ]
+            return []
+
+    monkeypatch.setattr(providers, '_ytm', lambda: FakeYTMusic())
+    monkeypatch.setattr(
+        providers,
+        'album_track_counts',
+        lambda ids: {'MPREb_test': 15} if ids else {},
+    )
+
+    results = providers.search_media('test album', limit=5)
+    albums = [r for r in results if r.get('media_type') == 'album']
+
+    assert len(albums) == 1
+    assert albums[0]['track_count'] == 15

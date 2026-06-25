@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from difflib import SequenceMatcher
 from threading import Lock
 from typing import Any, Optional
@@ -136,6 +137,16 @@ def _artists_from_result(result: dict[str, Any]) -> list[str]:
     ]
 
 
+def _parse_track_count(raw: Any) -> Optional[int]:
+    if raw is None:
+        return None
+    try:
+        count = int(raw)
+    except (TypeError, ValueError):
+        return None
+    return count if count > 0 else None
+
+
 def _result_to_album(result: dict[str, Any]) -> Optional[dict[str, Any]]:
     browse_id = result.get('browseId')
     if not browse_id:
@@ -156,7 +167,11 @@ def _result_to_album(result: dict[str, Any]) -> Optional[dict[str, Any]]:
         'cover_url': _upgrade_thumbnail(cover),
         'year': year,
         'release_date': year if len(year) == 4 and year.isdigit() else '',
-        'track_count': result.get('trackCount') or result.get('count'),
+        'track_count': _parse_track_count(
+            result.get('trackCount')
+            or result.get('count')
+            or result.get('songCount')
+        ),
         'url': f'https://music.youtube.com/browse/{browse_id}',
         'source': 'youtube',
     }
@@ -184,6 +199,11 @@ def _song_result_to_album(result: dict[str, Any]) -> Optional[dict[str, Any]]:
         'cover_url': _upgrade_thumbnail(cover),
         'year': '',
         'release_date': '',
+        'track_count': _parse_track_count(
+            album.get('trackCount')
+            or album.get('count')
+            or album.get('songCount')
+        ),
         'url': f'https://music.youtube.com/browse/{browse_id}',
         'source': 'youtube',
     }
@@ -288,6 +308,40 @@ def search_albums(query: str, limit: int = 10) -> list[dict[str, Any]]:
     return albums
 
 
+def album_track_counts(browse_ids: list[str]) -> dict[str, int]:
+    """Resolve track totals for album browse ids (uses get_album + cache)."""
+
+    unique: list[str] = []
+    seen: set[str] = set()
+    for raw in browse_ids:
+        bid = str(raw or '').strip()
+        if not bid or bid in seen:
+            continue
+        seen.add(bid)
+        unique.append(bid)
+    if not unique:
+        return {}
+
+    def lookup(browse_id: str) -> tuple[str, Optional[int]]:
+        _, total = _cached_album_tracks_and_count(browse_id)
+        return browse_id, total
+
+    counts: dict[str, int] = {}
+    if len(unique) == 1:
+        bid, total = lookup(unique[0])
+        if total:
+            counts[bid] = total
+        return counts
+
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        futures = [pool.submit(lookup, bid) for bid in unique]
+        for future in as_completed(futures):
+            bid, total = future.result()
+            if total:
+                counts[bid] = total
+    return counts
+
+
 def _search_tokens(value: str) -> list[str]:
     return re.findall(r'[a-z0-9]+', value.casefold())
 
@@ -347,6 +401,24 @@ def _search_relevance(item: dict[str, Any], query: str) -> float:
     return score
 
 
+def _attach_album_track_counts(items: list[dict[str, Any]]) -> None:
+    browse_ids = [
+        str(item.get('browse_id'))
+        for item in items
+        if item.get('media_type') == 'album'
+        and item.get('browse_id')
+        and not _parse_track_count(item.get('track_count'))
+    ]
+    if not browse_ids:
+        return
+    counts = album_track_counts(browse_ids)
+    for item in items:
+        bid = str(item.get('browse_id') or '')
+        count = counts.get(bid)
+        if count:
+            item['track_count'] = count
+
+
 def search_media(query: str, limit: int = 20) -> list[dict[str, Any]]:
     if not query.strip():
         return []
@@ -381,7 +453,9 @@ def search_media(query: str, limit: int = 20) -> list[dict[str, Any]]:
         key=lambda pair: (_search_relevance(pair[1], query), -pair[0]),
         reverse=True,
     )
-    return [item for _, item in ranked[:limit]]
+    final = [item for _, item in ranked[:limit]]
+    _attach_album_track_counts(final)
+    return final
 
 
 def album_tracks_from_browse_id(browse_id: str) -> list[dict[str, Any]]:

@@ -294,6 +294,9 @@
   .media-type-pill-album {
     @apply bg-info/15 text-info border border-info/25;
   }
+  .media-type-pill-tracks {
+    @apply bg-base-content/5 text-base-content/70 border border-white/10 normal-case;
+  }
 
   .card-hover-glow {
     @apply transition-all duration-300 hover:-translate-y-0.5 hover:shadow-glow-sm;

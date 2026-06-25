@@ -270,13 +270,19 @@ def read_library_entry_fast(
     title = tagged_title or (
         stem.split(' - ', 1)[-1].strip() if ' - ' in stem else stem
     )
+    genre = canonical_genre(
+        str(song.get('genre') or '').strip() or _genre_from_path(path)
+    )
+    genre_fields = _library_genre_fields(genre) if genre else {
+        'genre': '',
+        'browse_genre': '',
+    }
     return {
         'file': relative,
         'title': title or stem,
         'artist': artist,
         'album': album,
-        'genre': '',
-        'browse_genre': '',
+        **genre_fields,
     }
 
 
@@ -407,6 +413,54 @@ def schedule_artist_genre_warmup(root: Path) -> None:
     """Warm the artist genre cache for artists missing file tags."""
 
     warm_library_genres(root)
+
+
+def media_item_key(item: dict[str, Any]) -> str:
+    for field in ('song_id', 'browse_id', 'url'):
+        value = str(item.get(field) or '').strip()
+        if value:
+            return value
+    return ''
+
+
+def album_in_library(
+    album: dict[str, Any],
+    items: list[dict[str, str]],
+) -> bool:
+    from .downloader import _normalize_duplicate_key
+
+    artists = album.get('artists') or []
+    artist = str(artists[0] if artists else '').strip()
+    album_name = str(album.get('name') or album.get('album_name') or '').strip()
+    if not album_name:
+        return False
+
+    artist_key = _normalize_duplicate_key(artist)
+    album_key = _normalize_duplicate_key(album_name)
+    if not album_key:
+        return False
+
+    for item in items:
+        if _normalize_duplicate_key(str(item.get('album') or '')) != album_key:
+            continue
+        item_artist_key = _normalize_duplicate_key(str(item.get('artist') or ''))
+        if not artist_key or item_artist_key == artist_key:
+            return True
+    return False
+
+
+def media_in_library(
+    item: dict[str, Any],
+    *,
+    downloader: Any,
+    library_items: list[dict[str, str]],
+) -> bool:
+    media_type = str(item.get('media_type') or 'track').strip().lower()
+    if media_type == 'album':
+        return album_in_library(item, library_items)
+    if downloader is None:
+        return False
+    return bool(downloader.duplicate_filename_for(item))
 
 
 _library_changed_callbacks: list[Callable[[], None]] = []

@@ -4,6 +4,7 @@ import {
   artistFromPath,
   groupAlbums,
   groupGenres,
+  libraryGenreName,
   libraryCoverFolders,
   matchesLibraryAlbumEntry,
   matchesLibraryArtistName,
@@ -54,6 +55,47 @@ describe('library path helpers', () => {
     const genres = groupGenres([item], 'Unknown genre')
     expect(genres).toHaveLength(1)
     expect(genres[0].name).toBe('Unknown genre')
+  })
+
+  it('merges hip hop genre spelling variants into one bucket', () => {
+    const items = [
+      {
+        file: 'Artist A/Album/01.flac',
+        genre: 'Hip Hop',
+        browse_genre: 'Hip-Hop',
+      },
+      {
+        file: 'Artist B/Album/01.flac',
+        genre: 'Hip-Hop',
+        browse_genre: 'Hip-Hop',
+      },
+    ]
+
+    const genres = groupGenres(items)
+    expect(genres).toHaveLength(1)
+    expect(genres[0].name).toBe('Hip-Hop')
+    expect(genres[0].files).toHaveLength(2)
+  })
+
+  it('groups specific genres like Swing instead of collapsing to browse parents', () => {
+    const items = [
+      {
+        file: 'Swing Sisters/Swing/01.flac',
+        genre: 'Swing',
+        browse_genre: 'Jazz',
+      },
+      {
+        file: 'Swing Sisters/Swing/02.flac',
+        genre: 'Swing',
+        browse_genre: 'Jazz',
+      },
+    ]
+
+    const genres = groupGenres(items)
+    expect(genres).toHaveLength(1)
+    expect(genres[0].name).toBe('Swing')
+    expect(genres[0].subgenres).toEqual(['Jazz'])
+    expect(libraryGenreName(items[0])).toBe('Swing')
   })
 
   it('groups genre cover files from distinct albums', () => {

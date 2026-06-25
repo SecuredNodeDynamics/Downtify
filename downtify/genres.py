@@ -167,12 +167,13 @@ def _title_case_genre(value: str) -> str:
     raw = ' '.join(str(value or '').strip().split())
     if not raw:
         return ''
-    if raw.casefold() in {'r&b', 'rnb'}:
+    folded = raw.casefold().replace('-', ' ')
+    if folded in {'r&b', 'rnb', 'r and b'}:
         return 'R&B'
+    if folded in {'hip hop', 'hiphop'}:
+        return 'Hip-Hop'
     if raw.casefold() in {'edm', 'idm'}:
         return raw.upper()
-    if raw.casefold() == 'hip-hop':
-        return 'Hip-Hop'
     if raw.islower() or raw.isupper():
         return raw.title()
     return raw

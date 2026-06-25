@@ -9,6 +9,7 @@ import {
   notifyDownloadHistory,
   upsertHistoryItem,
 } from '/src/model/downloadHistory'
+import { isMediaOwned } from '/src/model/libraryOwnership'
 
 const downloadDestination = useDownloadDestination()
 
@@ -282,19 +283,22 @@ export function useDownloadManager() {
 
   function queueAlbum(album) {
     if (!album.browse_id) return Promise.resolve()
-    loading.value = true
-    return API.openYoutubeAlbum(album.browse_id)
-      .then((res) => {
-        if (res.status === 200 && Array.isArray(res.data)) {
-          return queueBatch(res.data)
-        }
-      })
-      .catch((err) => {
-        console.log('Album queue failed:', err.message)
-      })
-      .finally(() => {
-        loading.value = false
-      })
+    return isMediaOwned(album).then((owned) => {
+      if (owned) return { album, skipped: true }
+      loading.value = true
+      return API.openYoutubeAlbum(album.browse_id)
+        .then((res) => {
+          if (res.status === 200 && Array.isArray(res.data)) {
+            return queueBatch(res.data)
+          }
+        })
+        .catch((err) => {
+          console.log('Album queue failed:', err.message)
+        })
+        .finally(() => {
+          loading.value = false
+        })
+    })
   }
 
   function download(song) {
@@ -327,8 +331,12 @@ export function useDownloadManager() {
       })
   }
 
-  function queue(song, beginDownload = true) {
-    if (song && song.media_type === 'album') return queueAlbum(song)
+  async function queue(song, beginDownload = true) {
+    if (!song) return Promise.resolve({ song, filename: null })
+    if (await isMediaOwned(song)) {
+      return Promise.resolve({ song, filename: null, skipped: true })
+    }
+    if (song.media_type === 'album') return queueAlbum(song)
     progressTracker.appendSong(song)
     if (beginDownload) return download(song)
     return Promise.resolve({ song, filename: null })

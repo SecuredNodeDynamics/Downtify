@@ -32,6 +32,7 @@
       :aria-label="
         showClear ? t('library.clearSearch') : submitAriaLabel || undefined
       "
+      @pointerdown="onActionPointerDown"
       @click="onAction"
     >
       <span
@@ -169,10 +170,26 @@ function onInput(event) {
   emit('update:modelValue', event.target.value)
 }
 
+function dismissKeyboard() {
+  const input = inputRef.value
+  if (input) {
+    input.blur()
+  }
+  const active = document.activeElement
+  if (active instanceof HTMLElement && active !== document.body) {
+    active.blur()
+  }
+}
+
 function clear() {
   emit('update:modelValue', '')
   emit('clear')
-  inputRef.value?.focus()
+  dismissKeyboard()
+}
+
+function onActionPointerDown(event) {
+  if (!showClear.value || props.submitLoading) return
+  event.preventDefault()
 }
 
 function onAction() {

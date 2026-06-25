@@ -121,7 +121,13 @@
               {{ artistsOf(song) }}
             </p>
             <p
-              v-if="song.album_name"
+              v-if="mediaType(song) === 'album' && song.year"
+              class="text-xs text-base-content/40 truncate"
+            >
+              {{ song.year }}
+            </p>
+            <p
+              v-else-if="mediaType(song) !== 'album' && song.album_name"
               class="text-xs text-base-content/40 truncate"
             >
               {{ song.album_name }}
@@ -134,16 +140,33 @@
 
         <!-- Actions -->
         <div
-          class="flex flex-wrap items-center justify-end gap-1 border-t border-white/6 pt-2 sm:border-0 sm:pt-0 shrink-0"
+          class="flex w-full items-center justify-between gap-2 border-t border-white/6 pt-2 sm:w-auto sm:border-0 sm:pt-0 shrink-0"
         >
-          <span
-            class="media-type-pill"
-            :class="mediaTypeClass(song)"
-            :title="mediaTypeLabel(song)"
-          >
-            {{ mediaTypeLabel(song) }}
-          </span>
+          <div class="flex min-w-0 items-center gap-1.5">
+            <span
+              class="media-type-pill"
+              :class="mediaTypeClass(song)"
+              :title="mediaTypeLabel(song)"
+            >
+              {{ mediaTypeLabel(song) }}
+            </span>
+            <span
+              v-if="mediaType(song) === 'album'"
+              class="media-type-pill media-type-pill-tracks"
+              :title="albumTracksTagTitle(song)"
+            >
+              {{ t('search.tracksTag') }}
+              <span class="mx-0.5 text-base-content/35">·</span>
+              <span
+                class="tabular-nums"
+                :class="albumTrackCount(song) ? '' : 'opacity-50'"
+              >
+                {{ albumTrackCount(song) ?? '…' }}
+              </span>
+            </span>
+          </div>
 
+          <div class="flex shrink-0 items-center gap-1">
           <button
             class="icon-btn text-primary hover:bg-primary/10"
             @click="openDemo(song)"
@@ -158,13 +181,21 @@
             :href="externalServiceUrl(song)"
             target="_blank"
             rel="noopener"
-            :title="externalServiceLabel(song)"
+            :title="externalServiceLabel()"
           >
             <Icon icon="clarity:pop-out-line" class="h-4 w-4" />
           </a>
 
           <button
-            v-if="downloadState(song) === 'queued'"
+            v-if="downloadState(song) === 'owned'"
+            class="icon-btn text-success cursor-default"
+            :title="t('search.inLibrary')"
+            disabled
+          >
+            <Icon icon="clarity:check-circle-solid" class="h-5 w-5" />
+          </button>
+          <button
+            v-else-if="downloadState(song) === 'queued'"
             class="icon-btn text-primary cursor-default"
             :title="t('search.inQueue')"
             disabled
@@ -179,6 +210,7 @@
           >
             <Icon icon="clarity:download-line" class="h-5 w-5" />
           </button>
+          </div>
         </div>
       </li>
     </ul>
@@ -273,9 +305,10 @@
 
             <div
               v-else
-              class="demo-modal-body min-h-0 flex-1 overflow-y-auto overscroll-contain"
+              class="demo-modal-body flex min-h-0 flex-1 flex-col"
             >
-              <div class="grid gap-5 p-5 sm:grid-cols-[160px_1fr]">
+              <div class="demo-modal-hero shrink-0 p-5">
+                <div class="grid gap-5 sm:grid-cols-[160px_1fr]">
                 <div
                   class="demo-modal-cover relative mx-auto aspect-square w-full max-w-44 overflow-hidden rounded-2xl bg-base-content/10 shadow-lg sm:mx-0 sm:max-w-none"
                 >
@@ -419,12 +452,14 @@
                     <button
                       v-if="demoType === 'album' && demoSourceItem"
                       class="btn btn-primary btn-sm gap-2 rounded-full sm:shrink-0"
-                      :disabled="downloadState(demoSourceItem) === 'queued'"
+                      :disabled="downloadState(demoSourceItem) !== 'idle'"
                       @click="downloadAlbumFromDemo"
                     >
                       <Icon icon="clarity:download-line" class="h-4 w-4" />
                       {{
-                        downloadState(demoSourceItem) === 'queued'
+                        downloadState(demoSourceItem) === 'owned'
+                          ? t('search.inLibrary')
+                          : downloadState(demoSourceItem) === 'queued'
                           ? t('search.inQueue')
                           : t('search.downloadAlbum')
                       }}
@@ -432,12 +467,14 @@
                     <button
                       v-if="demoType === 'album'"
                       class="btn btn-sm gap-2 rounded-full border border-white/10 bg-base-100/85 hover:bg-base-100 sm:shrink-0"
-                      :disabled="downloadState(activeDemoTrack) === 'queued'"
+                      :disabled="downloadState(activeDemoTrack) !== 'idle'"
                       @click="downloadFromDemo"
                     >
                       <Icon icon="clarity:download-line" class="h-4 w-4" />
                       {{
-                        downloadState(activeDemoTrack) === 'queued'
+                        downloadState(activeDemoTrack) === 'owned'
+                          ? t('search.inLibrary')
+                          : downloadState(activeDemoTrack) === 'queued'
                           ? t('search.inQueue')
                           : t('search.downloadTrack')
                       }}
@@ -445,12 +482,14 @@
                     <button
                       v-else
                       class="btn btn-primary btn-sm gap-2 rounded-full sm:shrink-0"
-                      :disabled="downloadState(activeDemoTrack) === 'queued'"
+                      :disabled="downloadState(activeDemoTrack) !== 'idle'"
                       @click="downloadFromDemo"
                     >
                       <Icon icon="clarity:download-line" class="h-4 w-4" />
                       {{
-                        downloadState(activeDemoTrack) === 'queued'
+                        downloadState(activeDemoTrack) === 'owned'
+                          ? t('search.inLibrary')
+                          : downloadState(activeDemoTrack) === 'queued'
                           ? t('search.inQueue')
                           : t('search.download')
                       }}
@@ -458,21 +497,22 @@
                     <a
                       v-if="externalServiceUrl(activeDemoTrack)"
                       class="btn btn-sm gap-2 rounded-full bg-base-100/85 sm:shrink-0"
-                      :class="externalServiceButtonClass(activeDemoTrack)"
+                      :class="externalServiceButtonClass()"
                       :href="externalServiceUrl(activeDemoTrack)"
                       target="_blank"
                       rel="noopener"
                     >
                       <Icon icon="clarity:pop-out-line" class="h-4 w-4" />
-                      {{ externalServiceLabel(activeDemoTrack) }}
+                      {{ externalServiceLabel() }}
                     </a>
                   </div>
                 </div>
               </div>
+              </div>
 
               <div
                 v-if="demoType === 'album' && demoTracks.length"
-                class="border-t border-white/5 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))]"
+                class="demo-modal-tracks min-h-0 flex-1 border-t border-white/5 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))]"
               >
                 <div
                   v-for="(track, index) in demoTracks"
@@ -545,6 +585,8 @@ import { Icon } from '@iconify/vue'
 
 import { useSearchManager } from '../model/search'
 import { useProgressTracker, useDownloadManager } from '../model/download'
+import { useLibraryOwnership } from '../model/libraryOwnership'
+import { useAlbumTrackCounts } from '../model/albumTrackCounts'
 import { useI18n } from '../i18n'
 import API from '../model/api'
 import CoverImage from './CoverImage.vue'
@@ -587,6 +629,21 @@ const resolvingDemoAudioKeys = ref({})
 const failedDemoAudioKeys = ref({})
 const demoAudio = new Audio()
 demoAudio.volume = demoVolume.value
+
+const ownershipItems = computed(() => {
+  const items = [...(props.data || [])]
+  if (demoOpen.value && demoSourceItem.value) {
+    items.push(demoSourceItem.value)
+  }
+  if (demoOpen.value && demoTracks.value.length) {
+    items.push(...demoTracks.value)
+  }
+  return items
+})
+const { isOwned } = useLibraryOwnership(ownershipItems)
+const { trackCountFor, countsByBrowseId } = useAlbumTrackCounts(
+  computed(() => props.data)
+)
 
 demoAudio.addEventListener('timeupdate', () => {
   demoProgress.value = demoAudio.currentTime
@@ -736,59 +793,48 @@ function mediaTypeClass(song) {
     : 'media-type-pill-track'
 }
 
+function trackCountLabel(count) {
+  const n = Number(count)
+  if (!Number.isFinite(n) || n < 1) return ''
+  return n === 1
+    ? t('search.trackCountOne', { count: n })
+    : t('search.trackCountMany', { count: n })
+}
+
+function albumTrackCount(song) {
+  if (mediaType(song) !== 'album') return null
+  void countsByBrowseId.value
+  const count = trackCountFor(song)
+  return count || null
+}
+
+function albumTracksTagTitle(song) {
+  const count = albumTrackCount(song)
+  if (!count) return t('search.tracksTag')
+  return trackCountLabel(count)
+}
+
 function isSpotifyUrl(url) {
   return /open\.spotify\.com\//.test(url || '')
-}
-
-function isYoutubeMusicUrl(url) {
-  return /(?:music\.youtube\.com|youtube\.com|youtu\.be)\//.test(url || '')
-}
-
-function youtubeMusicUrlFor(item) {
-  if (!item) return ''
-  if (isYoutubeMusicUrl(item.url)) return item.url
-  if (item.browse_id)
-    return `https://music.youtube.com/browse/${item.browse_id}`
-
-  const youtubeId =
-    item.youtube_id ||
-    (item.source === 'youtube' ? item.song_id : '') ||
-    item.url?.match(/[?&]v=([A-Za-z0-9_-]{6,})/)?.[1] ||
-    item.url?.match(/youtu\.be\/([A-Za-z0-9_-]{6,})/)?.[1]
-
-  if (youtubeId && !String(youtubeId).startsWith('album:')) {
-    return `https://music.youtube.com/watch?v=${youtubeId}`
-  }
-  return ''
 }
 
 function externalServiceUrl(item) {
   if (!item) return ''
   if (isSpotifyUrl(item.url)) return item.url
-  if (
-    item.source === 'youtube' ||
-    isYoutubeMusicUrl(item.url) ||
-    item.browse_id
-  ) {
-    return youtubeMusicUrlFor(item)
-  }
-  return item.url || ''
+  return ''
 }
 
-function externalServiceLabel(item) {
-  return isSpotifyUrl(externalServiceUrl(item))
-    ? t('search.openOnSpotify')
-    : t('search.openOnYoutubeMusic')
+function externalServiceLabel() {
+  return t('search.openOnSpotify')
 }
 
-function externalServiceButtonClass(item) {
-  return isSpotifyUrl(externalServiceUrl(item))
-    ? 'border-white/10'
-    : 'border-error/70 text-error hover:border-error hover:bg-error/10'
+function externalServiceButtonClass() {
+  return 'border-white/10'
 }
 
 function downloadState(song) {
   if (!song) return 'idle'
+  if (isOwned(song)) return 'owned'
   const item = pt.getBySong(song)
   if (!item) return 'idle'
   if (item.isErrored()) return 'error'
@@ -797,6 +843,7 @@ function downloadState(song) {
 }
 
 function download(song) {
+  if (downloadState(song) !== 'idle') return
   emit('download', song)
 }
 
@@ -928,12 +975,16 @@ function onDemoVolumeOutsideClick(event) {
 }
 
 function downloadFromDemo() {
-  if (!activeDemoTrack.value) return
+  if (!activeDemoTrack.value || downloadState(activeDemoTrack.value) !== 'idle') {
+    return
+  }
   download(activeDemoTrack.value)
 }
 
 function downloadAlbumFromDemo() {
-  if (!demoSourceItem.value) return
+  if (!demoSourceItem.value || downloadState(demoSourceItem.value) !== 'idle') {
+    return
+  }
   download(demoSourceItem.value)
 }
 
@@ -1136,6 +1187,21 @@ function formatDuration(seconds) {
 
 .demo-modal-panel {
   max-height: min(92dvh, 100%);
+}
+
+.demo-modal-tracks {
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.demo-modal-tracks::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 @media (min-width: 640px) {
