@@ -1113,7 +1113,10 @@ import {
 import { useI18n } from '../i18n'
 import API from '../model/api'
 import { usesApkUpdateFlow } from '../model/appUpdate'
-import { checkDowntifyVersion } from '../model/appVersion'
+import {
+  checkDowntifyVersion,
+  getCachedUpdateStatus,
+} from '../model/appVersion'
 import { installApkUpdate } from '../model/apkUpdate'
 import ThemedSelect from './ThemedSelect.vue'
 
@@ -1221,14 +1224,6 @@ function applySettingsTab(tab) {
 function openSettingsTab(event) {
   applySettingsTab(event?.detail?.tab)
 }
-
-watch(
-  () => route.query.tab,
-  (tab) => {
-    if (typeof tab === 'string') applySettingsTab(tab)
-  },
-  { immediate: true }
-)
 
 onMounted(() =>
   window.addEventListener('downtify:open-settings', openSettingsTab)
@@ -1405,29 +1400,6 @@ function uniqueLibrariesByName(libraries) {
   })
 }
 
-// Watch for tab changes to fetch Jellyfin libraries when API tab is opened
-watch(activeTab, (newTab) => {
-  if (newTab === 'api') {
-    // Fetch libraries if we have URL and API key, but libraries haven't been fetched yet
-    const hasUrl = sm.settings.value.jellyfin_url?.trim()
-    const hasApiKey = sm.settings.value.jellyfin_api_key?.trim()
-    if (
-      hasUrl &&
-      hasApiKey &&
-      jellyfinLibraries.value.length === 0 &&
-      !jellyfinLibraryError.value
-    ) {
-      onJellyfinConfigChange()
-    }
-  }
-  if (newTab === 'logs') {
-    loadRepairLog()
-  }
-  if (newTab === 'help') {
-    loadUpdateStatus()
-  }
-})
-
 const localFolderBlockMessage = computed(() => {
   if (localFolderBlockReason.value === 'insecure') {
     return t('settings.localFolderInsecure')
@@ -1477,6 +1449,11 @@ async function loadRepairLog() {
 }
 
 async function loadUpdateStatus(refresh = false) {
+  if (!refresh && !updateStatus.value) {
+    const cached = getCachedUpdateStatus()
+    if (cached) updateStatus.value = cached
+  }
+
   helpLoading.value = true
   helpError.value = ''
   try {
@@ -1807,4 +1784,33 @@ async function testJellyfinApi() {
     jellyfinTestLoading.value = false
   }
 }
+
+watch(activeTab, (newTab) => {
+  if (newTab === 'api') {
+    const hasUrl = sm.settings.value.jellyfin_url?.trim()
+    const hasApiKey = sm.settings.value.jellyfin_api_key?.trim()
+    if (
+      hasUrl &&
+      hasApiKey &&
+      jellyfinLibraries.value.length === 0 &&
+      !jellyfinLibraryError.value
+    ) {
+      onJellyfinConfigChange()
+    }
+  }
+  if (newTab === 'logs') {
+    loadRepairLog()
+  }
+  if (newTab === 'help') {
+    loadUpdateStatus()
+  }
+})
+
+watch(
+  () => route.query.tab,
+  (tab) => {
+    if (typeof tab === 'string') applySettingsTab(tab)
+  },
+  { immediate: true }
+)
 </script>

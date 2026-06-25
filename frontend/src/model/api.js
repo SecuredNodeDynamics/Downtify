@@ -326,10 +326,10 @@ function coverSourcesForArtist(artistName, previewFiles = []) {
   if (cached) return cached
 
   const urls = []
-  if (name) urls.push(coverFolderURL(name))
   for (const file of files) {
     urls.push(...coverUrlsForLibraryFile(file))
   }
+  if (name) urls.push(coverFolderURL(name))
   const deduped = [...new Set(urls.filter(Boolean))]
   const entry = Object.freeze({
     src: deduped[0] || '',

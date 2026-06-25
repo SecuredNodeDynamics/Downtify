@@ -210,6 +210,21 @@ function buildWebUpdateStatus(data) {
   }
 }
 
+export function getCachedUpdateStatus() {
+  if (!cachedStatus) return null
+  if (Date.now() - cachedAt >= CACHE_TTL_MS) return null
+
+  if (isCapacitorNative()) {
+    return {
+      ...cachedStatus,
+      current_version:
+        getInstalledClientVersionSync() || cachedStatus.current_version,
+    }
+  }
+
+  return { ...cachedStatus }
+}
+
 export async function checkDowntifyVersion({ refresh = false } = {}) {
   const now = Date.now()
 

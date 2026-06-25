@@ -2453,7 +2453,12 @@ def artist_folder_image_preview(folder: str = Query(...)) -> Response:
     return Response(
         content=data,
         media_type=artist_art.media_type_for_image(data),
-        headers={'Cache-Control': 'no-store'},
+        headers={
+            'Cache-Control': 'public, max-age=86400',
+            'Access-Control-Allow-Origin': '*',
+            'Cross-Origin-Resource-Policy': 'cross-origin',
+            'ETag': f'"{int(image.stat().st_mtime)}"',
+        },
     )
 
 

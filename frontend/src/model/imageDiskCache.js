@@ -1,6 +1,6 @@
 const DB_NAME = 'downtify-image-cache'
 const STORE_NAME = 'images'
-const DB_VERSION = 1
+const DB_VERSION = 2
 const MAX_ENTRIES = 500
 
 let dbPromise = null
@@ -14,11 +14,14 @@ function openDb() {
 
   dbPromise = new Promise((resolve) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION)
-    request.onupgradeneeded = () => {
+    request.onupgradeneeded = (event) => {
       const db = request.result
       if (!db.objectStoreNames.contains(STORE_NAME)) {
         const store = db.createObjectStore(STORE_NAME, { keyPath: 'key' })
         store.createIndex('updatedAt', 'updatedAt', { unique: false })
+      }
+      if (event.oldVersion < 2) {
+        // v2 stores ArrayBuffer payloads instead of Blob for Android WebView reliability.
       }
     }
     request.onsuccess = () => resolve(request.result)
@@ -32,6 +35,17 @@ function cacheKey(url) {
   return String(url || '').trim()
 }
 
+function blobFromRecord(record) {
+  if (!record) return null
+  if (record.buffer instanceof ArrayBuffer) {
+    return new Blob([record.buffer], {
+      type: record.mime || 'image/jpeg',
+    })
+  }
+  if (record.blob instanceof Blob) return record.blob
+  return null
+}
+
 export async function readPersistedImage(url) {
   const key = cacheKey(url)
   if (!key) return null
@@ -43,8 +57,7 @@ export async function readPersistedImage(url) {
     const tx = db.transaction(STORE_NAME, 'readonly')
     const request = tx.objectStore(STORE_NAME).get(key)
     request.onsuccess = () => {
-      const record = request.result
-      resolve(record?.blob instanceof Blob ? record.blob : null)
+      resolve(blobFromRecord(request.result))
     }
     request.onerror = () => resolve(null)
   })
@@ -87,13 +100,21 @@ export async function writePersistedImage(url, blob) {
   const db = await openDb()
   if (!db) return
 
+  let buffer
+  try {
+    buffer = await blob.arrayBuffer()
+  } catch {
+    return
+  }
+
   await new Promise((resolve) => {
     const tx = db.transaction(STORE_NAME, 'readwrite')
     tx.oncomplete = () => resolve()
     tx.onerror = () => resolve()
     tx.objectStore(STORE_NAME).put({
       key,
-      blob,
+      buffer,
+      mime: blob.type || 'image/jpeg',
       updatedAt: Date.now(),
     })
   })

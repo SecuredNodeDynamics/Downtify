@@ -5,12 +5,18 @@ import {
   canLoadImageDirectly,
   getCachedCoverDisplay,
   rememberCoverDisplay,
+  resolveImageSrc,
 } from '../model/imageLoader'
 
 vi.mock('../model/serverConnection.js', () => ({
   buildApiBaseUrl: () => 'http://downtify.local:8000',
   getServerConfig: () => ({ host: 'downtify.local', port: 8000, protocol: 'http' }),
   isCapacitorNative: vi.fn(() => false),
+}))
+
+vi.mock('../model/imageDiskCache.js', () => ({
+  readPersistedImage: vi.fn(async () => null),
+  writePersistedImage: vi.fn(async () => {}),
 }))
 
 describe('imageLoader cover cache', () => {
@@ -49,5 +55,17 @@ describe('canLoadImageDirectly', () => {
     isCapacitorNative.mockReturnValue(false)
 
     expect(canLoadImageDirectly('https://i.scdn.co/image/abc')).toBe(true)
+  })
+})
+
+describe('resolveImageSrc direct URLs', () => {
+  it('returns same-origin URLs immediately on native without preloading', async () => {
+    const { isCapacitorNative } = await import('../model/serverConnection.js')
+    const { readPersistedImage } = await import('../model/imageDiskCache.js')
+    isCapacitorNative.mockReturnValue(true)
+    readPersistedImage.mockResolvedValueOnce(null)
+
+    const url = 'http://downtify.local:8000/cover?file=Artist%2Ftrack.mp3'
+    await expect(resolveImageSrc(url)).resolves.toBe(url)
   })
 })

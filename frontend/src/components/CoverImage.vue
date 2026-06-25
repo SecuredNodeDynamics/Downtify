@@ -8,6 +8,7 @@
       referrerpolicy="no-referrer"
       :loading="imageLoading"
       decoding="async"
+      @load="onImageLoad"
       @error="onError"
     />
     <div
@@ -25,7 +26,9 @@ import { computed, ref, watch } from 'vue'
 
 import {
   buildCoverSourceKey,
+  canLoadImageDirectly,
   getCachedCoverDisplay,
+  persistLoadedImage,
   rememberCoverDisplay,
   resolveImageSrc,
 } from '../model/imageLoader'
@@ -95,7 +98,23 @@ async function applyCandidate(url) {
   displaySrc.value = resolved || url
   rememberCoverDisplay(sourceKey.value, displaySrc.value, false)
   restoredFromCache.value = true
+
+  if (canLoadImageDirectly(url) && !displaySrc.value.startsWith('blob:')) {
+    void persistLoadedImage(url).then((upgraded) => {
+      if (!upgraded?.startsWith('blob:') || current !== requestId) return
+      displaySrc.value = upgraded
+      rememberCoverDisplay(sourceKey.value, upgraded, false)
+    })
+  }
+
   return true
+}
+
+function onImageLoad() {
+  const url = candidateUrls[candidateIndex]
+  if (url && canLoadImageDirectly(url) && !displaySrc.value.startsWith('blob:')) {
+    void persistLoadedImage(url)
+  }
 }
 
 async function loadCurrentCandidate() {

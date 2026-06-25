@@ -40,14 +40,39 @@ export function canLoadImageDirectly(url) {
 }
 
 function persistImageInBackground(url) {
-  if (!isCapacitorNative() || !canLoadImageDirectly(url)) return
-  void fetch(url)
-    .then((response) => (response.ok ? response.blob() : null))
-    .then((blob) => {
-      if (blob) return writePersistedImage(url, blob)
-      return null
-    })
-    .catch(() => {})
+  void persistLoadedImage(url)
+}
+
+async function fetchDirectImageBlob(url) {
+  try {
+    const response = await fetch(url, { credentials: 'omit' })
+    if (response.ok) return await response.blob()
+  } catch {
+    // Fall back to the native HTTP bridge below.
+  }
+  return fetchImageBlob(url)
+}
+
+export async function persistLoadedImage(url) {
+  const value = String(url || '').trim()
+  if (!value || !canLoadImageDirectly(value)) return ''
+
+  const existing = await readPersistedImage(value)
+  if (existing) {
+    const blobUrl = URL.createObjectURL(existing)
+    rememberResolvedUrl(value, blobUrl)
+    return blobUrl
+  }
+
+  try {
+    const blob = await fetchDirectImageBlob(value)
+    await writePersistedImage(value, blob)
+    const blobUrl = URL.createObjectURL(blob)
+    rememberResolvedUrl(value, blobUrl)
+    return blobUrl
+  } catch {
+    return ''
+  }
 }
 
 function contentTypeFromHeaders(headers = {}) {
@@ -171,8 +196,8 @@ export async function resolveImageSrc(url) {
         rememberResolvedUrl(value, blobUrl)
         return blobUrl
       }
-      await preloadHttpImage(value)
-      return urlCache.get(value) || value
+      rememberResolvedUrl(value, value)
+      return value
     } catch (error) {
       console.warn('Failed to load direct image on native:', value, error)
       return value
@@ -223,17 +248,12 @@ export async function preloadCoverSources({ src, fallbacks = [] } = {}) {
 
   for (const url of urls) {
     try {
-      if (canLoadImageDirectly(url)) {
-        await preloadHttpImage(url)
-        const resolved = urlCache.get(url) || url
-        if (resolved) {
-          rememberCoverDisplay(sourceKey, resolved, false)
-          return resolved
-        }
-      }
       const resolved = await resolveImageSrc(url)
       if (resolved) {
         rememberCoverDisplay(sourceKey, resolved, false)
+        if (canLoadImageDirectly(url) && !resolved.startsWith('blob:')) {
+          void persistLoadedImage(url)
+        }
         return resolved
       }
     } catch {
