@@ -33,7 +33,10 @@ def _hostname_allowed(host: str) -> bool:
 def _resolve_host_ips(host: str) -> list[str]:
     try:
         infos = socket.getaddrinfo(host, None)
-    except socket.gaierror:
+    except (OSError, UnicodeError, ValueError):
+        # Name resolution can fail or behave unexpectedly on some runtimes
+        # (e.g. Android). The host allow-list above already restricts targets to
+        # trusted CDNs, so an inconclusive lookup must not raise.
         return []
     addresses: list[str] = []
     for info in infos:

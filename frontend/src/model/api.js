@@ -416,16 +416,14 @@ function isCdnImageUrl(url) {
 }
 
 function shouldProxyRemoteImage(url) {
-  if (isCdnImageUrl(url)) return true
-  if (!isCapacitorNative()) return false
-  try {
-    const target = new URL(url)
-    const server = new URL(buildApiBaseUrl(getServerConfig()))
-    if (target.origin === server.origin) return false
-    return target.protocol === 'http:' || target.protocol === 'https:'
-  } catch {
-    return false
-  }
+  // Native clients fetch remote artwork through Capacitor's native HTTP bridge
+  // (see imageLoader.resolveImageSrc), which reaches CDNs directly at the OS
+  // layer. Routing those through the on-device embedded server's
+  // /api/image-proxy made search/artist art depend on the embedded Python
+  // process doing its own outbound fetches, which is unreliable on Android even
+  // when the rest of the app has network. Only the web build proxies CDN images.
+  if (isCapacitorNative()) return false
+  return isCdnImageUrl(url)
 }
 
 function mediaUrl(src) {
