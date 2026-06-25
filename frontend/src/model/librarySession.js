@@ -7,7 +7,7 @@ let lastBackgroundRefreshAt = 0
 let libraryRevision = 0
 const libraryChangeListeners = new Set()
 
-const PERSIST_KEY = 'downtify-library-cache-v1'
+const PERSIST_KEY = 'downtify-library-cache-v2'
 const PERSIST_MAX_AGE_MS = 24 * 60 * 60 * 1000
 export const LIBRARY_BACKGROUND_REFRESH_MS = 30_000
 
@@ -83,14 +83,22 @@ export function getLibraryPrefetchPromise() {
 
 function normalizeLibraryPayload(items) {
   return (items || [])
-    .map((item) => ({
-      file: String(item?.file || '').trim(),
-      title: String(item?.title || '').trim(),
-      artist: String(item?.artist || '').trim(),
-      album: String(item?.album || '').trim(),
-      genre: String(item?.genre || '').trim(),
-      browse_genre: String(item?.browse_genre || item?.genre || '').trim(),
-    }))
+    .map((item) => {
+      const normalized = {
+        file: String(item?.file || '').trim(),
+        title: String(item?.title || '').trim(),
+        artist: String(item?.artist || '').trim(),
+        album: String(item?.album || '').trim(),
+        genre: String(item?.genre || '').trim(),
+        browse_genre: String(item?.browse_genre || item?.genre || '').trim(),
+      }
+      if (Array.isArray(item?.artists) && item.artists.length) {
+        normalized.artists = item.artists
+          .map((artist) => String(artist || '').trim())
+          .filter(Boolean)
+      }
+      return normalized
+    })
     .filter((item) => item.file)
 }
 

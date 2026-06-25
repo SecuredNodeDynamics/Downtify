@@ -91,6 +91,47 @@ def _path_parts(file: str) -> list[str]:
     return [part.strip() for part in str(file or '').split('/') if part.strip()]
 
 
+def _unique_artist_names(*values: Any) -> list[str]:
+    artists: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        if value is None:
+            continue
+        if isinstance(value, list):
+            items = value
+        else:
+            items = re.split(r'[,/&]+', str(value))
+        for item in items:
+            name = str(item or '').strip()
+            if not name:
+                continue
+            key = name.casefold()
+            if key in seen:
+                continue
+            seen.add(key)
+            artists.append(name)
+    return artists
+
+
+def _artists_for_entry(
+    file: str,
+    song: dict[str, Any],
+    primary: str,
+) -> list[str]:
+    parts = _path_parts(file)
+    folder_artist = parts[0] if len(parts) > 1 else ''
+    artists = _unique_artist_names(
+        song.get('artists'),
+        primary,
+        folder_artist,
+    )
+    if artists:
+        return artists
+    if primary:
+        return [primary]
+    return []
+
+
 def _artist_name(file: str, song: dict[str, Any]) -> str:
     parts = _path_parts(file)
     if len(parts) > 1:
@@ -116,6 +157,9 @@ def _song_from_file_safe(path: Path) -> dict[str, Any]:
         return _song_from_file(path)
     except Exception:
         stem = path.stem
+        if re.match(r'^\d+\s*-\s*', stem):
+            title = re.sub(r'^\d+\s*-\s*', '', stem).strip() or stem
+            return {'name': title, 'artists': [], 'album_name': '', 'genre': ''}
         if ' - ' in stem:
             artist, title = stem.split(' - ', 1)
             return {
@@ -226,10 +270,12 @@ def read_library_entry(
         fetch_missing_genres=fetch_missing_genres,
     )
     title = str(song.get('name') or path.stem).strip() or path.stem
+    artists = _artists_for_entry(relative, song, artist)
     return {
         'file': relative,
         'title': title,
         'artist': artist,
+        'artists': artists,
         'album': album,
         **_library_genre_fields(genre),
     }
@@ -251,6 +297,27 @@ def _album_name_from_tags(path: Path) -> str:
         return ''
 
 
+def _artists_from_path_tags(path: Path) -> list[str]:
+    try:
+        artists = _song_from_file(path).get('artists') or []
+        if artists:
+            return _unique_artist_names(artists)
+    except Exception:
+        pass
+    try:
+        from mutagen.id3 import ID3
+
+        tags = ID3(str(path))
+        frame = tags.get('TPE1')
+        if frame is None:
+            return []
+        text = getattr(frame, 'text', None)
+        value = ', '.join(str(item) for item in text) if text else str(frame)
+        return _unique_artist_names(value)
+    except Exception:
+        return []
+
+
 def read_library_entry_fast(
     root: Path,
     relative: str,
@@ -262,6 +329,8 @@ def read_library_entry_fast(
     song: dict[str, Any] = {}
     if len(parts) <= 2:
         song = _song_from_file_safe(path)
+    else:
+        song = {'artists': _artists_from_path_tags(path)}
     artist = _artist_name(relative, song) or 'Unknown Artist'
     album = _album_name(relative, song)
     if not album:
@@ -278,10 +347,12 @@ def read_library_entry_fast(
         'genre': '',
         'browse_genre': '',
     }
+    artists = _artists_for_entry(relative, song, artist)
     return {
         'file': relative,
         'title': title or stem,
         'artist': artist,
+        'artists': artists,
         'album': album,
         **genre_fields,
     }
@@ -456,6 +527,14 @@ def _artist_keys_match(left: set[str], right: str) -> bool:
     )
 
 
+def _library_item_artist_names(item: dict[str, Any]) -> list[str]:
+    names = _unique_artist_names(item.get('artists'), item.get('artist'))
+    primary = str(item.get('artist') or '').strip()
+    if names:
+        return names
+    return [primary] if primary else []
+
+
 def track_in_library_from_metadata(
     song: dict[str, Any],
     items: list[dict[str, str]],
@@ -470,8 +549,9 @@ def track_in_library_from_metadata(
         item_title = _normalize_duplicate_key(str(item.get('title') or ''))
         if item_title != title_key:
             continue
-        if _artist_keys_match(artist_keys, str(item.get('artist') or '')):
-            return True
+        for lib_artist in _library_item_artist_names(item):
+            if _artist_keys_match(artist_keys, lib_artist):
+                return True
     return False
 
 
@@ -493,8 +573,9 @@ def album_in_library(
     for item in items:
         if _normalize_duplicate_key(str(item.get('album') or '')) != album_key:
             continue
-        if _artist_keys_match(artist_keys, str(item.get('artist') or '')):
-            return True
+        for lib_artist in _library_item_artist_names(item):
+            if _artist_keys_match(artist_keys, lib_artist):
+                return True
     return False
 
 

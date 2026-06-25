@@ -1,7 +1,11 @@
 import { ref, unref, watch } from 'vue'
 
 import API from './api'
-import { normalizeLibraryItem, groupAlbums } from './library'
+import {
+  normalizeLibraryItem,
+  groupAlbums,
+  libraryItemArtists,
+} from './library'
 import {
   getCachedLibraryItems,
   onLibraryChanged,
@@ -64,13 +68,15 @@ export function findOwnedAlbum(item, libraryItems) {
   if (!albumNameKey) return null
 
   const searchArtists = artistKeys(item)
-  let nameMatch = null
+  const matches = []
   for (const album of albums) {
     if (normalizeDupKey(album.name) !== albumNameKey) continue
-    if (artistKeysMatch(searchArtists, album.artist)) return album
-    if (!nameMatch) nameMatch = album
+    matches.push(album)
   }
-  return nameMatch
+  for (const album of matches) {
+    if (artistKeysMatch(searchArtists, album.artist)) return album
+  }
+  return matches[0] || null
 }
 
 export function findOwnedTrack(item, libraryItems) {
@@ -85,7 +91,14 @@ export function findOwnedTrack(item, libraryItems) {
   for (const raw of libraryItems) {
     const lib = normalizeLibraryItem(raw)
     if (normalizeDupKey(lib.title) !== titleKey) continue
-    if (!artistKeysMatch(searchArtists, lib.artist)) continue
+    let matched = false
+    for (const libArtist of libraryItemArtists(lib)) {
+      if (artistKeysMatch(searchArtists, libArtist)) {
+        matched = true
+        break
+      }
+    }
+    if (!matched) continue
     return lib
   }
   return null

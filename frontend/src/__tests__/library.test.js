@@ -3,6 +3,7 @@ import {
   albumFromPath,
   artistFromPath,
   groupAlbums,
+  groupArtists,
   groupGenres,
   libraryGenreName,
   libraryCoverFolders,
@@ -38,6 +39,42 @@ describe('library path helpers', () => {
     expect(albums[0].name).toBe('Hollywood')
     expect(albums[0].artist).toBe('Aaron Copland')
     expect(albums[0].files).toHaveLength(2)
+  })
+
+  it('virtually groups collaborations under each credited artist', () => {
+    const items = [
+      {
+        file: 'Connor Price/Swing/01.flac',
+        artist: 'Connor Price',
+        artists: ['Connor Price', 'Nic D', '4Korners'],
+        album: 'Swing',
+        title: 'Swing',
+      },
+    ]
+
+    const artists = groupArtists(items)
+    expect(artists.map((artist) => artist.name).sort()).toEqual([
+      '4Korners',
+      'Connor Price',
+      'Nic D',
+    ])
+
+    const albums = groupAlbums(items)
+    expect(albums).toHaveLength(3)
+    expect(
+      albums.find((album) => album.artist === 'Nic D')?.files
+    ).toEqual(['Connor Price/Swing/01.flac'])
+    expect(matchesLibraryTrackItem(items[0], 'Nic D')).toBe(true)
+    expect(
+      matchesLibraryAlbumEntry(
+        {
+          name: 'Swing',
+          artist: 'Nic D',
+          artists: ['Connor Price', 'Nic D', '4Korners'],
+        },
+        '4Korners'
+      )
+    ).toBe(true)
   })
 
   it('normalizes sparse items and buckets unknown genres', () => {

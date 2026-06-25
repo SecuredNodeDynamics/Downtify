@@ -37,9 +37,6 @@
 
       <div class="mt-10">
         <SearchInput class="w-full" />
-        <div class="mt-4 flex justify-center">
-          <SearchResultFilter class="max-w-md" />
-        </div>
         <div
           class="mt-4 flex flex-wrap items-center justify-center gap-2 text-xs text-base-content/60"
         >
@@ -64,7 +61,6 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import SearchInput from './SearchInput.vue'
-import SearchResultFilter from './SearchResultFilter.vue'
 import { useI18n } from '../i18n'
 
 const { t } = useI18n()

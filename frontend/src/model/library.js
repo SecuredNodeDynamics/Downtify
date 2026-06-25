@@ -28,11 +28,60 @@ export function albumFromPath(file) {
   return ''
 }
 
+export function splitArtistNames(value) {
+  const names = []
+  const seen = new Set()
+  for (const part of String(value || '').split(/[,/&]+/)) {
+    const trimmed = part.trim()
+    if (!trimmed) continue
+    const key = trimmed.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    names.push(trimmed)
+  }
+  return names
+}
+
+export function libraryItemArtists(item, options = {}) {
+  const unknownArtist = options.unknownArtist || 'Unknown Artist'
+  const file = String(item?.file || '')
+  const primary =
+    String(item?.artist || '').trim() || artistFromPath(file, unknownArtist)
+  const artists = []
+  const seen = new Set()
+  const add = (name) => {
+    const trimmed = String(name || '').trim()
+    if (!trimmed) return
+    const key = trimmed.toLowerCase()
+    if (seen.has(key)) return
+    seen.add(key)
+    artists.push(trimmed)
+  }
+
+  if (Array.isArray(item?.artists)) {
+    for (const artist of item.artists) add(artist)
+  }
+  for (const artist of splitArtistNames(primary)) add(artist)
+  add(primary)
+
+  const parts = pathParts(file)
+  if (parts.length > 1) add(parts[0])
+
+  if (!artists.length) add(unknownArtist)
+  return artists
+}
+
+export function libraryArtistsLabel(item, options = {}) {
+  const artists = libraryItemArtists(item, options)
+  return artists.join(', ')
+}
+
 export function normalizeLibraryItem(item, options = {}) {
   const unknownArtist = options.unknownArtist || 'Unknown Artist'
   const file = String(item?.file || '')
   const artist =
     String(item?.artist || '').trim() || artistFromPath(file, unknownArtist)
+  const artists = libraryItemArtists({ ...item, artist, file }, options)
   const album = String(item?.album || '').trim() || albumFromPath(file)
   const title =
     String(item?.title || '').trim() ||
@@ -44,10 +93,18 @@ export function normalizeLibraryItem(item, options = {}) {
     file,
     title,
     artist,
+    artists,
     album,
     genre,
     browse_genre: browseGenre,
   }
+}
+
+export function albumArtistsLabel(album) {
+  if (Array.isArray(album?.artists) && album.artists.length > 1) {
+    return album.artists.join(', ')
+  }
+  return String(album?.artist || album?.primaryArtist || '').trim()
 }
 
 export function albumKey(artist, album) {
@@ -71,17 +128,22 @@ export function groupArtists(items, options = {}) {
 
   for (const raw of items) {
     const item = normalizeLibraryItem(raw, options)
-    const name = item.artist || 'Unknown Artist'
-    if (!grouped.has(name)) {
-      grouped.set(name, {
-        name,
-        files: [],
-        albums: new Set(),
-      })
+    for (const name of libraryItemArtists(item, options)) {
+      if (!grouped.has(name)) {
+        grouped.set(name, {
+          name,
+          files: [],
+          albums: new Set(),
+          fileSet: new Set(),
+        })
+      }
+      const artist = grouped.get(name)
+      if (!artist.fileSet.has(item.file)) {
+        artist.fileSet.add(item.file)
+        artist.files.push(item.file)
+      }
+      if (item.album) artist.albums.add(item.album)
     }
-    const artist = grouped.get(name)
-    artist.files.push(item.file)
-    if (item.album) artist.albums.add(item.album)
   }
 
   return Array.from(grouped.values())
@@ -101,21 +163,36 @@ export function groupAlbums(items, options = {}) {
   for (const raw of items) {
     const item = normalizeLibraryItem(raw, options)
     if (!item.album) continue
-    const key = albumKey(item.artist, item.album)
-    if (!grouped.has(key)) {
-      grouped.set(key, {
-        key,
-        name: item.album,
-        artist: item.artist,
-        files: [],
-      })
+    const creditedArtists = libraryItemArtists(item, options)
+    for (const browseArtist of creditedArtists) {
+      const key = albumKey(browseArtist, item.album)
+      if (!grouped.has(key)) {
+        grouped.set(key, {
+          key,
+          name: item.album,
+          artist: browseArtist,
+          artists: creditedArtists,
+          primaryArtist: item.artist,
+          files: [],
+          fileSet: new Set(),
+        })
+      }
+      const album = grouped.get(key)
+      if (!album.fileSet.has(item.file)) {
+        album.fileSet.add(item.file)
+        album.files.push(item.file)
+      }
     }
-    grouped.get(key).files.push(item.file)
   }
 
   return Array.from(grouped.values())
     .map((album) => ({
-      ...album,
+      key: album.key,
+      name: album.name,
+      artist: album.artist,
+      artists: album.artists,
+      primaryArtist: album.primaryArtist,
+      files: album.files,
       coverFile: album.files[0],
     }))
     .sort(
@@ -227,17 +304,22 @@ export function matchesLibraryArtistName(artistName, query) {
 export function matchesLibraryAlbumEntry(album, query) {
   const q = normalizeLibrarySearchQuery(query)
   if (!q) return true
+  const artistFields = Array.isArray(album?.artists)
+    ? album.artists
+    : [album?.artist]
   return (
-    matchesLibraryField(album.name, q) || matchesLibraryField(album.artist, q)
+    matchesLibraryField(album.name, q) ||
+    artistFields.some((artist) => matchesLibraryField(artist, q))
   )
 }
 
 export function matchesLibraryTrackItem(item, query) {
   const q = normalizeLibrarySearchQuery(query)
   if (!q) return true
+  const artistFields = libraryItemArtists(item)
   return (
     matchesLibraryField(item.title, q) ||
-    matchesLibraryField(item.artist, q) ||
+    artistFields.some((artist) => matchesLibraryField(artist, q)) ||
     matchesLibraryField(item.album, q)
   )
 }

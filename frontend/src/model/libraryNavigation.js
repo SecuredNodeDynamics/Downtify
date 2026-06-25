@@ -1,4 +1,4 @@
-import { albumKey } from './library'
+import { albumKey, libraryItemArtists } from './library'
 
 let pendingLibraryNavigation = null
 
@@ -22,9 +22,17 @@ export function libraryNavigationForAlbum(album) {
   }
 }
 
-export function libraryNavigationForTrack(track) {
+export function libraryNavigationForTrack(track, options = {}) {
   if (!track?.file) return null
-  const artist = String(track.artist || '').trim()
+  const preferredArtist = String(options.preferredArtist || '').trim()
+  const creditedArtists = libraryItemArtists(track)
+  const artist =
+    (preferredArtist &&
+      creditedArtists.find(
+        (name) => name.toLowerCase() === preferredArtist.toLowerCase()
+      )) ||
+    creditedArtists[0] ||
+    String(track.artist || '').trim()
   const album = String(track.album || '').trim()
   if (album && artist) {
     return {

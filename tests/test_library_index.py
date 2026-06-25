@@ -45,6 +45,7 @@ def test_list_library_files_falls_back_to_filename(monkeypatch, tmp_path):
             'file': 'Artist - Title.mp3',
             'title': 'Title',
             'artist': 'Artist',
+            'artists': ['Artist'],
             'album': '',
             'genre': '',
             'browse_genre': '',
@@ -92,6 +93,28 @@ def test_list_library_files_fast_reads_genre_from_tags_for_album_paths(tmp_path)
     assert items[0]['artist'] == 'Alan Silvestri'
     assert items[0]['album'] == 'Back to the Future'
     assert items[0]['title'] == 'Main Title'
+
+
+def test_list_library_files_fast_reads_multi_artist_tags(tmp_path):
+    artist_dir = tmp_path / 'Connor Price' / 'Swing'
+    artist_dir.mkdir(parents=True)
+    path = artist_dir / '01 - Swing.mp3'
+    path.write_bytes(b'audio')
+    tags = ID3()
+    tags.add(TIT2(encoding=3, text='Swing'))
+    tags.add(TPE1(encoding=3, text='Connor Price, Nic D, 4Korners'))
+    tags.add(TALB(encoding=3, text='Swing'))
+    tags.save(path)
+
+    items = library_index.list_library_files_fast(tmp_path)
+
+    assert len(items) == 1
+    assert items[0]['artist'] == 'Connor Price'
+    assert items[0]['artists'] == [
+        'Connor Price',
+        'Nic D',
+        '4Korners',
+    ]
 
 
 def test_read_library_entry_rejects_traversal(tmp_path):

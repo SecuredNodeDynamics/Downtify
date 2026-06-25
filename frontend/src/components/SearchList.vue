@@ -935,7 +935,9 @@ async function viewOwnedInLibrary(item) {
   } else {
     const track = findOwnedTrack(item, items)
     if (track) {
-      navigation = libraryNavigationForTrack(track)
+      const preferredArtist =
+        item.artists?.[0] || item.artist || track.artists?.[0] || track.artist
+      navigation = libraryNavigationForTrack(track, { preferredArtist })
     } else if (item.album_name) {
       navigation = libraryNavigationForAlbum(
         findOwnedAlbum(

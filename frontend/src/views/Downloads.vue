@@ -147,7 +147,7 @@
               {{ selectedAlbum.name }}
             </h2>
             <p class="library-drill-meta">
-              {{ selectedAlbum.artist }} -
+              {{ albumArtistsLabel(selectedAlbum) }} -
               {{
                 t('library.albumMeta', { tracks: selectedAlbum.files.length })
               }}
@@ -365,7 +365,9 @@
                     </div>
                     <div class="library-browse-card-body">
                       <p class="library-browse-card-title">{{ album.name }}</p>
-                      <p class="library-browse-card-sub">{{ album.artist }}</p>
+                      <p class="library-browse-card-sub">
+                        {{ albumArtistsLabel(album) }}
+                      </p>
                       <p class="library-browse-card-meta">
                         {{
                           t('library.albumMeta', { tracks: album.files.length })
@@ -555,6 +557,7 @@ import API from '/src/model/api'
 import { beginAppLoading, endAppLoading } from '/src/model/appLoading'
 import { useDownloadManager } from '/src/model/download'
 import {
+  albumArtistsLabel,
   albumKey,
   displayNameFromFile,
   groupAlbums,
