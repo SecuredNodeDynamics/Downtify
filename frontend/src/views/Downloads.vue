@@ -17,28 +17,15 @@
 
         <div v-if="files.length > 0" class="library-chrome-tools space-y-2">
           <form class="library-search" @submit.prevent="submitLibrarySearch">
-            <div class="relative min-w-0 flex-1">
-              <input
-                v-model="librarySearchQuery"
-                type="text"
-                inputmode="search"
-                enterkeyhint="search"
-                autocomplete="off"
-                autocapitalize="off"
-                autocorrect="off"
-                spellcheck="false"
-                class="input-modern h-12 w-full text-sm"
-                :placeholder="t('library.searchPlaceholder')"
-                :aria-label="t('library.searchPlaceholder')"
-              />
-              <button
-                type="submit"
-                class="absolute right-1.5 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-primary text-primary-content shadow-glow-sm"
-                :disabled="!librarySearchActive"
-              >
-                <Icon icon="clarity:search-line" class="h-4 w-4" />
-              </button>
-            </div>
+            <SearchField
+              root-class="w-full flex-1"
+              v-model="librarySearchQuery"
+              :placeholder="t('library.searchPlaceholder')"
+              :aria-label="t('library.searchPlaceholder')"
+              :submit-disabled="!librarySearchActive"
+              @clear="clearLibrarySearch"
+              @submit="submitLibrarySearch"
+            />
           </form>
 
           <div class="library-tabs">
@@ -94,17 +81,17 @@
           class="library-drill-header"
         >
           <button
-            class="btn btn-sm h-10 rounded-full border-white/10 bg-base-100/85 hover:bg-base-100"
+            class="library-drill-back"
             @click="closeArtist"
           >
             <Icon icon="clarity:angle-line" class="h-4 w-4 rotate-[-90deg]" />
             {{ t('library.backToArtists') }}
           </button>
-          <div class="min-w-0 flex-1 text-right">
-            <h2 class="truncate text-base font-semibold sm:text-lg">
+          <div class="library-drill-main">
+            <h2 class="library-drill-title">
               {{ selectedArtist.name }}
             </h2>
-            <p class="text-xs text-base-content/50">
+            <p class="library-drill-meta">
               {{
                 t('library.artistMeta', {
                   tracks: selectedArtist.files.length,
@@ -113,7 +100,9 @@
               }}
             </p>
           </div>
-          <LibraryArtistMonitor :artist-name="selectedArtist.name" />
+          <div class="library-drill-actions">
+            <LibraryArtistMonitor :artist-name="selectedArtist.name" />
+          </div>
         </div>
 
         <div
@@ -121,17 +110,17 @@
           class="library-drill-header"
         >
           <button
-            class="btn btn-sm h-10 rounded-full border-white/10 bg-base-100/85 hover:bg-base-100"
+            class="library-drill-back"
             @click="closeGenre"
           >
             <Icon icon="clarity:angle-line" class="h-4 w-4 rotate-[-90deg]" />
             {{ t('library.backToGenres') }}
           </button>
-          <div class="min-w-0 text-right">
-            <h2 class="truncate text-base font-semibold sm:text-lg">
+          <div class="library-drill-main">
+            <h2 class="library-drill-title">
               {{ selectedGenreName }}
             </h2>
-            <p class="text-xs text-base-content/50">
+            <p class="library-drill-meta">
               {{
                 t('library.genreMeta', {
                   tracks: selectedGenreFiles.length,
@@ -143,7 +132,7 @@
 
         <div v-if="selectedAlbum" class="library-drill-header">
           <button
-            class="btn btn-sm h-10 rounded-full border-white/10 bg-base-100/85 hover:bg-base-100"
+            class="library-drill-back"
             @click="closeAlbum"
           >
             <Icon icon="clarity:angle-line" class="h-4 w-4 rotate-[-90deg]" />
@@ -151,11 +140,11 @@
               selectedArtist ? t('library.backToAlbums') : t('library.albums')
             }}
           </button>
-          <div class="min-w-0 text-right">
-            <h2 class="truncate text-base font-semibold sm:text-lg">
+          <div class="library-drill-main">
+            <h2 class="library-drill-title">
               {{ selectedAlbum.name }}
             </h2>
-            <p class="truncate text-xs text-base-content/50">
+            <p class="library-drill-meta">
               {{ selectedAlbum.artist }} -
               {{
                 t('library.albumMeta', { tracks: selectedAlbum.files.length })
@@ -558,6 +547,7 @@ import CoverImage from '/src/components/CoverImage.vue'
 import GenreCover from '/src/components/GenreCover.vue'
 import LibraryDownloadOffers from '/src/components/LibraryDownloadOffers.vue'
 import LibraryArtistMonitor from '/src/components/LibraryArtistMonitor.vue'
+import SearchField from '/src/components/SearchField.vue'
 import ServerConnectionPrompt from '/src/components/ServerConnectionPrompt.vue'
 import API from '/src/model/api'
 import { beginAppLoading, endAppLoading } from '/src/model/appLoading'
@@ -984,6 +974,10 @@ function playGenre(genre) {
   router.push({ name: 'Player' })
 }
 
+function clearLibrarySearch() {
+  librarySearchQuery.value = ''
+}
+
 function submitLibrarySearch() {
   if (librarySearchIsUrl.value) {
     downloadFromLibrarySearchUrl()
@@ -1101,7 +1095,27 @@ onUnmounted(() => {
 }
 
 .library-drill-header {
-  @apply flex flex-wrap items-center justify-between gap-3;
+  @apply flex flex-col items-stretch gap-3;
+}
+
+.library-drill-back {
+  @apply btn btn-sm inline-flex h-10 w-fit shrink-0 items-center gap-1.5 rounded-full border-white/10 bg-base-100/85 hover:bg-base-100;
+}
+
+.library-drill-main {
+  @apply min-w-0 w-full;
+}
+
+.library-drill-title {
+  @apply text-base font-semibold leading-snug sm:text-lg;
+}
+
+.library-drill-meta {
+  @apply mt-0.5 text-xs text-base-content/50;
+}
+
+.library-drill-actions {
+  @apply flex w-full flex-wrap items-center justify-end gap-2;
 }
 
 .library-browse-slot {

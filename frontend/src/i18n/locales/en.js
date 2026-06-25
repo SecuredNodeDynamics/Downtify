@@ -193,6 +193,7 @@ export default {
       'Pick the Spotify artist to watch for new tracks and albums.',
     monitorArtistMatchScore: '{score}% name match',
     monitorArtistNotFound: 'No matching Spotify artist found.',
+    monitorArtistNotFoundShort: 'Not Found',
     monitorArtistLookupFailed: 'Could not look up this artist on Spotify.',
     monitorArtistAddFailed: 'Failed to add artist to monitor.',
   },
@@ -619,6 +620,8 @@ export default {
     clearFilter: 'Clear filter',
     browseSearchPlaceholder: 'Search artists, albums, tracks, genres…',
     detailsEmpty: 'Artist and album details appear here while a track is playing.',
+    nothingPlaying: 'Nothing currently playing',
+    nothingPlayingHint: 'Choose a track from your library to start listening.',
     seek: 'Seek',
   },
   footer: {

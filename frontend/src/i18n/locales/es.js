@@ -198,6 +198,7 @@ export default {
       'Elige el artista de Spotify para vigilar nuevas pistas y álbumes.',
     monitorArtistMatchScore: '{score}% coincidencia de nombre',
     monitorArtistNotFound: 'No se encontró un artista coincidente en Spotify.',
+    monitorArtistNotFoundShort: 'No encontrado',
     monitorArtistLookupFailed: 'No se pudo buscar este artista en Spotify.',
     monitorArtistAddFailed: 'No se pudo agregar el artista al monitor.',
   },
@@ -632,6 +633,9 @@ export default {
     browseSearchPlaceholder: 'Buscar artistas, álbumes, pistas, géneros…',
     detailsEmpty:
       'Los detalles del artista y del álbum aparecen aquí mientras suena una pista.',
+    nothingPlaying: 'Nada en reproducción',
+    nothingPlayingHint:
+      'Elige una pista de tu biblioteca para empezar a escuchar.',
     seek: 'Buscar posición',
   },
   footer: {

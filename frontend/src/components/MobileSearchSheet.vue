@@ -6,34 +6,17 @@
   >
     <div class="modal-box mobile-search-sheet">
       <form class="flex items-center" @submit.prevent="submit">
-        <div class="relative min-w-0 flex-1">
-          <input
-            id="mobile-search-input"
-            ref="inputRef"
-            v-model="query"
-            type="text"
-            inputmode="search"
-            enterkeyhint="search"
-            autocomplete="off"
-            autocapitalize="off"
-            autocorrect="off"
-            spellcheck="false"
-            class="input-modern h-12 w-full text-sm"
-            :placeholder="placeholder"
-          />
-          <button
-            type="submit"
-            class="absolute right-1.5 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-primary text-primary-content shadow-glow-sm"
-            :disabled="!canSubmit"
-          >
-            <Icon
-              v-if="showDownloadIcon"
-              icon="clarity:download-line"
-              class="h-4 w-4"
-            />
-            <Icon v-else icon="clarity:search-line" class="h-4 w-4" />
-          </button>
-        </div>
+        <SearchField
+          ref="searchFieldRef"
+          root-class="w-full flex-1"
+          input-id="mobile-search-input"
+          v-model="query"
+          :placeholder="placeholder"
+          :submit-icon="showDownloadIcon ? 'download' : 'search'"
+          :submit-disabled="!canSubmit"
+          @submit="submit"
+          @clear="onClear"
+        />
       </form>
       <p v-if="isPlayerSearch" class="mt-2 text-xs text-base-content/50">
         {{ t('search.libraryHint') }}
@@ -50,7 +33,6 @@
 
 <script setup>
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { Icon } from '@iconify/vue'
 import { useRoute } from 'vue-router'
 
 import router from '../router'
@@ -58,6 +40,7 @@ import { useDownloadManager } from '../model/download'
 import { useMobileSearch } from '../model/mobileSearch'
 import { useSearchManager } from '../model/search'
 import { useI18n } from '../i18n'
+import SearchField from './SearchField.vue'
 
 const route = useRoute()
 const { t } = useI18n()
@@ -65,7 +48,7 @@ const sm = useSearchManager()
 const dm = useDownloadManager()
 const mobileSearch = useMobileSearch()
 
-const inputRef = ref(null)
+const searchFieldRef = ref(null)
 const query = ref('')
 
 const isPlayerSearch = computed(() => route.name === 'Player')
@@ -89,6 +72,12 @@ const canSubmit = computed(() => {
 
 function close() {
   mobileSearch.closeSheet()
+}
+
+function onClear() {
+  if (isPlayerSearch.value) {
+    mobileSearch.clearLibraryFilter()
+  }
 }
 
 function submit() {
@@ -123,19 +112,24 @@ function syncQueryFromContext() {
 }
 
 function focusInput() {
-  const el = inputRef.value || document.getElementById('mobile-search-input')
-  if (!el) return
+  const field = searchFieldRef.value
+  if (!field) return
   try {
-    el.readOnly = true
-    el.focus({ preventScroll: true })
-    el.readOnly = false
-    el.focus({ preventScroll: true })
-    if (typeof el.setSelectionRange === 'function') {
-      const end = el.value.length
-      el.setSelectionRange(end, end)
+    const el = document.getElementById('mobile-search-input')
+    if (el) {
+      el.readOnly = true
+      field.focus({ preventScroll: true })
+      el.readOnly = false
+      field.focus({ preventScroll: true })
+      if (typeof el.setSelectionRange === 'function') {
+        const end = el.value.length
+        el.setSelectionRange(end, end)
+      }
+      return
     }
+    field.focus({ preventScroll: true })
   } catch {
-    el.focus({ preventScroll: true })
+    field.focus({ preventScroll: true })
   }
 }
 

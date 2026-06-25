@@ -197,6 +197,7 @@ export default {
     monitorArtistMatchScore: '{score}% de correspondência de nome',
     monitorArtistNotFound:
       'Nenhum artista correspondente encontrado no Spotify.',
+    monitorArtistNotFoundShort: 'Não encontrado',
     monitorArtistLookupFailed:
       'Não foi possível buscar este artista no Spotify.',
     monitorArtistAddFailed: 'Falha ao adicionar artista ao monitor.',
@@ -630,6 +631,9 @@ export default {
     browseSearchPlaceholder: 'Buscar artistas, álbuns, faixas, gêneros…',
     detailsEmpty:
       'Os detalhes do artista e do álbum aparecem aqui enquanto uma faixa estiver tocando.',
+    nothingPlaying: 'Nada tocando no momento',
+    nothingPlayingHint:
+      'Escolha uma faixa da sua biblioteca para começar a ouvir.',
     seek: 'Buscar posição',
   },
   footer: {

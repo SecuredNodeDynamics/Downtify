@@ -24,21 +24,29 @@
     <button
       v-else
       type="button"
-      class="btn btn-sm inline-flex h-10 items-center gap-1.5 rounded-full border-white/10 bg-base-100/85 px-3 hover:bg-base-100 sm:px-4"
+      class="btn btn-sm inline-flex h-10 items-center gap-1.5 rounded-full px-3 sm:px-4"
+      :class="
+        artistNotFound
+          ? 'border-error bg-error/5 text-error hover:bg-error/10'
+          : 'border-white/10 bg-base-100/85 hover:bg-base-100'
+      "
       :disabled="busy"
       @click="startMonitor"
     >
       <span v-if="busy" class="loading loading-spinner loading-xs" />
-      <Icon v-else icon="clarity:eye-line" class="h-4 w-4 shrink-0" />
-      <span class="text-xs sm:text-sm">{{ t('library.monitorArtist') }}</span>
+      <Icon
+        v-else
+        :icon="artistNotFound ? 'clarity:warning-standard-line' : 'clarity:eye-line'"
+        class="h-4 w-4 shrink-0"
+      />
+      <span class="text-xs sm:text-sm">
+        {{
+          artistNotFound
+            ? t('library.monitorArtistNotFoundShort')
+            : t('library.monitorArtist')
+        }}
+      </span>
     </button>
-
-    <p
-      v-if="error"
-      class="mt-2 max-w-xs text-right text-[11px] leading-snug text-error"
-    >
-      {{ error }}
-    </p>
 
     <div
       v-if="pickerOpen"
@@ -101,7 +109,10 @@
           </button>
         </div>
 
-        <div class="border-t border-white/10 px-5 py-4">
+        <div class="border-t border-white/10 px-5 py-4 space-y-2">
+          <p v-if="pickerError" class="text-center text-sm text-error">
+            {{ pickerError }}
+          </p>
           <button
             type="button"
             class="btn btn-sm h-10 w-full rounded-full border-white/10 bg-base-100/85 hover:bg-base-100"
@@ -134,7 +145,8 @@ const { t } = useI18n()
 const router = useRouter()
 
 const busy = ref(false)
-const error = ref('')
+const artistNotFound = ref(false)
+const pickerError = ref('')
 const monitoredArtists = ref([])
 const pickerOpen = ref(false)
 const pickerMatches = ref([])
@@ -182,11 +194,12 @@ async function lookupSpotifyArtistsWithRetry(artistName, limit = 5) {
 async function startMonitor() {
   if (!props.artistName || busy.value) return
   busy.value = true
-  error.value = ''
+  artistNotFound.value = false
+  pickerError.value = ''
   try {
     const { matches } = await lookupSpotifyArtistsWithRetry(props.artistName)
     if (matches.length === 0) {
-      error.value = t('library.monitorArtistNotFound')
+      artistNotFound.value = true
       return
     }
 
@@ -202,9 +215,8 @@ async function startMonitor() {
 
     pickerMatches.value = matches
     pickerOpen.value = true
-  } catch (err) {
-    error.value =
-      err?.response?.data?.detail || t('library.monitorArtistLookupFailed')
+  } catch {
+    artistNotFound.value = true
   } finally {
     busy.value = false
   }
@@ -213,11 +225,12 @@ async function startMonitor() {
 async function addMatch(match) {
   if (!match?.url) return
   busy.value = true
-  error.value = ''
+  pickerError.value = ''
   try {
     await monitorAPI.addMonitoredPlaylist(match.url, 60, 'artist')
     pickerOpen.value = false
     pickerMatches.value = []
+    artistNotFound.value = false
     await refreshMonitored()
   } catch (err) {
     if (err?.response?.status === 409) {
@@ -225,7 +238,7 @@ async function addMatch(match) {
       await refreshMonitored()
       return
     }
-    error.value =
+    pickerError.value =
       err?.response?.data?.detail || t('library.monitorArtistAddFailed')
   } finally {
     busy.value = false
@@ -245,7 +258,8 @@ function goToMonitor() {
 watch(
   () => props.artistName,
   () => {
-    error.value = ''
+    artistNotFound.value = false
+    pickerError.value = ''
   }
 )
 
