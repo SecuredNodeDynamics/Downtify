@@ -19,6 +19,7 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "cairosvg>=2.7",
     "codeflash>=0.20.5",
     "pytest>=8.0",
     "ruff>=0.15.2",
@@ -47,6 +48,7 @@ quote-style = 'single'
 "downloader.py" = ["PLC1901", "PLC2701", "PLC0415", "PLR6104", "I001"]
 "downtify/*.py" = ["E501", "PLR0913", "PLR0917", "PLR2004", "PLW0603", "PLR0911", "PLR0915", "PLR0912", "PLR0916", "PLR0914", "PLC0415"]
 "tests/*.py" = ["PLR2004", "PLC2701", "E501", "PLR6301", "PLR1711", "PLC1901", "PLC0415", "F401", "PLW0108"]
+"scripts/*.py" = ["E501"]
 
 [tool.codeflash]
 # All paths are relative to this pyproject.toml's directory.
