@@ -136,13 +136,24 @@ function completeQueueItem(song, item) {
 }
 
 function maybeScanDeviceLibrary(item) {
-  if (!item?.filename || !supportsDeviceStorage()) return
+  if (!item?.filename) return
+  scanDeviceLibraryPath(item.filename)
+}
+
+/**
+ * Ask Android's MediaScanner to (re)index a library-relative path. Used both
+ * after a download (to add the file) and after a delete (scanning a path whose
+ * file is gone removes its stale MediaStore entry, so the track actually
+ * disappears from the device's music apps).
+ */
+export function scanDeviceLibraryPath(relativeFile) {
+  if (!relativeFile || !supportsDeviceStorage()) return
   const settingsLocation =
     moduleSettings.settings.value.server_media_location || ''
   activeDownloadRoot(settingsLocation)
     .then((root) => {
       if (!root) return
-      const rel = String(item.filename).replace(/^\/+/, '')
+      const rel = String(relativeFile).replace(/^\/+/, '')
       scanDownloadedFile(`${root.replace(/\/+$/, '')}/${rel}`)
     })
     .catch(() => {

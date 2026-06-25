@@ -6,7 +6,7 @@ import base64
 import re
 import struct
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 from urllib.parse import quote, unquote, urlparse
 
 import requests
@@ -553,6 +553,65 @@ def save_missing_artist_images(
             resolve_artist_mbid(artist, path),
             path,
         )
+        if not image:
+            continue
+        for folder in folders:
+            folder.mkdir(parents=True, exist_ok=True)
+            target = artist_image_target_path(
+                folder,
+                image,
+                artist_name=artist.get('name', ''),
+            )
+            if target.exists():
+                continue
+            target.write_bytes(image)
+            saved.append(unquote(target.relative_to(root.resolve()).as_posix()))
+            saved.extend(ensure_named_artist_image(folder, root.resolve()))
+    return saved
+
+
+def save_artist_images_for_track(
+    root: Path,
+    path: Path,
+    artists: list[dict[str, str]],
+    image_for_artist: Callable[[dict[str, str]], tuple[bytes | None, str]],
+    artist_folder_policy: str = 'artwork_available',
+) -> list[str]:
+    """Save artist photos for a freshly downloaded track.
+
+    Like :func:`save_missing_artist_images`, but the artwork is produced by the
+    caller-supplied ``image_for_artist`` callback so the download pipeline can
+    prefer real artist photos from online sources (by name) and fall back to
+    MusicBrainz/album art. Best-effort: skips artists already having artwork and
+    never raises for an individual artist.
+    """
+
+    saved: list[str] = []
+    for artist in _artists_for_policy(artists, artist_folder_policy):
+        folders = artist_folders_for_file(
+            root,
+            path,
+            [artist],
+            include_missing=False,
+        )
+        folders = [folder for folder in folders if not has_artist_image(folder)]
+        planned_folder = _safe_artist_folder_path(root, artist.get('name', ''))
+        if (
+            not folders
+            and planned_folder is not None
+            and not planned_folder.exists()
+            and _allows_missing_artist_folder(artist_folder_policy)
+        ):
+            folders = [planned_folder]
+        if not folders:
+            continue
+        try:
+            image, _source = image_for_artist(artist)
+        except Exception:
+            logger.opt(exception=True).debug(
+                'artist image lookup failed for {!r}', artist.get('name', '')
+            )
+            image = None
         if not image:
             continue
         for folder in folders:

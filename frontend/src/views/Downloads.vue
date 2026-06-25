@@ -549,7 +549,7 @@ import SearchField from '/src/components/SearchField.vue'
 import ServerConnectionPrompt from '/src/components/ServerConnectionPrompt.vue'
 import API from '/src/model/api'
 import { beginAppLoading, endAppLoading } from '/src/model/appLoading'
-import { useDownloadManager } from '/src/model/download'
+import { useDownloadManager, scanDeviceLibraryPath } from '/src/model/download'
 import {
   albumArtistsLabel,
   albumKey,
@@ -1070,6 +1070,7 @@ async function onDelete(file) {
   deleting.value = { ...deleting.value, [file]: true }
   try {
     await API.deleteDownload(file)
+    scanDeviceLibraryPath(file)
     files.value = files.value.filter((f) => f !== file)
     libraryItems.value = libraryItems.value.filter((item) => item.file !== file)
   } catch {

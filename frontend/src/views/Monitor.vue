@@ -304,6 +304,7 @@ import Navbar from '/src/components/Navbar.vue'
 import CoverImage from '/src/components/CoverImage.vue'
 import monitorAPI from '/src/model/monitor.js'
 import API from '/src/model/api.js'
+import { removeMonitoredArtist } from '/src/model/monitoredArtists.js'
 import { useI18n } from '/src/i18n'
 
 const { t } = useI18n()
@@ -511,6 +512,9 @@ async function onDelete(pl) {
     intervalDrafts.value = rest
     const { [pl.id]: _removedError, ...restErrors } = intervalErrors.value
     intervalErrors.value = restErrors
+    // Keep the shared artist-monitor state in sync so library/player badges
+    // stop showing "Monitoring" immediately after removal.
+    if (pl.kind === 'artist') removeMonitoredArtist(pl)
   } catch {
     // silently ignore
   }

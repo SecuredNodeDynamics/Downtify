@@ -44,6 +44,26 @@ function writeArtistAlias(libraryArtistName, monitoredArtistName) {
   }
 }
 
+function removeArtistAliasesFor(monitoredArtistName) {
+  const monitoredKey = normalizeMonitoredArtistName(monitoredArtistName)
+  if (!monitoredKey) return
+
+  const aliases = readArtistAliases()
+  let changed = false
+  for (const [libraryKey, mappedKey] of Object.entries(aliases)) {
+    if (mappedKey === monitoredKey || libraryKey === monitoredKey) {
+      delete aliases[libraryKey]
+      changed = true
+    }
+  }
+  if (!changed) return
+  try {
+    sessionStorage.setItem(ALIAS_STORAGE_KEY, JSON.stringify(aliases))
+  } catch {
+    // Ignore quota or privacy errors.
+  }
+}
+
 function rebuildMonitoredArtistMap(items) {
   const map = new Map()
   const aliases = readArtistAliases()
@@ -124,6 +144,21 @@ export function upsertMonitoredArtist(item, libraryArtistName = '') {
   }
 }
 
+/**
+ * Drops a removed artist from the shared monitor state immediately so library
+ * badges stop showing "Monitoring" without waiting for a network refresh. Also
+ * clears any library→monitored name aliases that pointed at it.
+ */
+export function removeMonitoredArtist(item) {
+  if (!item) return
+  const id = item.id
+  const items = monitoredArtists.value.filter((entry) => entry.id !== id)
+  applyMonitoredArtists(items)
+  removeArtistAliasesFor(item.name)
+  rebuildMonitoredArtistMap(monitoredArtists.value)
+  lastRefreshAt = Date.now()
+}
+
 export async function refreshMonitoredArtists({ force = false } = {}) {
   const now = Date.now()
   if (
@@ -179,5 +214,6 @@ export function useMonitoredArtists() {
     findMonitoredArtist,
     refreshMonitoredArtists,
     upsertMonitoredArtist,
+    removeMonitoredArtist,
   }
 }

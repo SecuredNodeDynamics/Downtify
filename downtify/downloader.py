@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import re
+import threading
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Optional, cast
@@ -32,6 +33,11 @@ from mutagen.oggopus import OggOpus
 from mutagen.oggvorbis import OggVorbis
 
 from . import lyrics as lyrics_mod
+from .artist_art import (
+    artist_or_fallback_image,
+    resolve_artist_mbid,
+    save_artist_images_for_track,
+)
 from .audio_caps import ffmpeg_available as _ffmpeg_available
 from .genres import canonical_genre
 from .jellyfin_meta import format_for_jellyfin
@@ -272,6 +278,9 @@ class Downloader:
         organize_by_artist: bool = False,
         organize_by_album: bool = False,
         enhance_metadata: bool = True,
+        download_artist_images: bool = True,
+        artist_folder_policy: str = 'artwork_available',
+        discogs_token: str = '',
     ):
         self.download_dir = Path(download_dir)
         self.download_dir.mkdir(parents=True, exist_ok=True)
@@ -282,6 +291,9 @@ class Downloader:
         self.organize_by_artist = organize_by_artist
         self.organize_by_album = organize_by_album
         self.enhance_metadata = enhance_metadata
+        self.download_artist_images = download_artist_images
+        self.artist_folder_policy = artist_folder_policy
+        self.discogs_token = discogs_token
 
     @staticmethod
     def _artist_subdir(song: dict[str, Any]) -> str:
@@ -619,9 +631,85 @@ class Downloader:
                         'Failed to embed lyrics into {}', final_path
                     )
 
+        self._maybe_save_artist_images(final_path, song)
+
         if progress_cb:
             progress_cb(100.0, 'Done')
         return f'{rel_prefix}{final_path.name}'
+
+    def _maybe_save_artist_images(
+        self, final_path: Path, song: dict[str, Any]
+    ) -> None:
+        """Fetch and cache real artist photos for the track's artists.
+
+        Runs in a background thread so it never delays the download finishing.
+        Artist photos are a separate asset from embedded album art and are the
+        only way the library's artist tiles can show real headshots — without
+        this they fall back to album covers. Best-effort and non-fatal.
+        """
+
+        if not self.download_artist_images:
+            return
+        names = song.get('artists') or []
+        if not names:
+            single = str(song.get('artist') or '').strip()
+            names = [single] if single else []
+        artists = [
+            {'name': str(name).strip(), 'id': ''}
+            for name in names
+            if str(name).strip()
+        ]
+        if not artists:
+            return
+
+        thread = threading.Thread(
+            target=self._save_artist_images,
+            args=(final_path, artists),
+            daemon=True,
+        )
+        thread.start()
+
+    def _save_artist_images(
+        self, final_path: Path, artists: list[dict[str, str]]
+    ) -> None:
+        from . import artist_image_sources
+
+        def image_for_artist(
+            artist: dict[str, str],
+        ) -> tuple[Optional[bytes], str]:
+            name = artist.get('name', '')
+            if name:
+                try:
+                    data, source = artist_image_sources.fetch_online_artist_image(
+                        name, discogs_token=self.discogs_token
+                    )
+                    if data:
+                        return data, source
+                except Exception:
+                    logger.opt(exception=True).debug(
+                        'online artist image lookup failed for {!r}', name
+                    )
+            try:
+                return artist_or_fallback_image(
+                    resolve_artist_mbid(artist, final_path), final_path
+                )
+            except Exception:
+                return None, ''
+
+        try:
+            saved = save_artist_images_for_track(
+                self.download_dir,
+                final_path,
+                artists,
+                image_for_artist,
+                artist_folder_policy=self.artist_folder_policy,
+            )
+            if saved:
+                logger.info('Saved artist image(s): {}', ', '.join(saved))
+        except Exception:
+            logger.opt(exception=True).warning(
+                'Failed to save artist images for {}', final_path
+            )
 
 
 def _download_cover(url: str) -> Optional[bytes]:

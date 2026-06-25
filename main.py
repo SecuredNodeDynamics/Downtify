@@ -148,6 +148,14 @@ def build_app() -> FastAPI:
         enhance_metadata=bool(
             api.state.settings.get('enhance_metadata', True)
         ),
+        download_artist_images=bool(
+            api.state.settings.get('download_artist_images', True)
+        ),
+        artist_folder_policy=str(
+            api.state.settings.get('artist_folder_policy')
+            or 'artwork_available'
+        ),
+        discogs_token=str(api.state.settings.get('discogs_token') or ''),
     )
     app.include_router(api.router)
 

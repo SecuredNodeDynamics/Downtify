@@ -87,6 +87,7 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     'organize_by_artist': False,
     'organize_by_album': False,
     'enhance_metadata': True,
+    'download_artist_images': True,
     'server_media_location': '',
     'jellyfin_url': '',
     'jellyfin_api_key': '',
@@ -3519,6 +3520,18 @@ async def update_settings_endpoint(
             if 'enhance_metadata' in payload:
                 state.downloader.enhance_metadata = bool(
                     payload['enhance_metadata']
+                )
+            if 'download_artist_images' in payload:
+                state.downloader.download_artist_images = bool(
+                    payload['download_artist_images']
+                )
+            if 'artist_folder_policy' in payload:
+                state.downloader.artist_folder_policy = (
+                    _artist_folder_policy()
+                )
+            if 'discogs_token' in payload:
+                state.downloader.discogs_token = str(
+                    payload.get('discogs_token') or ''
                 )
             if 'server_media_location' in payload:
                 _apply_download_dir_from_settings()

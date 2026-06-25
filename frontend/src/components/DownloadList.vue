@@ -137,10 +137,7 @@
                 />
               </div>
 
-              <div
-                v-else-if="manageItems.length === 0"
-                class="queue-empty"
-              >
+              <div v-else-if="manageItems.length === 0" class="queue-empty">
                 <Icon
                   icon="clarity:library-line"
                   class="mb-4 h-12 w-12 text-base-content/20"
@@ -230,10 +227,7 @@
                   </p>
                 </div>
 
-                <ul
-                  v-else-if="manageView === 'artists'"
-                  class="queue-list"
-                >
+                <ul v-else-if="manageView === 'artists'" class="queue-list">
                   <li
                     v-for="artist in manageArtists"
                     :key="artist.name"
@@ -241,10 +235,8 @@
                   >
                     <div class="queue-item-cover">
                       <CoverImage
-                        :src="coverSourcesFor(artist.previewFiles[0]).src"
-                        :fallbacks="
-                          coverSourcesFor(artist.previewFiles[0]).fallbacks
-                        "
+                        :src="coverSourcesForArtist(artist).src"
+                        :fallbacks="coverSourcesForArtist(artist).fallbacks"
                         :alt="artist.name"
                         img-class="h-full w-full object-cover"
                       >
@@ -297,10 +289,7 @@
                   </li>
                 </ul>
 
-                <ul
-                  v-else-if="manageView === 'albums'"
-                  class="queue-list"
-                >
+                <ul v-else-if="manageView === 'albums'" class="queue-list">
                   <li
                     v-for="album in manageAlbums"
                     :key="album.key"
@@ -691,13 +680,24 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onActivated, onDeactivated, watch } from 'vue'
+import {
+  ref,
+  computed,
+  onMounted,
+  onActivated,
+  onDeactivated,
+  watch,
+} from 'vue'
 import { useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import API from '../model/api'
 import CoverImage from './CoverImage.vue'
 import ServerConnectionPrompt from './ServerConnectionPrompt.vue'
-import { useProgressTracker, useDownloadManager } from '../model/download'
+import {
+  useProgressTracker,
+  useDownloadManager,
+  scanDeviceLibraryPath,
+} from '../model/download'
 import { useDownloadHistory } from '../model/downloadHistory'
 import {
   canOpenHistoryInPlayer,
@@ -794,6 +794,10 @@ function coverSourcesFor(file) {
   return API.coverSourcesForFile(file)
 }
 
+function coverSourcesForArtist(artist) {
+  return API.coverSourcesForArtist(artist.name, artist.previewFiles)
+}
+
 function decorateLibraryItems(items) {
   const unknownArtist = t('common.unknownArtist')
   return (items || [])
@@ -843,6 +847,7 @@ async function onManageDelete(item) {
   manageDeleting.value = { ...manageDeleting.value, [item.file]: true }
   try {
     await API.deleteDownload(item.file)
+    scanDeviceLibraryPath(item.file)
     manageItems.value = manageItems.value.filter((m) => m.file !== item.file)
   } catch {
     manageError.value = t('manage.failedDelete')
@@ -859,15 +864,14 @@ async function deleteManageFiles(key, files) {
   try {
     for (const file of targets) {
       await API.deleteDownload(file)
+      scanDeviceLibraryPath(file)
       removed.add(file)
     }
   } catch {
     manageError.value = t('manage.failedDelete')
   } finally {
     if (removed.size > 0) {
-      manageItems.value = manageItems.value.filter(
-        (m) => !removed.has(m.file)
-      )
+      manageItems.value = manageItems.value.filter((m) => !removed.has(m.file))
     }
     manageDeleting.value = { ...manageDeleting.value, [key]: false }
   }

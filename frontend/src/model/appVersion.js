@@ -114,15 +114,27 @@ export function sanitizeStoredVersions() {
 }
 
 async function fetchLatestGithubRelease() {
-  const response = await fetch(
-    'https://api.github.com/repos/SecuredNodeDynamics/Downtify/releases/latest',
-    {
-      headers: {
-        Accept: 'application/vnd.github+json',
-        'User-Agent': `Downtify/${getBundledAppVersion()}`,
-      },
-    }
-  )
+  // A bare fetch on a freshly launched APK can hang indefinitely when the
+  // radio is still negotiating connectivity. Bound it so the launch update
+  // check fails fast and the retry loop can try again, instead of leaving the
+  // header badge stuck until the user opens Settings.
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 15000)
+  let response
+  try {
+    response = await fetch(
+      'https://api.github.com/repos/SecuredNodeDynamics/Downtify/releases/latest',
+      {
+        headers: {
+          Accept: 'application/vnd.github+json',
+          'User-Agent': `Downtify/${getBundledAppVersion()}`,
+        },
+        signal: controller.signal,
+      }
+    )
+  } finally {
+    clearTimeout(timeout)
+  }
 
   if (response.status === 404) return null
   if (!response.ok) {

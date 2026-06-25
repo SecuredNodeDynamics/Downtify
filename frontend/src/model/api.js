@@ -348,10 +348,14 @@ function coverSourcesForArtist(
   if (cached) return cached
 
   const urls = []
+  // Prefer a real artist photo (saved as {Artist}/{Artist}.jpg by the
+  // downloader / metadata repair) so the artist tile shows a headshot rather
+  // than one of the artist's album covers. Falls back to embedded album art
+  // when no artist photo exists yet.
+  if (name) urls.push(coverFolderURL(name, size))
   for (const file of files) {
     urls.push(...coverUrlsForLibraryFile(file, size))
   }
-  if (name) urls.push(coverFolderURL(name, size))
   const deduped = [...new Set(urls.filter(Boolean))]
   const entry = Object.freeze({
     src: deduped[0] || '',
