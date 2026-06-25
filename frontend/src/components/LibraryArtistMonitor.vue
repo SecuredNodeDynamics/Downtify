@@ -132,6 +132,11 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import monitorAPI from '/src/model/monitor.js'
+import {
+  findMonitoredArtist,
+  monitoredArtists,
+  refreshMonitoredArtists,
+} from '/src/model/monitoredArtists.js'
 import { useI18n } from '/src/i18n'
 
 const props = defineProps({
@@ -147,34 +152,13 @@ const router = useRouter()
 const busy = ref(false)
 const artistNotFound = ref(false)
 const pickerError = ref('')
-const monitoredArtists = ref([])
 const pickerOpen = ref(false)
 const pickerMatches = ref([])
 
 const monitoredEntry = computed(() => {
-  const target = normalizeName(props.artistName)
-  if (!target) return null
-  return (
-    monitoredArtists.value.find(
-      (item) => item.kind === 'artist' && normalizeName(item.name) === target
-    ) || null
-  )
+  monitoredArtists.value
+  return findMonitoredArtist(props.artistName)
 })
-
-function normalizeName(value) {
-  return String(value || '')
-    .trim()
-    .toLocaleLowerCase()
-}
-
-async function refreshMonitored() {
-  try {
-    const res = await monitorAPI.listMonitoredPlaylists()
-    monitoredArtists.value = Array.isArray(res.data) ? res.data : []
-  } catch {
-    monitoredArtists.value = []
-  }
-}
 
 async function lookupSpotifyArtistsWithRetry(artistName, limit = 5) {
   const lookup = () =>
@@ -231,11 +215,11 @@ async function addMatch(match) {
     pickerOpen.value = false
     pickerMatches.value = []
     artistNotFound.value = false
-    await refreshMonitored()
+    await refreshMonitoredArtists()
   } catch (err) {
     if (err?.response?.status === 409) {
       pickerOpen.value = false
-      await refreshMonitored()
+      await refreshMonitoredArtists()
       return
     }
     pickerError.value =
@@ -264,6 +248,6 @@ watch(
 )
 
 onMounted(() => {
-  void refreshMonitored()
+  void refreshMonitoredArtists()
 })
 </script>

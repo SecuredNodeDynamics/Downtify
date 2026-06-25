@@ -527,19 +527,13 @@ function fallbackLibraryItems(paths) {
 }
 
 function syncPlayerPlaylist(fileList) {
-  const list = (fileList || []).filter(Boolean)
-  if (!list.length) return
+  player.syncPlaylistFromFiles(fileList || [], { autoplay: false })
+}
 
-  const currentFile = player.currentTrack.value?.file
-  if (currentFile && list.includes(currentFile)) {
-    player.setPlaylist(list, {
-      startIndex: list.indexOf(currentFile),
-      autoplay: false,
-    })
-    return
-  }
-
-  player.setPlaylist(list, {})
+function libraryPathsUnchanged(nextItems) {
+  const nextPaths = (nextItems || []).map((item) => item.file)
+  if (nextPaths.length !== files.value.length) return false
+  return nextPaths.every((file, index) => file === files.value[index])
 }
 
 function applyLibraryItems(items) {
@@ -591,7 +585,9 @@ async function refreshLibraryMetadataInBackground(force = false) {
     const items = await API.refreshLibraryInBackground(force)
     if (items.length > 0 && !libraryItemsUnchanged(items)) {
       applyLibraryItems(items)
-      syncPlayerPlaylist(items.map((item) => item.file))
+      if (!libraryPathsUnchanged(items)) {
+        syncPlayerPlaylist(items.map((item) => item.file))
+      }
       scheduleGenreRefresh(items)
     } else if (items.length > 0) {
       scheduleGenreRefresh(items)

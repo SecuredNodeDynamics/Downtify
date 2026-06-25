@@ -302,6 +302,7 @@
                       >
                         <Icon icon="clarity:play-line" class="h-4 w-4" />
                       </button>
+                      <LibraryArtistMonitorBadge :artist-name="artist.name" />
                     </div>
                     <div class="library-browse-card-body">
                       <p class="library-browse-card-title">{{ artist.name }}</p>
@@ -551,6 +552,7 @@ import CoverImage from '/src/components/CoverImage.vue'
 import GenreCover from '/src/components/GenreCover.vue'
 import LibraryDownloadOffers from '/src/components/LibraryDownloadOffers.vue'
 import LibraryArtistMonitor from '/src/components/LibraryArtistMonitor.vue'
+import LibraryArtistMonitorBadge from '/src/components/LibraryArtistMonitorBadge.vue'
 import SearchField from '/src/components/SearchField.vue'
 import ServerConnectionPrompt from '/src/components/ServerConnectionPrompt.vue'
 import API from '/src/model/api'
@@ -587,6 +589,7 @@ import { useLibraryRefresh } from '/src/model/libraryRefresh'
 import { useLibraryOnlineSearch } from '/src/model/libraryOnlineSearch'
 import { useSearchManager } from '/src/model/search'
 import { needsServerConnection } from '/src/model/serverConnection'
+import { refreshMonitoredArtists } from '/src/model/monitoredArtists'
 
 defineOptions({ name: 'List' })
 
@@ -1054,6 +1057,7 @@ onMounted(() => {
   if (libraryItems.value.length) {
     API.warmLibraryCovers(libraryItems.value)
   }
+  void refreshMonitoredArtists()
   void refresh()
   stopLibraryListener = onLibraryChanged(() => {
     void refresh({ background: true, force: true })
@@ -1062,6 +1066,7 @@ onMounted(() => {
 
 onActivated(() => {
   libraryRefresh.register(refreshFromHeader)
+  void refreshMonitoredArtists()
   if (files.value.length > 0) {
     void refresh({ background: true })
     return

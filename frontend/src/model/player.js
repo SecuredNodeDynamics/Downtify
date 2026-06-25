@@ -1,6 +1,7 @@
 import { ref, computed } from 'vue'
 
 import API from './api.js'
+import { isSameAudioUrl } from './playerAudioUrl.js'
 
 const VOLUME_KEY = 'downtify-player-volume'
 
@@ -58,6 +59,10 @@ function ensureAudio() {
     duration.value = isFinite(audio.duration) ? audio.duration : 0
   })
   audio.addEventListener('ended', onEnded)
+  audio.addEventListener('error', () => {
+    isPlaying.value = false
+    stopProgressTicker()
+  })
   audio.addEventListener('play', () => {
     isPlaying.value = true
     startProgressTicker()
@@ -120,7 +125,7 @@ function selectAt(index) {
     if (pos >= 0) shufflePos = pos
   }
   const nextUrl = playlist.value[index].url
-  if (a.src !== nextUrl) {
+  if (!isSameAudioUrl(a.src, nextUrl)) {
     a.pause()
     isPlaying.value = false
     stopProgressTicker()
@@ -128,10 +133,55 @@ function selectAt(index) {
     a.currentTime = 0
     currentTime.value = 0
     duration.value = 0
+    if (wasPlaying) {
+      a.play().catch(() => {})
+    }
+    return
   }
-  if (wasPlaying) {
+  if (wasPlaying && a.paused) {
     a.play().catch(() => {})
   }
+}
+
+export function syncPlaylistFromFiles(files, options = {}) {
+  const paths = (files || []).filter(Boolean)
+  if (!paths.length) return
+
+  const currentFile =
+    currentIndex.value >= 0
+      ? playlist.value[currentIndex.value]?.file
+      : null
+
+  const pathsUnchanged =
+    paths.length === playlist.value.length &&
+    paths.every((file, index) => playlist.value[index]?.file === file)
+
+  if (pathsUnchanged) return
+
+  if (currentFile && paths.includes(currentFile)) {
+    const wasPlaying = isPlaying.value
+    playlist.value = paths.map((file) => trackFromFile(file))
+    currentIndex.value = paths.indexOf(currentFile)
+    if (shuffle.value) buildShuffleOrder()
+
+    const track = playlist.value[currentIndex.value]
+    const a = ensureAudio()
+    if (track && !isSameAudioUrl(a.src, track.url)) {
+      selectAt(currentIndex.value)
+      return
+    }
+    if (wasPlaying && a.paused) {
+      a.play().catch(() => {})
+    }
+    return
+  }
+
+  if (currentFile && !paths.includes(currentFile)) {
+    pause()
+    currentIndex.value = -1
+  }
+
+  setPlaylist(paths, options)
 }
 
 function setPlaylist(files, options = {}) {
@@ -340,6 +390,7 @@ export function usePlayer() {
     repeatMode,
     shuffle,
     setPlaylist,
+    syncPlaylistFromFiles,
     selectAt,
     playAt,
     play,
