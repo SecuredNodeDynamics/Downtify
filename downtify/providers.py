@@ -12,6 +12,7 @@ from typing import Any, Optional
 from loguru import logger
 from ytmusicapi import YTMusic
 
+from . import spotify
 from .telemetry import json_log_blob, redact_sensitive_mapping
 
 
@@ -419,9 +420,53 @@ def _attach_album_track_counts(items: list[dict[str, Any]]) -> None:
             item['track_count'] = count
 
 
-def search_media(query: str, limit: int = 20) -> list[dict[str, Any]]:
-    if not query.strip():
+def _spotify_search_query(url: str) -> str:
+    """Build a YouTube Music text query from a Spotify URL."""
+
+    parsed = spotify.parse_spotify_url(url.strip())
+    if parsed is None:
+        return ''
+    kind, sid = parsed
+    if kind == 'track':
+        track = spotify.track_from_id(sid)
+        artists = track.get('artist') or ', '.join(track.get('artists') or [])
+        title = track.get('name') or ''
+        return f'{artists} {title}'.strip()
+    if kind in {'album', 'playlist'}:
+        tracks = (
+            spotify.album_tracks_from_id(sid)
+            if kind == 'album'
+            else spotify.playlist_tracks_from_id(sid)
+        )
+        if not tracks:
+            return ''
+        first = tracks[0]
+        artists = first.get('artist') or ', '.join(first.get('artists') or [])
+        if kind == 'album':
+            album = first.get('album_name') or ''
+            return f'{artists} {album}'.strip()
+        title = first.get('name') or ''
+        return f'{artists} {title}'.strip()
+    return ''
+
+
+def search_media_from_spotify_url(url: str, limit: int = 20) -> list[dict[str, Any]]:
+    query = _spotify_search_query(url)
+    if not query:
         return []
+    return search_media(query, limit=limit)
+
+
+def search_media(query: str, limit: int = 20) -> list[dict[str, Any]]:
+    query = query.strip()
+    if not query:
+        return []
+    if spotify.parse_spotify_url(query):
+        try:
+            return search_media_from_spotify_url(query, limit=limit)
+        except Exception:
+            logger.exception('Spotify URL search failed for {}', query)
+            return []
     song_limit = max(1, limit)
     album_limit = max(1, min(30, limit // 2))
     songs = search_songs(query, limit=song_limit)

@@ -15,6 +15,7 @@ import { useRoute } from 'vue-router'
 
 import { useSearchManager } from '../model/search'
 import { useDownloadManager } from '../model/download'
+import { resolveSearchRouteQuery } from '../model/searchNavigation'
 import API from '../model/api'
 
 import Navbar from '/src/components/Navbar.vue'
@@ -29,15 +30,15 @@ const route = useRoute()
 const sm = useSearchManager()
 const dm = useDownloadManager()
 
+const searchQuery = computed(() => resolveSearchRouteQuery(route))
 const filteredResults = computed(() => sm.filteredResults.value)
 
-watch(
-  () => route.params.query,
-  () => {
-    if (route.params.query) sm.searchFor(route.params.query)
-  },
-  { deep: true }
-)
+function runSearch() {
+  const query = searchQuery.value
+  if (query) sm.searchFor(query)
+}
 
-sm.searchFor(route.params.query)
+watch(searchQuery, runSearch)
+
+runSearch()
 </script>

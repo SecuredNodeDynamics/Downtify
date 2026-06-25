@@ -4,7 +4,7 @@
     :model-value="sm.searchTerm.value"
     :placeholder="placeHolder"
     :size="compact ? 'compact' : 'large'"
-    :submit-icon="sm.isValidURL(sm.searchTerm.value) ? 'download' : 'search'"
+    :submit-icon="'search'"
     :submit-disabled="dm.loading.value || !canSubmit"
     :submit-loading="dm.loading.value"
     @update:model-value="sm.searchTerm.value = $event"
@@ -18,6 +18,7 @@ import { ref, computed, onBeforeUnmount } from 'vue'
 import router from '../router'
 import { useSearchManager } from '../model/search'
 import { useDownloadManager } from '../model/download'
+import { buildSearchRoute } from '../model/searchNavigation'
 import { useI18n } from '../i18n'
 import SearchField from './SearchField.vue'
 
@@ -29,18 +30,15 @@ const sm = useSearchManager()
 const dm = useDownloadManager()
 const { t, locale } = useI18n()
 
-const placeHolderRotation = [
-  'https://open.spotify.com/track/4vfN00PlILRXy5dcXHQE9M',
-  'drugs - EDEN',
-  'Não Gosto Eu Amo - Henrique e Juliano',
-  'Perfect - Ed Sheeran',
-  'Lightning Crashes - Live',
+const placeHolderKeys = [
+  'search.placeholderArtist',
+  'search.placeholderAlbum',
+  'search.placeholderTrack',
 ]
 const rotationIndex = ref(0)
 const placeHolder = computed(() => {
   const _ = locale.value
-  if (rotationIndex.value === 0) return t('search.placeholder')
-  return placeHolderRotation[rotationIndex.value - 1]
+  return t(placeHolderKeys[rotationIndex.value])
 })
 
 const canSubmit = computed(() => {
@@ -50,18 +48,14 @@ const canSubmit = computed(() => {
 })
 
 const polling = setInterval(() => {
-  rotationIndex.value =
-    (rotationIndex.value + 1) % (placeHolderRotation.length + 1)
+  rotationIndex.value = (rotationIndex.value + 1) % placeHolderKeys.length
 }, 5000)
 onBeforeUnmount(() => clearInterval(polling))
 
 function lookUp(query) {
-  if (!query || !query.trim()) return
-  if (sm.isValidURL(query)) {
-    dm.fromURL(query)
-    router.push({ name: 'Download' })
-  } else if (sm.isValidSearch(query)) {
-    router.push({ name: 'Search', params: { query } })
-  }
+  const trimmed = query?.trim()
+  if (!trimmed) return
+  if (!sm.isValidSearch(trimmed) && !sm.isValidURL(trimmed)) return
+  router.push(buildSearchRoute(trimmed))
 }
 </script>

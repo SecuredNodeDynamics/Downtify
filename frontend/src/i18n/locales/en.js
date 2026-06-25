@@ -44,6 +44,9 @@ export default {
   },
   search: {
     placeholder: 'Search, paste a Spotify or YouTube Music link…',
+    placeholderArtist: 'Search by artist name',
+    placeholderAlbum: 'Search by album name',
+    placeholderTrack: 'Search by track name',
     libraryPlaceholder: 'Search your downloaded music…',
     libraryHint: 'Filters the player queue to music already on this server.',
     title: 'Search results',
@@ -118,6 +121,38 @@ export default {
     openInPlayer: 'Open in player',
     failedLoad: 'Failed to load download history.',
     failedRetry: 'Failed to retry this download.',
+  },
+  manage: {
+    tab: 'Manage',
+    title: 'Manage Library',
+    subtitle: 'Browse your downloaded media and remove anything you no longer want.',
+    empty: 'No downloaded media yet.',
+    emptyHint: 'Downloaded tracks will appear here once you add some.',
+    search: 'Filter your downloads…',
+    noMatches: 'No media matches your filter.',
+    artists: 'Artists',
+    albums: 'Albums',
+    tracks: 'Tracks',
+    delete: 'Delete from downloads',
+    deletePrompt: 'Delete "{title}" from your downloads? This cannot be undone.',
+    deleteAlbum: 'Delete album from downloads',
+    deleteAlbumPrompt:
+      'Delete the album "{name}" ({count} files) from your downloads? This cannot be undone.',
+    deleteArtist: 'Delete all media from downloads',
+    deleteArtistPrompt:
+      'Delete all {count} files by "{name}" from your downloads? This cannot be undone.',
+    deleting: 'Deleting…',
+    failedLoad: 'Failed to load your downloaded media.',
+    failedDelete: 'Failed to delete this media.',
+    albumMeta: '{count} tracks',
+    artistMeta: '{tracks} tracks - {albums} albums',
+    count: '{count} file',
+    countPlural: '{count} files',
+    artistCount: '{count} artist',
+    artistCountPlural: '{count} artists',
+    albumCount: '{count} album',
+    albumCountPlural: '{count} albums',
+    refresh: 'Refresh',
   },
   health: {
     title: 'Health',
@@ -577,6 +612,10 @@ export default {
       'When a download finishes, Downtify saves a copy to the folder you choose on this device.',
     downloadDestinationBrowserHint:
       'When a download finishes, Downtify saves a copy to your selected browser download location.',
+    downloadDestinationDeviceHint:
+      'When a download finishes, Downtify saves a copy to this device under Documents/Downtify.',
+    deviceDownloadsHint:
+      'Files are saved to your device storage under Documents/Downtify.',
     localFolderLabel: 'Save downloads to',
     localFolderNameHint:
       'Browsers only show the folder name, not the full path on your computer.',

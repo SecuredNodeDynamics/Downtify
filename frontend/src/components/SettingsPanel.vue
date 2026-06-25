@@ -124,17 +124,15 @@
                 {{ localFolderName }}
               </p>
               <p class="mt-1 text-[11px] text-base-content/40">
-                {{
-                  usesBrowserDownloads
-                    ? t('settings.browserDownloadsHint')
-                    : t('settings.localFolderNameHint')
-                }}
+                {{ localFolderDetailHint }}
               </p>
             </div>
           </div>
-          <div class="flex flex-wrap items-center gap-2">
+          <div
+            v-if="!usesBrowserDownloads && !usesNativeDownloads"
+            class="flex flex-wrap items-center gap-2"
+          >
             <button
-              v-if="!usesBrowserDownloads"
               type="button"
               class="btn btn-sm h-9 rounded-full border-white/10 bg-base-100/85 hover:bg-base-100"
               @click="changeLocalFolder"
@@ -142,7 +140,10 @@
               {{ t('settings.changeLocalFolder') }}
             </button>
           </div>
-          <p v-if="!localFolderReady" class="text-[11px] text-warning">
+          <p
+            v-if="!localFolderReady && !usesNativeDownloads"
+            class="text-[11px] text-warning"
+          >
             {{ t('settings.localFolderPermissionNeeded') }}
           </p>
         </div>
@@ -1129,6 +1130,7 @@ const {
   localFolderReady,
   localFolderBlockReason,
   usesBrowserDownloads,
+  usesNativeDownloads,
   isLocal,
   setDestination,
   pickLocalFolder,
@@ -1410,11 +1412,21 @@ const localFolderBlockMessage = computed(() => {
   return ''
 })
 
-const localDestinationHint = computed(() =>
-  usesBrowserDownloads.value
+const localDestinationHint = computed(() => {
+  if (usesNativeDownloads.value) {
+    return t('settings.downloadDestinationDeviceHint')
+  }
+  return usesBrowserDownloads.value
     ? t('settings.downloadDestinationBrowserHint')
     : t('settings.downloadDestinationLocalHint')
-)
+})
+
+const localFolderDetailHint = computed(() => {
+  if (usesNativeDownloads.value) return t('settings.deviceDownloadsHint')
+  return usesBrowserDownloads.value
+    ? t('settings.browserDownloadsHint')
+    : t('settings.localFolderNameHint')
+})
 
 function localFolderErrorMessage(reason) {
   if (reason === 'insecure') return t('settings.localFolderInsecure')

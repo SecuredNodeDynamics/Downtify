@@ -12,7 +12,7 @@
           input-id="mobile-search-input"
           v-model="query"
           :placeholder="placeholder"
-          :submit-icon="showDownloadIcon ? 'download' : 'search'"
+          :submit-icon="'search'"
           :submit-disabled="!canSubmit"
           @submit="submit"
           @clear="onClear"
@@ -36,16 +36,15 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 
 import router from '../router'
-import { useDownloadManager } from '../model/download'
 import { useMobileSearch } from '../model/mobileSearch'
 import { useSearchManager } from '../model/search'
+import { buildSearchRoute } from '../model/searchNavigation'
 import { useI18n } from '../i18n'
 import SearchField from './SearchField.vue'
 
 const route = useRoute()
 const { t } = useI18n()
 const sm = useSearchManager()
-const dm = useDownloadManager()
 const mobileSearch = useMobileSearch()
 
 const searchFieldRef = ref(null)
@@ -59,9 +58,6 @@ const placeholder = computed(() =>
     : t('search.placeholder')
 )
 
-const showDownloadIcon = computed(
-  () => !isPlayerSearch.value && sm.isValidURL(query.value)
-)
 
 const canSubmit = computed(() => {
   const value = query.value.trim()
@@ -90,17 +86,10 @@ function submit() {
     return
   }
 
-  if (sm.isValidURL(value)) {
-    dm.fromURL(value)
-    close()
-    router.push({ name: 'Download' })
-    return
-  }
+  if (!sm.isValidSearch(value) && !sm.isValidURL(value)) return
 
-  if (sm.isValidSearch(value)) {
-    close()
-    router.push({ name: 'Search', params: { query: value } })
-  }
+  close()
+  router.push(buildSearchRoute(value))
 }
 
 function syncQueryFromContext() {

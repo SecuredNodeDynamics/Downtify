@@ -35,6 +35,21 @@
           >
             {{ t('history.tab') }}
           </button>
+          <button
+            type="button"
+            class="queue-tab-btn"
+            :class="
+              activeTab === 'manage'
+                ? 'queue-tab-btn-active'
+                : 'queue-tab-btn-inactive'
+            "
+            @click="activeTab = 'manage'"
+          >
+            {{ t('manage.tab') }}
+            <span v-if="manageItems.length > 0" class="queue-tab-count">
+              {{ manageItems.length }}
+            </span>
+          </button>
         </div>
 
         <button
@@ -74,6 +89,22 @@
             <span class="hidden sm:inline">{{ t('history.clear') }}</span>
           </button>
         </template>
+
+        <button
+          v-else-if="activeTab === 'manage'"
+          type="button"
+          class="queue-action-btn"
+          @click="refreshManage"
+          :disabled="manageLoading"
+          :title="t('manage.refresh')"
+        >
+          <span
+            v-if="manageLoading"
+            class="loading loading-spinner loading-xs"
+          />
+          <Icon v-else icon="clarity:refresh-line" class="h-4 w-4" />
+          <span class="hidden sm:inline">{{ t('manage.refresh') }}</span>
+        </button>
       </div>
     </div>
 
@@ -83,7 +114,314 @@
       >
         <div class="queue-panel panel-glow-inner p-3 sm:p-5">
           <div class="queue-scroll-body">
-            <template v-if="activeTab === 'queue'">
+            <template v-if="activeTab === 'manage'">
+              <div
+                v-if="manageError"
+                class="mb-3 flex items-center gap-3 rounded-2xl border border-error/20 bg-error/10 p-3 text-sm text-error"
+              >
+                <Icon
+                  icon="clarity:exclamation-circle-line"
+                  class="h-5 w-5 shrink-0"
+                />
+                <span>{{ manageError }}</span>
+              </div>
+
+              <div
+                v-if="manageLoading && manageItems.length === 0"
+                class="space-y-2"
+              >
+                <div
+                  v-for="n in 5"
+                  :key="n"
+                  class="skeleton h-16 rounded-2xl"
+                />
+              </div>
+
+              <div
+                v-else-if="manageItems.length === 0"
+                class="queue-empty"
+              >
+                <Icon
+                  icon="clarity:library-line"
+                  class="mb-4 h-12 w-12 text-base-content/20"
+                />
+                <p class="text-sm text-base-content/50">
+                  {{ t('manage.empty') }}
+                </p>
+                <p class="mt-1 text-xs text-base-content/40">
+                  {{ t('manage.emptyHint') }}
+                </p>
+              </div>
+
+              <template v-else>
+                <div class="manage-controls">
+                  <label class="manage-search">
+                    <Icon
+                      icon="clarity:search-line"
+                      class="h-4 w-4 shrink-0 text-base-content/40"
+                    />
+                    <input
+                      v-model="manageQuery"
+                      type="text"
+                      class="manage-search-input"
+                      :placeholder="t('manage.search')"
+                    />
+                    <button
+                      v-if="manageQuery"
+                      type="button"
+                      class="icon-btn"
+                      @click="manageQuery = ''"
+                    >
+                      <Icon icon="clarity:times-line" class="h-4 w-4" />
+                    </button>
+                  </label>
+                  <span class="manage-count">{{ manageCountLabel }}</span>
+                </div>
+
+                <div class="manage-view-tabs">
+                  <button
+                    type="button"
+                    class="manage-view-btn"
+                    :class="
+                      manageView === 'artists'
+                        ? 'manage-view-btn-active'
+                        : 'manage-view-btn-inactive'
+                    "
+                    @click="manageView = 'artists'"
+                  >
+                    {{ t('manage.artists') }}
+                  </button>
+                  <button
+                    type="button"
+                    class="manage-view-btn"
+                    :class="
+                      manageView === 'albums'
+                        ? 'manage-view-btn-active'
+                        : 'manage-view-btn-inactive'
+                    "
+                    @click="manageView = 'albums'"
+                  >
+                    {{ t('manage.albums') }}
+                  </button>
+                  <button
+                    type="button"
+                    class="manage-view-btn"
+                    :class="
+                      manageView === 'tracks'
+                        ? 'manage-view-btn-active'
+                        : 'manage-view-btn-inactive'
+                    "
+                    @click="manageView = 'tracks'"
+                  >
+                    {{ t('manage.tracks') }}
+                  </button>
+                </div>
+
+                <div
+                  v-if="filteredManageItems.length === 0"
+                  class="queue-empty"
+                >
+                  <Icon
+                    icon="clarity:search-line"
+                    class="mb-4 h-10 w-10 text-base-content/20"
+                  />
+                  <p class="text-sm text-base-content/50">
+                    {{ t('manage.noMatches') }}
+                  </p>
+                </div>
+
+                <ul
+                  v-else-if="manageView === 'artists'"
+                  class="queue-list"
+                >
+                  <li
+                    v-for="artist in manageArtists"
+                    :key="artist.name"
+                    class="queue-item"
+                  >
+                    <div class="queue-item-cover">
+                      <CoverImage
+                        :src="coverSourcesFor(artist.previewFiles[0]).src"
+                        :fallbacks="
+                          coverSourcesFor(artist.previewFiles[0]).fallbacks
+                        "
+                        :alt="artist.name"
+                        img-class="h-full w-full object-cover"
+                      >
+                        <template #fallback>
+                          <Icon
+                            icon="clarity:user-line"
+                            class="h-5 w-5 text-base-content/35"
+                          />
+                        </template>
+                      </CoverImage>
+                    </div>
+
+                    <div class="min-w-0 flex-1">
+                      <p class="truncate text-sm font-semibold">
+                        {{ artist.name }}
+                      </p>
+                      <p class="truncate text-xs text-base-content/60">
+                        {{
+                          t('manage.artistMeta', {
+                            tracks: artist.files.length,
+                            albums: artist.albumCount,
+                          })
+                        }}
+                      </p>
+                    </div>
+
+                    <div class="flex shrink-0 items-center gap-1">
+                      <button
+                        type="button"
+                        class="icon-btn text-error/70 hover:bg-error/10 hover:text-error"
+                        :disabled="
+                          manageDeleting[`artist:${artist.name}`] === true
+                        "
+                        @click="onManageDeleteArtist(artist)"
+                        :title="t('manage.deleteArtist')"
+                      >
+                        <span
+                          v-if="
+                            manageDeleting[`artist:${artist.name}`] === true
+                          "
+                          class="loading loading-spinner loading-xs"
+                        />
+                        <Icon
+                          v-else
+                          icon="clarity:trash-line"
+                          class="h-4 w-4"
+                        />
+                      </button>
+                    </div>
+                  </li>
+                </ul>
+
+                <ul
+                  v-else-if="manageView === 'albums'"
+                  class="queue-list"
+                >
+                  <li
+                    v-for="album in manageAlbums"
+                    :key="album.key"
+                    class="queue-item"
+                  >
+                    <div class="queue-item-cover">
+                      <CoverImage
+                        :src="coverSourcesFor(album.coverFile).src"
+                        :fallbacks="coverSourcesFor(album.coverFile).fallbacks"
+                        :alt="album.name"
+                        img-class="h-full w-full object-cover"
+                      >
+                        <template #fallback>
+                          <Icon
+                            icon="clarity:album-line"
+                            class="h-5 w-5 text-base-content/35"
+                          />
+                        </template>
+                      </CoverImage>
+                    </div>
+
+                    <div class="min-w-0 flex-1">
+                      <p class="truncate text-sm font-semibold">
+                        {{ album.name }}
+                      </p>
+                      <p class="truncate text-xs text-base-content/60">
+                        {{ album.artist }}
+                      </p>
+                      <p class="truncate text-xs text-base-content/40">
+                        {{
+                          t('manage.albumMeta', { count: album.files.length })
+                        }}
+                      </p>
+                    </div>
+
+                    <div class="flex shrink-0 items-center gap-1">
+                      <button
+                        type="button"
+                        class="icon-btn text-error/70 hover:bg-error/10 hover:text-error"
+                        :disabled="
+                          manageDeleting[`album:${album.key}`] === true
+                        "
+                        @click="onManageDeleteAlbum(album)"
+                        :title="t('manage.deleteAlbum')"
+                      >
+                        <span
+                          v-if="manageDeleting[`album:${album.key}`] === true"
+                          class="loading loading-spinner loading-xs"
+                        />
+                        <Icon
+                          v-else
+                          icon="clarity:trash-line"
+                          class="h-4 w-4"
+                        />
+                      </button>
+                    </div>
+                  </li>
+                </ul>
+
+                <ul v-else class="queue-list">
+                  <li
+                    v-for="item in filteredManageItems"
+                    :key="item.file"
+                    class="queue-item"
+                  >
+                    <div class="queue-item-cover">
+                      <CoverImage
+                        :src="coverSourcesFor(item.file).src"
+                        :fallbacks="coverSourcesFor(item.file).fallbacks"
+                        :alt="item.title"
+                        img-class="h-full w-full object-cover"
+                      >
+                        <template #fallback>
+                          <Icon
+                            icon="clarity:music-note-line"
+                            class="h-5 w-5 text-base-content/35"
+                          />
+                        </template>
+                      </CoverImage>
+                    </div>
+
+                    <div class="min-w-0 flex-1">
+                      <p class="truncate text-sm font-semibold">
+                        {{ item.title || t('common.unknownTrack') }}
+                      </p>
+                      <p class="truncate text-xs text-base-content/60">
+                        {{ item.artistsLabel }}
+                      </p>
+                      <p
+                        v-if="item.album"
+                        class="truncate text-xs text-base-content/40"
+                      >
+                        {{ item.album }}
+                      </p>
+                    </div>
+
+                    <div class="flex shrink-0 items-center gap-1">
+                      <button
+                        type="button"
+                        class="icon-btn text-error/70 hover:bg-error/10 hover:text-error"
+                        :disabled="manageDeleting[item.file] === true"
+                        @click="onManageDelete(item)"
+                        :title="t('manage.delete')"
+                      >
+                        <span
+                          v-if="manageDeleting[item.file] === true"
+                          class="loading loading-spinner loading-xs"
+                        />
+                        <Icon
+                          v-else
+                          icon="clarity:trash-line"
+                          class="h-4 w-4"
+                        />
+                      </button>
+                    </div>
+                  </li>
+                </ul>
+              </template>
+            </template>
+
+            <template v-else-if="activeTab === 'queue'">
               <div
                 v-if="pt.activeDownloadCount.value === 0"
                 class="queue-empty"
@@ -353,7 +691,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onActivated, watch } from 'vue'
+import { ref, computed, onMounted, onActivated, onDeactivated, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import API from '../model/api'
@@ -365,6 +703,17 @@ import {
   canOpenHistoryInPlayer,
   setPlayerNavigation,
 } from '../model/playerNavigation'
+import {
+  normalizeLibraryItem,
+  libraryArtistsLabel,
+  matchesLibraryTrackItem,
+  groupAlbums,
+  groupArtists,
+} from '../model/library'
+import {
+  getCachedLibraryItems,
+  onLibraryChanged,
+} from '../model/librarySession'
 import { useI18n } from '../i18n'
 
 const router = useRouter()
@@ -385,8 +734,171 @@ const historyError = ref('')
 const retrying = ref({})
 let historyFetchSeq = 0
 
+const manageItems = ref([])
+const manageLoading = ref(false)
+const manageError = ref('')
+const manageQuery = ref('')
+const manageView = ref('tracks')
+const manageDeleting = ref({})
+let manageFetchSeq = 0
+let stopManageLibraryListener = null
+
+const filteredManageItems = computed(() => {
+  const query = manageQuery.value.trim()
+  if (!query) return manageItems.value
+  return manageItems.value.filter((item) =>
+    matchesLibraryTrackItem(item, query)
+  )
+})
+
+const manageGroupOptions = computed(() => ({
+  unknownArtist: t('common.unknownArtist'),
+}))
+
+const manageAlbums = computed(() =>
+  groupAlbums(filteredManageItems.value, manageGroupOptions.value)
+)
+
+const manageArtists = computed(() =>
+  groupArtists(filteredManageItems.value, manageGroupOptions.value)
+)
+
+const manageResultCount = computed(() => {
+  if (manageView.value === 'albums') return manageAlbums.value.length
+  if (manageView.value === 'artists') return manageArtists.value.length
+  return filteredManageItems.value.length
+})
+
+const manageCountLabel = computed(() => {
+  const count = manageResultCount.value
+  if (manageView.value === 'albums') {
+    return count === 1
+      ? t('manage.albumCount', { count })
+      : t('manage.albumCountPlural', { count })
+  }
+  if (manageView.value === 'artists') {
+    return count === 1
+      ? t('manage.artistCount', { count })
+      : t('manage.artistCountPlural', { count })
+  }
+  return count === 1
+    ? t('manage.count', { count })
+    : t('manage.countPlural', { count })
+})
+
 function coverSrc(url) {
   return API.mediaUrl(url)
+}
+
+function coverSourcesFor(file) {
+  return API.coverSourcesForFile(file)
+}
+
+function decorateLibraryItems(items) {
+  const unknownArtist = t('common.unknownArtist')
+  return (items || [])
+    .map((raw) => {
+      const normalized = normalizeLibraryItem(raw, { unknownArtist })
+      return {
+        ...normalized,
+        artistsLabel:
+          libraryArtistsLabel(normalized, { unknownArtist }) || unknownArtist,
+      }
+    })
+    .sort(
+      (a, b) =>
+        a.artistsLabel.localeCompare(b.artistsLabel) ||
+        a.album.localeCompare(b.album) ||
+        a.title.localeCompare(b.title)
+    )
+}
+
+async function refreshManage({ background = false } = {}) {
+  const seq = ++manageFetchSeq
+  if (!background) manageLoading.value = true
+  manageError.value = ''
+  try {
+    const res = await API.getLibraryFiles()
+    if (seq !== manageFetchSeq) return
+    manageItems.value = decorateLibraryItems(res.data || [])
+  } catch {
+    if (seq !== manageFetchSeq) return
+    manageError.value = t('manage.failedLoad')
+  } finally {
+    if (seq === manageFetchSeq && !background) {
+      manageLoading.value = false
+    }
+  }
+}
+
+function loadManageFromCache() {
+  const cached = getCachedLibraryItems()
+  if (cached?.length) {
+    manageItems.value = decorateLibraryItems(cached)
+  }
+}
+
+async function onManageDelete(item) {
+  if (!confirm(t('manage.deletePrompt', { title: item.title }))) return
+  manageDeleting.value = { ...manageDeleting.value, [item.file]: true }
+  try {
+    await API.deleteDownload(item.file)
+    manageItems.value = manageItems.value.filter((m) => m.file !== item.file)
+  } catch {
+    manageError.value = t('manage.failedDelete')
+  } finally {
+    manageDeleting.value = { ...manageDeleting.value, [item.file]: false }
+  }
+}
+
+async function deleteManageFiles(key, files) {
+  const targets = (files || []).filter(Boolean)
+  if (targets.length === 0) return
+  manageDeleting.value = { ...manageDeleting.value, [key]: true }
+  const removed = new Set()
+  try {
+    for (const file of targets) {
+      await API.deleteDownload(file)
+      removed.add(file)
+    }
+  } catch {
+    manageError.value = t('manage.failedDelete')
+  } finally {
+    if (removed.size > 0) {
+      manageItems.value = manageItems.value.filter(
+        (m) => !removed.has(m.file)
+      )
+    }
+    manageDeleting.value = { ...manageDeleting.value, [key]: false }
+  }
+}
+
+function onManageDeleteAlbum(album) {
+  if (
+    !confirm(
+      t('manage.deleteAlbumPrompt', {
+        name: album.name,
+        count: album.files.length,
+      })
+    )
+  ) {
+    return
+  }
+  return deleteManageFiles(`album:${album.key}`, album.files)
+}
+
+function onManageDeleteArtist(artist) {
+  if (
+    !confirm(
+      t('manage.deleteArtistPrompt', {
+        name: artist.name,
+        count: artist.files.length,
+      })
+    )
+  ) {
+    return
+  }
+  return deleteManageFiles(`artist:${artist.name}`, artist.files)
 }
 
 async function onClearAll() {
@@ -478,6 +990,10 @@ function openHistoryInPlayer(item) {
 
 watch(activeTab, (tab) => {
   if (tab === 'history') void refreshHistory()
+  if (tab === 'manage') {
+    loadManageFromCache()
+    void refreshManage({ background: manageItems.value.length > 0 })
+  }
 })
 
 watch(
@@ -487,10 +1003,34 @@ watch(
   }
 )
 
-onMounted(refreshHistory)
+function registerManageLibraryListener() {
+  if (stopManageLibraryListener) return
+  stopManageLibraryListener = onLibraryChanged(() => {
+    if (activeTab.value === 'manage') {
+      void refreshManage({ background: true })
+    }
+  })
+}
+
+onMounted(() => {
+  void refreshHistory()
+  loadManageFromCache()
+  registerManageLibraryListener()
+})
 
 onActivated(() => {
   void refreshHistory()
+  registerManageLibraryListener()
+  if (activeTab.value === 'manage') {
+    void refreshManage({ background: manageItems.value.length > 0 })
+  }
+})
+
+onDeactivated(() => {
+  if (stopManageLibraryListener) {
+    stopManageLibraryListener()
+    stopManageLibraryListener = null
+  }
 })
 </script>
 
@@ -555,6 +1095,38 @@ onActivated(() => {
 
 .queue-empty {
   @apply flex flex-col items-center px-4 py-12 text-center sm:py-16;
+}
+
+.manage-controls {
+  @apply mb-3 flex items-center gap-3;
+}
+
+.manage-search {
+  @apply flex min-w-0 flex-1 items-center gap-2 rounded-full border border-white/10 bg-base-100/75 px-3 py-2;
+}
+
+.manage-search-input {
+  @apply min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-base-content/40;
+}
+
+.manage-count {
+  @apply shrink-0 text-xs text-base-content/50;
+}
+
+.manage-view-tabs {
+  @apply mb-3 inline-flex gap-1 rounded-full border border-white/10 bg-base-100/75 p-1;
+}
+
+.manage-view-btn {
+  @apply rounded-full px-3 py-1.5 text-xs font-medium transition-colors sm:px-4 sm:text-sm;
+}
+
+.manage-view-btn-active {
+  @apply bg-primary text-primary-content shadow-glow-sm;
+}
+
+.manage-view-btn-inactive {
+  @apply text-base-content/65 hover:bg-white/5 hover:text-base-content;
 }
 
 .queue-list {

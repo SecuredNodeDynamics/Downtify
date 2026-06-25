@@ -1,5 +1,7 @@
 import { ref, computed } from 'vue'
 
+import { isCapacitorNative } from './serverConnection'
+
 const DESTINATION_KEY = 'downtify-download-destination'
 const FOLDER_NAME_KEY = 'downtify-local-folder-name'
 const LOCAL_MODE_KEY = 'downtify-local-save-mode'
@@ -24,8 +26,11 @@ function readFolderName() {
 
 function readLocalSaveMode() {
   const value = localStorage.getItem(LOCAL_MODE_KEY)
-  return value === 'browser-downloads' ? value : 'folder'
+  if (value === 'browser-downloads' || value === 'native') return value
+  return isCapacitorNative() ? 'native' : 'folder'
 }
+
+const NATIVE_SUBDIR = 'Downtify'
 
 function getLocalFolderSupport() {
   if (typeof window === 'undefined') {
@@ -45,6 +50,9 @@ function supportsBrowserDownloads() {
 }
 
 function getLocalSaveSupport() {
+  if (isCapacitorNative()) {
+    return { supported: true, mode: 'native', reason: null }
+  }
   const folderSupport = getLocalFolderSupport()
   if (folderSupport.supported) {
     return { supported: true, mode: 'folder', reason: null }
@@ -149,7 +157,11 @@ function setDestination(value) {
 }
 
 function setLocalMode(mode) {
-  localSaveMode.value = mode === 'browser-downloads' ? mode : 'folder'
+  if (mode === 'browser-downloads' || mode === 'native') {
+    localSaveMode.value = mode
+  } else {
+    localSaveMode.value = 'folder'
+  }
   try {
     localStorage.setItem(LOCAL_MODE_KEY, localSaveMode.value)
   } catch {
@@ -183,6 +195,16 @@ async function activateLocalDestination() {
   }
   if (support.mode === 'folder') {
     await pickLocalFolder()
+  } else if (support.mode === 'native') {
+    dirHandle = null
+    localFolderName.value = `${NATIVE_SUBDIR} (Documents)`
+    localFolderReady.value = true
+    setLocalMode('native')
+    try {
+      localStorage.setItem(FOLDER_NAME_KEY, localFolderName.value)
+    } catch {
+      // ignore
+    }
   } else {
     dirHandle = null
     localFolderName.value = 'Selected browser download location'
@@ -255,6 +277,51 @@ async function writeBlobToFolder(relativePath, blob) {
   return true
 }
 
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      const result = String(reader.result || '')
+      const comma = result.indexOf(',')
+      resolve(comma >= 0 ? result.slice(comma + 1) : result)
+    }
+    reader.onerror = () => reject(reader.error)
+    reader.readAsDataURL(blob)
+  })
+}
+
+async function writeBlobToDevice(relativePath, blob) {
+  const segments = String(relativePath || '')
+    .split('/')
+    .filter(Boolean)
+  if (!segments.length) throw new Error('no-filename')
+
+  const { Filesystem, Directory } = await import('@capacitor/filesystem')
+  const data = await blobToBase64(blob)
+  const path = `${NATIVE_SUBDIR}/${segments.join('/')}`
+  const dirPath = path.slice(0, path.lastIndexOf('/'))
+
+  if (dirPath) {
+    try {
+      await Filesystem.mkdir({
+        path: dirPath,
+        directory: Directory.Documents,
+        recursive: true,
+      })
+    } catch {
+      // Directory already exists; ignore.
+    }
+  }
+
+  await Filesystem.writeFile({
+    path,
+    data,
+    directory: Directory.Documents,
+    recursive: true,
+  })
+  return true
+}
+
 async function saveToLocalMachine(downloadUrl, filename) {
   if (destination.value !== 'local' || !downloadUrl) return
 
@@ -268,6 +335,11 @@ async function saveToLocalMachine(downloadUrl, filename) {
     throw new Error('no-filename')
   }
 
+  if (localSaveMode.value === 'native' && isCapacitorNative()) {
+    await writeBlobToDevice(filename, blob)
+    return
+  }
+
   if (localSaveMode.value === 'folder' && supportsLocalFolder()) {
     await writeBlobToFolder(filename, blob)
     return
@@ -278,6 +350,15 @@ async function saveToLocalMachine(downloadUrl, filename) {
 
 async function bootstrapLocalDestination() {
   if (destination.value !== 'local') return
+
+  if (isCapacitorNative()) {
+    localFolderReady.value = true
+    setLocalMode('native')
+    if (!localFolderName.value) {
+      localFolderName.value = `${NATIVE_SUBDIR} (Documents)`
+    }
+    return
+  }
 
   if (localSaveMode.value === 'browser-downloads') {
     if (!supportsBrowserDownloads()) {
@@ -322,6 +403,7 @@ export function useDownloadDestination() {
     usesBrowserDownloads: computed(
       () => localSaveMode.value === 'browser-downloads'
     ),
+    usesNativeDownloads: computed(() => localSaveMode.value === 'native'),
     isLocal: computed(() => destination.value === 'local'),
     hasLocalFolder: computed(
       () => destination.value === 'local' && Boolean(localFolderName.value)

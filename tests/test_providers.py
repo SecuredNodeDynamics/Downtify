@@ -296,3 +296,55 @@ def test_search_media_attaches_album_track_counts(monkeypatch):
 
     assert len(albums) == 1
     assert albums[0]['track_count'] == 15
+
+
+def test_search_media_from_spotify_track_url(monkeypatch):
+    track_url = 'https://open.spotify.com/track/6vIpkg9mdc5kDYvwuO6Qtc'
+
+    monkeypatch.setattr(
+        providers.spotify,
+        'parse_spotify_url',
+        lambda url: ('track', '6vIpkg9mdc5kDYvwuO6Qtc')
+        if url == track_url
+        else None,
+    )
+    monkeypatch.setattr(
+        providers.spotify,
+        'track_from_id',
+        lambda _track_id: {
+            'name': 'Kaisey Jiyun',
+            'artist': 'The Local Train',
+            'artists': ['The Local Train'],
+        },
+    )
+
+    class FakeYTMusic:
+        def search(self, query, filter=None, limit=20):
+            assert query == 'The Local Train Kaisey Jiyun'
+            if filter == 'albums':
+                return []
+            if filter == 'songs':
+                return [
+                    {
+                        'videoId': 'abc12345678',
+                        'title': 'Kaisey Jiyun',
+                        'artists': [{'name': 'The Local Train'}],
+                        'album': {'name': 'Aalas Ka Pedh', 'id': 'MPREb_album'},
+                        'thumbnails': [{'url': 'https://img=w60-h60'}],
+                    },
+                ]
+            return []
+
+    monkeypatch.setattr(providers, '_ytm', lambda: FakeYTMusic())
+    monkeypatch.setattr(
+        providers,
+        'album_track_counts',
+        lambda ids: {'MPREb_album': 9} if ids else {},
+    )
+
+    results = providers.search_media(track_url, limit=5)
+
+    tracks = [r for r in results if r.get('media_type') == 'track']
+    assert len(tracks) == 1
+    assert tracks[0]['name'] == 'Kaisey Jiyun'
+    assert tracks[0]['artists'] == ['The Local Train']

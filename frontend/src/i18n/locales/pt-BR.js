@@ -45,6 +45,9 @@ export default {
   search: {
     placeholder:
       'Busque uma música ou cole um link do Spotify ou YouTube Music…',
+    placeholderArtist: 'Busque pelo nome do artista',
+    placeholderAlbum: 'Busque pelo nome do álbum',
+    placeholderTrack: 'Busque pelo nome da faixa',
     libraryPlaceholder: 'Busque sua música baixada…',
     libraryHint: 'Filtra a fila do player para a música já neste servidor.',
     title: 'Resultados da busca',
@@ -119,6 +122,38 @@ export default {
     openInPlayer: 'Abrir no player',
     failedLoad: 'Falha ao carregar o histórico de downloads.',
     failedRetry: 'Falha ao tentar este download novamente.',
+  },
+  manage: {
+    tab: 'Gerenciar',
+    title: 'Gerenciar biblioteca',
+    subtitle: 'Veja sua mídia baixada e remova o que não quiser mais.',
+    empty: 'Nenhuma mídia baixada ainda.',
+    emptyHint: 'As faixas baixadas aparecerão aqui quando você adicionar algumas.',
+    search: 'Filtre seus downloads…',
+    noMatches: 'Nenhuma mídia corresponde ao seu filtro.',
+    artists: 'Artistas',
+    albums: 'Álbuns',
+    tracks: 'Faixas',
+    delete: 'Excluir dos downloads',
+    deletePrompt: 'Excluir "{title}" dos seus downloads? Isso não pode ser desfeito.',
+    deleteAlbum: 'Excluir álbum dos downloads',
+    deleteAlbumPrompt:
+      'Excluir o álbum "{name}" ({count} arquivos) dos seus downloads? Isso não pode ser desfeito.',
+    deleteArtist: 'Excluir toda a mídia dos downloads',
+    deleteArtistPrompt:
+      'Excluir os {count} arquivos de "{name}" dos seus downloads? Isso não pode ser desfeito.',
+    deleting: 'Excluindo…',
+    failedLoad: 'Falha ao carregar sua mídia baixada.',
+    failedDelete: 'Falha ao excluir esta mídia.',
+    albumMeta: '{count} faixas',
+    artistMeta: '{tracks} faixas - {albums} álbuns',
+    count: '{count} arquivo',
+    countPlural: '{count} arquivos',
+    artistCount: '{count} artista',
+    artistCountPlural: '{count} artistas',
+    albumCount: '{count} álbum',
+    albumCountPlural: '{count} álbuns',
+    refresh: 'Atualizar',
   },
   health: {
     title: 'Saúde',
@@ -587,6 +622,10 @@ export default {
       'Quando um download terminar, o Downtify salvará uma cópia na pasta que você escolher neste dispositivo.',
     downloadDestinationBrowserHint:
       'Quando um download terminar, o Downtify salvara uma copia no local de download selecionado no navegador.',
+    downloadDestinationDeviceHint:
+      'Quando um download terminar, o Downtify salvara uma copia neste dispositivo em Documentos/Downtify.',
+    deviceDownloadsHint:
+      'Os arquivos sao salvos no armazenamento do seu dispositivo em Documentos/Downtify.',
     localFolderLabel: 'Salvar downloads em',
     localFolderNameHint:
       'O navegador mostra apenas o nome da pasta, não o caminho completo no seu computador.',

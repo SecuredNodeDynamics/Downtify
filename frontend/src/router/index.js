@@ -18,7 +18,13 @@ const routes = [
     meta: { mobileTitleKey: 'nav.home' },
   },
   {
-    path: '/search/:query',
+    path: '/search/:query(.*)',
+    name: 'SearchLegacy',
+    component: Search,
+    meta: { mobileTitleKey: 'nav.search' },
+  },
+  {
+    path: '/search',
     name: 'Search',
     component: Search,
     meta: { mobileTitleKey: 'nav.search' },

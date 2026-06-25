@@ -44,6 +44,9 @@ export default {
   },
   search: {
     placeholder: 'Busca o pega un enlace de Spotify o YouTube Music…',
+    placeholderArtist: 'Busca por nombre de artista',
+    placeholderAlbum: 'Busca por nombre de álbum',
+    placeholderTrack: 'Busca por nombre de canción',
     libraryPlaceholder: 'Busca tu música descargada…',
     libraryHint:
       'Filtra la cola del reproductor a la música ya en este servidor.',
@@ -120,6 +123,38 @@ export default {
     openInPlayer: 'Abrir en el reproductor',
     failedLoad: 'No se pudo cargar el historial de descargas.',
     failedRetry: 'No se pudo reintentar esta descarga.',
+  },
+  manage: {
+    tab: 'Administrar',
+    title: 'Administrar biblioteca',
+    subtitle: 'Explora tu contenido descargado y elimina lo que ya no quieras.',
+    empty: 'Aún no hay contenido descargado.',
+    emptyHint: 'Las canciones descargadas aparecerán aquí cuando agregues algunas.',
+    search: 'Filtra tus descargas…',
+    noMatches: 'Ningún contenido coincide con tu filtro.',
+    artists: 'Artistas',
+    albums: 'Álbumes',
+    tracks: 'Canciones',
+    delete: 'Eliminar de las descargas',
+    deletePrompt: '¿Eliminar "{title}" de tus descargas? Esto no se puede deshacer.',
+    deleteAlbum: 'Eliminar álbum de las descargas',
+    deleteAlbumPrompt:
+      '¿Eliminar el álbum "{name}" ({count} archivos) de tus descargas? Esto no se puede deshacer.',
+    deleteArtist: 'Eliminar todo el contenido de las descargas',
+    deleteArtistPrompt:
+      '¿Eliminar los {count} archivos de "{name}" de tus descargas? Esto no se puede deshacer.',
+    deleting: 'Eliminando…',
+    failedLoad: 'No se pudo cargar tu contenido descargado.',
+    failedDelete: 'No se pudo eliminar este contenido.',
+    albumMeta: '{count} canciones',
+    artistMeta: '{tracks} canciones - {albums} álbumes',
+    count: '{count} archivo',
+    countPlural: '{count} archivos',
+    artistCount: '{count} artista',
+    artistCountPlural: '{count} artistas',
+    albumCount: '{count} álbum',
+    albumCountPlural: '{count} álbumes',
+    refresh: 'Actualizar',
   },
   health: {
     title: 'Salud',
@@ -589,6 +624,10 @@ export default {
       'Cuando termine una descarga, Downtify guardará una copia en la carpeta que elijas en este dispositivo.',
     downloadDestinationBrowserHint:
       'Cuando termine una descarga, Downtify guardara una copia en la ubicacion de descarga seleccionada en tu navegador.',
+    downloadDestinationDeviceHint:
+      'Cuando termine una descarga, Downtify guardara una copia en este dispositivo en Documentos/Downtify.',
+    deviceDownloadsHint:
+      'Los archivos se guardan en el almacenamiento de tu dispositivo en Documentos/Downtify.',
     localFolderLabel: 'Guardar descargas en',
     localFolderNameHint:
       'El navegador solo muestra el nombre de la carpeta, no la ruta completa en tu equipo.',

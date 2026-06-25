@@ -75,10 +75,7 @@
             :class="{ 'icon-btn-active': route.name === 'Download' }"
             @click="
               route.name === 'Download'
-                ? router.push({
-                    name: 'Search',
-                    params: { query: sm.searchTerm.value || ' ' },
-                  })
+                ? router.push(buildSearchRoute(sm.searchTerm.value || ''))
                 : router.push({ name: 'Download' })
             "
             :title="t('nav.queue')"
@@ -163,6 +160,7 @@ import { useRoute } from 'vue-router'
 import router from '../router'
 import { useBinaryThemeManager } from '../model/theme'
 import { useSearchManager } from '../model/search'
+import { buildSearchRoute } from '../model/searchNavigation'
 import { useHealthRefresh } from '../model/healthRefresh'
 import { useLibraryRefresh } from '../model/libraryRefresh'
 import { useI18n } from '../i18n'
