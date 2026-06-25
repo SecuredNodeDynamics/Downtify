@@ -9,7 +9,7 @@
 </h1>
 
 <p align="center">
-  <strong>Self-hosted music downloader. Paste a Spotify link, get a perfectly tagged audio file — no API keys, no account, no hassle.</strong>
+  <strong>Self-hosted music downloader with a web UI and Android app. Paste a Spotify link, get a perfectly tagged audio file — no API keys, no account, no hassle.</strong>
 </p>
 
 <div align="center">
@@ -22,15 +22,63 @@
 
 </div>
 
-https://github.com/user-attachments/assets/9711efe8-a960-4e1a-8d55-e0d1c20208f7
+<table align="center">
+  <tr>
+    <td align="center" width="50%">
+      <img src="docs/screenshots/desktop-web.png" alt="Downtify in a desktop web browser" width="100%"><br>
+      <sub><b>Desktop / browser</b></sub>
+    </td>
+    <td align="center" width="50%">
+      <img src="docs/screenshots/android-app.png" alt="Downtify Android app" width="55%"><br>
+      <sub><b>Android app</b></sub>
+    </td>
+  </tr>
+</table>
+
+---
+
+## 💻 Desktop and 📱 Android — how it fits together
+
+Downtify is built around a **single server** that does all the heavy work — resolving Spotify metadata, finding audio on YouTube Music, downloading with `yt-dlp`, converting with `ffmpeg`, and tagging with `mutagen`. Everything lands in your downloads folder on the machine running the server.
+
+You interact with that server in two ways:
+
+| | **Desktop / browser** | **Android app** |
+|---|---|---|
+| **What it is** | The full web UI served by your Downtify instance | A native Android client (Capacitor) for the same UI |
+| **Where downloads happen** | On the server | On the server — not on the phone |
+| **How you connect** | Open `http://your-server:8000` in any browser | Install the APK, then point the app at your server in **Settings → API** |
+| **Best for** | Home-server setup, queue management, metadata tools, Jellyfin integration | Listening on the go, searching, queuing downloads from your phone |
+
+### On your computer
+
+1. Run Downtify with Docker (or `uv run python main.py` for local development).
+2. Open the URL in Chrome, Firefox, Safari, or Edge.
+3. Paste a Spotify link or search YouTube Music, then download.
+4. Browse your library, use the built-in player, watch playlists, and tweak settings — all in the browser.
+
+The browser talks directly to the server it was loaded from. No extra configuration is needed when you use Downtify on the same machine or LAN.
+
+### On Android
+
+1. **Install the server** somewhere reachable from your phone — a home NAS, Raspberry Pi, VPS, or any box running the Docker image.
+2. **Install the Android app** from the [latest GitHub release](https://github.com/SecuredNodeDynamics/Downtify/releases) (`downtify-x.y.z.apk`).
+3. On first launch, open **Settings → API** and enter your server address:
+   - Home network: `192.168.1.50:8000`
+   - Public access: `https://downtify.example.com` (reverse proxy, Cloudflare Tunnel, Tailscale, etc.)
+4. Tap **Test connection**, then **Save address**. The app reloads and shows your live queue, library, and downloads.
+
+The Android app is a **remote control and player** for your server. Your music library stays on the server; the phone streams and manages it over HTTP/WebSocket. Queue, history, playlist monitor, search, and the built-in player all work the same as in the browser.
+
+> **Tip:** Use a VPN or HTTPS tunnel if you connect over the internet. The app supports `http://` on your LAN and `https://` for public URLs.
 
 ---
 
 ## ✨ What is Downtify?
 
-Downtify is a **self-hosted web app** that downloads music from Spotify — without touching the Spotify API, without needing an account, and without any Premium subscription. Just drop a link and get a fully-tagged audio file.
+Downtify is a **self-hosted music downloader** with a modern web interface and an optional **Android companion app**. It downloads music from Spotify — without touching the Spotify API, without needing an account, and without any Premium subscription. Just drop a link and get a fully-tagged audio file.
 
-It resolves track metadata directly from Spotify's public embed pages, finds the best audio match on YouTube Music, downloads it with `yt-dlp`, converts it with `ffmpeg`, and embeds album art + all metadata with `mutagen`. The entire pipeline runs inside a single Docker container.
+It resolves track metadata directly from Spotify's public embed pages, finds the best audio match on YouTube Music, downloads it with `yt-dlp`, converts it with `ffmpeg`, and embeds album art + all metadata with `mutagen`. The entire pipeline runs inside a single Docker container on your server.
 
 ---
 
@@ -42,17 +90,20 @@ It resolves track metadata directly from Spotify's public embed pages, finds the
 | 👁️ **Playlist Monitor** | Watch playlists and **auto-download new songs** as they are added to Spotify |
 | 🎨 **Rich metadata** | Album art, title, artist, album, year — all embedded in every file |
 | 🎚️ **Multiple formats** | MP3 · FLAC · M4A · OGG · OPUS |
-| 🔎 **Free-text search** | Search YouTube Music directly — no Spotify link needed |
+| 🔎 **Free-text search** | Search YouTube Music directly — filter results by albums or tracks |
 | 🔑 **Zero credentials** | No Spotify API key, no account, no Premium required |
 | 🔔 **Real-time progress** | Live download progress via WebSocket — no page reload needed |
 | 🐳 **One Docker command** | Up and running in under a minute |
+| 📱 **Android app** | Native client for your server — download APK from [Releases](https://github.com/SecuredNodeDynamics/Downtify/releases) |
 | 🏠 **Home server platforms** | Available on Umbrel, CasaOS and HomeDock |
-| 🎧 **Built-in player** | Play your downloaded music straight from the web UI — progress bar, shuffle, repeat, volume |
+| 🎧 **Built-in player** | Play your downloaded music from the browser or Android app — progress bar, shuffle, repeat, volume |
 | 🌍 **Multi-language UI** | English (default), Spanish and Brazilian Portuguese — easy to add more |
 
 ---
 
 ## 🚀 Quick Start
+
+### Server (required for both browser and Android)
 
 ```bash
 docker run -d -p 8000:8000 --name downtify \
@@ -64,6 +115,15 @@ docker run -d -p 8000:8000 --name downtify \
 Open [http://localhost:8000](http://localhost:8000), paste a Spotify link, and hit download.
 
 > Change `/path/to/downloads` to wherever you want your music saved.
+
+### Android app
+
+1. Download `downtify-x.y.z.apk` from the [Releases](https://github.com/SecuredNodeDynamics/Downtify/releases) page.
+2. Install it on your phone (enable “Install unknown apps” for your browser or file manager if prompted).
+3. Open **Settings → API**, enter your Downtify server URL, test the connection, and save.
+4. Search, queue downloads, browse your library, and listen — the same UI as the browser, tuned for mobile.
+
+The app can check GitHub for newer APK versions under **Settings → Help** and install updates in place.
 
 ### Docker Compose
 
@@ -117,6 +177,8 @@ Spotify embed page  →  YouTube Music search  →  yt-dlp + ffmpeg + mutagen
 2. **Audio match** — [`ytmusicapi`](https://ytmusicapi.readthedocs.io/) searches YouTube Music for the track and picks the best result by comparing audio duration. Free-text searches skip the Spotify step entirely.
 3. **Download & tag** — [`yt-dlp`](https://github.com/yt-dlp/yt-dlp) downloads the audio and `ffmpeg` converts it to your chosen format. [`mutagen`](https://mutagen.readthedocs.io/) embeds title, artist, album, year and cover art into the file.
 
+Whether you use the **browser** or the **Android app**, you are talking to this same pipeline on your server. The clients only send requests and display progress; they never download from Spotify or YouTube directly.
+
 ---
 
 ## 👁️ Playlist Monitor
@@ -125,7 +187,7 @@ The **Playlist Monitor** lets Downtify watch your favorite Spotify playlists and
 
 **How to use it:**
 
-1. Click the eye icon (👁) in the navigation bar
+1. Click the eye icon (👁) in the navigation bar (or open **More → Monitor** on Android)
 2. Paste a Spotify playlist URL
 3. Choose how often Downtify should check for new tracks (every 15 min up to once a day)
 4. Click **Watch**
@@ -203,7 +265,7 @@ Track paths inside the M3U are written **relative to the M3U file itself**, so t
 
 ## 🎧 Built-in Player
 
-Downtify ships with a clean web player so you don't need a separate app to listen to what you've downloaded. Open the headphones icon (🎧) in the navigation bar — or hit the play button next to any file in the **Library** — and Downtify will load every audio file from your downloads folder into a queue.
+Downtify ships with a clean player in both the **browser** and the **Android app** so you don't need a separate app to listen to what you've downloaded. Open the headphones icon (🎧) in the navigation bar — or hit the play button next to any file in the **Library** — and Downtify will load every audio file from your downloads folder into a queue.
 
 **What's included:**
 
@@ -214,7 +276,7 @@ Downtify ships with a clean web player so you don't need a separate app to liste
 - Volume slider with mute toggle (volume is remembered between sessions)
 - Side queue listing every track in your library, each one with its own thumbnail and the currently playing one highlighted
 
-The player parses `Artist - Title.ext` filenames so the now-playing card shows artist and title nicely, and pulls the cover art directly from the audio file's embedded tags (the same artwork Downtify wrote at download time). Playback uses your browser's native HTML5 audio element — no extra dependencies, no extra processes.
+The player parses `Artist - Title.ext` filenames so the now-playing card shows artist and title nicely, and pulls the cover art directly from the audio file's embedded tags (the same artwork Downtify wrote at download time). Playback uses your browser's or device's native audio element — no extra dependencies, no extra processes.
 
 ---
 
