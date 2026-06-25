@@ -103,6 +103,7 @@ jobs:
         run: |
           set -euo pipefail
           git tag -a "${{ steps.release.outputs.tag }}" -m "Release ${{ steps.release.outputs.tag }}"
+          git pull --rebase origin "${GITHUB_REF_NAME}"
           git push origin "HEAD:${GITHUB_REF_NAME}"
           git push origin "${{ steps.release.outputs.tag }}"
 

@@ -26,13 +26,24 @@ require_release_signing() {
 verify_apk_signature() {
   local apk="$1"
   local build_tools
+  local verify_out
   build_tools="$(ls -d "$ANDROID_HOME/build-tools"/* 2>/dev/null | sort -V | tail -1)"
   if [[ -z "$build_tools" || ! -x "$build_tools/apksigner" ]]; then
     echo "apksigner not found under ANDROID_HOME/build-tools" >&2
     exit 1
   fi
 
-  "$build_tools/apksigner" verify --verbose "$apk" >/dev/null
+  verify_out="$("$build_tools/apksigner" verify --verbose "$apk" 2>&1)"
+  echo "$verify_out" | grep -E '^(Verifies|Verified using)' || true
+
+  if ! echo "$verify_out" | grep -q 'Verified using v2 scheme (APK Signature Scheme v2): true'; then
+    echo "APK is not signed with v2 scheme: $apk" >&2
+    exit 1
+  fi
+  if ! echo "$verify_out" | grep -q 'Verified using v3 scheme (APK Signature Scheme v3): true'; then
+    echo "APK is not signed with v3 scheme (rebuild after enabling v3SigningEnabled): $apk" >&2
+    exit 1
+  fi
 
   if "$build_tools/apksigner" verify --print-certs "$apk" 2>/dev/null | grep -qi 'Android Debug'; then
     echo "Refusing to ship a debug-signed APK: $apk" >&2

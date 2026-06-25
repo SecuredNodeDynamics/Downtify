@@ -33,7 +33,7 @@ Official references:
 
 ## Already configured in this repository
 
-You do **not** need code changes for verification. The repo is set up for it:
+You do **not** need app code changes for verification, but release builds should use **v1 + v2 + v3** (and v4 when supported) signing schemes — see `frontend/android/app/build.gradle`. The repo is set up for it:
 
 | Item | Status |
 |------|--------|
@@ -42,7 +42,7 @@ You do **not** need code changes for verification. The repo is set up for it:
 | Stable release keystore | `scripts/setup-android-release-keystore.sh` → `frontend/android/keystore/downtify-release.keystore` |
 | APK naming | `downtify-{version}.apk` on GitHub Releases |
 | CI signing | `.github/workflows/android-apk.yml` + GitHub Actions secrets |
-| Signature schemes | v1 + v2 signing enabled in `frontend/android/app/build.gradle` |
+| Signature schemes | v1 + v2 + v3 + v4 signing enabled in `frontend/android/app/build.gradle` |
 
 **You must do manually** (cannot be automated in git):
 
@@ -89,7 +89,18 @@ The `android-apk.yml` workflow and `scripts/publish.sh` both require release sig
 
 ### 3. Collect signing info for Google registration
 
-Google needs the **SHA-256 certificate fingerprint** of your **release** signing key (not the debug key).
+Run the helper script (reads your local release keystore; never prints passwords):
+
+```bash
+chmod +x scripts/android-verification-info.sh
+./scripts/android-verification-info.sh frontend/dist/downtify-*.apk
+```
+
+It prints the package name, key alias, certificate DN, SHA-256 in **colon format** (for the Google console) and hex format, APK signature scheme status (v1–v4), registration links, and a checklist.
+
+Google needs the **SHA-256 certificate fingerprint** of your **release** signing key (not the debug key). Use the **colon format** line (`AA:BB:CC:...`) when pasting into Android Developer Console.
+
+Manual alternatives:
 
 **From the keystore** (replace alias/password as needed):
 
@@ -100,8 +111,6 @@ keytool -list -v \
   -storepass 'YOUR_KEYSTORE_PASSWORD' \
   | grep -A1 'SHA256:'
 ```
-
-Copy the fingerprint in the form `AA:BB:CC:...` (colons included).
 
 **From a built APK** (after `bash scripts/build-android-apk.sh`):
 
@@ -201,7 +210,7 @@ After that, in-app updates keep the same certificate and install in place.
 bash scripts/build-android-apk.sh
 ```
 
-The script runs `apksigner verify` and rejects debug certificates.
+The script runs `apksigner verify` and rejects debug certificates. Release builds must verify **v2 and v3** signature schemes (rebuild after enabling v3 in `build.gradle`).
 
 To inspect the certificate:
 
