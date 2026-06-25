@@ -1,6 +1,6 @@
 <template>
   <div class="mx-auto max-w-4xl px-4 py-4 sm:py-8 sm:px-6 overflow-x-hidden">
-    <!-- Header -->
+    <!-- Header (desktop title; hidden on mobile — MobileAppBar shows page title) -->
     <div class="mb-6 sm:mb-8 mobile-page-header">
       <h1 class="text-2xl font-bold tracking-tight">{{ t('search.title') }}</h1>
       <p class="mt-1 text-sm text-base-content/60">
@@ -21,9 +21,20 @@
         </template>
         <template v-else>{{ t('search.typeToBegin') }}</template>
       </p>
-      <div v-if="sm.searchTerm.value" class="mt-4 max-w-md">
-        <SearchResultFilter />
-      </div>
+    </div>
+
+    <!-- Result type filter (visible on mobile + desktop) -->
+    <div
+      v-if="sm.searchTerm.value"
+      class="search-results-chrome mb-4 sm:mb-6"
+    >
+      <p class="search-results-query mb-2 text-sm text-base-content/60 lg:hidden">
+        {{ t('search.matchesFor') }}
+        <span class="text-base-content/90 font-medium">
+          "{{ sm.searchTerm.value }}"
+        </span>
+      </p>
+      <SearchResultFilter />
     </div>
 
     <!-- Error -->
@@ -1082,6 +1093,29 @@ function formatDuration(seconds) {
 </script>
 
 <style scoped>
+.search-results-chrome {
+  max-width: 32rem;
+}
+
+@media (max-width: 1023px) {
+  .search-results-chrome {
+    position: sticky;
+    z-index: 20;
+    top: 0;
+    max-width: none;
+    margin-left: -1rem;
+    margin-right: -1rem;
+    padding: 0.75rem 1rem 0.875rem;
+    background: color-mix(in srgb, var(--b1) 92%, transparent);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgb(255 255 255 / 0.08);
+  }
+
+  .search-results-query {
+    @apply truncate;
+  }
+}
+
 .demo-modal-enter-active,
 .demo-modal-leave-active {
   transition: opacity 0.2s ease;

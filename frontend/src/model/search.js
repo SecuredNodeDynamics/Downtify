@@ -1,4 +1,4 @@
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 
 import API from '/src/model/api'
 
@@ -52,6 +52,8 @@ function filterResults(items) {
   }
   return list
 }
+
+const filteredResults = computed(() => filterResults(results.value))
 
 function useSearchManager() {
   hydrateResultFilter()
@@ -116,6 +118,7 @@ function useSearchManager() {
     resultFilter,
     setResultFilter,
     filterResults,
+    filteredResults,
     searchFor,
     isValid,
     isValidSearch,

@@ -25,7 +25,7 @@ const route = useRoute()
 const sm = useSearchManager()
 const dm = useDownloadManager()
 
-const filteredResults = computed(() => sm.filterResults(sm.results.value))
+const filteredResults = computed(() => sm.filteredResults.value)
 
 watch(
   () => route.params.query,

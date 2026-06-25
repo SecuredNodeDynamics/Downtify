@@ -45,4 +45,22 @@ describe('search result filter', () => {
     expect(localStorage.getItem('downtify-search-result-filter')).toBe('albums')
     expect(sm.resultFilter.value).toBe('albums')
   })
+
+  it('updates filteredResults when the filter changes', () => {
+    const sm = useSearchManager()
+    sm.setResultFilter('both')
+    const items = [
+      { song_id: '1', media_type: 'track', name: 'Song' },
+      { song_id: 'album:abc', media_type: 'album', name: 'Album' },
+    ]
+
+    sm.results.value = items
+    expect(sm.filteredResults.value).toHaveLength(2)
+
+    sm.setResultFilter('albums')
+    expect(sm.filteredResults.value).toEqual([items[1]])
+
+    sm.setResultFilter('tracks')
+    expect(sm.filteredResults.value).toEqual([items[0]])
+  })
 })
