@@ -504,9 +504,9 @@ const currentArtistAlbums = computed(() => {
 
 const currentCoverSources = computed(() => {
   const file = player.currentTrack.value?.file || ''
-  if (!file) return API.coverSourcesForFile('')
-  // Full-screen art needs a higher resolution than the small grid thumbnails.
-  return API.coverSourcesForFile(file, 640)
+  const artist =
+    currentLibraryItem.value?.artist || player.currentTrack.value?.artist || ''
+  return API.coverSourcesForNowPlaying(file, { artistName: artist })
 })
 
 const artistCoverMap = computed(() => {

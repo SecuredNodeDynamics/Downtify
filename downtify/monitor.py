@@ -307,16 +307,40 @@ async def check_monitored(
         if not t.get('song_id'):
             continue
         tid = t['song_id']
-        if tid not in known_tracks:
-            new_tracks.append(t)
-        else:
+        if tid in known_tracks:
             stored = known_tracks[tid]
-            if (
-                stored is not None
-                and not (downloader.download_dir / stored).exists()
-            ):
-                # File was deleted — re-download
-                new_tracks.append(t)
+            if stored is None:
+                # Recorded as downloaded but without a filename; leave as-is.
+                continue
+            if (downloader.download_dir / stored).exists():
+                continue
+            # Recorded file is gone — fall through to the on-disk recheck
+            # below before deciding to re-download.
+
+        # The track is either unknown to the monitor or its recorded file is
+        # missing. Before (re)downloading, check whether a matching file is
+        # already anywhere in the library — e.g. it was downloaded manually
+        # before monitoring began (possibly into a different folder), or the
+        # monitor's bookkeeping was reset. Adopting the existing file stops the
+        # monitor from re-downloading (and repeatedly failing) the same tracks
+        # on every check.
+        existing = await asyncio.to_thread(
+            downloader.duplicate_filename_for, t, pl_subdir
+        )
+        if existing:
+            try:
+                await asyncio.to_thread(
+                    db.mark_track_downloaded, item.id, tid, existing
+                )
+            except sqlite3.IntegrityError:
+                logger.warning(
+                    'Monitor item {} removed during check; stopping',
+                    item.id,
+                )
+                return 0
+            continue
+
+        new_tracks.append(t)
 
     if new_tracks:
         logger.info(

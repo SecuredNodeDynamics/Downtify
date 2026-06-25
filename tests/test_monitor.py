@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
 from downtify import api
-from downtify.monitor import PlaylistMonitorDB
+from downtify.downloader import Downloader
+from downtify.monitor import PlaylistMonitorDB, check_monitored
 
 
 def test_monitor_db_stores_kind(tmp_path: Path) -> None:
@@ -85,3 +86,58 @@ async def test_list_monitor_playlists_does_not_block_on_spotify_images(
         assert payload[0]['image_url'] == ''
     finally:
         api.state.monitor_db = old_monitor_db
+
+
+@pytest.mark.asyncio
+async def test_check_monitored_adopts_existing_file_instead_of_redownloading(
+    tmp_path: Path,
+) -> None:
+    """A monitored track already on disk must not be re-downloaded.
+
+    Reproduces the APK bug where adding an already-downloaded artist to the
+    monitor caused every track to be re-fetched (and repeatedly fail) on each
+    check because the monitor only consulted its own bookkeeping.
+    """
+
+    db = PlaylistMonitorDB(tmp_path / 'monitor.db')
+    artist = db.add_playlist(
+        'ar456',
+        'Test Artist',
+        'https://open.spotify.com/artist/ar456',
+        kind='artist',
+    )
+
+    downloader = Downloader(tmp_path / 'downloads', audio_format='m4a')
+    song = {'song_id': 'trk1', 'name': 'Song', 'artists': ['Test Artist']}
+
+    # Simulate a manual download: the file exists on disk but the monitor has
+    # never recorded it.
+    expected = downloader.existing_filename_for(song)
+    assert expected is None
+    basename = downloader._format_basename(song)
+    (downloader.download_dir / f'{basename}.m4a').write_bytes(b'audio')
+
+    loop = pytest.importorskip('asyncio').get_running_loop()
+
+    with (
+        patch(
+            'downtify.monitor._fetch_monitored_tracks',
+            new=AsyncMock(return_value=[song]),
+        ),
+        patch.object(
+            downloader,
+            'download',
+            side_effect=AssertionError('existing track must not re-download'),
+        ),
+    ):
+        downloaded = await check_monitored(
+            artist,
+            db,
+            downloader,
+            broadcast=AsyncMock(),
+            loop=loop,
+        )
+
+    assert downloaded == 0
+    known = db.get_track_filenames(artist.id)
+    assert known.get('trk1') == f'{basename}.m4a'

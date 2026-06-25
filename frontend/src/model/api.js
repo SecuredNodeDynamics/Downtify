@@ -365,6 +365,44 @@ function coverSourcesForArtist(
   return entry
 }
 
+const NOW_PLAYING_COVER_SIZE_WEB = 640
+
+function mergeCoverSources(primary, secondary) {
+  const urls = [
+    primary?.src,
+    ...(primary?.fallbacks || []),
+    secondary?.src,
+    ...(secondary?.fallbacks || []),
+  ]
+    .map((url) => String(url || '').trim())
+    .filter(Boolean)
+  const deduped = [...new Set(urls)]
+  return {
+    src: deduped[0] || '',
+    fallbacks: Object.freeze(deduped.slice(1)),
+  }
+}
+
+/**
+ * Cover URLs for the full-screen now-playing artwork. On native embedded builds
+ * stick to the same 320px thumbnail size used by library grids so the hero art
+ * reuses warmed cache entries and avoids unreliable 640px /cover responses.
+ */
+function coverSourcesForNowPlaying(fileName, { artistName = '' } = {}) {
+  const file = String(fileName || '').trim()
+  if (!file) return EMPTY_COVER_SOURCES
+
+  const size = isCapacitorNative()
+    ? DEFAULT_COVER_SIZE
+    : NOW_PLAYING_COVER_SIZE_WEB
+  const trackSources = coverSourcesForFile(file, size)
+  const artist = String(artistName || '').trim()
+  if (!artist) return trackSources
+
+  const artistSources = coverSourcesForArtist(artist, [file], size)
+  return Object.freeze(mergeCoverSources(trackSources, artistSources))
+}
+
 function clearCoverSourcesCache() {
   coverSourcesCache.clear()
 }
@@ -621,6 +659,7 @@ export default {
   coverFallbackUrls,
   coverSourcesForFile,
   coverSourcesForArtist,
+  coverSourcesForNowPlaying,
   clearCoverSourcesCache,
   warmLibraryCovers,
   refreshLibraryInBackground,

@@ -66,7 +66,9 @@ const sourceKey = computed(() =>
 )
 
 const imageLoading = computed(() =>
-  restoredFromCache.value || displaySrc.value ? 'eager' : 'lazy'
+  usesEmbeddedServer() || restoredFromCache.value || displaySrc.value
+    ? 'eager'
+    : 'lazy'
 )
 
 function resetCandidates(primary, fallbacks = []) {
