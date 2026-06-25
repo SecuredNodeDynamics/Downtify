@@ -1602,7 +1602,7 @@ def get_health() -> dict[str, Any]:
 
 
 @router.get('/api/library/files')
-def get_library_files() -> list[dict[str, str]]:
+def get_library_files() -> list[dict[str, Any]]:
     download_dir = (
         _active_download_dir()
         if state.downloader is not None
