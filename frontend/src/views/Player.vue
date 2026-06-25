@@ -253,17 +253,6 @@
             class="player-queue panel-glow-inner flex flex-col gap-3 p-3 sm:gap-3 sm:p-5"
           >
             <div class="player-browse-chrome shrink-0 space-y-2 sm:space-y-3">
-              <div v-if="browsePlayFiles.length" class="flex justify-end px-1">
-                <button
-                  type="button"
-                  class="btn btn-primary btn-xs h-8 rounded-full px-3"
-                  @click="playFiles(browsePlayFiles)"
-                >
-                  <Icon icon="clarity:play-line" class="h-3.5 w-3.5" />
-                  {{ t('player.playAll') }}
-                </button>
-              </div>
-
               <button
                 v-if="canBrowseBack"
                 type="button"
@@ -817,11 +806,6 @@ const {
 function queueOnlineDownload(song) {
   dm.queue(song)
 }
-
-const browsePlayFiles = computed(() => {
-  if (browseView.value !== 'tracks') return []
-  return visibleTrackFiles.value
-})
 
 const canBrowseBack = computed(() =>
   Boolean(
