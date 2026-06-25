@@ -4,6 +4,8 @@ import monitorAPI from './monitor.js'
 
 const monitoredArtists = ref([])
 const monitoredArtistMap = ref(new Map())
+const ALIAS_STORAGE_KEY = 'downtify.monitor.artist-aliases'
+
 let loadPromise = null
 let lastRefreshAt = 0
 
@@ -17,13 +19,47 @@ export function normalizeMonitoredArtistName(value) {
     .toLocaleLowerCase()
 }
 
+function readArtistAliases() {
+  try {
+    const raw = sessionStorage.getItem(ALIAS_STORAGE_KEY)
+    if (!raw) return {}
+    const parsed = JSON.parse(raw)
+    return parsed && typeof parsed === 'object' ? parsed : {}
+  } catch {
+    return {}
+  }
+}
+
+function writeArtistAlias(libraryArtistName, monitoredArtistName) {
+  const libraryKey = normalizeMonitoredArtistName(libraryArtistName)
+  const monitoredKey = normalizeMonitoredArtistName(monitoredArtistName)
+  if (!libraryKey || !monitoredKey) return
+
+  const aliases = readArtistAliases()
+  aliases[libraryKey] = monitoredKey
+  try {
+    sessionStorage.setItem(ALIAS_STORAGE_KEY, JSON.stringify(aliases))
+  } catch {
+    // Ignore quota or privacy errors.
+  }
+}
+
 function rebuildMonitoredArtistMap(items) {
   const map = new Map()
+  const aliases = readArtistAliases()
+
   for (const item of items || []) {
     if (item?.kind !== 'artist') continue
     const key = normalizeMonitoredArtistName(item.name)
     if (key) map.set(key, item)
   }
+
+  for (const [libraryKey, monitoredKey] of Object.entries(aliases)) {
+    if (map.has(libraryKey)) continue
+    const item = map.get(monitoredKey)
+    if (item) map.set(libraryKey, item)
+  }
+
   monitoredArtistMap.value = map
 }
 
@@ -38,6 +74,23 @@ function applyMonitoredArtists(items) {
   rebuildMonitoredArtistMap(monitoredArtists.value)
 }
 
+export function upsertMonitoredArtist(item, libraryArtistName = '') {
+  if (!item || item.kind !== 'artist') return
+
+  const items = [...monitoredArtists.value]
+  const index = items.findIndex((entry) => entry.id === item.id)
+  if (index >= 0) items[index] = item
+  else items.unshift(item)
+
+  applyMonitoredArtists(items)
+  lastRefreshAt = Date.now()
+
+  if (libraryArtistName) {
+    writeArtistAlias(libraryArtistName, item.name)
+    rebuildMonitoredArtistMap(items)
+  }
+}
+
 export async function refreshMonitoredArtists({ force = false } = {}) {
   const now = Date.now()
   if (
@@ -47,28 +100,41 @@ export async function refreshMonitoredArtists({ force = false } = {}) {
   ) {
     return
   }
-  if (loadPromise) return loadPromise
 
-  loadPromise = monitorAPI
-    .listMonitoredPlaylists()
-    .then((res) => {
-      applyMonitoredArtists(res.data)
-      lastRefreshAt = Date.now()
-      if (res.refresh) {
-        res.refresh
-          .then((fresh) => {
-            applyMonitoredArtists(fresh.data)
-            lastRefreshAt = Date.now()
-          })
-          .catch(() => {})
+  if (force) {
+    loadPromise = null
+  } else if (loadPromise) {
+    return loadPromise
+  }
+
+  loadPromise = (async () => {
+    try {
+      const res = await monitorAPI.listMonitoredPlaylists({
+        useCache: !force,
+      })
+
+      if (force && res.refresh) {
+        const fresh = await res.refresh
+        applyMonitoredArtists(fresh.data)
+      } else {
+        applyMonitoredArtists(res.data)
+        if (res.refresh) {
+          res.refresh
+            .then((fresh) => {
+              applyMonitoredArtists(fresh.data)
+              lastRefreshAt = Date.now()
+            })
+            .catch(() => {})
+        }
       }
-    })
-    .catch(() => {
-      applyMonitoredArtists([])
-    })
-    .finally(() => {
-      loadPromise = null
-    })
+
+      lastRefreshAt = Date.now()
+    } catch {
+      if (!force) applyMonitoredArtists([])
+    }
+  })().finally(() => {
+    loadPromise = null
+  })
 
   return loadPromise
 }
@@ -79,5 +145,6 @@ export function useMonitoredArtists() {
     monitoredArtistMap,
     findMonitoredArtist,
     refreshMonitoredArtists,
+    upsertMonitoredArtist,
   }
 }

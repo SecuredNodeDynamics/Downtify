@@ -1,5 +1,5 @@
 <template>
-  <div class="library-artist-monitor shrink-0">
+  <div class="library-artist-monitor flex shrink-0 flex-col items-end">
     <button
       v-if="monitoredEntry"
       type="button"
@@ -47,6 +47,13 @@
         }}
       </span>
     </button>
+
+    <p
+      v-if="pickerError && !pickerOpen"
+      class="mt-1 max-w-[14rem] text-right text-xs leading-snug text-error sm:max-w-xs"
+    >
+      {{ pickerError }}
+    </p>
 
     <div
       v-if="pickerOpen"
@@ -135,7 +142,10 @@ import monitorAPI from '/src/model/monitor.js'
 import {
   findMonitoredArtist,
   monitoredArtistMap,
+  monitoredArtists,
+  normalizeMonitoredArtistName,
   refreshMonitoredArtists,
+  upsertMonitoredArtist,
 } from '../model/monitoredArtists.js'
 import { useI18n } from '/src/i18n'
 
@@ -184,6 +194,7 @@ async function startMonitor() {
     const { matches } = await lookupSpotifyArtistsWithRetry(props.artistName)
     if (matches.length === 0) {
       artistNotFound.value = true
+      pickerError.value = t('library.monitorArtistNotFound')
       return
     }
 
@@ -199,27 +210,54 @@ async function startMonitor() {
 
     pickerMatches.value = matches
     pickerOpen.value = true
-  } catch {
+  } catch (err) {
     artistNotFound.value = true
+    pickerError.value =
+      err?.response?.data?.detail || t('library.monitorArtistLookupFailed')
   } finally {
     busy.value = false
   }
 }
 
+function monitorUrlForMatch(match) {
+  const url = String(match?.url || '').trim()
+  if (url) return url
+  const spotifyId = String(match?.spotify_id || '').trim()
+  if (!spotifyId) return ''
+  return `https://open.spotify.com/artist/${spotifyId}`
+}
+
 async function addMatch(match) {
-  if (!match?.url) return
+  const url = monitorUrlForMatch(match)
+  if (!url) {
+    pickerError.value = t('library.monitorArtistAddFailed')
+    return
+  }
+
   busy.value = true
   pickerError.value = ''
   try {
-    await monitorAPI.addMonitoredPlaylist(match.url, 60, 'artist')
+    const res = await monitorAPI.addMonitoredPlaylist(url, 60, 'artist')
     pickerOpen.value = false
     pickerMatches.value = []
     artistNotFound.value = false
+    upsertMonitoredArtist(res.data, props.artistName)
     await refreshMonitoredArtists({ force: true })
   } catch (err) {
     if (err?.response?.status === 409) {
       pickerOpen.value = false
       await refreshMonitoredArtists({ force: true })
+      if (!findMonitoredArtist(props.artistName)) {
+        const linked =
+          findMonitoredArtist(match?.name) ||
+          monitoredArtists.value.find(
+            (item) =>
+              item.kind === 'artist' &&
+              normalizeMonitoredArtistName(item.name) ===
+                normalizeMonitoredArtistName(match?.name)
+          )
+        if (linked) upsertMonitoredArtist(linked, props.artistName)
+      }
       return
     }
     pickerError.value =
