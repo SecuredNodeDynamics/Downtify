@@ -177,6 +177,9 @@
   .icon-btn-active {
     @apply bg-primary text-primary-content hover:bg-primary hover:text-primary-content shadow-glow-sm;
   }
+  .icon-btn-error {
+    @apply border-error/40 text-error hover:border-error/60 hover:bg-error/10 hover:text-error;
+  }
 
   .tab-glow-shell {
     @apply border-primary/25 shadow-glow-sm;
@@ -366,6 +369,9 @@
   .mobile-app-bar-icon,
   .mobile-app-bar-logo {
     @apply inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-base-content/90 transition-colors active:bg-white/10;
+  }
+  .mobile-app-bar-icon-error {
+    @apply text-error active:bg-error/10;
   }
 
   .bottom-nav {

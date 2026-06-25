@@ -549,6 +549,7 @@ import {
   fetchLibraryItems,
   getInitialLibrarySnapshot,
   onLibraryChanged,
+  resetLibraryPrefetch,
 } from '/src/model/librarySession'
 import { buildApiBaseUrl, getServerConfig } from '/src/model/serverConnection'
 import { useI18n } from '/src/i18n'
@@ -784,9 +785,25 @@ function hydrateLibraryFromSession() {
 }
 
 async function refreshFromHeader() {
+  libraryRefresh.setFailed(false)
   libraryRefresh.setLoading(true)
+  error.value = ''
   try {
-    await refresh({ background: files.value.length > 0 })
+    resetLibraryPrefetch()
+    const items = await fetchLibraryItems(
+      () => API.getLibraryFiles().then((res) => res.data || []),
+      { preferPrefetch: false }
+    )
+    if (items.length > 0) {
+      applyLibraryData(items)
+      return
+    }
+
+    const res = await API.listDownloads()
+    applyLibraryData(pathsToLibraryItems(res.data || []))
+  } catch {
+    libraryRefresh.setFailed(true)
+    error.value = t('library.failedLoad')
   } finally {
     libraryRefresh.setLoading(false)
   }
@@ -961,6 +978,7 @@ function queueOnlineDownload(song) {
 let stopLibraryListener = null
 
 onMounted(() => {
+  libraryRefresh.register(refreshFromHeader)
   if (libraryItems.value.length) {
     API.warmLibraryCovers(libraryItems.value)
   }

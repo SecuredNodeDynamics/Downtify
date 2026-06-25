@@ -1,6 +1,7 @@
 import { ref } from 'vue'
 
 const loading = ref(false)
+const failed = ref(false)
 let refreshHandler = null
 
 export function useLibraryRefresh() {
@@ -14,6 +15,7 @@ export function useLibraryRefresh() {
 
   async function refresh() {
     if (!refreshHandler) return
+    failed.value = false
     await refreshHandler()
   }
 
@@ -21,11 +23,17 @@ export function useLibraryRefresh() {
     loading.value = Boolean(value)
   }
 
+  function setFailed(value) {
+    failed.value = Boolean(value)
+  }
+
   return {
     loading,
+    failed,
     register,
     unregister,
     refresh,
     setLoading,
+    setFailed,
   }
 }

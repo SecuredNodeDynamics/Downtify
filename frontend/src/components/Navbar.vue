@@ -88,16 +88,21 @@
 
           <button
             v-if="route.name === 'List'"
+            type="button"
             class="icon-btn"
+            :class="{ 'icon-btn-error': libraryRefreshFailed }"
             :title="t('common.refresh')"
             :disabled="libraryRefreshLoading"
             @click="refreshLibrary()"
           >
-            <span
-              v-if="libraryRefreshLoading"
-              class="loading loading-spinner loading-sm text-primary"
+            <Icon
+              icon="clarity:refresh-line"
+              class="h-5 w-5 transition-colors"
+              :class="[
+                libraryRefreshLoading ? 'animate-spin text-primary' : '',
+                libraryRefreshFailed ? 'text-error' : '',
+              ]"
             />
-            <Icon v-else icon="clarity:refresh-line" class="h-5 w-5" />
           </button>
 
           <button
@@ -173,6 +178,6 @@ const sm = useSearchManager()
 const { t } = useI18n()
 const { loading: healthRefreshLoading, refresh: refreshHealth } =
   useHealthRefresh()
-const { loading: libraryRefreshLoading, refresh: refreshLibrary } =
+const { loading: libraryRefreshLoading, failed: libraryRefreshFailed, refresh: refreshLibrary } =
   useLibraryRefresh()
 </script>
