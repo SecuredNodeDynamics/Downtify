@@ -53,6 +53,7 @@ from . import (
     artist_art,
     artist_image_options,
     artist_image_sources,
+    audio_caps,
     m3u,
     metadata_repair,
     providers,
@@ -1446,6 +1447,17 @@ def _start_docker_self_update(
 @router.get('/api/version')
 def get_version() -> str:
     return state.version
+
+
+@router.get('/api/capabilities')
+def get_capabilities() -> dict[str, Any]:
+    """Report what the current host can do, so the UI offers only working
+    choices (e.g. MP3/FLAC are only listed when ffmpeg can encode them)."""
+
+    return {
+        'ffmpeg': audio_caps.ffmpeg_available(),
+        'audio_formats': audio_caps.available_audio_formats(),
+    }
 
 
 @router.get('/api/check_update')

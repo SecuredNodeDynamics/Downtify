@@ -334,14 +334,16 @@
             class="select w-full rounded-xl bg-base-100/85 border border-white/10 focus:border-primary/60"
             v-model="sm.settings.value.format"
           >
-            <option
-              v-for="fmt in sm.settingsOptions.format"
-              :key="fmt"
-              :value="fmt"
-            >
+            <option v-for="fmt in formatOptions" :key="fmt" :value="fmt">
               {{ fmt.toUpperCase() }}
             </option>
           </select>
+          <p
+            v-if="isDeviceMode && !ffmpegAvailable"
+            class="text-[11px] text-base-content/40 mt-1.5"
+          >
+            {{ t('settings.deviceFormatNoFfmpeg') }}
+          </p>
         </div>
         <div>
           <div class="flex items-baseline justify-between mb-2">
@@ -1228,6 +1230,11 @@ import {
 } from '../model/deviceStorage'
 import { notifyLibraryChanged } from '../model/librarySession'
 import {
+  supportedAudioFormats,
+  ffmpegAvailable,
+  loadCapabilities,
+} from '../model/capabilities'
+import {
   buildApiBaseUrl,
   canConnectToCurrentPage,
   canSaveServerUrlInput,
@@ -1332,6 +1339,15 @@ const deviceLocationPath = computed(
     deviceDefaultDir.value
 )
 const deviceStorageGranted = computed(() => allFilesAccessGranted.value)
+const formatOptions = computed(() => {
+  const all = sm.settingsOptions.format
+  // On the embedded device backend, only offer formats the bundled ffmpeg can
+  // actually produce; remote/server builds expose the full list.
+  if (!isDeviceMode.value) return all
+  const supported = supportedAudioFormats.value
+  const filtered = all.filter((fmt) => supported.includes(fmt))
+  return filtered.length ? filtered : all
+})
 const activeServerDisplay = computed(() =>
   formatServerDisplay(getServerConfig())
 )
@@ -1435,6 +1451,18 @@ async function resetDeviceFolder() {
 
 onMounted(() => initDeviceStorage())
 watch(isDeviceMode, () => initDeviceStorage())
+
+onMounted(() => loadCapabilities())
+watch(
+  formatOptions,
+  (options) => {
+    if (!options.length) return
+    if (!options.includes(sm.settings.value.format)) {
+      sm.settings.value.format = options[0]
+    }
+  },
+  { immediate: true }
+)
 onMounted(() =>
   window.addEventListener('downtify:open-settings', openSettingsTab)
 )

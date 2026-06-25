@@ -667,6 +667,8 @@ export default {
     deviceLocationNoPath:
       'Essa pasta não pode ser usada diretamente. Escolha uma pasta no armazenamento interno ou no seu cartão SD.',
     deviceLocationError: 'Não foi possível definir o local de download.',
+    deviceFormatNoFfmpeg:
+      'Esta versão não tem um conversor no dispositivo, então os downloads são salvos como M4A (AAC). MP3 e FLAC exigem uma versão com ffmpeg.',
   },
   player: {
     title: 'Player',

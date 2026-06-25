@@ -67,13 +67,22 @@ npm run android:icons
 uv run python "$ROOT/scripts/fix-android-adaptive-icons.py"
 npm run build:android
 
-# The embedded (serverless) backend needs a bundled ffmpeg per ABI. Warn early
-# if it's missing — search still works but conversions will fail without it.
+# The embedded (serverless) backend needs a bundled ffmpeg per ABI so it can
+# transcode to MP3/FLAC on-device. Build it when missing if opted in, otherwise
+# warn (search/browse still work; downloads fall back to native M4A).
 JNILIBS_DIR="$ANDROID_DIR/app/src/main/jniLibs"
 if ! ls "$JNILIBS_DIR"/*/libffmpeg.so >/dev/null 2>&1; then
-  echo "WARNING: No bundled ffmpeg found under $JNILIBS_DIR/<abi>/libffmpeg.so" >&2
-  echo "         On-device downloads that need conversion will fail." >&2
-  echo "         See frontend/android/app/src/main/jniLibs/README.md" >&2
+  if [[ "${DOWNTIFY_AUTO_BUILD_FFMPEG:-0}" == "1" ]]; then
+    echo "No bundled ffmpeg found; building it (DOWNTIFY_AUTO_BUILD_FFMPEG=1)..." >&2
+    bash "$ROOT/scripts/build-android-ffmpeg.sh"
+  else
+    echo "WARNING: No bundled ffmpeg found under $JNILIBS_DIR/<abi>/libffmpeg.so" >&2
+    echo "         On-device MP3/FLAC conversion will be unavailable (downloads" >&2
+    echo "         fall back to native M4A)." >&2
+    echo "         Build it once with: bash scripts/build-android-ffmpeg.sh" >&2
+    echo "         (or re-run with DOWNTIFY_AUTO_BUILD_FFMPEG=1). See" >&2
+    echo "         frontend/android/app/src/main/jniLibs/README.md" >&2
+  fi
 fi
 
 cd android

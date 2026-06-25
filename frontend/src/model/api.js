@@ -512,6 +512,10 @@ function clearHistory() {
   return API.delete('/api/history')
 }
 
+function getCapabilities() {
+  return API.get('/api/capabilities')
+}
+
 function getSettings() {
   return API.get('/api/settings', { params: { client_id: sessionID } })
 }
@@ -635,6 +639,7 @@ export default {
   reconcileHistory,
   retryHistoryItem,
   clearHistory,
+  getCapabilities,
   getSettings,
   setSettings,
   getJellyfinLibraries,

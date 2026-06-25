@@ -19,18 +19,39 @@ At runtime, `downtify/mobile.py` (`prepare_ffmpeg`) creates `ffmpeg`/`ffprobe`
 symlinks pointing at these extracted libraries and passes the directory to
 yt-dlp via `DOWNTIFY_FFMPEG_LOCATION`, so they are discovered by name.
 
-## Where to get static ffmpeg for Android
+## Building them (recommended)
 
-Use a **statically linked** ffmpeg compiled for `android` with the NDK (so it
-has no `libc++_shared`/`libgcc_s` runtime dependencies). Options:
+Run the helper script, which cross-compiles **libmp3lame** (for MP3) and a
+statically linked **ffmpeg/ffprobe** CLI (FLAC/AAC/Ogg/Opus are native) for each
+ABI and stages them here automatically:
 
-- Build from source with the Android NDK (`--enable-static --disable-shared`,
-  target `aarch64-linux-android` / `x86_64-linux-android`).
-- Use a prebuilt static ffmpeg for Android from a trusted source and rename the
-  executable to `libffmpeg.so`.
+```bash
+bash scripts/build-android-ffmpeg.sh
+# or as part of the APK build:
+DOWNTIFY_AUTO_BUILD_FFMPEG=1 bash scripts/build-android-apk.sh
+```
 
-Verify it runs on-device with `adb shell <nativeLibraryDir>/libffmpeg.so -version`.
+Requires the Android NDK (set `ANDROID_NDK_HOME`, or have one under
+`$ANDROID_HOME/ndk/*` or `.tools/android-sdk/ndk/*`). Tune with env vars:
+`ABIS`, `ANDROID_API_LEVEL`, `FFMPEG_VERSION`, `LAME_VERSION`.
+
+The script builds `--enable-static --disable-shared` so the `libav*` code is
+linked into the program, producing a single self-contained executable that we
+ship renamed to `libffmpeg.so` (Android only extracts `lib*.so` and cannot ship
+versioned sonames like `libavcodec.so.60`).
+
+## Where downloads format depends on this
+
+`downtify/audio_caps.py` probes the bundled ffmpeg's encoders at runtime and the
+app only offers formats it can actually produce. With ffmpeg present you get
+MP3/FLAC/M4A/Ogg/Opus; without it, downloads fall back to native **M4A (AAC)**.
+
+## Verifying on-device
+
+```bash
+adb shell "$(pm path com.securednodedynamics.downtify | sed 's/package://;s|base.apk|lib/arm64|')/libffmpeg.so" -encoders | grep -E 'libmp3lame|flac'
+```
 
 These binaries are intentionally **git-ignored** (large/per-environment).
-Without them, search/browse still work but downloads that require conversion
-will fail.
+Without them, search/browse still work and downloads succeed as native M4A, but
+MP3/FLAC conversion is unavailable.

@@ -669,6 +669,8 @@ export default {
     deviceLocationNoPath:
       'Esa carpeta no se puede usar directamente. Elige una carpeta en el almacenamiento interno o en tu tarjeta SD.',
     deviceLocationError: 'No se pudo establecer la ubicación de descargas.',
+    deviceFormatNoFfmpeg:
+      'Esta versión no tiene un convertidor en el dispositivo, así que las descargas se guardan como M4A (AAC). MP3 y FLAC requieren una versión con ffmpeg.',
   },
   player: {
     title: 'Reproductor',

@@ -32,6 +32,7 @@ from mutagen.oggopus import OggOpus
 from mutagen.oggvorbis import OggVorbis
 
 from . import lyrics as lyrics_mod
+from .audio_caps import ffmpeg_available as _ffmpeg_available
 from .genres import canonical_genre
 from .jellyfin_meta import format_for_jellyfin
 from .m3u import sanitize_playlist_name
@@ -62,6 +63,14 @@ _AUDIO_EXTENSIONS = {'mp3', 'm4a', 'mp4', 'aac', 'flac', 'ogg', 'opus', 'wav'}
 # minimal static binary bundled in the Android APK) can reliably produce, so it
 # is used as a fallback when the configured codec cannot be encoded on-device.
 _FALLBACK_AUDIO_FORMAT = 'm4a'
+
+# Prefer a natively downloadable AAC/M4A stream so a playable, taggable file can
+# be produced without any ffmpeg post-processing (used on builds with no ffmpeg,
+# e.g. the embedded Android APK). Falls back to whatever audio is available.
+_NATIVE_AUDIO_FORMAT = (
+    'bestaudio[ext=m4a]/bestaudio[acodec^=mp4a]/best[ext=m4a]/bestaudio/best'
+)
+
 
 ProgressCallback = Callable[[float, str], None]
 _PREVIEW_AUDIO_CACHE_TTL_SECONDS = 45 * 60
@@ -431,6 +440,49 @@ class Downloader:
                     'Could not remove leftover {}', candidate
                 )
 
+    def _download_native_audio(
+        self,
+        url: str,
+        out_template: str,
+        target_dir: Path,
+        basename: str,
+        hook: Callable[[dict[str, Any]], None],
+    ) -> Path:
+        """Download a playable audio container with no ffmpeg post-processing.
+
+        Used on builds without ffmpeg (e.g. the embedded Android APK). The file
+        is later tagged — including embedded cover art — by mutagen, which needs
+        no external binaries, so downloads succeed and covers render on-device.
+        """
+
+        ydl_opts = _base_ytdlp_opts()
+        ydl_opts.update({
+            'outtmpl': out_template,
+            'overwrites': True,
+            'progress_hooks': [hook],
+            'format': _NATIVE_AUDIO_FORMAT,
+            'postprocessors': [],
+        })
+        with _yt_dlp().YoutubeDL(cast(Any, ydl_opts)) as ydl:
+            ydl.download([url])
+
+        chosen: Optional[Path] = None
+        for candidate in sorted(target_dir.glob(f'{basename}.*')):
+            if not candidate.is_file():
+                continue
+            if candidate.suffix.lower().lstrip('.') in _AUDIO_EXTENSIONS:
+                chosen = candidate
+                break
+        if chosen is None:
+            for candidate in target_dir.glob(f'{basename}.*'):
+                if candidate.is_file():
+                    chosen = candidate
+                    break
+        if chosen is None:
+            return target_dir / f'{basename}.{_FALLBACK_AUDIO_FORMAT}'
+        self._cleanup_leftovers(target_dir, basename, keep=chosen)
+        return chosen
+
     def _download_and_extract(
         self,
         url: str,
@@ -441,13 +493,23 @@ class Downloader:
     ) -> Path:
         """Download a track and extract audio to the configured format.
 
-        Falls back to a universally supported codec when the configured one
-        cannot be produced on this platform. On the embedded Android build the
-        bundled ffmpeg may lack the encoder for the configured format (e.g.
-        ``libmp3lame`` for MP3); rather than failing the whole download, retry
-        once with ``m4a`` (AAC) so the user still gets a tagged, playable,
+        When no ffmpeg binary is available (e.g. the embedded Android APK), skip
+        post-processing entirely and keep a natively downloaded AAC/M4A file so
+        the download still succeeds. Otherwise extract to the configured format,
+        falling back to ``m4a`` (AAC) when the configured codec cannot be
+        produced on this platform, so the user still gets a tagged, playable,
         library-visible file.
         """
+
+        if not _ffmpeg_available():
+            logger.info(
+                'ffmpeg unavailable; downloading native audio without '
+                'conversion for {}',
+                basename,
+            )
+            return self._download_native_audio(
+                url, out_template, target_dir, basename, hook
+            )
 
         primary = (self.audio_format or 'mp3').lower()
         try:

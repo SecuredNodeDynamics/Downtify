@@ -656,6 +656,8 @@ export default {
     deviceLocationNoPath:
       'That folder can’t be used directly. Pick a folder on internal storage or your SD card.',
     deviceLocationError: 'Could not set the download location.',
+    deviceFormatNoFfmpeg:
+      'This build has no on-device converter, so downloads are saved as M4A (AAC). MP3 and FLAC need an ffmpeg-enabled build.',
   },
   player: {
     title: 'Player',

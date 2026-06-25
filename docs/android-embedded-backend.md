@@ -38,9 +38,14 @@ WebView (Vue app)  ──HTTP──▶  127.0.0.1:8765  (FastAPI via uvicorn)
    ([chaquopy#1017](https://github.com/chaquo/chaquopy/issues/1017)). We install
    `pydantic<2` (pure Python) in the Chaquopy `pip` block; FastAPI runs fine on
    it. If you bump FastAPI, verify it still supports Pydantic v1.
-2. **ffmpeg must be supplied per ABI.** See
+2. **ffmpeg must be supplied per ABI for MP3/FLAC.** Build it with
+   `bash scripts/build-android-ffmpeg.sh` (cross-compiles libmp3lame + a static
+   ffmpeg/ffprobe CLI into `jniLibs/<abi>/lib*.so`). See
    `frontend/android/app/src/main/jniLibs/README.md`. Without it, search/browse
-   work but downloads that need conversion fail.
+   work and downloads still succeed as native **M4A (AAC)**, but MP3/FLAC
+   conversion is unavailable. The app probes ffmpeg's encoders at runtime
+   (`downtify/audio_caps.py`, `/api/capabilities`) and only offers formats it
+   can produce.
 3. **APK size.** The Python runtime + dependencies + ffmpeg add tens of MB.
 4. **AGP/Chaquopy compatibility.** The Android Gradle Plugin version must be one
    Chaquopy supports. If the build fails at the Chaquopy step, align versions per
@@ -50,8 +55,13 @@ WebView (Vue app)  ──HTTP──▶  127.0.0.1:8765  (FastAPI via uvicorn)
 
 ## Building
 
-1. Provide ffmpeg binaries (see the jniLibs README) for `arm64-v8a` (devices)
-   and `x86_64` (emulator).
+1. Provide ffmpeg binaries for `arm64-v8a` (devices) and `x86_64` (emulator):
+
+   ```bash
+   bash scripts/build-android-ffmpeg.sh
+   ```
+
+   (see the jniLibs README for prerequisites and options).
 2. Build as usual:
 
    ```bash
