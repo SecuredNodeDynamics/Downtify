@@ -64,6 +64,7 @@ fi
 
 cp "$ROOT/assets/icon-without-backgroud.svg" "$FRONTEND/assets/logo.svg"
 npm run android:icons
+uv run python "$ROOT/scripts/fix-android-adaptive-icons.py"
 npm run build:android
 
 # The embedded (serverless) backend needs a bundled ffmpeg per ABI. Warn early

@@ -5,7 +5,7 @@
     "dev": "vite",
     "build": "vite build",
     "build:android": "VITE_CAPACITOR=1 vite build && cap sync android",
-    "android:icons": "npx @capacitor/assets generate --android --iconBackgroundColor '#040000' --splashBackgroundColor '#040000'",
+    "android:icons": "npx @capacitor/assets generate --android --iconBackgroundColor '#1AD35D' --splashBackgroundColor '#040000'",
     "android:apk": "cd android && ./gradlew assembleDebug",
     "android:apk:release": "cd android && ./gradlew assembleRelease",
     "preview": "vite preview",
