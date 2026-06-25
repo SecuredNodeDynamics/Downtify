@@ -20,7 +20,12 @@ from .musicbrainz import (
     warm_artist_genre_cache,
 )
 
-_LIST_EXTENSIONS = {ext for ext in AUDIO_EXTENSIONS if ext != '.mp4'}
+# Keep the listing in sync with the "is it already downloaded?" check
+# (downloader._AUDIO_EXTENSIONS) and metadata repair so a file can never count
+# as "owned" in search yet be invisible in the library. On the embedded Android
+# backend a track can land as an ``.mp4``/``.wav`` container, so those must be
+# listable too.
+_LIST_EXTENSIONS = AUDIO_EXTENSIONS | {'.wav'}
 _ALBUM_GENRE_CACHE_LOADED = False
 _ALBUM_GENRE_CACHE: dict[str, str] = {}
 

@@ -198,6 +198,60 @@
         </p>
       </div>
 
+      <!-- Download location (on-device mode): the embedded backend reads &
+           writes this folder so the Library and Player tabs see the media. -->
+      <div v-if="isDeviceMode">
+        <label
+          class="block text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2"
+        >
+          {{ t('settings.downloadLocation') }}
+        </label>
+        <div
+          class="rounded-xl border border-white/10 bg-base-100/85 px-3 py-3 space-y-2"
+        >
+          <div class="flex items-start gap-3">
+            <Icon
+              icon="clarity:music-note-line"
+              class="mt-0.5 h-5 w-5 shrink-0 text-primary"
+            />
+            <div class="min-w-0 flex-1">
+              <p class="text-sm font-medium">
+                {{ deviceLocationLabel }}
+              </p>
+              <p class="truncate text-[11px] text-base-content/50">
+                {{ deviceLocationPath || t('settings.deviceLocationDefault') }}
+              </p>
+            </div>
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              class="btn btn-sm h-9 rounded-full border-white/10 bg-base-100/85 hover:bg-base-100"
+              @click="chooseDeviceFolder"
+            >
+              {{ t('settings.chooseFolder') }}
+            </button>
+            <button
+              v-if="sm.settings.value.server_media_location"
+              type="button"
+              class="btn btn-sm h-9 rounded-full border-white/10 bg-base-100/85 hover:bg-base-100"
+              @click="resetDeviceFolder"
+            >
+              {{ t('settings.useMusicLibrary') }}
+            </button>
+          </div>
+          <p v-if="!deviceStorageGranted" class="text-[11px] text-warning">
+            {{ t('settings.deviceStoragePermission') }}
+          </p>
+        </div>
+        <p class="text-[11px] text-base-content/40 mt-1.5">
+          {{ t('settings.downloadLocationHint') }}
+        </p>
+        <p v-if="deviceDownloadError" class="text-[11px] text-error mt-2">
+          {{ deviceDownloadError }}
+        </p>
+      </div>
+
       <!-- Audio source -->
       <div>
         <label
@@ -1163,6 +1217,17 @@ import axios from 'axios'
 import { useSettingsManager } from '../model/settings'
 import { useDownloadDestination } from '../model/downloadDestination'
 import {
+  deviceMusicPath,
+  deviceMusicName,
+  allFilesAccessGranted,
+  refreshAllFilesAccess,
+  requestAllFilesAccess,
+  pickDeviceMusicFolder,
+  useDefaultMusicFolder,
+  getDefaultMusicDir,
+} from '../model/deviceStorage'
+import { notifyLibraryChanged } from '../model/librarySession'
+import {
   buildApiBaseUrl,
   canConnectToCurrentPage,
   canSaveServerUrlInput,
@@ -1249,6 +1314,24 @@ const connectionMode = ref(getConnectionMode())
 const isDeviceMode = computed(
   () => embeddedAvailable.value && connectionMode.value === 'device'
 )
+const deviceDownloadError = ref('')
+const deviceDefaultDir = ref('')
+const deviceLocationLabel = computed(() => {
+  if (deviceMusicName.value) return deviceMusicName.value
+  const path = sm.settings.value.server_media_location || deviceMusicPath.value
+  if (path) {
+    const segments = String(path).split('/').filter(Boolean)
+    return segments[segments.length - 1] || path
+  }
+  return t('settings.deviceLocationDefault')
+})
+const deviceLocationPath = computed(
+  () =>
+    sm.settings.value.server_media_location ||
+    deviceMusicPath.value ||
+    deviceDefaultDir.value
+)
+const deviceStorageGranted = computed(() => allFilesAccessGranted.value)
 const activeServerDisplay = computed(() =>
   formatServerDisplay(getServerConfig())
 )
@@ -1300,6 +1383,58 @@ function openSettingsTab(event) {
   applySettingsTab(event?.detail?.tab)
 }
 
+async function initDeviceStorage() {
+  if (!isDeviceMode.value || !isCapacitorNative()) return
+  await refreshAllFilesAccess()
+  if (!deviceDefaultDir.value) {
+    deviceDefaultDir.value = await getDefaultMusicDir()
+  }
+}
+
+async function chooseDeviceFolder() {
+  deviceDownloadError.value = ''
+  // The embedded Python backend reads/writes the folder by absolute path, which
+  // needs broad storage access (a per-folder SAF grant is not enough).
+  const granted = await requestAllFilesAccess()
+  if (!granted) {
+    deviceDownloadError.value = t('settings.deviceStoragePermission')
+    return
+  }
+  try {
+    const path = await pickDeviceMusicFolder()
+    sm.settings.value.server_media_location = path
+    sm.saveSettings()
+    notifyLibraryChanged()
+  } catch (err) {
+    if (err?.name === 'AbortError') return
+    deviceDownloadError.value =
+      err?.message === 'no-path'
+        ? t('settings.deviceLocationNoPath')
+        : err?.message || t('settings.deviceLocationError')
+  }
+}
+
+async function resetDeviceFolder() {
+  deviceDownloadError.value = ''
+  const granted = await requestAllFilesAccess()
+  if (!granted) {
+    deviceDownloadError.value = t('settings.deviceStoragePermission')
+    return
+  }
+  try {
+    const path = await useDefaultMusicFolder()
+    sm.settings.value.server_media_location = path
+    deviceDefaultDir.value = path
+    sm.saveSettings()
+    notifyLibraryChanged()
+  } catch (err) {
+    deviceDownloadError.value =
+      err?.message || t('settings.deviceLocationError')
+  }
+}
+
+onMounted(() => initDeviceStorage())
+watch(isDeviceMode, () => initDeviceStorage())
 onMounted(() =>
   window.addEventListener('downtify:open-settings', openSettingsTab)
 )

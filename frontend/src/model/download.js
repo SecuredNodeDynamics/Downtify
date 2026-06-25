@@ -10,8 +10,14 @@ import {
   upsertHistoryItem,
 } from '/src/model/downloadHistory'
 import { isMediaOwned } from '/src/model/libraryOwnership'
+import {
+  supportsDeviceStorage,
+  activeDownloadRoot,
+  scanDownloadedFile,
+} from '/src/model/deviceStorage'
 
 const downloadDestination = useDownloadDestination()
+const moduleSettings = useSettingsManager()
 
 const STATUS = {
   QUEUED: 'In Queue',
@@ -123,9 +129,25 @@ const progressTracker = useProgressTracker()
 function completeQueueItem(song, item) {
   if (item) {
     maybeSaveToLocalMachine(item)
+    maybeScanDeviceLibrary(item)
   }
   progressTracker.removeFromQueue(song)
   notifyLibraryChanged()
+}
+
+function maybeScanDeviceLibrary(item) {
+  if (!item?.filename || !supportsDeviceStorage()) return
+  const settingsLocation =
+    moduleSettings.settings.value.server_media_location || ''
+  activeDownloadRoot(settingsLocation)
+    .then((root) => {
+      if (!root) return
+      const rel = String(item.filename).replace(/^\/+/, '')
+      scanDownloadedFile(`${root.replace(/\/+$/, '')}/${rel}`)
+    })
+    .catch(() => {
+      // Scanning is best-effort.
+    })
 }
 
 function maybeSaveToLocalMachine(item) {

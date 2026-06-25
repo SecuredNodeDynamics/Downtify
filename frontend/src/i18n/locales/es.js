@@ -129,14 +129,16 @@ export default {
     title: 'Administrar biblioteca',
     subtitle: 'Explora tu contenido descargado y elimina lo que ya no quieras.',
     empty: 'Aún no hay contenido descargado.',
-    emptyHint: 'Las canciones descargadas aparecerán aquí cuando agregues algunas.',
+    emptyHint:
+      'Las canciones descargadas aparecerán aquí cuando agregues algunas.',
     search: 'Filtra tus descargas…',
     noMatches: 'Ningún contenido coincide con tu filtro.',
     artists: 'Artistas',
     albums: 'Álbumes',
     tracks: 'Canciones',
     delete: 'Eliminar de las descargas',
-    deletePrompt: '¿Eliminar "{title}" de tus descargas? Esto no se puede deshacer.',
+    deletePrompt:
+      '¿Eliminar "{title}" de tus descargas? Esto no se puede deshacer.',
     deleteAlbum: 'Eliminar álbum de las descargas',
     deleteAlbumPrompt:
       '¿Eliminar el álbum "{name}" ({count} archivos) de tus descargas? Esto no se puede deshacer.',
@@ -656,6 +658,17 @@ export default {
     localFolderPermissionNeeded:
       'El acceso a la carpeta expiró. Haz clic en “Cambiar carpeta…” para permitir guardar de nuevo.',
     localFolderError: 'No se pudo acceder a la carpeta elegida.',
+    downloadLocation: 'Ubicación de descargas',
+    downloadLocationHint:
+      'Las descargas se guardan aquí y la Biblioteca y el Reproductor leen de esta carpeta. De forma predeterminada van a la biblioteca de música de tu dispositivo.',
+    deviceLocationDefault: 'Biblioteca de música (predeterminada)',
+    chooseFolder: 'Elegir carpeta…',
+    useMusicLibrary: 'Usar biblioteca de música',
+    deviceStoragePermission:
+      'Permite el acceso al almacenamiento para que Downtify pueda guardar y leer esta carpeta.',
+    deviceLocationNoPath:
+      'Esa carpeta no se puede usar directamente. Elige una carpeta en el almacenamiento interno o en tu tarjeta SD.',
+    deviceLocationError: 'No se pudo establecer la ubicación de descargas.',
   },
   player: {
     title: 'Reproductor',

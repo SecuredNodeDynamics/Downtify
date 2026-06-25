@@ -58,6 +58,10 @@ def _yt_dlp() -> 'yt_dlp_module':
 
 _INVALID_FS_CHARS = re.compile(r'[\\/:*?"<>|\x00-\x1f]')
 _AUDIO_EXTENSIONS = {'mp3', 'm4a', 'mp4', 'aac', 'flac', 'ogg', 'opus', 'wav'}
+# AAC in an MP4/M4A container is the one codec every ffmpeg build (including the
+# minimal static binary bundled in the Android APK) can reliably produce, so it
+# is used as a fallback when the configured codec cannot be encoded on-device.
+_FALLBACK_AUDIO_FORMAT = 'm4a'
 
 ProgressCallback = Callable[[float, str], None]
 _PREVIEW_AUDIO_CACHE_TTL_SECONDS = 45 * 60
@@ -387,6 +391,103 @@ class Downloader:
             target = target / part
         return target, f"{'/'.join(parts)}/"
 
+    def _extract_opts(
+        self,
+        out_template: str,
+        hook: Callable[[dict[str, Any]], None],
+        audio_format: str,
+    ) -> dict[str, Any]:
+        ydl_opts = _base_ytdlp_opts()
+        ydl_opts.update({
+            'outtmpl': out_template,
+            'overwrites': True,
+            'progress_hooks': [hook],
+            'postprocessors': [
+                {
+                    'key': 'FFmpegExtractAudio',
+                    'preferredcodec': audio_format,
+                    'preferredquality': self.audio_bitrate,
+                }
+            ],
+        })
+        return ydl_opts
+
+    @staticmethod
+    def _cleanup_leftovers(
+        target_dir: Path, basename: str, keep: Path
+    ) -> None:
+        """Remove stray same-basename source containers (e.g. a leftover
+        ``.webm``/``.mp4`` from a failed first conversion attempt)."""
+
+        for candidate in target_dir.glob(f'{basename}.*'):
+            if candidate == keep or not candidate.is_file():
+                continue
+            if candidate.suffix.lower() in {'.lrc', '.txt'}:
+                continue
+            try:
+                candidate.unlink()
+            except OSError:
+                logger.opt(exception=True).debug(
+                    'Could not remove leftover {}', candidate
+                )
+
+    def _download_and_extract(
+        self,
+        url: str,
+        out_template: str,
+        target_dir: Path,
+        basename: str,
+        hook: Callable[[dict[str, Any]], None],
+    ) -> Path:
+        """Download a track and extract audio to the configured format.
+
+        Falls back to a universally supported codec when the configured one
+        cannot be produced on this platform. On the embedded Android build the
+        bundled ffmpeg may lack the encoder for the configured format (e.g.
+        ``libmp3lame`` for MP3); rather than failing the whole download, retry
+        once with ``m4a`` (AAC) so the user still gets a tagged, playable,
+        library-visible file.
+        """
+
+        primary = (self.audio_format or 'mp3').lower()
+        try:
+            with _yt_dlp().YoutubeDL(
+                cast(Any, self._extract_opts(out_template, hook, primary))
+            ) as ydl:
+                ydl.download([url])
+        except Exception as exc:
+            if primary == _FALLBACK_AUDIO_FORMAT:
+                raise
+            logger.warning(
+                "Audio extraction to {!r} failed ({}); retrying as {!r}.",
+                primary,
+                exc,
+                _FALLBACK_AUDIO_FORMAT,
+            )
+            self._cleanup_leftovers(
+                target_dir, basename, keep=target_dir / basename
+            )
+            with _yt_dlp().YoutubeDL(
+                cast(
+                    Any,
+                    self._extract_opts(
+                        out_template, hook, _FALLBACK_AUDIO_FORMAT
+                    ),
+                )
+            ) as ydl:
+                ydl.download([url])
+
+        for ext in (primary, _FALLBACK_AUDIO_FORMAT):
+            candidate = target_dir / f'{basename}.{ext}'
+            if candidate.exists():
+                self._cleanup_leftovers(target_dir, basename, keep=candidate)
+                return candidate
+
+        for candidate in target_dir.glob(f'{basename}.*'):
+            if candidate.is_file():
+                return candidate
+        return target_dir / f'{basename}.{primary}'
+
     def download(
         self,
         song: dict[str, Any],
@@ -432,30 +533,10 @@ class Downloader:
             except Exception:
                 logger.opt(exception=True).debug('progress hook error')
 
-        ydl_opts = _base_ytdlp_opts()
-        ydl_opts.update({
-            'outtmpl': out_template,
-            'overwrites': True,
-            'progress_hooks': [hook],
-            'postprocessors': [
-                {
-                    'key': 'FFmpegExtractAudio',
-                    'preferredcodec': self.audio_format,
-                    'preferredquality': self.audio_bitrate,
-                }
-            ],
-        })
-
         url = f'https://music.youtube.com/watch?v={video_id}'
-        with _yt_dlp().YoutubeDL(cast(Any, ydl_opts)) as ydl:
-            ydl.download([url])
-
-        final_path = target_dir / f'{basename}.{self.audio_format}'
-        if not final_path.exists():
-            for candidate in target_dir.glob(f'{basename}.*'):
-                if candidate.is_file():
-                    final_path = candidate
-                    break
+        final_path = self._download_and_extract(
+            url, out_template, target_dir, basename, hook
+        )
 
         try:
             embed_metadata(final_path, song)

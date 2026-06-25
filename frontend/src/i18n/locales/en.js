@@ -125,7 +125,8 @@ export default {
   manage: {
     tab: 'Manage',
     title: 'Manage Library',
-    subtitle: 'Browse your downloaded media and remove anything you no longer want.',
+    subtitle:
+      'Browse your downloaded media and remove anything you no longer want.',
     empty: 'No downloaded media yet.',
     emptyHint: 'Downloaded tracks will appear here once you add some.',
     search: 'Filter your downloads…',
@@ -134,7 +135,8 @@ export default {
     albums: 'Albums',
     tracks: 'Tracks',
     delete: 'Delete from downloads',
-    deletePrompt: 'Delete "{title}" from your downloads? This cannot be undone.',
+    deletePrompt:
+      'Delete "{title}" from your downloads? This cannot be undone.',
     deleteAlbum: 'Delete album from downloads',
     deleteAlbumPrompt:
       'Delete the album "{name}" ({count} files) from your downloads? This cannot be undone.',
@@ -548,8 +550,7 @@ export default {
       'Downtify runs entirely on this device — search and downloads work without any server.',
     connectionModeServerHint:
       'Use a Downtify server on your network or the internet.',
-    connectionModeServerConfigHint:
-      'Set the server address in Settings → API.',
+    connectionModeServerConfigHint: 'Set the server address in Settings → API.',
     runningOnThisDevice: 'Running on this device',
     runningOnThisDeviceHint:
       'Search, downloads and conversion all happen locally. Nothing is sent to an external Downtify server.',
@@ -644,6 +645,17 @@ export default {
     localFolderPermissionNeeded:
       'Folder access expired. Click “Change folder…” to allow saving again.',
     localFolderError: 'Could not access the chosen folder.',
+    downloadLocation: 'Download location',
+    downloadLocationHint:
+      "Downloads are saved here and the Library and Player read from this folder. By default they go to your device's music library.",
+    deviceLocationDefault: 'Music library (default)',
+    chooseFolder: 'Choose folder…',
+    useMusicLibrary: 'Use music library',
+    deviceStoragePermission:
+      'Allow storage access so Downtify can save to and read this folder.',
+    deviceLocationNoPath:
+      'That folder can’t be used directly. Pick a folder on internal storage or your SD card.',
+    deviceLocationError: 'Could not set the download location.',
   },
   player: {
     title: 'Player',
@@ -681,7 +693,8 @@ export default {
     noFilterResults: 'No downloaded tracks match your search.',
     clearFilter: 'Clear filter',
     browseSearchPlaceholder: 'Search artists, albums, tracks, genres…',
-    detailsEmpty: 'Artist and album details appear here while a track is playing.',
+    detailsEmpty:
+      'Artist and album details appear here while a track is playing.',
     nothingPlaying: 'Nothing currently playing',
     nothingPlayingHint: 'Choose a track from your library to start listening.',
     seek: 'Seek',

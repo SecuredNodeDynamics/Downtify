@@ -128,14 +128,16 @@ export default {
     title: 'Gerenciar biblioteca',
     subtitle: 'Veja sua mídia baixada e remova o que não quiser mais.',
     empty: 'Nenhuma mídia baixada ainda.',
-    emptyHint: 'As faixas baixadas aparecerão aqui quando você adicionar algumas.',
+    emptyHint:
+      'As faixas baixadas aparecerão aqui quando você adicionar algumas.',
     search: 'Filtre seus downloads…',
     noMatches: 'Nenhuma mídia corresponde ao seu filtro.',
     artists: 'Artistas',
     albums: 'Álbuns',
     tracks: 'Faixas',
     delete: 'Excluir dos downloads',
-    deletePrompt: 'Excluir "{title}" dos seus downloads? Isso não pode ser desfeito.',
+    deletePrompt:
+      'Excluir "{title}" dos seus downloads? Isso não pode ser desfeito.',
     deleteAlbum: 'Excluir álbum dos downloads',
     deleteAlbumPrompt:
       'Excluir o álbum "{name}" ({count} arquivos) dos seus downloads? Isso não pode ser desfeito.',
@@ -654,6 +656,17 @@ export default {
     localFolderPermissionNeeded:
       'O acesso à pasta expirou. Clique em “Alterar pasta…” para permitir salvar novamente.',
     localFolderError: 'Não foi possível acessar a pasta escolhida.',
+    downloadLocation: 'Local de download',
+    downloadLocationHint:
+      'Os downloads são salvos aqui e a Biblioteca e o Player leem desta pasta. Por padrão, eles vão para a biblioteca de música do seu dispositivo.',
+    deviceLocationDefault: 'Biblioteca de música (padrão)',
+    chooseFolder: 'Escolher pasta…',
+    useMusicLibrary: 'Usar biblioteca de música',
+    deviceStoragePermission:
+      'Permita o acesso ao armazenamento para que o Downtify possa salvar e ler esta pasta.',
+    deviceLocationNoPath:
+      'Essa pasta não pode ser usada diretamente. Escolha uma pasta no armazenamento interno ou no seu cartão SD.',
+    deviceLocationError: 'Não foi possível definir o local de download.',
   },
   player: {
     title: 'Player',
