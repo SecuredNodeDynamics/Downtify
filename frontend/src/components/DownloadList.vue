@@ -216,7 +216,9 @@
                   v-for="item in sortedHistory"
                   :key="item.id"
                   class="queue-item"
-                  :class="{ 'queue-item-playable': canOpenHistoryInPlayer(item) }"
+                  :class="{
+                    'queue-item-playable': canOpenHistoryInPlayer(item),
+                  }"
                 >
                   <button
                     v-if="canOpenHistoryInPlayer(item)"
@@ -251,7 +253,10 @@
                         <span class="truncate text-sm font-semibold">
                           {{ item.title || t('common.unknownTrack') }}
                         </span>
-                        <span :class="historyStatusClass(item)" class="shrink-0">
+                        <span
+                          :class="historyStatusClass(item)"
+                          class="shrink-0"
+                        >
                           {{ historyStatusLabel(item) }}
                         </span>
                       </div>
@@ -291,7 +296,10 @@
                         <span class="truncate text-sm font-semibold">
                           {{ item.title || t('common.unknownTrack') }}
                         </span>
-                        <span :class="historyStatusClass(item)" class="shrink-0">
+                        <span
+                          :class="historyStatusClass(item)"
+                          class="shrink-0"
+                        >
                           {{ historyStatusLabel(item) }}
                         </span>
                       </div>
@@ -327,7 +335,11 @@
                         v-if="retrying[item.id] === true"
                         class="loading loading-spinner loading-xs"
                       />
-                      <Icon v-else icon="clarity:refresh-line" class="h-4 w-4" />
+                      <Icon
+                        v-else
+                        icon="clarity:refresh-line"
+                        class="h-4 w-4"
+                      />
                     </button>
                   </div>
                 </li>

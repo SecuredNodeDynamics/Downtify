@@ -14,8 +14,10 @@
 
 <div align="center">
 
+[![Test](https://github.com/SecuredNodeDynamics/Downtify/actions/workflows/test.yml/badge.svg)](https://github.com/SecuredNodeDynamics/Downtify/actions/workflows/test.yml)
 [![GitHub Release](https://img.shields.io/github/v/release/SecuredNodeDynamics/Downtify?color=blue)](https://github.com/SecuredNodeDynamics/Downtify/releases)
 [![GitHub License](https://img.shields.io/github/license/SecuredNodeDynamics/Downtify?color=blue)](/LICENSE)
+[![GHCR](https://img.shields.io/badge/GHCR-ghcr.io%2Fsecurednodedynamics%2Fdowntify-blue?logo=github)](https://github.com/SecuredNodeDynamics/Downtify/pkgs/container/downtify)
 [![Visitors](https://api.visitorbadge.io/api/visitors?path=SecuredNodeDynamics%2FDowntify&label=repository%20visits&countColor=%231182c3&style=flat)](https://github.com/SecuredNodeDynamics/Downtify)
 
 </div>

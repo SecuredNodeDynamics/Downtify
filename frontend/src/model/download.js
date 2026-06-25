@@ -21,9 +21,7 @@ const STATUS = {
 
 const downloadQueue = ref([])
 const activeQueue = computed(() =>
-  [...downloadQueue.value].sort(
-    (a, b) => (b.queuedAt || 0) - (a.queuedAt || 0)
-  )
+  [...downloadQueue.value].sort((a, b) => (b.queuedAt || 0) - (a.queuedAt || 0))
 )
 const activeDownloadCount = computed(() => activeQueue.value.length)
 
@@ -252,8 +250,8 @@ export function useDownloadManager() {
         return res
       })
       .catch((err) => {
-      console.log('Batch submit failed:', err.message)
-    })
+        console.log('Batch submit failed:', err.message)
+      })
   }
 
   function fromURL(url) {
@@ -364,7 +362,10 @@ export function useDownloadManager() {
       })
       .catch((err) => {
         console.error('retryWithAudio error:', err.message)
-        completeQueueItem(overriddenSong, progressTracker.getBySong(overriddenSong))
+        completeQueueItem(
+          overriddenSong,
+          progressTracker.getBySong(overriddenSong)
+        )
         return { song: overriddenSong, filename: null }
       })
   }

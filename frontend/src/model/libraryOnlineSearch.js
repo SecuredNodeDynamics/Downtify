@@ -97,7 +97,9 @@ export function useLibraryOnlineSearch(queryRef, viewModeRef, enabledRef) {
     timer = setTimeout(runSearch, 350)
   }
 
-  watch([queryRef, viewModeRef, enabledRef], scheduleSearch, { immediate: true })
+  watch([queryRef, viewModeRef, enabledRef], scheduleSearch, {
+    immediate: true,
+  })
 
   onUnmounted(() => {
     clearTimeout(timer)

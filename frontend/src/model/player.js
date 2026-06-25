@@ -147,7 +147,11 @@ function setPlaylist(files, options = {}) {
     } else {
       playAt(options.startIndex)
     }
-  } else if (options.selectFirst && tracks.length > 0 && currentIndex.value < 0) {
+  } else if (
+    options.selectFirst &&
+    tracks.length > 0 &&
+    currentIndex.value < 0
+  ) {
     selectAt(0)
   } else if (options.autoplay && tracks.length > 0 && currentIndex.value < 0) {
     playAt(0)

@@ -194,7 +194,8 @@ export default {
     monitorArtistPickSubtitle:
       'Escolha o artista do Spotify para acompanhar novas faixas e álbuns.',
     monitorArtistMatchScore: '{score}% de correspondência de nome',
-    monitorArtistNotFound: 'Nenhum artista correspondente encontrado no Spotify.',
+    monitorArtistNotFound:
+      'Nenhum artista correspondente encontrado no Spotify.',
     monitorArtistLookupFailed:
       'Não foi possível buscar este artista no Spotify.',
     monitorArtistAddFailed: 'Falha ao adicionar artista ao monitor.',

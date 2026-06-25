@@ -68,7 +68,10 @@
           <p class="truncate text-xs text-base-content/55">
             {{ artistsLabel(item) }}
           </p>
-          <p v-if="item.album_name" class="truncate text-[11px] text-base-content/40">
+          <p
+            v-if="item.album_name"
+            class="truncate text-[11px] text-base-content/40"
+          >
             {{ item.album_name }}
           </p>
         </div>
@@ -89,7 +92,9 @@
           >
             <Icon
               :icon="
-                isQueued(item) ? 'clarity:check-circle-line' : 'clarity:download-line'
+                isQueued(item)
+                  ? 'clarity:check-circle-line'
+                  : 'clarity:download-line'
               "
               class="h-4 w-4"
             />

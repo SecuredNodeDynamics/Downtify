@@ -11,9 +11,9 @@ import requests
 from loguru import logger
 
 from . import artist_image_sources
+from . import musicbrainz as musicbrainz_module
 from .artist_art import _wikimedia_artist_image_url
 from .metadata_repair import artist_search_names
-from . import musicbrainz as musicbrainz_module
 from .musicbrainz import USER_AGENT, _ratio, _throttle_musicbrainz
 
 _SPOTIFY_ARTIST_URL_RE = re.compile(

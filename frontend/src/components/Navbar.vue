@@ -178,6 +178,9 @@ const sm = useSearchManager()
 const { t } = useI18n()
 const { loading: healthRefreshLoading, refresh: refreshHealth } =
   useHealthRefresh()
-const { loading: libraryRefreshLoading, failed: libraryRefreshFailed, refresh: refreshLibrary } =
-  useLibraryRefresh()
+const {
+  loading: libraryRefreshLoading,
+  failed: libraryRefreshFailed,
+  refresh: refreshLibrary,
+} = useLibraryRefresh()
 </script>

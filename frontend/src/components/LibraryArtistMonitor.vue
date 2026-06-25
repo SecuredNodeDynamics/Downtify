@@ -144,8 +144,7 @@ const monitoredEntry = computed(() => {
   if (!target) return null
   return (
     monitoredArtists.value.find(
-      (item) =>
-        item.kind === 'artist' && normalizeName(item.name) === target
+      (item) => item.kind === 'artist' && normalizeName(item.name) === target
     ) || null
   )
 })

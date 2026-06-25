@@ -70,8 +70,11 @@ const route = useRoute()
 const { t } = useI18n()
 const { loading: healthRefreshLoading, refresh: refreshHealth } =
   useHealthRefresh()
-const { loading: libraryRefreshLoading, failed: libraryRefreshFailed, refresh: refreshLibrary } =
-  useLibraryRefresh()
+const {
+  loading: libraryRefreshLoading,
+  failed: libraryRefreshFailed,
+  refresh: refreshLibrary,
+} = useLibraryRefresh()
 
 const showHealthRefresh = computed(() => route.name === 'Health')
 const showLibraryRefresh = computed(() => route.name === 'List')

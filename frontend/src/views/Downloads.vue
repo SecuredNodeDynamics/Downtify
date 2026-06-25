@@ -42,60 +42,60 @@
           </form>
 
           <div class="library-toolbar">
-          <div class="library-tabs">
+            <div class="library-tabs">
+              <button
+                class="library-tab-btn"
+                :class="
+                  viewMode === 'artists'
+                    ? 'library-tab-btn-active'
+                    : 'library-tab-btn-inactive'
+                "
+                @click="showArtists"
+              >
+                {{ t('library.artists') }}
+              </button>
+              <button
+                class="library-tab-btn"
+                :class="
+                  viewMode === 'albums'
+                    ? 'library-tab-btn-active'
+                    : 'library-tab-btn-inactive'
+                "
+                @click="showAlbums"
+              >
+                {{ t('library.albums') }}
+              </button>
+              <button
+                class="library-tab-btn"
+                :class="
+                  viewMode === 'tracks'
+                    ? 'library-tab-btn-active'
+                    : 'library-tab-btn-inactive'
+                "
+                @click="showTracks"
+              >
+                {{ t('library.tracks') }}
+              </button>
+              <button
+                class="library-tab-btn"
+                :class="
+                  viewMode === 'genres'
+                    ? 'library-tab-btn-active'
+                    : 'library-tab-btn-inactive'
+                "
+                @click="showGenres"
+              >
+                {{ t('library.genres') }}
+              </button>
+            </div>
             <button
-              class="library-tab-btn"
-              :class="
-                viewMode === 'artists'
-                  ? 'library-tab-btn-active'
-                  : 'library-tab-btn-inactive'
-              "
-              @click="showArtists"
+              class="library-play-btn"
+              @click="playAll"
+              :title="t('library.play')"
             >
-              {{ t('library.artists') }}
+              <Icon icon="clarity:play-line" class="h-4 w-4" />
+              <span class="hidden sm:inline">{{ t('library.play') }}</span>
             </button>
-            <button
-              class="library-tab-btn"
-              :class="
-                viewMode === 'albums'
-                  ? 'library-tab-btn-active'
-                  : 'library-tab-btn-inactive'
-              "
-              @click="showAlbums"
-            >
-              {{ t('library.albums') }}
-            </button>
-            <button
-              class="library-tab-btn"
-              :class="
-                viewMode === 'tracks'
-                  ? 'library-tab-btn-active'
-                  : 'library-tab-btn-inactive'
-              "
-              @click="showTracks"
-            >
-              {{ t('library.tracks') }}
-            </button>
-            <button
-              class="library-tab-btn"
-              :class="
-                viewMode === 'genres'
-                  ? 'library-tab-btn-active'
-                  : 'library-tab-btn-inactive'
-              "
-              @click="showGenres"
-            >
-              {{ t('library.genres') }}
-            </button>
-          </div>
-          <button
-            class="library-play-btn"
-            @click="playAll"
-            :title="t('library.play')"
-          >
-            <Icon icon="clarity:play-line" class="h-4 w-4" />
-            <span class="hidden sm:inline">{{ t('library.play') }}</span>
-          </button>
           </div>
         </div>
 
@@ -203,313 +203,345 @@
             <div
               class="library-browse-body flex flex-col items-center justify-center"
             >
-            <Icon
-              icon="clarity:library-line"
-              class="mb-4 h-12 w-12 text-base-content/20"
-            />
-            <p class="text-sm text-base-content/50">{{ t('library.empty') }}</p>
-            <p class="mt-1 text-xs text-base-content/40">
-              {{ t('library.emptyHint') }}
-            </p>
-          </div>
+              <Icon
+                icon="clarity:library-line"
+                class="mb-4 h-12 w-12 text-base-content/20"
+              />
+              <p class="text-sm text-base-content/50">
+                {{ t('library.empty') }}
+              </p>
+              <p class="mt-1 text-xs text-base-content/40">
+                {{ t('library.emptyHint') }}
+              </p>
+            </div>
           </div>
         </div>
 
-        <div v-else class="panel-glow-shell panel-glow-shell-grow surface min-h-0 rounded-3xl">
+        <div
+          v-else
+          class="panel-glow-shell panel-glow-shell-grow surface min-h-0 rounded-3xl"
+        >
           <div class="library-browse panel-glow-inner p-3 sm:p-5">
             <div class="library-browse-body">
-          <div v-if="showLibraryNoSearchResults">
-            <div
-              v-if="librarySearchIsUrl"
-              class="flex flex-col items-center gap-4 px-4 py-10 text-center"
-            >
-              <Icon
-                icon="clarity:link-line"
-                class="h-10 w-10 text-base-content/20"
-              />
-              <div>
-                <p class="text-sm font-semibold">
-                  {{ t('library.notInLibrary') }}
-                </p>
-                <p class="mt-1 text-xs text-base-content/50">
-                  {{ t('library.downloadFromLinkHint') }}
-                </p>
-              </div>
-              <button
-                type="button"
-                class="btn btn-primary rounded-full"
-                @click="downloadFromLibrarySearchUrl"
-              >
-                <Icon icon="clarity:download-line" class="h-4 w-4" />
-                {{ t('library.downloadFromLink') }}
-              </button>
-            </div>
-            <template v-else>
-              <div class="mb-1 flex flex-col items-center px-4 py-6 text-center">
-                <Icon
-                  icon="clarity:search-line"
-                  class="mb-3 h-10 w-10 text-base-content/20"
-                />
-                <p class="text-sm text-base-content/50">
-                  {{ t('library.noSearchResults') }}
-                </p>
-              </div>
-              <ServerConnectionPrompt v-if="needsServerConnection()" />
-              <LibraryDownloadOffers
-                v-else
-                :items="onlineResults"
-                :loading="onlineLoading"
-                :error="onlineError"
-                @download="queueOnlineDownload"
-              />
-            </template>
-          </div>
-
-          <ul
-            v-else-if="viewMode === 'artists' && !selectedArtist"
-            class="library-browse-grid"
-          >
-          <li v-for="artist in filteredArtists" :key="artist.name" class="browse-tile-shell">
-            <article
-              class="library-browse-card"
-              role="button"
-              tabindex="0"
-              @click="openArtist(artist.name)"
-              @keydown.enter="openArtist(artist.name)"
-              @keydown.space.prevent="openArtist(artist.name)"
-            >
-              <div class="library-browse-card-cover">
-                <CoverImage
-                  v-if="
-                    artistCoverFor(artist).src ||
-                    artistCoverFor(artist).fallbacks.length
-                  "
-                  :key="`artist:${artist.name}`"
-                  :src="artistCoverFor(artist).src"
-                  :fallbacks="artistCoverFor(artist).fallbacks"
-                  :alt="artist.name"
-                  img-class="absolute inset-0 h-full w-full object-cover"
+              <div v-if="showLibraryNoSearchResults">
+                <div
+                  v-if="librarySearchIsUrl"
+                  class="flex flex-col items-center gap-4 px-4 py-10 text-center"
                 >
-                  <template #fallback>
-                    <Icon
-                      icon="clarity:user-line"
-                      class="absolute left-1/2 top-1/2 h-8 w-8 -translate-x-1/2 -translate-y-1/2 text-base-content/40"
-                    />
-                  </template>
-                </CoverImage>
-                <Icon
-                  v-else
-                  icon="clarity:user-line"
-                  class="absolute left-1/2 top-1/2 h-8 w-8 -translate-x-1/2 -translate-y-1/2 text-base-content/40"
-                />
-                <button
-                  type="button"
-                  class="library-browse-card-play"
-                  :title="t('library.playArtist')"
-                  @click.stop="playArtist(artist)"
-                >
-                  <Icon icon="clarity:play-line" class="h-4 w-4" />
-                </button>
-              </div>
-              <div class="library-browse-card-body">
-                <p class="library-browse-card-title">{{ artist.name }}</p>
-                <p class="library-browse-card-sub">
-                  {{
-                    t('library.artistMeta', {
-                      tracks: artist.files.length,
-                      albums: artist.albumCount,
-                    })
-                  }}
-                </p>
-              </div>
-            </article>
-          </li>
-          </ul>
-
-          <ul
-            v-else-if="
-              (viewMode === 'albums' ||
-                (viewMode === 'artists' && selectedArtist)) &&
-              !selectedAlbum
-            "
-            class="library-browse-grid"
-          >
-          <li v-for="album in filteredVisibleAlbums" :key="album.key" class="browse-tile-shell">
-            <article
-              class="library-browse-card"
-              role="button"
-              tabindex="0"
-              @click="openAlbum(album)"
-              @keydown.enter="openAlbum(album)"
-              @keydown.space.prevent="openAlbum(album)"
-            >
-              <div class="library-browse-card-cover">
-                <CoverImage
-                  :key="album.coverFile"
-                  :src="coverSourcesFor(album.coverFile).src"
-                  :fallbacks="coverSourcesFor(album.coverFile).fallbacks"
-                  :alt="album.name"
-                  img-class="absolute inset-0 h-full w-full object-cover"
-                >
-                  <template #fallback>
-                    <Icon
-                      icon="clarity:album-line"
-                      class="absolute left-1/2 top-1/2 h-8 w-8 -translate-x-1/2 -translate-y-1/2 text-base-content/40"
-                    />
-                  </template>
-                </CoverImage>
-                <button
-                  type="button"
-                  class="library-browse-card-play"
-                  :title="t('library.playAlbum')"
-                  @click.stop="playAlbum(album)"
-                >
-                  <Icon icon="clarity:play-line" class="h-4 w-4" />
-                </button>
-              </div>
-              <div class="library-browse-card-body">
-                <p class="library-browse-card-title">{{ album.name }}</p>
-                <p class="library-browse-card-sub">{{ album.artist }}</p>
-                <p class="library-browse-card-meta">
-                  {{ t('library.albumMeta', { tracks: album.files.length }) }}
-                </p>
-              </div>
-            </article>
-          </li>
-          </ul>
-
-          <ul
-            v-else-if="viewMode === 'genres' && !selectedGenreName"
-            class="library-browse-grid"
-          >
-            <li
-              v-for="genre in filteredGenres"
-              :key="genre.name"
-              class="browse-tile-shell"
-            >
-              <article
-                class="library-browse-card"
-                role="button"
-                tabindex="0"
-                @click="openGenre(genre.name)"
-                @keydown.enter="openGenre(genre.name)"
-                @keydown.space.prevent="openGenre(genre.name)"
-              >
-                <div class="library-browse-card-cover">
-                  <GenreCover :name="genre.name" :files="genre.coverFiles" />
+                  <Icon
+                    icon="clarity:link-line"
+                    class="h-10 w-10 text-base-content/20"
+                  />
+                  <div>
+                    <p class="text-sm font-semibold">
+                      {{ t('library.notInLibrary') }}
+                    </p>
+                    <p class="mt-1 text-xs text-base-content/50">
+                      {{ t('library.downloadFromLinkHint') }}
+                    </p>
+                  </div>
                   <button
                     type="button"
-                    class="library-browse-card-play"
-                    :title="t('library.playGenre')"
-                    @click.stop="playGenre(genre)"
+                    class="btn btn-primary rounded-full"
+                    @click="downloadFromLibrarySearchUrl"
                   >
-                    <Icon icon="clarity:play-line" class="h-4 w-4" />
+                    <Icon icon="clarity:download-line" class="h-4 w-4" />
+                    {{ t('library.downloadFromLink') }}
                   </button>
                 </div>
-                <div class="library-browse-card-body">
-                  <p class="library-browse-card-title">{{ genre.name }}</p>
-                  <p
-                    v-if="genre.subgenres?.length"
-                    class="library-browse-card-sub truncate"
-                  >
-                    {{ genre.subgenres.slice(0, 3).join(' · ') }}
-                  </p>
-                  <p class="library-browse-card-meta">
-                    {{ t('library.genreMeta', { tracks: genre.files.length }) }}
-                  </p>
-                </div>
-              </article>
-            </li>
-          </ul>
-
-          <ul
-            v-else-if="
-              viewMode === 'tracks' ||
-              selectedAlbum ||
-              (selectedArtist && selectedArtistAlbums.length === 0) ||
-              selectedGenreName
-            "
-            class="library-track-list space-y-2"
-          >
-          <li
-            v-for="file in filteredVisibleFiles"
-            :key="file"
-            class="browse-tile-shell"
-          >
-            <div
-              class="library-track-row rounded-2xl border border-primary/20 bg-base-100/90 p-3 sm:p-4 flex items-center gap-3"
-            >
-            <!-- Cover thumb -->
-            <div
-              class="relative h-11 w-11 shrink-0 overflow-hidden rounded-xl bg-base-200/80"
-            >
-              <CoverImage
-                :key="file"
-                :src="coverSourcesFor(file).src"
-                :fallbacks="coverSourcesFor(file).fallbacks"
-                :alt="file"
-                img-class="absolute inset-0 h-full w-full object-cover"
-              >
-                <template #fallback>
+                <template v-else>
                   <div
-                    class="flex h-full w-full items-center justify-center text-base-content/35"
+                    class="mb-1 flex flex-col items-center px-4 py-6 text-center"
                   >
-                    <Icon icon="clarity:music-note-line" class="h-5 w-5" />
+                    <Icon
+                      icon="clarity:search-line"
+                      class="mb-3 h-10 w-10 text-base-content/20"
+                    />
+                    <p class="text-sm text-base-content/50">
+                      {{ t('library.noSearchResults') }}
+                    </p>
                   </div>
+                  <ServerConnectionPrompt v-if="needsServerConnection()" />
+                  <LibraryDownloadOffers
+                    v-else
+                    :items="onlineResults"
+                    :loading="onlineLoading"
+                    :error="onlineError"
+                    @download="queueOnlineDownload"
+                  />
                 </template>
-              </CoverImage>
-            </div>
+              </div>
 
-            <!-- Filename -->
-            <div class="flex-1 min-w-0">
-              <span class="text-sm font-medium truncate block">{{
-                displayName(file)
-              }}</span>
-              <span class="text-xs text-base-content/40">
-                <span v-if="folderOf(file)" class="mr-2 text-primary/70">
-                  <Icon
-                    icon="clarity:folder-line"
-                    class="inline h-3 w-3 mr-0.5 align-text-top"
-                  />{{ folderOf(file) }}
-                </span>
-                {{ formatExt(file) }}
-              </span>
-            </div>
+              <ul
+                v-else-if="viewMode === 'artists' && !selectedArtist"
+                class="library-browse-grid"
+              >
+                <li
+                  v-for="artist in filteredArtists"
+                  :key="artist.name"
+                  class="browse-tile-shell"
+                >
+                  <article
+                    class="library-browse-card"
+                    role="button"
+                    tabindex="0"
+                    @click="openArtist(artist.name)"
+                    @keydown.enter="openArtist(artist.name)"
+                    @keydown.space.prevent="openArtist(artist.name)"
+                  >
+                    <div class="library-browse-card-cover">
+                      <CoverImage
+                        v-if="
+                          artistCoverFor(artist).src ||
+                          artistCoverFor(artist).fallbacks.length
+                        "
+                        :key="`artist:${artist.name}`"
+                        :src="artistCoverFor(artist).src"
+                        :fallbacks="artistCoverFor(artist).fallbacks"
+                        :alt="artist.name"
+                        img-class="absolute inset-0 h-full w-full object-cover"
+                      >
+                        <template #fallback>
+                          <Icon
+                            icon="clarity:user-line"
+                            class="absolute left-1/2 top-1/2 h-8 w-8 -translate-x-1/2 -translate-y-1/2 text-base-content/40"
+                          />
+                        </template>
+                      </CoverImage>
+                      <Icon
+                        v-else
+                        icon="clarity:user-line"
+                        class="absolute left-1/2 top-1/2 h-8 w-8 -translate-x-1/2 -translate-y-1/2 text-base-content/40"
+                      />
+                      <button
+                        type="button"
+                        class="library-browse-card-play"
+                        :title="t('library.playArtist')"
+                        @click.stop="playArtist(artist)"
+                      >
+                        <Icon icon="clarity:play-line" class="h-4 w-4" />
+                      </button>
+                    </div>
+                    <div class="library-browse-card-body">
+                      <p class="library-browse-card-title">{{ artist.name }}</p>
+                      <p class="library-browse-card-sub">
+                        {{
+                          t('library.artistMeta', {
+                            tracks: artist.files.length,
+                            albums: artist.albumCount,
+                          })
+                        }}
+                      </p>
+                    </div>
+                  </article>
+                </li>
+              </ul>
 
-            <!-- Actions -->
-            <div class="flex items-center gap-1 shrink-0">
-              <button
-                class="icon-btn text-primary hover:bg-primary/10"
-                @click="playFile(file)"
-                :title="t('library.play')"
+              <ul
+                v-else-if="
+                  (viewMode === 'albums' ||
+                    (viewMode === 'artists' && selectedArtist)) &&
+                  !selectedAlbum
+                "
+                class="library-browse-grid"
               >
-                <Icon icon="clarity:play-line" class="h-4 w-4" />
-              </button>
-              <a
-                class="icon-btn"
-                :href="API.downloadFileURL(file)"
-                download
-                :title="t('library.downloadToDevice')"
+                <li
+                  v-for="album in filteredVisibleAlbums"
+                  :key="album.key"
+                  class="browse-tile-shell"
+                >
+                  <article
+                    class="library-browse-card"
+                    role="button"
+                    tabindex="0"
+                    @click="openAlbum(album)"
+                    @keydown.enter="openAlbum(album)"
+                    @keydown.space.prevent="openAlbum(album)"
+                  >
+                    <div class="library-browse-card-cover">
+                      <CoverImage
+                        :key="album.coverFile"
+                        :src="coverSourcesFor(album.coverFile).src"
+                        :fallbacks="coverSourcesFor(album.coverFile).fallbacks"
+                        :alt="album.name"
+                        img-class="absolute inset-0 h-full w-full object-cover"
+                      >
+                        <template #fallback>
+                          <Icon
+                            icon="clarity:album-line"
+                            class="absolute left-1/2 top-1/2 h-8 w-8 -translate-x-1/2 -translate-y-1/2 text-base-content/40"
+                          />
+                        </template>
+                      </CoverImage>
+                      <button
+                        type="button"
+                        class="library-browse-card-play"
+                        :title="t('library.playAlbum')"
+                        @click.stop="playAlbum(album)"
+                      >
+                        <Icon icon="clarity:play-line" class="h-4 w-4" />
+                      </button>
+                    </div>
+                    <div class="library-browse-card-body">
+                      <p class="library-browse-card-title">{{ album.name }}</p>
+                      <p class="library-browse-card-sub">{{ album.artist }}</p>
+                      <p class="library-browse-card-meta">
+                        {{
+                          t('library.albumMeta', { tracks: album.files.length })
+                        }}
+                      </p>
+                    </div>
+                  </article>
+                </li>
+              </ul>
+
+              <ul
+                v-else-if="viewMode === 'genres' && !selectedGenreName"
+                class="library-browse-grid"
               >
-                <Icon icon="clarity:download-line" class="h-4 w-4" />
-              </a>
-              <button
-                class="icon-btn text-error/70 hover:text-error hover:bg-error/10"
-                :disabled="deleting[file] === true"
-                @click="onDelete(file)"
-                :title="t('library.deleteFile')"
+                <li
+                  v-for="genre in filteredGenres"
+                  :key="genre.name"
+                  class="browse-tile-shell"
+                >
+                  <article
+                    class="library-browse-card"
+                    role="button"
+                    tabindex="0"
+                    @click="openGenre(genre.name)"
+                    @keydown.enter="openGenre(genre.name)"
+                    @keydown.space.prevent="openGenre(genre.name)"
+                  >
+                    <div class="library-browse-card-cover">
+                      <GenreCover
+                        :name="genre.name"
+                        :files="genre.coverFiles"
+                      />
+                      <button
+                        type="button"
+                        class="library-browse-card-play"
+                        :title="t('library.playGenre')"
+                        @click.stop="playGenre(genre)"
+                      >
+                        <Icon icon="clarity:play-line" class="h-4 w-4" />
+                      </button>
+                    </div>
+                    <div class="library-browse-card-body">
+                      <p class="library-browse-card-title">{{ genre.name }}</p>
+                      <p
+                        v-if="genre.subgenres?.length"
+                        class="library-browse-card-sub truncate"
+                      >
+                        {{ genre.subgenres.slice(0, 3).join(' · ') }}
+                      </p>
+                      <p class="library-browse-card-meta">
+                        {{
+                          t('library.genreMeta', { tracks: genre.files.length })
+                        }}
+                      </p>
+                    </div>
+                  </article>
+                </li>
+              </ul>
+
+              <ul
+                v-else-if="
+                  viewMode === 'tracks' ||
+                  selectedAlbum ||
+                  (selectedArtist && selectedArtistAlbums.length === 0) ||
+                  selectedGenreName
+                "
+                class="library-track-list space-y-2"
               >
-                <span
-                  v-if="deleting[file] === true"
-                  class="loading loading-spinner loading-xs"
-                />
-                <Icon v-else icon="clarity:trash-line" class="h-4 w-4" />
-              </button>
+                <li
+                  v-for="file in filteredVisibleFiles"
+                  :key="file"
+                  class="browse-tile-shell"
+                >
+                  <div
+                    class="library-track-row rounded-2xl border border-primary/20 bg-base-100/90 p-3 sm:p-4 flex items-center gap-3"
+                  >
+                    <!-- Cover thumb -->
+                    <div
+                      class="relative h-11 w-11 shrink-0 overflow-hidden rounded-xl bg-base-200/80"
+                    >
+                      <CoverImage
+                        :key="file"
+                        :src="coverSourcesFor(file).src"
+                        :fallbacks="coverSourcesFor(file).fallbacks"
+                        :alt="file"
+                        img-class="absolute inset-0 h-full w-full object-cover"
+                      >
+                        <template #fallback>
+                          <div
+                            class="flex h-full w-full items-center justify-center text-base-content/35"
+                          >
+                            <Icon
+                              icon="clarity:music-note-line"
+                              class="h-5 w-5"
+                            />
+                          </div>
+                        </template>
+                      </CoverImage>
+                    </div>
+
+                    <!-- Filename -->
+                    <div class="flex-1 min-w-0">
+                      <span class="text-sm font-medium truncate block">{{
+                        displayName(file)
+                      }}</span>
+                      <span class="text-xs text-base-content/40">
+                        <span
+                          v-if="folderOf(file)"
+                          class="mr-2 text-primary/70"
+                        >
+                          <Icon
+                            icon="clarity:folder-line"
+                            class="inline h-3 w-3 mr-0.5 align-text-top"
+                          />{{ folderOf(file) }}
+                        </span>
+                        {{ formatExt(file) }}
+                      </span>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="flex items-center gap-1 shrink-0">
+                      <button
+                        class="icon-btn text-primary hover:bg-primary/10"
+                        @click="playFile(file)"
+                        :title="t('library.play')"
+                      >
+                        <Icon icon="clarity:play-line" class="h-4 w-4" />
+                      </button>
+                      <a
+                        class="icon-btn"
+                        :href="API.downloadFileURL(file)"
+                        download
+                        :title="t('library.downloadToDevice')"
+                      >
+                        <Icon icon="clarity:download-line" class="h-4 w-4" />
+                      </a>
+                      <button
+                        class="icon-btn text-error/70 hover:text-error hover:bg-error/10"
+                        :disabled="deleting[file] === true"
+                        @click="onDelete(file)"
+                        :title="t('library.deleteFile')"
+                      >
+                        <span
+                          v-if="deleting[file] === true"
+                          class="loading loading-spinner loading-xs"
+                        />
+                        <Icon
+                          v-else
+                          icon="clarity:trash-line"
+                          class="h-4 w-4"
+                        />
+                      </button>
+                    </div>
+                  </div>
+                </li>
+              </ul>
             </div>
-            </div>
-          </li>
-          </ul>
-          </div>
           </div>
         </div>
       </div>
@@ -518,7 +550,15 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, onActivated, onDeactivated, onUnmounted } from 'vue'
+import {
+  ref,
+  computed,
+  watch,
+  onMounted,
+  onActivated,
+  onDeactivated,
+  onUnmounted,
+} from 'vue'
 import { Icon } from '@iconify/vue'
 import { useRouter } from 'vue-router'
 import Navbar from '/src/components/Navbar.vue'

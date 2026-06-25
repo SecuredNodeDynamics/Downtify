@@ -438,8 +438,7 @@ async function onToggle(pl) {
   } catch (err) {
     actionErrors.value = {
       ...actionErrors.value,
-      [pl.id]:
-        err?.response?.data?.detail || t('monitor.failedUpdate'),
+      [pl.id]: err?.response?.data?.detail || t('monitor.failedUpdate'),
     }
   }
 }
@@ -470,8 +469,7 @@ async function onApplyInterval(pl) {
     }
     intervalErrors.value = {
       ...intervalErrors.value,
-      [pl.id]:
-        err?.response?.data?.detail || t('monitor.failedApplyInterval'),
+      [pl.id]: err?.response?.data?.detail || t('monitor.failedApplyInterval'),
     }
   } finally {
     applyingInterval.value = { ...applyingInterval.value, [pl.id]: false }
@@ -497,8 +495,7 @@ async function onCheck(pl) {
   } catch (err) {
     actionErrors.value = {
       ...actionErrors.value,
-      [pl.id]:
-        err?.response?.data?.detail || t('monitor.checkFailed'),
+      [pl.id]: err?.response?.data?.detail || t('monitor.checkFailed'),
     }
   } finally {
     checking.value = { ...checking.value, [pl.id]: false }

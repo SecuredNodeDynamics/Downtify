@@ -47,511 +47,551 @@
           <div
             class="player-now flex flex-col items-center rounded-3xl p-3 text-center sm:p-8"
           >
-          <!-- Cover -->
-          <div
-            class="player-cover relative flex items-center justify-center overflow-hidden rounded-2xl bg-primary/10 text-primary shadow-glow sm:rounded-3xl"
-            :class="{ 'pulse-glow': player.isPlaying.value }"
-          >
-            <CoverImage
-              v-if="
-                currentCoverSources.src || currentCoverSources.fallbacks.length
-              "
-              :key="player.currentTrack.value?.file || libraryItems[0]?.file || 'player-cover'"
-              :src="currentCoverSources.src"
-              :fallbacks="currentCoverSources.fallbacks"
-              :alt="trackTitle"
-              img-class="absolute inset-0 h-full w-full object-cover"
-            >
-              <template #fallback>
-                <Icon
-                  icon="clarity:music-note-line"
-                  class="h-16 w-16 sm:h-24 sm:w-24"
-                />
-              </template>
-            </CoverImage>
-            <Icon
-              v-else
-              icon="clarity:music-note-line"
-              class="h-16 w-16 sm:h-24 sm:w-24"
-            />
+            <!-- Cover -->
             <div
-              v-if="player.isPlaying.value"
-              class="absolute bottom-2 right-2 equalizer h-5 sm:bottom-3 sm:right-3"
-              aria-hidden="true"
+              class="player-cover relative flex items-center justify-center overflow-hidden rounded-2xl bg-primary/10 text-primary shadow-glow sm:rounded-3xl"
+              :class="{ 'pulse-glow': player.isPlaying.value }"
             >
-              <span></span><span></span><span></span>
-            </div>
-          </div>
-
-          <!-- Title / artist -->
-          <div class="mt-3 w-full sm:mt-6">
-            <p class="text-lg font-bold tracking-tight truncate sm:text-xl">
-              {{ trackTitle }}
-            </p>
-            <p class="mt-0.5 text-sm text-base-content/60 truncate">
-              {{ trackArtist }}
-            </p>
-          </div>
-
-          <!-- Progress -->
-          <div class="mt-3 w-full sm:mt-6">
-            <div
-              class="player-progress"
-              :class="{ 'player-progress--scrubbing': isScrubbing }"
-              ref="progressBar"
-              role="slider"
-              tabindex="0"
-              :aria-label="t('player.seek')"
-              :aria-valuemin="0"
-              :aria-valuemax="Math.floor(player.duration.value || 0)"
-              :aria-valuenow="Math.floor(player.currentTime.value || 0)"
-              :aria-valuetext="`${formatTime(player.currentTime.value)} / ${formatTime(player.duration.value)}`"
-              @pointerdown="onSeekStart"
-              @keydown="onSeekKeydown"
-            >
-              <div class="player-progress-track" ref="progressTrack">
-                <div
-                  class="player-progress-fill"
-                  :style="{ width: `${displayProgressPct}%` }"
-                />
-                <div
-                  class="player-progress-thumb"
-                  :style="{ left: `${displayProgressPct}%` }"
-                />
+              <CoverImage
+                v-if="
+                  currentCoverSources.src ||
+                  currentCoverSources.fallbacks.length
+                "
+                :key="
+                  player.currentTrack.value?.file ||
+                  libraryItems[0]?.file ||
+                  'player-cover'
+                "
+                :src="currentCoverSources.src"
+                :fallbacks="currentCoverSources.fallbacks"
+                :alt="trackTitle"
+                img-class="absolute inset-0 h-full w-full object-cover"
+              >
+                <template #fallback>
+                  <Icon
+                    icon="clarity:music-note-line"
+                    class="h-16 w-16 sm:h-24 sm:w-24"
+                  />
+                </template>
+              </CoverImage>
+              <Icon
+                v-else
+                icon="clarity:music-note-line"
+                class="h-16 w-16 sm:h-24 sm:w-24"
+              />
+              <div
+                v-if="player.isPlaying.value"
+                class="absolute bottom-2 right-2 equalizer h-5 sm:bottom-3 sm:right-3"
+                aria-hidden="true"
+              >
+                <span></span><span></span><span></span>
               </div>
             </div>
-            <div
-              class="mt-1 flex items-center justify-between text-xs text-base-content/50 tabular-nums sm:mt-2"
-            >
-              <span>{{ formatTime(player.currentTime.value) }}</span>
-              <span>{{ formatTime(player.duration.value) }}</span>
+
+            <!-- Title / artist -->
+            <div class="mt-3 w-full sm:mt-6">
+              <p class="text-lg font-bold tracking-tight truncate sm:text-xl">
+                {{ trackTitle }}
+              </p>
+              <p class="mt-0.5 text-sm text-base-content/60 truncate">
+                {{ trackArtist }}
+              </p>
             </div>
-          </div>
 
-          <!-- Transport -->
-          <div
-            class="mt-3 flex items-center justify-center gap-2 sm:mt-5 sm:gap-3"
-          >
-            <button
-              class="icon-btn h-9 w-9 sm:h-10 sm:w-10"
-              :class="{ 'icon-btn-active': player.shuffle.value }"
-              @click="player.toggleShuffle()"
-              :title="
-                player.shuffle.value
-                  ? t('player.shuffleOn')
-                  : t('player.shuffleOff')
-              "
-            >
-              <Icon icon="clarity:shuffle-line" class="h-4 w-4 sm:h-5 sm:w-5" />
-            </button>
-            <button
-              class="icon-btn h-10 w-10 sm:h-10 sm:w-10"
-              @click="player.prev()"
-              :title="t('player.previous')"
-              :disabled="files.length === 0"
-            >
-              <Icon
-                icon="clarity:step-forward-2-line"
-                class="h-5 w-5 -scale-x-100"
-              />
-            </button>
-            <button
-              class="player-play-btn inline-flex items-center justify-center rounded-full bg-primary text-primary-content shadow-glow-sm transition hover:scale-105 active:scale-95 disabled:opacity-50"
-              @click="player.toggle()"
-              :disabled="files.length === 0"
-              :title="
-                player.isPlaying.value ? t('player.pause') : t('player.play')
-              "
-            >
-              <Icon
-                :icon="
-                  player.isPlaying.value
-                    ? 'clarity:pause-solid'
-                    : 'clarity:play-solid'
-                "
-                class="h-7 w-7 sm:h-6 sm:w-6"
-              />
-            </button>
-            <button
-              class="icon-btn h-10 w-10 sm:h-10 sm:w-10"
-              @click="player.next()"
-              :title="t('player.next')"
-              :disabled="files.length === 0"
-            >
-              <Icon icon="clarity:step-forward-2-line" class="h-5 w-5" />
-            </button>
-            <button
-              class="icon-btn relative h-9 w-9 sm:h-10 sm:w-10"
-              :class="{ 'icon-btn-active': player.repeatMode.value !== 'off' }"
-              @click="player.cycleRepeat()"
-              :title="repeatTitle"
-            >
-              <Icon icon="clarity:refresh-line" class="h-4 w-4 sm:h-5 sm:w-5" />
-              <span
-                v-if="player.repeatMode.value === 'one'"
-                class="absolute -bottom-0.5 -right-0.5 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-primary px-1 text-[9px] font-bold text-primary-content"
+            <!-- Progress -->
+            <div class="mt-3 w-full sm:mt-6">
+              <div
+                class="player-progress"
+                :class="{ 'player-progress--scrubbing': isScrubbing }"
+                ref="progressBar"
+                role="slider"
+                tabindex="0"
+                :aria-label="t('player.seek')"
+                :aria-valuemin="0"
+                :aria-valuemax="Math.floor(player.duration.value || 0)"
+                :aria-valuenow="Math.floor(player.currentTime.value || 0)"
+                :aria-valuetext="`${formatTime(
+                  player.currentTime.value
+                )} / ${formatTime(player.duration.value)}`"
+                @pointerdown="onSeekStart"
+                @keydown="onSeekKeydown"
               >
-                1
-              </span>
-            </button>
-          </div>
+                <div class="player-progress-track" ref="progressTrack">
+                  <div
+                    class="player-progress-fill"
+                    :style="{ width: `${displayProgressPct}%` }"
+                  />
+                  <div
+                    class="player-progress-thumb"
+                    :style="{ left: `${displayProgressPct}%` }"
+                  />
+                </div>
+              </div>
+              <div
+                class="mt-1 flex items-center justify-between text-xs text-base-content/50 tabular-nums sm:mt-2"
+              >
+                <span>{{ formatTime(player.currentTime.value) }}</span>
+                <span>{{ formatTime(player.duration.value) }}</span>
+              </div>
+            </div>
 
-          <!-- Volume (desktop only — mobile uses device volume) -->
-          <div class="mt-6 hidden w-full max-w-xs items-center gap-3 lg:flex">
-            <button
-              class="icon-btn"
-              @click="player.toggleMute()"
-              :title="
-                player.isMuted.value ? t('player.unmute') : t('player.mute')
-              "
+            <!-- Transport -->
+            <div
+              class="mt-3 flex items-center justify-center gap-2 sm:mt-5 sm:gap-3"
             >
-              <Icon
-                :icon="
-                  player.isMuted.value || player.volume.value === 0
-                    ? 'clarity:volume-mute-line'
-                    : player.volume.value < 0.5
-                    ? 'clarity:volume-down-line'
-                    : 'clarity:volume-up-line'
+              <button
+                class="icon-btn h-9 w-9 sm:h-10 sm:w-10"
+                :class="{ 'icon-btn-active': player.shuffle.value }"
+                @click="player.toggleShuffle()"
+                :title="
+                  player.shuffle.value
+                    ? t('player.shuffleOn')
+                    : t('player.shuffleOff')
                 "
-                class="h-5 w-5"
+              >
+                <Icon
+                  icon="clarity:shuffle-line"
+                  class="h-4 w-4 sm:h-5 sm:w-5"
+                />
+              </button>
+              <button
+                class="icon-btn h-10 w-10 sm:h-10 sm:w-10"
+                @click="player.prev()"
+                :title="t('player.previous')"
+                :disabled="files.length === 0"
+              >
+                <Icon
+                  icon="clarity:step-forward-2-line"
+                  class="h-5 w-5 -scale-x-100"
+                />
+              </button>
+              <button
+                class="player-play-btn inline-flex items-center justify-center rounded-full bg-primary text-primary-content shadow-glow-sm transition hover:scale-105 active:scale-95 disabled:opacity-50"
+                @click="player.toggle()"
+                :disabled="files.length === 0"
+                :title="
+                  player.isPlaying.value ? t('player.pause') : t('player.play')
+                "
+              >
+                <Icon
+                  :icon="
+                    player.isPlaying.value
+                      ? 'clarity:pause-solid'
+                      : 'clarity:play-solid'
+                  "
+                  class="h-7 w-7 sm:h-6 sm:w-6"
+                />
+              </button>
+              <button
+                class="icon-btn h-10 w-10 sm:h-10 sm:w-10"
+                @click="player.next()"
+                :title="t('player.next')"
+                :disabled="files.length === 0"
+              >
+                <Icon icon="clarity:step-forward-2-line" class="h-5 w-5" />
+              </button>
+              <button
+                class="icon-btn relative h-9 w-9 sm:h-10 sm:w-10"
+                :class="{
+                  'icon-btn-active': player.repeatMode.value !== 'off',
+                }"
+                @click="player.cycleRepeat()"
+                :title="repeatTitle"
+              >
+                <Icon
+                  icon="clarity:refresh-line"
+                  class="h-4 w-4 sm:h-5 sm:w-5"
+                />
+                <span
+                  v-if="player.repeatMode.value === 'one'"
+                  class="absolute -bottom-0.5 -right-0.5 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-primary px-1 text-[9px] font-bold text-primary-content"
+                >
+                  1
+                </span>
+              </button>
+            </div>
+
+            <!-- Volume (desktop only — mobile uses device volume) -->
+            <div class="mt-6 hidden w-full max-w-xs items-center gap-3 lg:flex">
+              <button
+                class="icon-btn"
+                @click="player.toggleMute()"
+                :title="
+                  player.isMuted.value ? t('player.unmute') : t('player.mute')
+                "
+              >
+                <Icon
+                  :icon="
+                    player.isMuted.value || player.volume.value === 0
+                      ? 'clarity:volume-mute-line'
+                      : player.volume.value < 0.5
+                      ? 'clarity:volume-down-line'
+                      : 'clarity:volume-up-line'
+                  "
+                  class="h-5 w-5"
+                />
+              </button>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                :value="player.isMuted.value ? 0 : player.volume.value"
+                @input="onVolume($event)"
+                class="player-range flex-1"
+                :title="t('player.volume')"
               />
-            </button>
-            <input
-              type="range"
-              min="0"
-              max="1"
-              step="0.01"
-              :value="player.isMuted.value ? 0 : player.volume.value"
-              @input="onVolume($event)"
-              class="player-range flex-1"
-              :title="t('player.volume')"
-            />
-          </div>
+            </div>
           </div>
         </section>
 
         <!-- Library browser -->
-        <aside class="panel-glow-shell panel-glow-shell-grow surface min-h-0 rounded-3xl">
+        <aside
+          class="panel-glow-shell panel-glow-shell-grow surface min-h-0 rounded-3xl"
+        >
           <div
             class="player-queue panel-glow-inner flex flex-col gap-3 p-3 sm:gap-3 sm:p-5"
           >
-          <div class="player-browse-chrome shrink-0 space-y-2 sm:space-y-3">
-            <div
-              v-if="browsePlayFiles.length"
-              class="flex justify-end px-1"
-            >
-              <button
-                type="button"
-                class="btn btn-primary btn-xs h-8 rounded-full px-3"
-                @click="playFiles(browsePlayFiles)"
-              >
-                <Icon icon="clarity:play-line" class="h-3.5 w-3.5" />
-                {{ t('player.playAll') }}
-              </button>
-            </div>
-
-            <button
-              v-if="canBrowseBack"
-              type="button"
-              class="inline-flex max-w-full items-center gap-1 rounded-full bg-white/5 px-3 py-1.5 text-xs font-medium text-primary"
-              @click="browseBack"
-            >
-              <Icon
-                icon="clarity:arrow-line"
-                class="h-3.5 w-3.5 -scale-x-100"
-              />
-              <span class="truncate">{{ browseBackLabel }}</span>
-            </button>
-
-            <div
-              v-if="!canBrowseBack"
-              class="player-browse-tabs"
-              role="tablist"
-              :aria-label="t('player.browse')"
-            >
-              <button
-                v-for="tab in browseTabs"
-                :key="tab.id"
-                type="button"
-                role="tab"
-                class="player-browse-tab-btn"
-                :class="
-                  browseMode === tab.id
-                    ? 'player-browse-tab-btn-active'
-                    : 'player-browse-tab-btn-inactive'
-                "
-                :aria-selected="browseMode === tab.id"
-                @click="setBrowseMode(tab.id)"
-              >
-                {{ tab.shortLabel }}
-              </button>
-            </div>
-
-            <form
-              class="player-browse-search"
-              @submit.prevent
-            >
-              <div class="relative min-w-0 flex-1">
-                <input
-                  v-model="browseSearchQuery"
-                  type="text"
-                  inputmode="search"
-                  enterkeyhint="search"
-                  autocomplete="off"
-                  autocapitalize="off"
-                  autocorrect="off"
-                  spellcheck="false"
-                  class="input-modern h-12 w-full text-sm"
-                  :placeholder="t('player.browseSearchPlaceholder')"
-                  :aria-label="t('player.browseSearchPlaceholder')"
-                />
-                <button
-                  type="submit"
-                  class="absolute right-1.5 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-primary text-primary-content shadow-glow-sm"
-                  :disabled="!browseFilter"
-                >
-                  <Icon icon="clarity:search-line" class="h-4 w-4" />
-                </button>
-              </div>
-            </form>
-          </div>
-
-          <div class="player-browse-body min-h-0 flex-1 overflow-y-auto">
-            <div
-              v-if="loading && libraryItems.length === 0"
-              class="player-browse-grid"
-            >
-              <div
-                v-for="n in 6"
-                :key="n"
-                class="skeleton aspect-[4/5] rounded-2xl"
-              />
-            </div>
-
-            <ul v-else-if="browseView === 'artists'" class="player-browse-grid">
-              <li v-for="artist in filteredArtists" :key="artist.name" class="browse-tile-shell">
-                <article
-                  class="player-browse-card"
-                  role="button"
-                  tabindex="0"
-                  @click="openArtist(artist.name)"
-                  @keydown.enter="openArtist(artist.name)"
-                  @keydown.space.prevent="openArtist(artist.name)"
-                >
-                  <div class="player-browse-card-cover">
-                    <CoverImage
-                      v-if="
-                        artistCoverFor(artist).src ||
-                        artistCoverFor(artist).fallbacks.length
-                      "
-                      :key="`artist:${artist.name}`"
-                      :src="artistCoverFor(artist).src"
-                      :fallbacks="artistCoverFor(artist).fallbacks"
-                      :alt="artist.name"
-                      img-class="absolute inset-0 h-full w-full object-cover"
-                    >
-                      <template #fallback>
-                        <Icon
-                          icon="clarity:user-line"
-                          class="absolute left-1/2 top-1/2 h-8 w-8 -translate-x-1/2 -translate-y-1/2 text-base-content/40"
-                        />
-                      </template>
-                    </CoverImage>
-                    <Icon
-                      v-else
-                      icon="clarity:user-line"
-                      class="absolute left-1/2 top-1/2 h-8 w-8 -translate-x-1/2 -translate-y-1/2 text-base-content/40"
-                    />
-                    <button
-                      type="button"
-                      class="player-browse-card-play"
-                      :title="t('library.playArtist')"
-                      @click.stop="playFiles(artist.files)"
-                    >
-                      <Icon icon="clarity:play-line" class="h-4 w-4" />
-                    </button>
-                  </div>
-                  <div class="player-browse-card-body">
-                    <p class="player-browse-card-title">{{ artist.name }}</p>
-                    <p class="player-browse-card-sub">
-                      {{
-                        t('library.artistMeta', {
-                          tracks: artist.files.length,
-                          albums: artist.albumCount,
-                        })
-                      }}
-                    </p>
-                  </div>
-                </article>
-              </li>
-            </ul>
-
-            <ul
-              v-else-if="
-                browseView === 'albums' || browseView === 'artist-albums'
-              "
-              class="player-browse-grid"
-            >
-              <li v-for="album in visibleAlbums" :key="album.key" class="browse-tile-shell">
-                <article
-                  class="player-browse-card"
-                  role="button"
-                  tabindex="0"
-                  @click="openAlbum(album.key)"
-                  @keydown.enter="openAlbum(album.key)"
-                  @keydown.space.prevent="openAlbum(album.key)"
-                >
-                  <div class="player-browse-card-cover">
-                    <CoverImage
-                      :key="album.coverFile"
-                      :src="coverSourcesFor(album.coverFile).src"
-                      :fallbacks="coverSourcesFor(album.coverFile).fallbacks"
-                      :alt="album.name"
-                      img-class="absolute inset-0 h-full w-full object-cover"
-                    >
-                      <template #fallback>
-                        <Icon
-                          icon="clarity:album-line"
-                          class="absolute left-1/2 top-1/2 h-8 w-8 -translate-x-1/2 -translate-y-1/2 text-base-content/40"
-                        />
-                      </template>
-                    </CoverImage>
-                    <button
-                      type="button"
-                      class="player-browse-card-play"
-                      :title="t('library.playAlbum')"
-                      @click.stop="playFiles(album.files)"
-                    >
-                      <Icon icon="clarity:play-line" class="h-4 w-4" />
-                    </button>
-                  </div>
-                  <div class="player-browse-card-body">
-                    <p class="player-browse-card-title">{{ album.name }}</p>
-                    <p class="player-browse-card-sub">{{ album.artist }}</p>
-                    <p class="player-browse-card-meta">
-                      {{
-                        t('library.albumMeta', { tracks: album.files.length })
-                      }}
-                    </p>
-                  </div>
-                </article>
-              </li>
-            </ul>
-
-            <ul v-else-if="browseView === 'genres'" class="player-browse-grid">
-              <li v-for="genre in filteredGenres" :key="genre.name" class="browse-tile-shell">
-                <article
-                  class="player-browse-card"
-                  role="button"
-                  tabindex="0"
-                  @click="openGenre(genre.name)"
-                  @keydown.enter="openGenre(genre.name)"
-                  @keydown.space.prevent="openGenre(genre.name)"
-                >
-                  <div class="player-browse-card-cover">
-                    <GenreCover :name="genre.name" :files="genre.coverFiles" />
-                    <button
-                      type="button"
-                      class="player-browse-card-play"
-                      :title="t('library.playGenre')"
-                      @click.stop="playFiles(genre.files)"
-                    >
-                      <Icon icon="clarity:play-line" class="h-4 w-4" />
-                    </button>
-                  </div>
-                  <div class="player-browse-card-body">
-                    <p class="player-browse-card-title">{{ genre.name }}</p>
-                    <p
-                      v-if="genre.subgenres?.length"
-                      class="player-browse-card-sub truncate"
-                    >
-                      {{ genre.subgenres.slice(0, 3).join(' · ') }}
-                    </p>
-                    <p class="player-browse-card-meta">
-                      {{ t('player.genreMeta', { count: genre.files.length }) }}
-                    </p>
-                  </div>
-                </article>
-              </li>
-            </ul>
-
-            <ul
-              v-else-if="
-                browseView === 'tracks' && visibleTrackItems.length > 0
-              "
-              class="player-browse-grid"
-            >
-              <li v-for="item in visibleTrackItems" :key="item.file" class="browse-tile-shell">
+            <div class="player-browse-chrome shrink-0 space-y-2 sm:space-y-3">
+              <div v-if="browsePlayFiles.length" class="flex justify-end px-1">
                 <button
                   type="button"
-                  class="player-browse-card"
-                  :class="{
-                    'player-browse-card-active': isCurrentFile(item.file),
-                  }"
-                  @click="playFiles(visibleTrackFiles, item.file)"
+                  class="btn btn-primary btn-xs h-8 rounded-full px-3"
+                  @click="playFiles(browsePlayFiles)"
                 >
-                  <div
-                    class="player-browse-card-cover"
-                    :class="{
-                      'ring-2 ring-primary/50': isCurrentFile(item.file),
-                    }"
-                  >
-                    <CoverImage
-                      :key="item.file"
-                      :src="coverSourcesFor(item.file).src"
-                      :fallbacks="coverSourcesFor(item.file).fallbacks"
-                      :alt="item.title"
-                      img-class="absolute inset-0 h-full w-full object-cover"
-                    >
-                      <template #fallback>
-                        <Icon
-                          icon="clarity:music-note-line"
-                          class="absolute left-1/2 top-1/2 h-8 w-8 -translate-x-1/2 -translate-y-1/2 text-base-content/40"
-                        />
-                      </template>
-                    </CoverImage>
-                    <span
-                      v-if="isCurrentFile(item.file) && player.isPlaying.value"
-                      class="absolute bottom-2 right-2 equalizer h-4"
-                      aria-hidden="true"
-                    >
-                      <span></span><span></span><span></span>
-                    </span>
-                  </div>
-                  <div class="player-browse-card-body">
-                    <p class="player-browse-card-title">{{ item.title }}</p>
-                    <p class="player-browse-card-sub">
-                      {{ item.artist || t('common.unknownArtist') }}
-                      <span v-if="item.album"> · {{ item.album }}</span>
-                    </p>
-                  </div>
+                  <Icon icon="clarity:play-line" class="h-3.5 w-3.5" />
+                  {{ t('player.playAll') }}
                 </button>
-              </li>
-            </ul>
+              </div>
 
-            <div v-else-if="browseFilter && playerBrowseEmptyWithFilter">
-              <ServerConnectionPrompt v-if="needsServerConnection()" />
-              <LibraryDownloadOffers
-                v-else
-                :items="playerOnlineResults"
-                :loading="playerOnlineLoading"
-                :error="playerOnlineError"
-                @download="queueOnlineDownload"
-              />
+              <button
+                v-if="canBrowseBack"
+                type="button"
+                class="inline-flex max-w-full items-center gap-1 rounded-full bg-white/5 px-3 py-1.5 text-xs font-medium text-primary"
+                @click="browseBack"
+              >
+                <Icon
+                  icon="clarity:arrow-line"
+                  class="h-3.5 w-3.5 -scale-x-100"
+                />
+                <span class="truncate">{{ browseBackLabel }}</span>
+              </button>
+
+              <div
+                v-if="!canBrowseBack"
+                class="player-browse-tabs"
+                role="tablist"
+                :aria-label="t('player.browse')"
+              >
+                <button
+                  v-for="tab in browseTabs"
+                  :key="tab.id"
+                  type="button"
+                  role="tab"
+                  class="player-browse-tab-btn"
+                  :class="
+                    browseMode === tab.id
+                      ? 'player-browse-tab-btn-active'
+                      : 'player-browse-tab-btn-inactive'
+                  "
+                  :aria-selected="browseMode === tab.id"
+                  @click="setBrowseMode(tab.id)"
+                >
+                  {{ tab.shortLabel }}
+                </button>
+              </div>
+
+              <form class="player-browse-search" @submit.prevent>
+                <div class="relative min-w-0 flex-1">
+                  <input
+                    v-model="browseSearchQuery"
+                    type="text"
+                    inputmode="search"
+                    enterkeyhint="search"
+                    autocomplete="off"
+                    autocapitalize="off"
+                    autocorrect="off"
+                    spellcheck="false"
+                    class="input-modern h-12 w-full text-sm"
+                    :placeholder="t('player.browseSearchPlaceholder')"
+                    :aria-label="t('player.browseSearchPlaceholder')"
+                  />
+                  <button
+                    type="submit"
+                    class="absolute right-1.5 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-primary text-primary-content shadow-glow-sm"
+                    :disabled="!browseFilter"
+                  >
+                    <Icon icon="clarity:search-line" class="h-4 w-4" />
+                  </button>
+                </div>
+              </form>
             </div>
 
-            <div v-else-if="browseFilter" class="py-10 text-center">
-              <p class="text-sm text-base-content/50">
-                {{ t('player.noFilterResults') }}
-              </p>
-            </div>
+            <div class="player-browse-body min-h-0 flex-1 overflow-y-auto">
+              <div
+                v-if="loading && libraryItems.length === 0"
+                class="player-browse-grid"
+              >
+                <div
+                  v-for="n in 6"
+                  :key="n"
+                  class="skeleton aspect-[4/5] rounded-2xl"
+                />
+              </div>
 
-            <div v-else class="py-10 text-center">
-              <p class="text-sm text-base-content/50">
-                {{ t('player.empty') }}
-              </p>
+              <ul
+                v-else-if="browseView === 'artists'"
+                class="player-browse-grid"
+              >
+                <li
+                  v-for="artist in filteredArtists"
+                  :key="artist.name"
+                  class="browse-tile-shell"
+                >
+                  <article
+                    class="player-browse-card"
+                    role="button"
+                    tabindex="0"
+                    @click="openArtist(artist.name)"
+                    @keydown.enter="openArtist(artist.name)"
+                    @keydown.space.prevent="openArtist(artist.name)"
+                  >
+                    <div class="player-browse-card-cover">
+                      <CoverImage
+                        v-if="
+                          artistCoverFor(artist).src ||
+                          artistCoverFor(artist).fallbacks.length
+                        "
+                        :key="`artist:${artist.name}`"
+                        :src="artistCoverFor(artist).src"
+                        :fallbacks="artistCoverFor(artist).fallbacks"
+                        :alt="artist.name"
+                        img-class="absolute inset-0 h-full w-full object-cover"
+                      >
+                        <template #fallback>
+                          <Icon
+                            icon="clarity:user-line"
+                            class="absolute left-1/2 top-1/2 h-8 w-8 -translate-x-1/2 -translate-y-1/2 text-base-content/40"
+                          />
+                        </template>
+                      </CoverImage>
+                      <Icon
+                        v-else
+                        icon="clarity:user-line"
+                        class="absolute left-1/2 top-1/2 h-8 w-8 -translate-x-1/2 -translate-y-1/2 text-base-content/40"
+                      />
+                      <button
+                        type="button"
+                        class="player-browse-card-play"
+                        :title="t('library.playArtist')"
+                        @click.stop="playFiles(artist.files)"
+                      >
+                        <Icon icon="clarity:play-line" class="h-4 w-4" />
+                      </button>
+                    </div>
+                    <div class="player-browse-card-body">
+                      <p class="player-browse-card-title">{{ artist.name }}</p>
+                      <p class="player-browse-card-sub">
+                        {{
+                          t('library.artistMeta', {
+                            tracks: artist.files.length,
+                            albums: artist.albumCount,
+                          })
+                        }}
+                      </p>
+                    </div>
+                  </article>
+                </li>
+              </ul>
+
+              <ul
+                v-else-if="
+                  browseView === 'albums' || browseView === 'artist-albums'
+                "
+                class="player-browse-grid"
+              >
+                <li
+                  v-for="album in visibleAlbums"
+                  :key="album.key"
+                  class="browse-tile-shell"
+                >
+                  <article
+                    class="player-browse-card"
+                    role="button"
+                    tabindex="0"
+                    @click="openAlbum(album.key)"
+                    @keydown.enter="openAlbum(album.key)"
+                    @keydown.space.prevent="openAlbum(album.key)"
+                  >
+                    <div class="player-browse-card-cover">
+                      <CoverImage
+                        :key="album.coverFile"
+                        :src="coverSourcesFor(album.coverFile).src"
+                        :fallbacks="coverSourcesFor(album.coverFile).fallbacks"
+                        :alt="album.name"
+                        img-class="absolute inset-0 h-full w-full object-cover"
+                      >
+                        <template #fallback>
+                          <Icon
+                            icon="clarity:album-line"
+                            class="absolute left-1/2 top-1/2 h-8 w-8 -translate-x-1/2 -translate-y-1/2 text-base-content/40"
+                          />
+                        </template>
+                      </CoverImage>
+                      <button
+                        type="button"
+                        class="player-browse-card-play"
+                        :title="t('library.playAlbum')"
+                        @click.stop="playFiles(album.files)"
+                      >
+                        <Icon icon="clarity:play-line" class="h-4 w-4" />
+                      </button>
+                    </div>
+                    <div class="player-browse-card-body">
+                      <p class="player-browse-card-title">{{ album.name }}</p>
+                      <p class="player-browse-card-sub">{{ album.artist }}</p>
+                      <p class="player-browse-card-meta">
+                        {{
+                          t('library.albumMeta', { tracks: album.files.length })
+                        }}
+                      </p>
+                    </div>
+                  </article>
+                </li>
+              </ul>
+
+              <ul
+                v-else-if="browseView === 'genres'"
+                class="player-browse-grid"
+              >
+                <li
+                  v-for="genre in filteredGenres"
+                  :key="genre.name"
+                  class="browse-tile-shell"
+                >
+                  <article
+                    class="player-browse-card"
+                    role="button"
+                    tabindex="0"
+                    @click="openGenre(genre.name)"
+                    @keydown.enter="openGenre(genre.name)"
+                    @keydown.space.prevent="openGenre(genre.name)"
+                  >
+                    <div class="player-browse-card-cover">
+                      <GenreCover
+                        :name="genre.name"
+                        :files="genre.coverFiles"
+                      />
+                      <button
+                        type="button"
+                        class="player-browse-card-play"
+                        :title="t('library.playGenre')"
+                        @click.stop="playFiles(genre.files)"
+                      >
+                        <Icon icon="clarity:play-line" class="h-4 w-4" />
+                      </button>
+                    </div>
+                    <div class="player-browse-card-body">
+                      <p class="player-browse-card-title">{{ genre.name }}</p>
+                      <p
+                        v-if="genre.subgenres?.length"
+                        class="player-browse-card-sub truncate"
+                      >
+                        {{ genre.subgenres.slice(0, 3).join(' · ') }}
+                      </p>
+                      <p class="player-browse-card-meta">
+                        {{
+                          t('player.genreMeta', { count: genre.files.length })
+                        }}
+                      </p>
+                    </div>
+                  </article>
+                </li>
+              </ul>
+
+              <ul
+                v-else-if="
+                  browseView === 'tracks' && visibleTrackItems.length > 0
+                "
+                class="player-browse-grid"
+              >
+                <li
+                  v-for="item in visibleTrackItems"
+                  :key="item.file"
+                  class="browse-tile-shell"
+                >
+                  <button
+                    type="button"
+                    class="player-browse-card"
+                    :class="{
+                      'player-browse-card-active': isCurrentFile(item.file),
+                    }"
+                    @click="playFiles(visibleTrackFiles, item.file)"
+                  >
+                    <div
+                      class="player-browse-card-cover"
+                      :class="{
+                        'ring-2 ring-primary/50': isCurrentFile(item.file),
+                      }"
+                    >
+                      <CoverImage
+                        :key="item.file"
+                        :src="coverSourcesFor(item.file).src"
+                        :fallbacks="coverSourcesFor(item.file).fallbacks"
+                        :alt="item.title"
+                        img-class="absolute inset-0 h-full w-full object-cover"
+                      >
+                        <template #fallback>
+                          <Icon
+                            icon="clarity:music-note-line"
+                            class="absolute left-1/2 top-1/2 h-8 w-8 -translate-x-1/2 -translate-y-1/2 text-base-content/40"
+                          />
+                        </template>
+                      </CoverImage>
+                      <span
+                        v-if="
+                          isCurrentFile(item.file) && player.isPlaying.value
+                        "
+                        class="absolute bottom-2 right-2 equalizer h-4"
+                        aria-hidden="true"
+                      >
+                        <span></span><span></span><span></span>
+                      </span>
+                    </div>
+                    <div class="player-browse-card-body">
+                      <p class="player-browse-card-title">{{ item.title }}</p>
+                      <p class="player-browse-card-sub">
+                        {{ item.artist || t('common.unknownArtist') }}
+                        <span v-if="item.album"> · {{ item.album }}</span>
+                      </p>
+                    </div>
+                  </button>
+                </li>
+              </ul>
+
+              <div v-else-if="browseFilter && playerBrowseEmptyWithFilter">
+                <ServerConnectionPrompt v-if="needsServerConnection()" />
+                <LibraryDownloadOffers
+                  v-else
+                  :items="playerOnlineResults"
+                  :loading="playerOnlineLoading"
+                  :error="playerOnlineError"
+                  @download="queueOnlineDownload"
+                />
+              </div>
+
+              <div v-else-if="browseFilter" class="py-10 text-center">
+                <p class="text-sm text-base-content/50">
+                  {{ t('player.noFilterResults') }}
+                </p>
+              </div>
+
+              <div v-else class="py-10 text-center">
+                <p class="text-sm text-base-content/50">
+                  {{ t('player.empty') }}
+                </p>
+              </div>
             </div>
-          </div>
           </div>
         </aside>
       </div>
@@ -772,11 +812,7 @@ const {
   results: playerOnlineResults,
   loading: playerOnlineLoading,
   error: playerOnlineError,
-} = useLibraryOnlineSearch(
-  browseFilter,
-  browseView,
-  playerOnlineSearchEnabled
-)
+} = useLibraryOnlineSearch(browseFilter, browseView, playerOnlineSearchEnabled)
 
 function queueOnlineDownload(song) {
   dm.queue(song)
@@ -1411,12 +1447,8 @@ onUnmounted(() => {
   box-shadow: 0 0 12px rgba(26, 208, 92, 0.45);
   transform: translate(-50%, -50%) scale(0.9);
   opacity: 0;
-  transition:
-    left 100ms linear,
-    opacity 160ms ease,
-    transform 160ms ease,
-    width 160ms ease,
-    height 160ms ease;
+  transition: left 100ms linear, opacity 160ms ease, transform 160ms ease,
+    width 160ms ease, height 160ms ease;
   will-change: left, transform;
 }
 

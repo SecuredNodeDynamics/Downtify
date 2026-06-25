@@ -184,7 +184,9 @@ export function itemMap(items) {
 }
 
 export function normalizeLibrarySearchQuery(query) {
-  return String(query || '').trim().toLowerCase()
+  return String(query || '')
+    .trim()
+    .toLowerCase()
 }
 
 export function matchesLibraryField(field, query) {
@@ -203,8 +205,7 @@ export function matchesLibraryAlbumEntry(album, query) {
   const q = normalizeLibrarySearchQuery(query)
   if (!q) return true
   return (
-    matchesLibraryField(album.name, q) ||
-    matchesLibraryField(album.artist, q)
+    matchesLibraryField(album.name, q) || matchesLibraryField(album.artist, q)
   )
 }
 

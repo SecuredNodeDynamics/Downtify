@@ -60,9 +60,7 @@ export async function refreshDownloadHistory({ reconcile = true } = {}) {
     }
     const res = await API.getHistory(500, false)
     if (seq !== historyFetchSeq) return false
-    history.value = sortHistoryItems(
-      Array.isArray(res.data) ? res.data : []
-    )
+    history.value = sortHistoryItems(Array.isArray(res.data) ? res.data : [])
     return true
   } catch {
     return false

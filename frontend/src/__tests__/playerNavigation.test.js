@@ -23,9 +23,9 @@ describe('playerNavigation', () => {
   })
 
   it('allows opening completed or skipped history rows with a filename', () => {
-    expect(
-      canOpenHistoryInPlayer({ status: 'done', filename: 'a.mp3' })
-    ).toBe(true)
+    expect(canOpenHistoryInPlayer({ status: 'done', filename: 'a.mp3' })).toBe(
+      true
+    )
     expect(
       canOpenHistoryInPlayer({ status: 'skipped', filename: 'a.mp3' })
     ).toBe(true)

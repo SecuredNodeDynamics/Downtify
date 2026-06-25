@@ -161,11 +161,13 @@ export default {
     clearSearch: 'Clear search',
     noSearchResults: 'No matches in your library.',
     notInLibrary: 'Not in your library yet',
-    notInLibraryHint: 'Download any match below and it will appear here when finished.',
+    notInLibraryHint:
+      'Download any match below and it will appear here when finished.',
     downloadTrack: 'Download',
     downloadAlbum: 'Download album',
     downloadFromLink: 'Download from link',
-    downloadFromLinkHint: 'This link is not in your library yet. Start the download now.',
+    downloadFromLinkHint:
+      'This link is not in your library yet. Start the download now.',
     onlineSearchLoading: 'Searching online…',
     onlineSearchEmpty: 'Nothing found online for this search.',
     onlineSearchError: 'Could not search online. Check your server connection.',

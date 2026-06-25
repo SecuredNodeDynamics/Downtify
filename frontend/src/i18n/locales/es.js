@@ -197,8 +197,7 @@ export default {
       'Elige el artista de Spotify para vigilar nuevas pistas y álbumes.',
     monitorArtistMatchScore: '{score}% coincidencia de nombre',
     monitorArtistNotFound: 'No se encontró un artista coincidente en Spotify.',
-    monitorArtistLookupFailed:
-      'No se pudo buscar este artista en Spotify.',
+    monitorArtistLookupFailed: 'No se pudo buscar este artista en Spotify.',
     monitorArtistAddFailed: 'No se pudo agregar el artista al monitor.',
   },
   metadata: {
@@ -336,7 +335,8 @@ export default {
     urlPlaceholderArtist: 'Pega una URL de artista de Spotify…',
     watch: 'Vigilar',
     failedAdd: 'No se pudo añadir. Comprueba la URL e inténtalo de nuevo.',
-    failedLoad: 'No se pudieron cargar las listas monitorizadas. Actualiza la página.',
+    failedLoad:
+      'No se pudieron cargar las listas monitorizadas. Actualiza la página.',
     empty: 'Aún no hay nada vigilado.',
     emptyHint:
       'Pega un enlace de lista o artista de Spotify arriba para empezar.',

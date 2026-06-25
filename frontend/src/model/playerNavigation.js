@@ -1,8 +1,4 @@
-import {
-  albumKey,
-  groupAlbums,
-  normalizeLibraryItem,
-} from './library'
+import { albumKey, groupAlbums, normalizeLibraryItem } from './library'
 
 let pendingNavigation = null
 
@@ -61,8 +57,7 @@ export function resolvePlayerBrowseState(libraryItems, intent, options = {}) {
 
   const artistFiles = items
     .filter(
-      (item) =>
-        normalizeLibraryItem(item, { unknownArtist }).artist === artist
+      (item) => normalizeLibraryItem(item, { unknownArtist }).artist === artist
     )
     .map((item) => item.file)
 

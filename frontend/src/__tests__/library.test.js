@@ -121,7 +121,10 @@ describe('library path helpers', () => {
       )
     ).toBe(true)
     expect(
-      matchesLibraryAlbumEntry({ name: 'Random', artist: 'Rip Kane' }, 'Kenny G')
+      matchesLibraryAlbumEntry(
+        { name: 'Random', artist: 'Rip Kane' },
+        'Kenny G'
+      )
     ).toBe(false)
 
     expect(matchesLibraryTrackItem(kennyArtist, 'Kenny G')).toBe(true)

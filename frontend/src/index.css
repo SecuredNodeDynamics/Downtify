@@ -116,27 +116,23 @@
 @layer components {
   .surface {
     @apply bg-base-100/90 backdrop-blur-md border border-primary/20;
-    box-shadow:
-      0 4px 18px -5px rgba(26, 208, 92, 0.12),
+    box-shadow: 0 4px 18px -5px rgba(26, 208, 92, 0.12),
       0 14px 40px -10px rgba(26, 208, 92, 0.09);
   }
   [data-theme='downtify-light'] .surface {
     @apply bg-white/85 border-primary/20;
-    box-shadow:
-      0 4px 16px -5px rgba(26, 208, 92, 0.1),
+    box-shadow: 0 4px 16px -5px rgba(26, 208, 92, 0.1),
       0 12px 36px -10px rgba(26, 208, 92, 0.08);
   }
 
   .surface-strong {
     @apply bg-base-100 border border-primary/25;
-    box-shadow:
-      0 6px 22px -6px rgba(26, 208, 92, 0.16),
+    box-shadow: 0 6px 22px -6px rgba(26, 208, 92, 0.16),
       0 16px 44px -12px rgba(26, 208, 92, 0.12);
   }
   [data-theme='downtify-light'] .surface-strong {
     @apply bg-white border-primary/25;
-    box-shadow:
-      0 6px 20px -6px rgba(26, 208, 92, 0.12),
+    box-shadow: 0 6px 20px -6px rgba(26, 208, 92, 0.12),
       0 14px 40px -12px rgba(26, 208, 92, 0.1);
   }
 
@@ -235,18 +231,14 @@
 
   .themed-select-menu {
     @apply overflow-hidden rounded-xl border border-white/10 bg-base-100 p-0 shadow-glow;
-    box-shadow:
-      0 4px 18px -5px rgba(26, 208, 92, 0.12),
-      0 14px 40px -10px rgba(26, 208, 92, 0.09),
-      0 12px 32px rgba(0, 0, 0, 0.35);
+    box-shadow: 0 4px 18px -5px rgba(26, 208, 92, 0.12),
+      0 14px 40px -10px rgba(26, 208, 92, 0.09), 0 12px 32px rgba(0, 0, 0, 0.35);
   }
 
   [data-theme='downtify-light'] .themed-select-menu {
     @apply border-black/10 bg-white;
-    box-shadow:
-      0 4px 16px -5px rgba(26, 208, 92, 0.1),
-      0 12px 36px -10px rgba(26, 208, 92, 0.08),
-      0 12px 28px rgba(0, 0, 0, 0.12);
+    box-shadow: 0 4px 16px -5px rgba(26, 208, 92, 0.1),
+      0 12px 36px -10px rgba(26, 208, 92, 0.08), 0 12px 28px rgba(0, 0, 0, 0.12);
   }
 
   .themed-select-option {
@@ -334,8 +326,7 @@
     @apply border border-primary/25;
     animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite,
       scanGlow 2s ease-in-out infinite;
-    box-shadow:
-      0 4px 16px -5px rgba(26, 208, 92, 0.1),
+    box-shadow: 0 4px 16px -5px rgba(26, 208, 92, 0.1),
       0 10px 28px -8px rgba(26, 208, 92, 0.08);
   }
 
@@ -610,14 +601,12 @@
   0%,
   100% {
     border-color: rgba(26, 208, 92, 0.18);
-    box-shadow:
-      0 4px 16px -5px rgba(26, 208, 92, 0.1),
+    box-shadow: 0 4px 16px -5px rgba(26, 208, 92, 0.1),
       0 10px 28px -8px rgba(26, 208, 92, 0.08);
   }
   50% {
     border-color: rgba(26, 208, 92, 0.55);
-    box-shadow:
-      0 6px 22px -6px rgba(26, 208, 92, 0.2),
+    box-shadow: 0 6px 22px -6px rgba(26, 208, 92, 0.2),
       0 16px 40px -10px rgba(26, 208, 92, 0.16);
   }
 }
