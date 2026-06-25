@@ -125,6 +125,8 @@ Open [http://localhost:8000](http://localhost:8000), paste a Spotify link, and h
 
 The app can check GitHub for newer APK versions under **Settings → Help** and install updates in place.
 
+Maintainers: release APKs must be signed with a stable release keystore and registered with [Android developer verification](docs/android-apk-signing.md) so users on certified Android devices can install without extra Play Protect friction (required in select regions from September 2026, globally from 2027).
+
 ### Docker Compose
 
 ```yaml
