@@ -31,6 +31,7 @@ export default {
     back: 'Voltar',
     switchToLight: 'Mudar para claro',
     switchToDark: 'Mudar para escuro',
+    updateAvailable: 'Atualização disponível — abrir ajuda e atualizações',
     downloadCounter: '{count} downloads ativos — abrir fila',
   },
   hero: {

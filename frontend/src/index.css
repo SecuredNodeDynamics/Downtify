@@ -177,6 +177,24 @@
     @apply border-error/40 text-error hover:border-error/60 hover:bg-error/10 hover:text-error;
   }
 
+  .header-update-notice {
+    @apply border-primary/40 text-primary shadow-glow-sm hover:border-primary hover:bg-primary/15 hover:text-primary;
+    animation: header-update-pulse 2.4s ease-in-out infinite;
+  }
+  .header-update-notice-mobile {
+    @apply border border-primary/30 bg-primary/10;
+  }
+
+  @keyframes header-update-pulse {
+    0%,
+    100% {
+      box-shadow: 0 0 0 0 rgba(26, 208, 92, 0.35);
+    }
+    50% {
+      box-shadow: 0 0 0 6px rgba(26, 208, 92, 0);
+    }
+  }
+
   .tab-glow-shell {
     @apply border-primary/25 shadow-glow-sm;
   }

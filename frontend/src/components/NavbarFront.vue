@@ -62,6 +62,8 @@
             <Icon icon="clarity:download-line" class="h-5 w-5" />
           </button>
 
+          <HeaderUpdateNotice />
+
           <button
             class="icon-btn"
             @click="
@@ -103,6 +105,7 @@ import { useBinaryThemeManager } from '../model/theme'
 import { useI18n } from '../i18n'
 import { openSettingsModal } from '../model/settingsModal'
 import DownloadCounterPill from './DownloadCounterPill.vue'
+import HeaderUpdateNotice from './HeaderUpdateNotice.vue'
 
 const themeMgr = useBinaryThemeManager({
   newLightAlias: 'downtify-light',

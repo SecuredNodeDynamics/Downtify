@@ -119,6 +119,8 @@
             <Icon v-else icon="clarity:refresh-line" class="h-5 w-5" />
           </button>
 
+          <HeaderUpdateNotice />
+
           <button
             class="icon-btn"
             @click="
@@ -167,6 +169,7 @@ import { useI18n } from '../i18n'
 
 import SearchInput from './SearchInput.vue'
 import DownloadCounterPill from './DownloadCounterPill.vue'
+import HeaderUpdateNotice from './HeaderUpdateNotice.vue'
 import { openSettingsModal } from '../model/settingsModal'
 
 const route = useRoute()

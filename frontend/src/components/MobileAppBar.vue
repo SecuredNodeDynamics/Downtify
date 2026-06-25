@@ -17,6 +17,7 @@
       <h1 class="mobile-app-bar-title truncate">{{ pageTitle }}</h1>
 
       <div class="ml-auto flex shrink-0 items-center gap-1">
+        <HeaderUpdateNotice compact />
         <DownloadCounterPill compact />
         <button
           v-if="showLibraryRefresh"
@@ -65,6 +66,7 @@ import { useHealthRefresh } from '../model/healthRefresh'
 import { useLibraryRefresh } from '../model/libraryRefresh'
 import { useI18n } from '../i18n'
 import DownloadCounterPill from './DownloadCounterPill.vue'
+import HeaderUpdateNotice from './HeaderUpdateNotice.vue'
 
 const route = useRoute()
 const { t } = useI18n()

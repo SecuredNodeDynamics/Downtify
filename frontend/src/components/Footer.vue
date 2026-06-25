@@ -23,24 +23,9 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
 import { useI18n } from '../i18n'
-import { checkDowntifyVersion } from '../model/appVersion'
-import { openSettingsModal } from '../model/settingsModal'
+import { useAppUpdateNotice } from '../model/appUpdateNotice'
 
 const { t } = useI18n()
-const updateAvailable = ref(false)
-
-onMounted(async () => {
-  try {
-    const status = await checkDowntifyVersion()
-    updateAvailable.value = Boolean(status?.update_available)
-  } catch {
-    updateAvailable.value = false
-  }
-})
-
-function openUpdateSettings() {
-  openSettingsModal('help')
-}
+const { updateAvailable, openUpdateSettings } = useAppUpdateNotice()
 </script>

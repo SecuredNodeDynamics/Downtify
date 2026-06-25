@@ -31,6 +31,7 @@ export default {
     back: 'Back',
     switchToLight: 'Switch to light',
     switchToDark: 'Switch to dark',
+    updateAvailable: 'Update available — open help and updates',
     downloadCounter: '{count} active downloads — open queue',
   },
   hero: {
