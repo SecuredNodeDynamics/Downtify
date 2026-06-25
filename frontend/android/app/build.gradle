@@ -22,8 +22,8 @@ android {
         applicationId "com.securednodedynamics.downtify"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 21078
-        versionName "2.10.78"
+        versionCode 21079
+        versionName "2.10.79"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
