@@ -630,6 +630,8 @@ export default {
     noFilterResults: 'Ninguna pista descargada coincide con tu búsqueda.',
     clearFilter: 'Quitar filtro',
     browseSearchPlaceholder: 'Buscar artistas, álbumes, pistas, géneros…',
+    detailsEmpty:
+      'Los detalles del artista y del álbum aparecen aquí mientras suena una pista.',
     seek: 'Buscar posición',
   },
   footer: {

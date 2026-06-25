@@ -628,6 +628,8 @@ export default {
     noFilterResults: 'Nenhuma faixa baixada corresponde à sua busca.',
     clearFilter: 'Limpar filtro',
     browseSearchPlaceholder: 'Buscar artistas, álbuns, faixas, gêneros…',
+    detailsEmpty:
+      'Os detalhes do artista e do álbum aparecem aqui enquanto uma faixa estiver tocando.',
     seek: 'Buscar posição',
   },
   footer: {

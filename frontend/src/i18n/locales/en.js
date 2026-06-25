@@ -618,6 +618,7 @@ export default {
     noFilterResults: 'No downloaded tracks match your search.',
     clearFilter: 'Clear filter',
     browseSearchPlaceholder: 'Search artists, albums, tracks, genres…',
+    detailsEmpty: 'Artist and album details appear here while a track is playing.',
     seek: 'Seek',
   },
   footer: {

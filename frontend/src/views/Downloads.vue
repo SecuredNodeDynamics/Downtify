@@ -41,60 +41,50 @@
             </div>
           </form>
 
-          <div class="library-toolbar">
-            <div class="library-tabs">
-              <button
-                class="library-tab-btn"
-                :class="
-                  viewMode === 'artists'
-                    ? 'library-tab-btn-active'
-                    : 'library-tab-btn-inactive'
-                "
-                @click="showArtists"
-              >
-                {{ t('library.artists') }}
-              </button>
-              <button
-                class="library-tab-btn"
-                :class="
-                  viewMode === 'albums'
-                    ? 'library-tab-btn-active'
-                    : 'library-tab-btn-inactive'
-                "
-                @click="showAlbums"
-              >
-                {{ t('library.albums') }}
-              </button>
-              <button
-                class="library-tab-btn"
-                :class="
-                  viewMode === 'tracks'
-                    ? 'library-tab-btn-active'
-                    : 'library-tab-btn-inactive'
-                "
-                @click="showTracks"
-              >
-                {{ t('library.tracks') }}
-              </button>
-              <button
-                class="library-tab-btn"
-                :class="
-                  viewMode === 'genres'
-                    ? 'library-tab-btn-active'
-                    : 'library-tab-btn-inactive'
-                "
-                @click="showGenres"
-              >
-                {{ t('library.genres') }}
-              </button>
-            </div>
+          <div class="library-tabs">
             <button
-              class="library-play-btn"
-              @click="playAll"
-              :title="t('library.play')"
+              class="library-tab-btn"
+              :class="
+                viewMode === 'artists'
+                  ? 'library-tab-btn-active'
+                  : 'library-tab-btn-inactive'
+              "
+              @click="showArtists"
             >
-              <Icon icon="clarity:play-line" class="h-4 w-4" />
-              <span class="hidden sm:inline">{{ t('library.play') }}</span>
+              {{ t('library.artists') }}
+            </button>
+            <button
+              class="library-tab-btn"
+              :class="
+                viewMode === 'albums'
+                  ? 'library-tab-btn-active'
+                  : 'library-tab-btn-inactive'
+              "
+              @click="showAlbums"
+            >
+              {{ t('library.albums') }}
+            </button>
+            <button
+              class="library-tab-btn"
+              :class="
+                viewMode === 'tracks'
+                  ? 'library-tab-btn-active'
+                  : 'library-tab-btn-inactive'
+              "
+              @click="showTracks"
+            >
+              {{ t('library.tracks') }}
+            </button>
+            <button
+              class="library-tab-btn"
+              :class="
+                viewMode === 'genres'
+                  ? 'library-tab-btn-active'
+                  : 'library-tab-btn-inactive'
+              "
+              @click="showGenres"
+            >
+              {{ t('library.genres') }}
             </button>
           </div>
         </div>
@@ -513,30 +503,32 @@
                       >
                         <Icon icon="clarity:play-line" class="h-4 w-4" />
                       </button>
-                      <a
-                        class="icon-btn"
-                        :href="API.downloadFileURL(file)"
-                        download
-                        :title="t('library.downloadToDevice')"
-                      >
-                        <Icon icon="clarity:download-line" class="h-4 w-4" />
-                      </a>
-                      <button
-                        class="icon-btn text-error/70 hover:text-error hover:bg-error/10"
-                        :disabled="deleting[file] === true"
-                        @click="onDelete(file)"
-                        :title="t('library.deleteFile')"
-                      >
-                        <span
-                          v-if="deleting[file] === true"
-                          class="loading loading-spinner loading-xs"
-                        />
-                        <Icon
-                          v-else
-                          icon="clarity:trash-line"
-                          class="h-4 w-4"
-                        />
-                      </button>
+                      <template v-if="viewMode !== 'tracks'">
+                        <a
+                          class="icon-btn"
+                          :href="API.downloadFileURL(file)"
+                          download
+                          :title="t('library.downloadToDevice')"
+                        >
+                          <Icon icon="clarity:download-line" class="h-4 w-4" />
+                        </a>
+                        <button
+                          class="icon-btn text-error/70 hover:text-error hover:bg-error/10"
+                          :disabled="deleting[file] === true"
+                          @click="onDelete(file)"
+                          :title="t('library.deleteFile')"
+                        >
+                          <span
+                            v-if="deleting[file] === true"
+                            class="loading loading-spinner loading-xs"
+                          />
+                          <Icon
+                            v-else
+                            icon="clarity:trash-line"
+                            class="h-4 w-4"
+                          />
+                        </button>
+                      </template>
                     </div>
                   </div>
                 </li>
@@ -992,12 +984,6 @@ function playGenre(genre) {
   router.push({ name: 'Player' })
 }
 
-function playAll() {
-  if (!files.value.length) return
-  player.setPlaylist(files.value, { startIndex: 0 })
-  router.push({ name: 'Player' })
-}
-
 function submitLibrarySearch() {
   if (librarySearchIsUrl.value) {
     downloadFromLibrarySearchUrl()
@@ -1098,16 +1084,12 @@ onUnmounted(() => {
   @apply flex w-full items-center;
 }
 
-.library-toolbar {
-  @apply flex items-center gap-2;
-}
-
 .library-tabs {
-  @apply inline-flex min-w-0 flex-1 gap-1 overflow-x-auto rounded-full border border-white/10 bg-base-100/75 p-1;
+  @apply flex w-full min-w-0 gap-1 rounded-full border border-white/10 bg-base-100/75 p-1;
 }
 
 .library-tab-btn {
-  @apply flex-1 whitespace-nowrap rounded-full px-3 py-2 text-center text-sm font-medium transition-colors sm:px-4;
+  @apply min-w-0 flex-1 truncate rounded-full px-2 py-2 text-center text-xs font-medium transition-colors sm:px-3 sm:text-sm;
 }
 
 .library-tab-btn-active {
@@ -1116,10 +1098,6 @@ onUnmounted(() => {
 
 .library-tab-btn-inactive {
   @apply text-base-content/60 hover:text-base-content;
-}
-
-.library-play-btn {
-  @apply btn btn-primary btn-sm inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full px-3 sm:px-4;
 }
 
 .library-drill-header {
