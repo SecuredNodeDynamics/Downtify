@@ -33,6 +33,7 @@ import MobileSearchSheet from './components/MobileSearchSheet.vue'
 import StarField from './components/StarField.vue'
 import router from './router'
 import { beginAppLoading, endAppLoading } from './model/appLoading'
+import { bootstrapAppUpdateNotice } from './model/appUpdateNotice'
 import { useBinaryThemeManager } from './model/theme'
 
 const keepAliveViews = ['Player', 'List', 'Settings', 'Download']
@@ -67,6 +68,8 @@ router.afterEach((to) => {
 })
 
 onMounted(async () => {
+  bootstrapAppUpdateNotice()
+
   const capacitor = window.Capacitor
   if (!capacitor?.isNativePlatform?.()) return
   try {

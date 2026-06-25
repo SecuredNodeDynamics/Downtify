@@ -1,6 +1,14 @@
 import { Capacitor, CapacitorHttp } from '@capacitor/core'
 
-import { isCapacitorNative } from './serverConnection.js'
+import {
+  readPersistedImage,
+  writePersistedImage,
+} from './imageDiskCache.js'
+import {
+  buildApiBaseUrl,
+  getServerConfig,
+  isCapacitorNative,
+} from './serverConnection.js'
 
 const urlCache = new Map()
 const sourceCache = new Map()
@@ -8,11 +16,38 @@ const preloadPromises = new Map()
 
 function base64ToBlob(base64, mimeType) {
   const binary = atob(base64)
-  const bytes = new Uint8Array(binary.length)
-  for (let i = 0; i < binary.length; i += 1) {
+  const len = binary.length
+  const bytes = new Uint8Array(len)
+  for (let i = 0; i < len; i += 1) {
     bytes[i] = binary.charCodeAt(i)
   }
   return new Blob([bytes], { type: mimeType || 'image/jpeg' })
+}
+
+export function canLoadImageDirectly(url) {
+  const value = String(url || '').trim()
+  if (!value || value.startsWith('data:') || value.startsWith('blob:')) {
+    return true
+  }
+  if (!isCapacitorNative()) return true
+  try {
+    const target = new URL(value)
+    const server = new URL(buildApiBaseUrl(getServerConfig()))
+    return target.origin === server.origin
+  } catch {
+    return false
+  }
+}
+
+function persistImageInBackground(url) {
+  if (!isCapacitorNative() || !canLoadImageDirectly(url)) return
+  void fetch(url)
+    .then((response) => (response.ok ? response.blob() : null))
+    .then((blob) => {
+      if (blob) return writePersistedImage(url, blob)
+      return null
+    })
+    .catch(() => {})
 }
 
 function contentTypeFromHeaders(headers = {}) {
@@ -24,7 +59,7 @@ function contentTypeFromHeaders(headers = {}) {
   return String(raw).split(';')[0].trim() || 'image/jpeg'
 }
 
-async function fetchWithCapacitorHttp(url) {
+async function fetchImageBlob(url) {
   const response = await CapacitorHttp.get({
     url,
     responseType: 'blob',
@@ -33,8 +68,7 @@ async function fetchWithCapacitorHttp(url) {
     throw new Error(`HTTP ${response.status}`)
   }
   const mime = contentTypeFromHeaders(response.headers)
-  const blob = base64ToBlob(response.data, mime)
-  return URL.createObjectURL(blob)
+  return base64ToBlob(response.data, mime)
 }
 
 async function fetchWithBrowser(url) {
@@ -89,6 +123,7 @@ function preloadHttpImage(url) {
     image.referrerPolicy = 'no-referrer'
     image.onload = () => {
       rememberResolvedUrl(value, value)
+      persistImageInBackground(value)
       resolve(value)
     }
     image.onerror = () => reject(new Error(`Failed to preload image: ${value}`))
@@ -128,10 +163,39 @@ export async function resolveImageSrc(url) {
     }
   }
 
+  if (canLoadImageDirectly(value)) {
+    try {
+      const persisted = await readPersistedImage(value)
+      if (persisted) {
+        const blobUrl = URL.createObjectURL(persisted)
+        rememberResolvedUrl(value, blobUrl)
+        return blobUrl
+      }
+      await preloadHttpImage(value)
+      return urlCache.get(value) || value
+    } catch (error) {
+      console.warn('Failed to load direct image on native:', value, error)
+      return value
+    }
+  }
+
   try {
-    const blobUrl = Capacitor.isNativePlatform()
-      ? await fetchWithCapacitorHttp(value)
-      : await fetchWithBrowser(value)
+    if (Capacitor.isNativePlatform()) {
+      const persisted = await readPersistedImage(value)
+      if (persisted) {
+        const blobUrl = URL.createObjectURL(persisted)
+        rememberResolvedUrl(value, blobUrl)
+        return blobUrl
+      }
+
+      const blob = await fetchImageBlob(value)
+      void writePersistedImage(value, blob)
+      const blobUrl = URL.createObjectURL(blob)
+      rememberResolvedUrl(value, blobUrl)
+      return blobUrl
+    }
+
+    const blobUrl = await fetchWithBrowser(value)
     rememberResolvedUrl(value, blobUrl)
     return blobUrl
   } catch (error) {
@@ -159,6 +223,14 @@ export async function preloadCoverSources({ src, fallbacks = [] } = {}) {
 
   for (const url of urls) {
     try {
+      if (canLoadImageDirectly(url)) {
+        await preloadHttpImage(url)
+        const resolved = urlCache.get(url) || url
+        if (resolved) {
+          rememberCoverDisplay(sourceKey, resolved, false)
+          return resolved
+        }
+      }
       const resolved = await resolveImageSrc(url)
       if (resolved) {
         rememberCoverDisplay(sourceKey, resolved, false)
@@ -172,7 +244,10 @@ export async function preloadCoverSources({ src, fallbacks = [] } = {}) {
   return ''
 }
 
-export function preloadCoverSourcesBatch(entries = [], { limit = 24 } = {}) {
+export function preloadCoverSourcesBatch(
+  entries = [],
+  { limit = 24, concurrency = 6 } = {}
+) {
   const queue = (entries || [])
     .map((entry) => ({
       src: entry?.src || '',
@@ -181,7 +256,23 @@ export function preloadCoverSourcesBatch(entries = [], { limit = 24 } = {}) {
     .filter((entry) => entry.src || entry.fallbacks.length)
     .slice(0, Math.max(0, limit))
 
-  void Promise.allSettled(queue.map((entry) => preloadCoverSources(entry)))
+  if (!queue.length) return
+
+  let cursor = 0
+  const workerCount = Math.min(Math.max(1, concurrency), queue.length)
+  const workers = Array.from({ length: workerCount }, async () => {
+    while (cursor < queue.length) {
+      const entry = queue[cursor]
+      cursor += 1
+      try {
+        await preloadCoverSources(entry)
+      } catch {
+        // Ignore individual preload failures.
+      }
+    }
+  })
+
+  void Promise.all(workers)
 }
 
 export function clearNativeImageCache() {
@@ -193,4 +284,7 @@ export function clearNativeImageCache() {
   urlCache.clear()
   sourceCache.clear()
   preloadPromises.clear()
+  void import('./imageDiskCache.js').then(({ clearPersistedImageCache }) =>
+    clearPersistedImageCache()
+  )
 }

@@ -134,9 +134,9 @@ import { Icon } from '@iconify/vue'
 import monitorAPI from '/src/model/monitor.js'
 import {
   findMonitoredArtist,
-  monitoredArtists,
+  monitoredArtistMap,
   refreshMonitoredArtists,
-} from '/src/model/monitoredArtists.js'
+} from '../model/monitoredArtists.js'
 import { useI18n } from '/src/i18n'
 
 const props = defineProps({
@@ -156,7 +156,7 @@ const pickerOpen = ref(false)
 const pickerMatches = ref([])
 
 const monitoredEntry = computed(() => {
-  monitoredArtists.value
+  monitoredArtistMap.value
   return findMonitoredArtist(props.artistName)
 })
 
@@ -215,11 +215,11 @@ async function addMatch(match) {
     pickerOpen.value = false
     pickerMatches.value = []
     artistNotFound.value = false
-    await refreshMonitoredArtists()
+    await refreshMonitoredArtists({ force: true })
   } catch (err) {
     if (err?.response?.status === 409) {
       pickerOpen.value = false
-      await refreshMonitoredArtists()
+      await refreshMonitoredArtists({ force: true })
       return
     }
     pickerError.value =

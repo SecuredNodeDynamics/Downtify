@@ -20,7 +20,7 @@ import { computed } from 'vue'
 import { Icon } from '@iconify/vue'
 
 import { useI18n } from '../i18n'
-import { findMonitoredArtist, monitoredArtists } from '../model/monitoredArtists'
+import { findMonitoredArtist, monitoredArtistMap } from '../model/monitoredArtists'
 
 const props = defineProps({
   artistName: {
@@ -32,7 +32,7 @@ const props = defineProps({
 const { t } = useI18n()
 
 const entry = computed(() => {
-  monitoredArtists.value
+  monitoredArtistMap.value
   return findMonitoredArtist(props.artistName)
 })
 </script>

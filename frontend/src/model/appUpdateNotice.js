@@ -1,37 +1,55 @@
-import { onMounted, ref } from 'vue'
-
-import { checkDowntifyVersion } from './appVersion'
+import { isCapacitorNative } from './serverConnection'
+import { appUpdateAvailable, checkDowntifyVersion } from './appVersion'
 import { openSettingsModal } from './settingsModal'
 
-const updateAvailable = ref(false)
 let checkPromise = null
+let bootstrapped = false
 
-async function refresh(refreshCache = false) {
+export { appUpdateAvailable }
+
+export async function refreshAppUpdateNotice(refreshCache = false) {
   if (!refreshCache && checkPromise) {
     await checkPromise
+    return appUpdateAvailable.value
+  }
+
+  checkPromise = checkDowntifyVersion({ refresh: refreshCache })
+    .then(() => appUpdateAvailable.value)
+    .catch(() => {
+      appUpdateAvailable.value = false
+      return false
+    })
+    .finally(() => {
+      checkPromise = null
+    })
+
+  return checkPromise
+}
+
+export function bootstrapAppUpdateNotice() {
+  if (bootstrapped) return
+  bootstrapped = true
+
+  const run = () => {
+    void refreshAppUpdateNotice(true)
+  }
+
+  if (isCapacitorNative()) {
+    window.setTimeout(run, 2000)
     return
   }
 
-  checkPromise = (async () => {
-    try {
-      const status = await checkDowntifyVersion({ refresh: refreshCache })
-      updateAvailable.value = Boolean(status?.update_available)
-    } catch {
-      updateAvailable.value = false
-    } finally {
-      checkPromise = null
-    }
-  })()
-
-  await checkPromise
+  run()
 }
 
 export function useAppUpdateNotice() {
-  onMounted(() => refresh())
-
   function openUpdateSettings() {
     openSettingsModal('help')
   }
 
-  return { updateAvailable, refresh, openUpdateSettings }
+  return {
+    updateAvailable: appUpdateAvailable,
+    refresh: refreshAppUpdateNotice,
+    openUpdateSettings,
+  }
 }

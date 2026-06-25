@@ -6,6 +6,7 @@ import {
   groupArtists,
   groupGenres,
   libraryGenreName,
+  libraryItemsEqual,
   libraryCoverFolders,
   matchesLibraryAlbumEntry,
   matchesLibraryArtistName,
@@ -262,5 +263,36 @@ describe('library path helpers', () => {
     expect(
       filterOnlineResultsForLibraryView(items, 'tracks', 'Kenny G')
     ).toHaveLength(2)
+  })
+
+  it('detects unchanged library items including artists metadata', () => {
+    const items = [
+      {
+        file: 'Artist/Album/track.mp3',
+        title: 'Track',
+        artist: 'Artist',
+        artists: ['Artist', 'Guest'],
+        album: 'Album',
+        genre: 'Pop',
+        browse_genre: 'Pop',
+      },
+    ]
+    const normalized = [
+      {
+        file: 'Artist/Album/track.mp3',
+        title: 'Track',
+        artist: 'Artist',
+        artists: ['Artist', 'Guest'],
+        album: 'Album',
+        genre: 'Pop',
+        browse_genre: 'Pop',
+      },
+    ]
+    expect(libraryItemsEqual(items, normalized)).toBe(true)
+    expect(
+      libraryItemsEqual(items, [
+        { ...normalized[0], artists: ['Artist', 'Other'] },
+      ])
+    ).toBe(false)
   })
 })

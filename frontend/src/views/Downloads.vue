@@ -203,7 +203,7 @@
           class="panel-glow-shell panel-glow-shell-grow surface min-h-0 rounded-3xl"
         >
           <div class="library-browse panel-glow-inner p-3 sm:p-5">
-            <div class="library-browse-body">
+            <div ref="browseBodyRef" class="library-browse-body">
               <div v-if="showLibraryNoSearchResults">
                 <div
                   v-if="librarySearchIsUrl"
@@ -272,13 +272,10 @@
                   >
                     <div class="library-browse-card-cover">
                       <CoverImage
-                        v-if="
-                          artistCoverFor(artist).src ||
-                          artistCoverFor(artist).fallbacks.length
-                        "
+                        v-if="artistCoverProps(artist).src || artistCoverProps(artist).fallbacks.length"
                         :key="`artist:${artist.name}`"
-                        :src="artistCoverFor(artist).src"
-                        :fallbacks="artistCoverFor(artist).fallbacks"
+                        :src="artistCoverProps(artist).src"
+                        :fallbacks="artistCoverProps(artist).fallbacks"
                         :alt="artist.name"
                         img-class="absolute inset-0 h-full w-full object-cover"
                       >
@@ -540,6 +537,7 @@ import {
   ref,
   computed,
   watch,
+  nextTick,
   onMounted,
   onActivated,
   onDeactivated,
@@ -566,6 +564,7 @@ import {
   groupArtists,
   groupGenres,
   itemMap,
+  libraryItemsEqual,
   libraryGenreName,
   matchesLibraryAlbumEntry,
   matchesLibraryArtistName,
@@ -590,6 +589,7 @@ import { useLibraryOnlineSearch } from '/src/model/libraryOnlineSearch'
 import { useSearchManager } from '/src/model/search'
 import { needsServerConnection } from '/src/model/serverConnection'
 import { refreshMonitoredArtists } from '/src/model/monitoredArtists'
+import { preloadCoverSourcesBatch } from '/src/model/imageLoader'
 
 defineOptions({ name: 'List' })
 
@@ -613,6 +613,46 @@ const selectedArtistName = ref('')
 const selectedAlbumKey = ref('')
 const selectedGenreName = ref('')
 const librarySearchQuery = ref('')
+const browseBodyRef = ref(null)
+const browseScrollPositions = new Map()
+
+function currentBrowseScrollKey() {
+  if (selectedAlbumKey.value) {
+    return `album:${selectedAlbumKey.value}`
+  }
+  if (selectedGenreName.value) {
+    return `genre:${selectedGenreName.value}`
+  }
+  if (selectedArtistName.value) {
+    return `artist:${selectedArtistName.value}`
+  }
+  return `tab:${viewMode.value}`
+}
+
+function saveBrowseScrollPosition() {
+  const el = browseBodyRef.value
+  if (!el) return
+  browseScrollPositions.set(currentBrowseScrollKey(), el.scrollTop)
+}
+
+function restoreBrowseScrollPosition(key) {
+  const top = browseScrollPositions.get(key) ?? 0
+  const apply = () => {
+    const el = browseBodyRef.value
+    if (el) el.scrollTop = top
+  }
+  nextTick(() => {
+    apply()
+    requestAnimationFrame(apply)
+  })
+}
+
+function resetBrowseScrollPosition() {
+  nextTick(() => {
+    const el = browseBodyRef.value
+    if (el) el.scrollTop = 0
+  })
+}
 
 const unknownGenreLabel = computed(() => t('player.unknownGenre'))
 const libraryGroupOptions = computed(() => ({
@@ -798,9 +838,66 @@ function artistCoverFor(artist) {
   return artistCoverMap.value.get(artist?.name) || API.coverSourcesForArtist('')
 }
 
+function artistCoverProps(artist) {
+  const sources = artistCoverFor(artist)
+  return {
+    src: sources.src,
+    fallbacks: sources.fallbacks,
+  }
+}
+
+function warmVisibleArtistCovers(artistList = []) {
+  const entries = artistList
+    .slice(0, 100)
+    .map((artist) => artistCoverFor(artist))
+    .filter((entry) => entry.src || entry.fallbacks?.length)
+  preloadCoverSourcesBatch(entries, { limit: 100, concurrency: 8 })
+}
+
+function warmVisibleAlbumCovers(albumList = []) {
+  const entries = albumList
+    .slice(0, 100)
+    .map((album) => coverSourcesFor(album.coverFile))
+    .filter((entry) => entry.src || entry.fallbacks?.length)
+  preloadCoverSourcesBatch(entries, { limit: 100, concurrency: 8 })
+}
+
+watch(
+  () =>
+    viewMode.value === 'artists' && !selectedArtist.value
+      ? filteredArtists.value.map((artist) => artist.name).join('\0')
+      : '',
+  () => {
+    if (viewMode.value !== 'artists' || selectedArtist.value) return
+    warmVisibleArtistCovers(filteredArtists.value)
+  }
+)
+
+watch(
+  () => {
+    const inAlbumBrowse =
+      (viewMode.value === 'albums' ||
+        (viewMode.value === 'artists' && selectedArtist.value)) &&
+      !selectedAlbum.value
+    return inAlbumBrowse
+      ? filteredVisibleAlbums.value.map((album) => albumKey(album)).join('\0')
+      : ''
+  },
+  () => {
+    if (selectedAlbum.value) return
+    const inAlbumBrowse =
+      viewMode.value === 'albums' ||
+      (viewMode.value === 'artists' && selectedArtist.value)
+    if (!inAlbumBrowse) return
+    warmVisibleAlbumCovers(filteredVisibleAlbums.value)
+  }
+)
+
 function applyLibraryData(items) {
   const options = libraryGroupOptions.value
-  libraryItems.value = items.map((item) => normalizeLibraryItem(item, options))
+  const normalized = items.map((item) => normalizeLibraryItem(item, options))
+  if (libraryItemsEqual(libraryItems.value, normalized)) return
+  libraryItems.value = normalized
   files.value = libraryItems.value.map((item) => item.file)
   API.warmLibraryCovers(libraryItems.value)
   scheduleGenreRefresh(libraryItems.value)
@@ -838,7 +935,7 @@ function scheduleGenreRefresh(items) {
   for (const delay of [3000, 10000, 30000, 90000, 300000]) {
     genreRefreshTimers.push(
       setTimeout(() => {
-        void refresh({ background: true, force: true })
+        void refresh({ background: true })
       }, delay)
     )
   }
@@ -949,81 +1046,99 @@ function folderOf(file) {
   return parts.slice(0, -1).join('/')
 }
 
-function showArtists() {
-  viewMode.value = 'artists'
+function switchLibraryTab(mode) {
+  saveBrowseScrollPosition()
+  viewMode.value = mode
   selectedArtistName.value = ''
   selectedAlbumKey.value = ''
   selectedGenreName.value = ''
+  restoreBrowseScrollPosition(`tab:${mode}`)
+}
+
+function showArtists() {
+  switchLibraryTab('artists')
 }
 
 function showAlbums() {
-  viewMode.value = 'albums'
-  selectedArtistName.value = ''
-  selectedAlbumKey.value = ''
-  selectedGenreName.value = ''
+  switchLibraryTab('albums')
 }
 
 function showTracks() {
-  viewMode.value = 'tracks'
-  selectedArtistName.value = ''
-  selectedAlbumKey.value = ''
-  selectedGenreName.value = ''
+  switchLibraryTab('tracks')
 }
 
 function showGenres() {
-  viewMode.value = 'genres'
-  selectedArtistName.value = ''
-  selectedAlbumKey.value = ''
-  selectedGenreName.value = ''
+  switchLibraryTab('genres')
 }
 
 function openArtist(name) {
+  saveBrowseScrollPosition()
   selectedArtistName.value = name
   selectedAlbumKey.value = ''
   selectedGenreName.value = ''
+  resetBrowseScrollPosition()
 }
 
 function closeArtist() {
+  const restoreKey = `tab:${viewMode.value}`
+  saveBrowseScrollPosition()
   selectedArtistName.value = ''
   selectedAlbumKey.value = ''
+  restoreBrowseScrollPosition(restoreKey)
 }
 
 function openAlbum(album) {
+  saveBrowseScrollPosition()
   selectedAlbumKey.value = album.key
   selectedGenreName.value = ''
+  resetBrowseScrollPosition()
 }
 
 function closeAlbum() {
+  const restoreKey = selectedArtistName.value
+    ? `artist:${selectedArtistName.value}`
+    : `tab:${viewMode.value}`
+  saveBrowseScrollPosition()
   selectedAlbumKey.value = ''
+  restoreBrowseScrollPosition(restoreKey)
 }
 
 function openGenre(name) {
+  saveBrowseScrollPosition()
   selectedGenreName.value = name
   selectedArtistName.value = ''
   selectedAlbumKey.value = ''
+  resetBrowseScrollPosition()
 }
 
 function closeGenre() {
+  const restoreKey = 'tab:genres'
+  saveBrowseScrollPosition()
   selectedGenreName.value = ''
+  restoreBrowseScrollPosition(restoreKey)
 }
 
 function playFile(file) {
+  saveBrowseScrollPosition()
   const playlist = visibleFiles.value
   player.setPlaylist(playlist, { startIndex: playlist.indexOf(file) })
   router.push({ name: 'Player' })
 }
 
 function playArtist(artist) {
+  saveBrowseScrollPosition()
   player.setPlaylist(artist.files, { startIndex: 0 })
   router.push({ name: 'Player' })
 }
 
 function playAlbum(album) {
+  saveBrowseScrollPosition()
   player.setPlaylist(album.files, { startIndex: 0 })
   router.push({ name: 'Player' })
 }
 
 function playGenre(genre) {
+  saveBrowseScrollPosition()
   player.setPlaylist(genre.files, { startIndex: 0 })
   router.push({ name: 'Player' })
 }
@@ -1066,7 +1181,7 @@ onMounted(() => {
 
 onActivated(() => {
   libraryRefresh.register(refreshFromHeader)
-  void refreshMonitoredArtists()
+  restoreBrowseScrollPosition(currentBrowseScrollKey())
   if (files.value.length > 0) {
     void refresh({ background: true })
     return
@@ -1075,6 +1190,7 @@ onActivated(() => {
 })
 
 onDeactivated(() => {
+  saveBrowseScrollPosition()
   libraryRefresh.unregister()
 })
 

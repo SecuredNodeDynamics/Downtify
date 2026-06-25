@@ -1,5 +1,6 @@
 import { App } from '@capacitor/app'
 import axios from 'axios'
+import { ref } from 'vue'
 
 import {
   buildApkUpdateStatus,
@@ -20,6 +21,12 @@ let nativeVersionPromise = null
 let cachedStatus = null
 let cachedAt = 0
 const CACHE_TTL_MS = 60 * 60 * 1000
+
+export const appUpdateAvailable = ref(false)
+
+function publishUpdateAvailability(status) {
+  appUpdateAvailable.value = Boolean(status?.update_available)
+}
 
 export function getBundledAppVersion() {
   return String(
@@ -211,7 +218,7 @@ export async function checkDowntifyVersion({ refresh = false } = {}) {
       const installed =
         (await resolveNativeInstalledVersion()) ||
         getInstalledClientVersionSync()
-      return {
+      const status = {
         ...cachedStatus,
         current_version: installed,
         update_available: Boolean(
@@ -223,8 +230,12 @@ export async function checkDowntifyVersion({ refresh = false } = {}) {
             isNewerApkVersion(cachedStatus.latest_version, installed)
         ),
       }
+      publishUpdateAvailability(status)
+      return status
     }
-    return { ...cachedStatus }
+    const status = { ...cachedStatus }
+    publishUpdateAvailability(status)
+    return status
   }
 
   if (!isCapacitorNative()) {
@@ -235,6 +246,7 @@ export async function checkDowntifyVersion({ refresh = false } = {}) {
     const status = buildWebUpdateStatus(response.data || {})
     cachedStatus = status
     cachedAt = now
+    publishUpdateAvailability(status)
     return status
   }
 
@@ -247,12 +259,14 @@ export async function checkDowntifyVersion({ refresh = false } = {}) {
   const status = buildNativeUpdateStatus(installed, serverVersion, release)
   cachedStatus = status
   cachedAt = now
+  publishUpdateAvailability(status)
   return status
 }
 
 export function resetDowntifyVersionCache() {
   cachedStatus = null
   cachedAt = 0
+  appUpdateAvailable.value = false
 }
 
 export { pickApkAsset }

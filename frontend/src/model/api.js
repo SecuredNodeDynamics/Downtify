@@ -344,8 +344,13 @@ function clearCoverSourcesCache() {
 }
 
 function warmLibraryCovers(items = []) {
+  const native = isCapacitorNative()
   const entries = []
   const seenArtists = new Set()
+  const artistLimit = native ? 80 : 24
+  const fileSlice = native ? 40 : 48
+  const batchLimit = native ? 80 : 96
+  const concurrency = native ? 8 : 12
 
   for (const item of items) {
     const artist = String(item?.artist || '').trim()
@@ -353,15 +358,15 @@ function warmLibraryCovers(items = []) {
     if (!artist || !file || seenArtists.has(artist)) continue
     seenArtists.add(artist)
     entries.push(coverSourcesForArtist(artist, [file]))
-    if (seenArtists.size >= 24) break
+    if (seenArtists.size >= artistLimit) break
   }
 
-  for (const item of items.slice(0, 48)) {
+  for (const item of items.slice(0, fileSlice)) {
     const file = String(item?.file || '').trim()
     if (file) entries.push(coverSourcesForFile(file))
   }
 
-  preloadCoverSourcesBatch(entries, { limit: 96 })
+  preloadCoverSourcesBatch(entries, { limit: batchLimit, concurrency })
 }
 
 const CDN_IMAGE_HOST_SUFFIXES = [

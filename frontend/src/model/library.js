@@ -221,6 +221,34 @@ export function genreCoverFiles(files) {
   return covers
 }
 
+function artistsListEqual(left, right) {
+  const a = Array.isArray(left) ? left : []
+  const b = Array.isArray(right) ? right : []
+  if (a.length !== b.length) return false
+  return a.every((value, index) => value === b[index])
+}
+
+export function libraryItemsEqual(current, next) {
+  if (!Array.isArray(current) || !Array.isArray(next)) return false
+  if (current.length !== next.length) return false
+  for (let index = 0; index < current.length; index += 1) {
+    const left = current[index]
+    const right = next[index]
+    if (!left || !right || left.file !== right.file) return false
+    if (
+      left.title !== right.title ||
+      left.artist !== right.artist ||
+      left.album !== right.album ||
+      left.genre !== right.genre ||
+      left.browse_genre !== right.browse_genre
+    ) {
+      return false
+    }
+    if (!artistsListEqual(left.artists, right.artists)) return false
+  }
+  return true
+}
+
 export function normalizeGenreDisplayName(name) {
   const raw = String(name || '').trim()
   if (!raw) return ''

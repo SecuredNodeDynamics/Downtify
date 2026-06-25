@@ -393,6 +393,7 @@ import {
   albumKey,
   groupAlbums,
   groupArtists,
+  libraryItemsEqual,
   normalizeLibraryItem,
 } from '/src/model/library'
 import {
@@ -598,20 +599,9 @@ async function refreshLibraryMetadataInBackground(force = false) {
 }
 
 function libraryItemsUnchanged(nextItems) {
-  const current = libraryItems.value
-  if (nextItems.length !== current.length) return false
-  const currentByFile = new Map(current.map((item) => [item.file, item]))
-  return nextItems.every((item) => {
-    const existing = currentByFile.get(item.file)
-    if (!existing) return false
-    return (
-      existing.title === item.title &&
-      existing.artist === item.artist &&
-      existing.album === item.album &&
-      existing.genre === item.genre &&
-      existing.browse_genre === item.browse_genre
-    )
-  })
+  const options = libraryGroupOptions.value
+  const normalized = nextItems.map((item) => normalizeLibraryItem(item, options))
+  return libraryItemsEqual(libraryItems.value, normalized)
 }
 
 function countUnknownGenres(items) {

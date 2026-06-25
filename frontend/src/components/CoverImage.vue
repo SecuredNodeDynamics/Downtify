@@ -111,12 +111,12 @@ async function loadCurrentCandidate() {
 function onError() {
   if (candidateIndex < candidateUrls.length - 1) {
     candidateIndex += 1
-    const nextUrl = candidateUrls[candidateIndex]
-    displaySrc.value = nextUrl
-    void applyCandidate(nextUrl)
+    displaySrc.value = ''
+    void applyCandidate(candidateUrls[candidateIndex])
     return
   }
   failed.value = true
+  displaySrc.value = ''
   rememberCoverDisplay(sourceKey.value, '', true)
 }
 
