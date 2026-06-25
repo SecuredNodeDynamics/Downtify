@@ -32,3 +32,14 @@ def test_duplicate_detection_ignores_non_audio_files(tmp_path):
     )
 
     assert downloader.duplicate_filename_for(song) is None
+
+
+def test_duplicate_detection_matches_when_only_first_artist_was_saved(tmp_path):
+    downloader = Downloader(tmp_path, output_template='{artists} - {title}')
+    song = {
+        'name': 'Swing',
+        'artists': ['Connor Price', 'Nic D', '4Korners'],
+    }
+    (tmp_path / 'Connor Price - Swing.mp3').write_text('audio', encoding='utf-8')
+
+    assert downloader.duplicate_filename_for(song) == 'Connor Price - Swing.mp3'

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Any, Callable
 
@@ -423,28 +424,76 @@ def media_item_key(item: dict[str, Any]) -> str:
     return ''
 
 
+def _artist_keys(item: dict[str, Any]) -> set[str]:
+    from .downloader import _normalize_duplicate_key
+
+    keys: set[str] = set()
+    for artist in item.get('artists') or []:
+        key = _normalize_duplicate_key(str(artist or ''))
+        if key:
+            keys.add(key)
+    combined = str(item.get('artist') or '').strip()
+    if combined:
+        for part in re.split(r'[,/&]+', combined):
+            key = _normalize_duplicate_key(part)
+            if key:
+                keys.add(key)
+    return keys
+
+
+def _artist_keys_match(left: set[str], right: str) -> bool:
+    from .downloader import _normalize_duplicate_key
+
+    if not left:
+        return True
+    item_key = _normalize_duplicate_key(right)
+    if not item_key:
+        return False
+    if item_key in left:
+        return True
+    return any(
+        ak in item_key or item_key in ak for ak in left if ak and item_key
+    )
+
+
+def track_in_library_from_metadata(
+    song: dict[str, Any],
+    items: list[dict[str, str]],
+) -> bool:
+    from .downloader import _normalize_duplicate_key
+
+    title_key = _normalize_duplicate_key(str(song.get('name') or ''))
+    if not title_key:
+        return False
+    artist_keys = _artist_keys(song)
+    for item in items:
+        item_title = _normalize_duplicate_key(str(item.get('title') or ''))
+        if item_title != title_key:
+            continue
+        if _artist_keys_match(artist_keys, str(item.get('artist') or '')):
+            return True
+    return False
+
+
 def album_in_library(
     album: dict[str, Any],
     items: list[dict[str, str]],
 ) -> bool:
     from .downloader import _normalize_duplicate_key
 
-    artists = album.get('artists') or []
-    artist = str(artists[0] if artists else '').strip()
     album_name = str(album.get('name') or album.get('album_name') or '').strip()
     if not album_name:
         return False
 
-    artist_key = _normalize_duplicate_key(artist)
     album_key = _normalize_duplicate_key(album_name)
     if not album_key:
         return False
 
+    artist_keys = _artist_keys(album)
     for item in items:
         if _normalize_duplicate_key(str(item.get('album') or '')) != album_key:
             continue
-        item_artist_key = _normalize_duplicate_key(str(item.get('artist') or ''))
-        if not artist_key or item_artist_key == artist_key:
+        if _artist_keys_match(artist_keys, str(item.get('artist') or '')):
             return True
     return False
 
@@ -458,9 +507,9 @@ def media_in_library(
     media_type = str(item.get('media_type') or 'track').strip().lower()
     if media_type == 'album':
         return album_in_library(item, library_items)
-    if downloader is None:
-        return False
-    return bool(downloader.duplicate_filename_for(item))
+    if downloader is not None and downloader.duplicate_filename_for(item):
+        return True
+    return track_in_library_from_metadata(item, library_items)
 
 
 _library_changed_callbacks: list[Callable[[], None]] = []

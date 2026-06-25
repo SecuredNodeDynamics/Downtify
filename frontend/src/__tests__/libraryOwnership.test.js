@@ -60,4 +60,27 @@ describe('libraryOwnership', () => {
     const owned = await isMediaOwned({ song_id: 'track:9', name: 'Song' })
     expect(owned).toBe(true)
   })
+
+  it('detects owned media from the local library cache', async () => {
+    const { isMediaOwnedLocally } = await import('../model/libraryOwnership.js')
+
+    expect(
+      isMediaOwnedLocally(
+        {
+          media_type: 'album',
+          name: 'Swing',
+          artists: ['Connor Price', 'Nic D'],
+          browse_id: 'album:1',
+        },
+        [
+          {
+            file: 'Connor Price/Swing/Swing.flac',
+            artist: 'Connor Price',
+            album: 'Swing',
+            title: 'Swing',
+          },
+        ]
+      )
+    ).toBe(true)
+  })
 })

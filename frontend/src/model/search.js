@@ -94,6 +94,7 @@ function useSearchManager() {
         if (res.status === 200) {
           results.value = res.data
           isSearching.value = false
+          void API.refreshLibraryInBackground()
         } else {
           console.error('Error Searching:', res)
           isSearching.value = false

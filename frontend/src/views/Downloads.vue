@@ -579,6 +579,7 @@ import {
 import { buildApiBaseUrl, getServerConfig } from '/src/model/serverConnection'
 import { useI18n } from '/src/i18n'
 import { usePlayer } from '/src/model/player'
+import { consumeLibraryNavigation } from '/src/model/libraryNavigation'
 import { useLibraryRefresh } from '/src/model/libraryRefresh'
 import { useLibraryOnlineSearch } from '/src/model/libraryOnlineSearch'
 import { useSearchManager } from '/src/model/search'
@@ -797,6 +798,16 @@ function applyLibraryData(items) {
   files.value = libraryItems.value.map((item) => item.file)
   API.warmLibraryCovers(libraryItems.value)
   scheduleGenreRefresh(libraryItems.value)
+  applyPendingLibraryNavigation()
+}
+
+function applyPendingLibraryNavigation() {
+  const intent = consumeLibraryNavigation()
+  if (!intent) return
+  viewMode.value = intent.browseMode || 'artists'
+  selectedArtistName.value = intent.selectedArtistName || ''
+  selectedAlbumKey.value = intent.selectedAlbumKey || ''
+  selectedGenreName.value = intent.selectedGenreName || ''
 }
 
 function countUnknownGenres(items) {

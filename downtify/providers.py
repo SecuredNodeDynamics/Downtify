@@ -433,6 +433,8 @@ def search_media(query: str, limit: int = 20) -> list[dict[str, Any]]:
         seen_album_ids.add(album.get('browse_id'))
         albums.append(album)
 
+    _attach_album_track_counts(albums)
+
     combined: list[dict[str, Any]] = []
     seen: set[tuple[str, str]] = set()
     for item in [*songs, *albums]:

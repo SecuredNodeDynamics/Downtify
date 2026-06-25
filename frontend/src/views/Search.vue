@@ -15,11 +15,15 @@ import { useRoute } from 'vue-router'
 
 import { useSearchManager } from '../model/search'
 import { useDownloadManager } from '../model/download'
+import API from '../model/api'
 
 import Navbar from '/src/components/Navbar.vue'
 import SearchList from '/src/components/SearchList.vue'
 
-onMounted(() => window.scroll(0, 0))
+onMounted(() => {
+  window.scroll(0, 0)
+  void API.refreshLibraryInBackground()
+})
 
 const route = useRoute()
 const sm = useSearchManager()

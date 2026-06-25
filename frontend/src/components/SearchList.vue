@@ -188,11 +188,11 @@
 
           <button
             v-if="downloadState(song) === 'owned'"
-            class="icon-btn text-success cursor-default"
-            :title="t('search.inLibrary')"
-            disabled
+            class="icon-btn text-success hover:bg-success/10"
+            @click="viewOwnedInLibrary(song)"
+            :title="t('search.viewInLibrary')"
           >
-            <Icon icon="clarity:check-circle-solid" class="h-5 w-5" />
+            <Icon icon="clarity:library-solid" class="h-5 w-5" />
           </button>
           <button
             v-else-if="downloadState(song) === 'queued'"
@@ -449,38 +449,92 @@
                   <div
                     class="demo-modal-actions mt-5 flex flex-col gap-2 sm:flex-row sm:flex-wrap lg:flex-nowrap"
                   >
-                    <button
-                      v-if="demoType === 'album' && demoSourceItem"
-                      class="btn btn-primary btn-sm gap-2 rounded-full sm:shrink-0"
-                      :disabled="downloadState(demoSourceItem) !== 'idle'"
-                      @click="downloadAlbumFromDemo"
-                    >
-                      <Icon icon="clarity:download-line" class="h-4 w-4" />
-                      {{
+                    <template
+                      v-if="
+                        demoType === 'album' &&
+                        demoSourceItem &&
                         downloadState(demoSourceItem) === 'owned'
-                          ? t('search.inLibrary')
-                          : downloadState(demoSourceItem) === 'queued'
-                          ? t('search.inQueue')
-                          : t('search.downloadAlbum')
-                      }}
-                    </button>
-                    <button
-                      v-if="demoType === 'album'"
-                      class="btn btn-sm gap-2 rounded-full border border-white/10 bg-base-100/85 hover:bg-base-100 sm:shrink-0"
-                      :disabled="downloadState(activeDemoTrack) !== 'idle'"
-                      @click="downloadFromDemo"
+                      "
                     >
-                      <Icon icon="clarity:download-line" class="h-4 w-4" />
-                      {{
+                      <button
+                        class="btn btn-primary btn-sm gap-2 rounded-full sm:shrink-0"
+                        @click="viewOwnedInLibrary(demoSourceItem)"
+                      >
+                        <Icon icon="clarity:library-solid" class="h-4 w-4" />
+                        {{ t('search.viewAlbum') }}
+                      </button>
+                      <button
+                        class="btn btn-sm gap-2 rounded-full border border-white/10 bg-base-100/85 hover:bg-base-100 sm:shrink-0"
+                        @click="playOwnedMedia(demoSourceItem)"
+                      >
+                        <Icon icon="clarity:play-solid" class="h-4 w-4" />
+                        {{ t('library.playAlbum') }}
+                      </button>
+                    </template>
+                    <template
+                      v-else-if="demoType === 'album' && demoSourceItem"
+                    >
+                      <button
+                        class="btn btn-primary btn-sm gap-2 rounded-full sm:shrink-0"
+                        :disabled="downloadState(demoSourceItem) !== 'idle'"
+                        @click="downloadAlbumFromDemo"
+                      >
+                        <Icon icon="clarity:download-line" class="h-4 w-4" />
+                        {{
+                          downloadState(demoSourceItem) === 'queued'
+                            ? t('search.inQueue')
+                            : t('search.downloadAlbum')
+                        }}
+                      </button>
+                      <button
+                        class="btn btn-sm gap-2 rounded-full border border-white/10 bg-base-100/85 hover:bg-base-100 sm:shrink-0"
+                        :disabled="downloadState(activeDemoTrack) === 'queued'"
+                        @click="
+                          downloadState(activeDemoTrack) === 'owned'
+                            ? viewOwnedInLibrary(activeDemoTrack)
+                            : downloadFromDemo()
+                        "
+                      >
+                        <Icon
+                          :icon="
+                            downloadState(activeDemoTrack) === 'owned'
+                              ? 'clarity:library-solid'
+                              : 'clarity:download-line'
+                          "
+                          class="h-4 w-4"
+                        />
+                        {{
+                          downloadState(activeDemoTrack) === 'owned'
+                            ? t('search.viewInLibrary')
+                            : downloadState(activeDemoTrack) === 'queued'
+                            ? t('search.inQueue')
+                            : t('search.downloadTrack')
+                        }}
+                      </button>
+                    </template>
+                    <template
+                      v-else-if="
+                        demoType !== 'album' &&
                         downloadState(activeDemoTrack) === 'owned'
-                          ? t('search.inLibrary')
-                          : downloadState(activeDemoTrack) === 'queued'
-                          ? t('search.inQueue')
-                          : t('search.downloadTrack')
-                      }}
-                    </button>
+                      "
+                    >
+                      <button
+                        class="btn btn-primary btn-sm gap-2 rounded-full sm:shrink-0"
+                        @click="viewOwnedInLibrary(activeDemoTrack)"
+                      >
+                        <Icon icon="clarity:library-solid" class="h-4 w-4" />
+                        {{ t('search.viewInLibrary') }}
+                      </button>
+                      <button
+                        class="btn btn-sm gap-2 rounded-full border border-white/10 bg-base-100/85 hover:bg-base-100 sm:shrink-0"
+                        @click="playOwnedMedia(activeDemoTrack)"
+                      >
+                        <Icon icon="clarity:play-solid" class="h-4 w-4" />
+                        {{ t('search.playTrack') }}
+                      </button>
+                    </template>
                     <button
-                      v-else
+                      v-else-if="demoType !== 'album'"
                       class="btn btn-primary btn-sm gap-2 rounded-full sm:shrink-0"
                       :disabled="downloadState(activeDemoTrack) !== 'idle'"
                       @click="downloadFromDemo"
@@ -579,14 +633,26 @@
 
 <script setup>
 import { ref, computed, watch, onBeforeUnmount } from 'vue'
+import { useRouter } from 'vue-router'
 
 const DEMO_VOLUME_KEY = 'downtify-player-volume'
 import { Icon } from '@iconify/vue'
 
 import { useSearchManager } from '../model/search'
 import { useProgressTracker, useDownloadManager } from '../model/download'
-import { useLibraryOwnership } from '../model/libraryOwnership'
+import {
+  useLibraryOwnership,
+  findOwnedAlbum,
+  findOwnedTrack,
+} from '../model/libraryOwnership'
 import { useAlbumTrackCounts } from '../model/albumTrackCounts'
+import {
+  libraryNavigationForAlbum,
+  libraryNavigationForTrack,
+  setLibraryNavigation,
+} from '../model/libraryNavigation'
+import { getCachedLibraryItems } from '../model/librarySession'
+import { usePlayer } from '../model/player'
 import { useI18n } from '../i18n'
 import API from '../model/api'
 import CoverImage from './CoverImage.vue'
@@ -600,6 +666,8 @@ const emit = defineEmits(['download'])
 const sm = useSearchManager()
 const pt = useProgressTracker()
 const dm = useDownloadManager()
+const router = useRouter()
+const player = usePlayer()
 const { t } = useI18n()
 
 function coverSrc(url) {
@@ -804,6 +872,8 @@ function trackCountLabel(count) {
 function albumTrackCount(song) {
   if (mediaType(song) !== 'album') return null
   void countsByBrowseId.value
+  const fromItem = Number(song?.track_count)
+  if (Number.isFinite(fromItem) && fromItem > 0) return fromItem
   const count = trackCountFor(song)
   return count || null
 }
@@ -845,6 +915,78 @@ function downloadState(song) {
 function download(song) {
   if (downloadState(song) !== 'idle') return
   emit('download', song)
+}
+
+async function libraryItemsForOwned() {
+  let items = getCachedLibraryItems()
+  if (!items?.length) {
+    items = await API.refreshLibraryInBackground(true)
+  }
+  return items || []
+}
+
+async function viewOwnedInLibrary(item) {
+  if (!item) return
+  const items = await libraryItemsForOwned()
+  let navigation = null
+
+  if (item.media_type === 'album') {
+    navigation = libraryNavigationForAlbum(findOwnedAlbum(item, items))
+  } else {
+    const track = findOwnedTrack(item, items)
+    if (track) {
+      navigation = libraryNavigationForTrack(track)
+    } else if (item.album_name) {
+      navigation = libraryNavigationForAlbum(
+        findOwnedAlbum(
+          {
+            media_type: 'album',
+            name: item.album_name,
+            artists: item.artists,
+            artist: item.artist,
+          },
+          items
+        )
+      )
+    }
+  }
+
+  if (!navigation) return
+  setLibraryNavigation(navigation)
+  closeDemo()
+  router.push({ name: 'List' })
+}
+
+async function playOwnedMedia(item) {
+  if (!item) return
+  const items = await libraryItemsForOwned()
+  const album =
+    item.media_type === 'album' ? findOwnedAlbum(item, items) : null
+  const track = album ? null : findOwnedTrack(item, items)
+
+  if (album?.files?.length) {
+    closeDemo()
+    player.setPlaylist(album.files, { startIndex: 0 })
+    router.push({ name: 'Player' })
+    return
+  }
+
+  if (!track?.file) return
+  const trackAlbum = track.album
+    ? findOwnedAlbum(
+        {
+          media_type: 'album',
+          name: track.album,
+          artists: [track.artist],
+        },
+        items
+      )
+    : null
+  const playlist = trackAlbum?.files?.length ? trackAlbum.files : [track.file]
+  const startIndex = playlist.indexOf(track.file)
+  closeDemo()
+  player.setPlaylist(playlist, { startIndex: Math.max(0, startIndex) })
+  router.push({ name: 'Player' })
 }
 
 async function openDemo(song) {

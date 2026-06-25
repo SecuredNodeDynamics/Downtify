@@ -37,6 +37,46 @@ def test_album_in_library_matches_artist_and_album_name():
     )
 
 
+def test_album_in_library_matches_any_listed_artist():
+    album = {
+        'media_type': 'album',
+        'name': 'Swing',
+        'artists': ['Connor Price', 'Nic D', '4Korners'],
+        'browse_id': 'album:1',
+    }
+    library_items = [
+        {
+            'file': 'Connor Price/Swing/01.flac',
+            'artist': 'Connor Price',
+            'album': 'Swing',
+            'title': 'Swing',
+        }
+    ]
+
+    assert album_in_library(album, library_items) is True
+
+
+def test_track_in_library_from_metadata_matches_title_and_artist():
+    from downtify.library_index import track_in_library_from_metadata
+
+    track = {
+        'media_type': 'track',
+        'name': 'Swing',
+        'artists': ['Connor Price', 'Nic D'],
+        'song_id': 'track:1',
+    }
+    library_items = [
+        {
+            'file': 'Connor Price/Swing/Swing.flac',
+            'artist': 'Connor Price',
+            'album': 'Swing',
+            'title': 'Swing',
+        }
+    ]
+
+    assert track_in_library_from_metadata(track, library_items) is True
+
+
 def test_media_in_library_uses_duplicate_detection_for_tracks(tmp_path):
     downloader = Downloader(tmp_path, output_template='{artists} - {title}')
     track = {

@@ -306,6 +306,28 @@ class Downloader:
         song: dict[str, Any],
         subdir: Optional[str] = None,
     ) -> Optional[str]:
+        hit = self._duplicate_filename_for_song(song, subdir=subdir)
+        if hit:
+            return hit
+
+        artists = song.get('artists') or []
+        if len(artists) <= 1:
+            return None
+        for artist in artists:
+            name = str(artist or '').strip()
+            if not name:
+                continue
+            solo = {**song, 'artists': [name]}
+            hit = self._duplicate_filename_for_song(solo, subdir=subdir)
+            if hit:
+                return hit
+        return None
+
+    def _duplicate_filename_for_song(
+        self,
+        song: dict[str, Any],
+        subdir: Optional[str] = None,
+    ) -> Optional[str]:
         exact = self.existing_filename_for(song, subdir=subdir)
         if (
             exact
