@@ -66,6 +66,7 @@ export default {
     inQueue: 'In queue',
     download: 'Download',
     downloadAlbum: 'Download album',
+    downloadTrack: 'Download track',
     demo: 'Demo',
     playInEmbed: 'Play preview',
     noPreview: 'No audio preview is available for this item.',

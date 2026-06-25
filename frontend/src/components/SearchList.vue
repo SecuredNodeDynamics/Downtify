@@ -231,10 +231,12 @@
           @click.self="closeDemo"
         >
           <div
-            class="surface-strong w-full max-w-3xl overflow-hidden rounded-t-3xl shadow-2xl sm:rounded-3xl"
+            class="demo-modal-panel surface-strong flex w-full max-w-3xl flex-col overflow-hidden rounded-t-3xl shadow-2xl sm:rounded-3xl"
+            role="dialog"
+            aria-modal="true"
           >
             <div
-              class="flex items-center justify-between border-b border-white/5 px-5 py-4"
+              class="flex shrink-0 items-center justify-between border-b border-white/5 px-5 py-4"
             >
               <div class="min-w-0">
                 <p
@@ -255,7 +257,7 @@
               </button>
             </div>
 
-            <div v-if="demoLoading" class="space-y-3 p-5">
+            <div v-if="demoLoading" class="shrink-0 space-y-3 p-5">
               <div class="skeleton h-36 rounded-2xl" />
               <div class="skeleton h-14 rounded-2xl" />
               <div class="skeleton h-14 rounded-2xl" />
@@ -263,16 +265,19 @@
 
             <div
               v-else-if="demoError"
-              class="flex flex-col items-center gap-3 p-8 text-center text-sm text-error"
+              class="flex shrink-0 flex-col items-center gap-3 p-8 text-center text-sm text-error"
             >
               <Icon icon="clarity:exclamation-circle-line" class="h-10 w-10" />
               <p>{{ demoError }}</p>
             </div>
 
-            <template v-else>
+            <div
+              v-else
+              class="demo-modal-body min-h-0 flex-1 overflow-y-auto overscroll-contain"
+            >
               <div class="grid gap-5 p-5 sm:grid-cols-[160px_1fr]">
                 <div
-                  class="relative aspect-square overflow-hidden rounded-2xl bg-base-content/10 shadow-lg"
+                  class="demo-modal-cover relative mx-auto aspect-square w-full max-w-44 overflow-hidden rounded-2xl bg-base-content/10 shadow-lg sm:mx-0 sm:max-w-none"
                 >
                   <CoverImage
                     v-if="activeDemoTrack?.cover_url"
@@ -409,11 +414,11 @@
                   </p>
 
                   <div
-                    class="mt-5 flex flex-wrap items-center gap-2 lg:flex-nowrap"
+                    class="demo-modal-actions mt-5 flex flex-col gap-2 sm:flex-row sm:flex-wrap lg:flex-nowrap"
                   >
                     <button
                       v-if="demoType === 'album' && demoSourceItem"
-                      class="btn btn-primary btn-sm gap-2 rounded-full"
+                      class="btn btn-primary btn-sm gap-2 rounded-full sm:shrink-0"
                       :disabled="downloadState(demoSourceItem) === 'queued'"
                       @click="downloadAlbumFromDemo"
                     >
@@ -425,7 +430,21 @@
                       }}
                     </button>
                     <button
-                      class="btn btn-primary btn-sm gap-2 rounded-full"
+                      v-if="demoType === 'album'"
+                      class="btn btn-sm gap-2 rounded-full border border-white/10 bg-base-100/85 hover:bg-base-100 sm:shrink-0"
+                      :disabled="downloadState(activeDemoTrack) === 'queued'"
+                      @click="downloadFromDemo"
+                    >
+                      <Icon icon="clarity:download-line" class="h-4 w-4" />
+                      {{
+                        downloadState(activeDemoTrack) === 'queued'
+                          ? t('search.inQueue')
+                          : t('search.downloadTrack')
+                      }}
+                    </button>
+                    <button
+                      v-else
+                      class="btn btn-primary btn-sm gap-2 rounded-full sm:shrink-0"
                       :disabled="downloadState(activeDemoTrack) === 'queued'"
                       @click="downloadFromDemo"
                     >
@@ -438,7 +457,7 @@
                     </button>
                     <a
                       v-if="externalServiceUrl(activeDemoTrack)"
-                      class="btn btn-sm gap-2 rounded-full bg-base-100/85"
+                      class="btn btn-sm gap-2 rounded-full bg-base-100/85 sm:shrink-0"
                       :class="externalServiceButtonClass(activeDemoTrack)"
                       :href="externalServiceUrl(activeDemoTrack)"
                       target="_blank"
@@ -453,7 +472,7 @@
 
               <div
                 v-if="demoType === 'album' && demoTracks.length"
-                class="max-h-64 overflow-y-auto border-t border-white/5 p-3"
+                class="border-t border-white/5 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))]"
               >
                 <div
                   v-for="(track, index) in demoTracks"
@@ -510,7 +529,7 @@
                   </button>
                 </div>
               </div>
-            </template>
+            </div>
           </div>
         </div>
       </Transition>
@@ -1112,6 +1131,16 @@ function formatDuration(seconds) {
 
   .search-results-query {
     @apply truncate;
+  }
+}
+
+.demo-modal-panel {
+  max-height: min(92dvh, 100%);
+}
+
+@media (min-width: 640px) {
+  .demo-modal-panel {
+    max-height: min(90dvh, 52rem);
   }
 }
 

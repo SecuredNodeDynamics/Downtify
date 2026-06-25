@@ -68,6 +68,7 @@ export default {
     inQueue: 'En la cola',
     download: 'Descargar',
     downloadAlbum: 'Descargar album',
+    downloadTrack: 'Descargar pista',
     demo: 'Demo',
     playInEmbed: 'Reproducir vista previa',
     noPreview: 'No hay vista previa de audio para este elemento.',

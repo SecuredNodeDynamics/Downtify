@@ -67,6 +67,7 @@ export default {
     inQueue: 'Na fila',
     download: 'Baixar',
     downloadAlbum: 'Baixar album',
+    downloadTrack: 'Baixar faixa',
     demo: 'Demo',
     playInEmbed: 'Reproduzir prévia',
     noPreview: 'Nenhuma prévia de áudio disponível para este item.',
