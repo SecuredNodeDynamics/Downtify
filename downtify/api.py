@@ -37,7 +37,6 @@ from typing import Any, Optional
 from urllib.parse import quote, urlencode
 
 import requests
-import yt_dlp
 from fastapi import (
     APIRouter,
     Body,
@@ -723,6 +722,21 @@ def _download_directory_summary(download_dir: Path) -> dict[str, Any]:
         external_path is None or str(storage_dir) == external_path
     )
     return summary
+
+
+def _yt_dlp_tool_info() -> dict[str, Any]:
+    # Imported lazily so the health check doesn't force yt-dlp's heavy import
+    # at startup (notably slow on the embedded Android build).
+    try:
+        import yt_dlp
+
+        return {
+            'available': True,
+            'path': None,
+            'version': getattr(yt_dlp.version, '__version__', None),
+        }
+    except Exception:
+        return {'available': False, 'path': None, 'version': None}
 
 
 def _command_version(command: str, args: list[str]) -> dict[str, Any]:
@@ -1568,11 +1582,7 @@ def get_health() -> dict[str, Any]:
         'python': sys.version.split()[0],
         'tools': {
             'ffmpeg': _command_version('ffmpeg', ['-version']),
-            'yt_dlp': {
-                'available': True,
-                'path': None,
-                'version': getattr(yt_dlp.version, '__version__', None),
-            },
+            'yt_dlp': _yt_dlp_tool_info(),
         },
         'downloads': _download_directory_summary(download_dir),
         'data': _directory_summary(database_dir),

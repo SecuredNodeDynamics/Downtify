@@ -196,7 +196,11 @@ export async function resolveImageSrc(url) {
         rememberResolvedUrl(value, blobUrl)
         return blobUrl
       }
+      // Show the direct URL now, but cache the bytes in the background so the
+      // next load is an instant blob from disk instead of re-hitting the
+      // (slow, on embedded Android) server.
       rememberResolvedUrl(value, value)
+      persistImageInBackground(value)
       return value
     } catch (error) {
       console.warn('Failed to load direct image on native:', value, error)

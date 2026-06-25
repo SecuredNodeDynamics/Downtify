@@ -6,10 +6,9 @@ import os
 import re
 import time
 from pathlib import Path
-from typing import Any, Callable, Optional, cast
+from typing import TYPE_CHECKING, Any, Callable, Optional, cast
 
 import requests
-import yt_dlp
 from loguru import logger
 from mutagen.flac import FLAC, Picture
 from mutagen.id3 import ID3
@@ -38,6 +37,24 @@ from .jellyfin_meta import format_for_jellyfin
 from .m3u import sanitize_playlist_name
 from .musicbrainz import enrich_song_metadata
 from .providers import enrich_from_match, find_match, find_match_for_video
+
+if TYPE_CHECKING:
+    import yt_dlp as yt_dlp_module
+
+
+def _yt_dlp() -> 'yt_dlp_module':
+    """Import yt-dlp lazily.
+
+    yt-dlp pulls in a very large set of extractor modules at import time, which
+    is slow on the embedded Android (Chaquopy) build. Deferring the import to
+    first use lets the server become responsive (search, library, playback)
+    without paying that cost up front; only the first download/preview pays it.
+    """
+
+    import yt_dlp
+
+    return yt_dlp
+
 
 _INVALID_FS_CHARS = re.compile(r'[\\/:*?"<>|\x00-\x1f]')
 _AUDIO_EXTENSIONS = {'mp3', 'm4a', 'mp4', 'aac', 'flac', 'ogg', 'opus', 'wav'}
@@ -211,7 +228,7 @@ def preview_audio_for_song(song: dict[str, Any]) -> dict[str, Any]:
     ydl_opts['skip_download'] = True
 
     url = f'https://music.youtube.com/watch?v={video_id}'
-    with yt_dlp.YoutubeDL(cast(Any, ydl_opts)) as ydl:
+    with _yt_dlp().YoutubeDL(cast(Any, ydl_opts)) as ydl:
         info = ydl.extract_info(url, download=False)
 
     audio_url = _best_audio_url(cast(dict[str, Any], info or {}))
@@ -430,7 +447,7 @@ class Downloader:
         })
 
         url = f'https://music.youtube.com/watch?v={video_id}'
-        with yt_dlp.YoutubeDL(cast(Any, ydl_opts)) as ydl:
+        with _yt_dlp().YoutubeDL(cast(Any, ydl_opts)) as ydl:
             ydl.download([url])
 
         final_path = target_dir / f'{basename}.{self.audio_format}'
