@@ -153,6 +153,7 @@ def build_app() -> FastAPI:
 
     def _on_library_changed() -> None:
         api.invalidate_library_files_cache()
+        api.invalidate_local_artist_inventory_cache()
         api.schedule_library_files_cache_refresh()
 
     library_index.register_library_changed_callback(_on_library_changed)

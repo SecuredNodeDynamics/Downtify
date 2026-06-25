@@ -440,6 +440,11 @@ class AppState:
         'built_at': 0.0,
         'building': False,
     }
+    local_artist_inventory_cache: dict[str, Any] = {
+        'root': '',
+        'data': None,
+        'built_at': 0.0,
+    }
     repair_log: list[dict[str, Any]] = []
 
 
@@ -3655,6 +3660,29 @@ def _track_artists_for_inventory(
 
 
 def _local_artist_inventory(root: Path) -> dict[str, dict[str, Any]]:
+    root_key = str(root.resolve())
+    now = time.monotonic()
+    cache = state.local_artist_inventory_cache
+    cached = cache.get('data')
+    if (
+        isinstance(cached, dict)
+        and cache.get('root') == root_key
+        and now - float(cache.get('built_at') or 0.0) < 300
+    ):
+        return cached
+    data = _build_local_artist_inventory(root)
+    cache['root'] = root_key
+    cache['data'] = data
+    cache['built_at'] = now
+    return data
+
+
+def invalidate_local_artist_inventory_cache() -> None:
+    state.local_artist_inventory_cache['data'] = None
+    state.local_artist_inventory_cache['built_at'] = 0.0
+
+
+def _build_local_artist_inventory(root: Path) -> dict[str, dict[str, Any]]:
     folders: dict[str, str] = {}
     folder_images: dict[str, bool] = {}
     folder_files: dict[str, str] = {}
@@ -3687,10 +3715,6 @@ def _local_artist_inventory(root: Path) -> dict[str, dict[str, Any]]:
             try:
                 song = metadata_repair._song_from_file(path)
             except Exception:
-                logger.opt(exception=True).warning(
-                    'Could not read artists from {} for reconciliation',
-                    path,
-                )
                 song = None
 
             for artist in _track_artists_for_inventory(path, song):

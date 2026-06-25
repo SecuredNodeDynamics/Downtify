@@ -167,8 +167,12 @@ def _genre_from_path(path: Path) -> str:
 
 def _artists(tags: Any) -> list[str]:
     if tags:
+        value = ''
         for key in ['artist', 'artists', '\xa9ART', 'TPE1']:
-            value = tags.get(key)
+            try:
+                value = tags.get(key)
+            except (KeyError, ValueError):
+                continue
             if isinstance(value, list) and value:
                 artists = [
                     str(item).strip() for item in value if str(item).strip()
@@ -177,8 +181,6 @@ def _artists(tags: Any) -> list[str]:
                     return artists
             if value:
                 break
-        else:
-            value = ''
     else:
         value = ''
     if not value:
@@ -188,7 +190,7 @@ def _artists(tags: Any) -> list[str]:
             return [
                 part.strip() for part in value.split(separator) if part.strip()
             ]
-    return [value.strip()]
+    return [str(value).strip()]
 
 
 def _song_from_file(path: Path) -> dict[str, Any]:

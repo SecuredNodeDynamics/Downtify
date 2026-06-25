@@ -21,6 +21,20 @@ def test_artists_reads_multi_value_tags():
     ]
 
 
+def test_artists_ignores_invalid_tag_keys():
+    class BrokenTags(dict):
+        def get(self, key, default=None):
+            if key == '\xa9ART':
+                raise ValueError('missing vorbis tag')
+            return super().get(key, default)
+
+    artists = metadata_repair._artists(
+        BrokenTags({'artist': 'Fallback Artist'})
+    )
+
+    assert artists == ['Fallback Artist']
+
+
 def test_safe_library_path_rejects_traversal(tmp_path):
     with pytest.raises(ValueError, match='Invalid library path'):
         metadata_repair.safe_library_path(tmp_path, '../outside.mp3')
