@@ -65,6 +65,16 @@ fi
 cp "$ROOT/assets/icon-without-backgroud.svg" "$FRONTEND/assets/logo.svg"
 npm run android:icons
 npm run build:android
+
+# The embedded (serverless) backend needs a bundled ffmpeg per ABI. Warn early
+# if it's missing — search still works but conversions will fail without it.
+JNILIBS_DIR="$ANDROID_DIR/app/src/main/jniLibs"
+if ! ls "$JNILIBS_DIR"/*/libffmpeg.so >/dev/null 2>&1; then
+  echo "WARNING: No bundled ffmpeg found under $JNILIBS_DIR/<abi>/libffmpeg.so" >&2
+  echo "         On-device downloads that need conversion will fail." >&2
+  echo "         See frontend/android/app/src/main/jniLibs/README.md" >&2
+fi
+
 cd android
 ./gradlew assembleRelease
 

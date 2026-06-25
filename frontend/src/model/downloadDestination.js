@@ -1,12 +1,16 @@
 import { ref, computed } from 'vue'
+import { registerPlugin } from '@capacitor/core'
 
 import { isCapacitorNative } from './serverConnection'
 
 const DESTINATION_KEY = 'downtify-download-destination'
 const FOLDER_NAME_KEY = 'downtify-local-folder-name'
 const LOCAL_MODE_KEY = 'downtify-local-save-mode'
+const NATIVE_URI_KEY = 'downtify-native-tree-uri'
 const HANDLE_DB = 'downtify-fs'
 const HANDLE_STORE = 'directory'
+
+const FolderPicker = registerPlugin('FolderPicker')
 
 const destination = ref(readDestination())
 const localFolderName = ref(readFolderName())
@@ -14,6 +18,46 @@ const localFolderReady = ref(false)
 const localSaveMode = ref(readLocalSaveMode())
 
 let dirHandle = null
+let nativeTreeUri = readNativeTreeUri()
+
+function readNativeTreeUri() {
+  try {
+    return localStorage.getItem(NATIVE_URI_KEY) || ''
+  } catch {
+    return ''
+  }
+}
+
+function guessMimeType(name) {
+  const ext = String(name || '').split('.').pop().toLowerCase()
+  switch (ext) {
+    case 'mp3':
+      return 'audio/mpeg'
+    case 'm4a':
+    case 'mp4':
+      return 'audio/mp4'
+    case 'aac':
+      return 'audio/aac'
+    case 'opus':
+      return 'audio/opus'
+    case 'ogg':
+      return 'audio/ogg'
+    case 'flac':
+      return 'audio/flac'
+    case 'wav':
+      return 'audio/wav'
+    case 'lrc':
+    case 'txt':
+      return 'text/plain'
+    case 'jpg':
+    case 'jpeg':
+      return 'image/jpeg'
+    case 'png':
+      return 'image/png'
+    default:
+      return 'application/octet-stream'
+  }
+}
 
 function readDestination() {
   const value = localStorage.getItem(DESTINATION_KEY)
@@ -169,7 +213,38 @@ function setLocalMode(mode) {
   }
 }
 
+async function pickNativeFolder() {
+  let result
+  try {
+    result = await FolderPicker.pickFolder()
+  } catch (err) {
+    if (err?.message === 'cancelled') {
+      const abort = new Error('cancelled')
+      abort.name = 'AbortError'
+      throw abort
+    }
+    throw err
+  }
+  nativeTreeUri = result?.uri || ''
+  if (!nativeTreeUri) {
+    throw new Error('no-folder')
+  }
+  localFolderName.value = result?.name || 'Selected folder'
+  localFolderReady.value = true
+  setLocalMode('native')
+  try {
+    localStorage.setItem(NATIVE_URI_KEY, nativeTreeUri)
+    localStorage.setItem(FOLDER_NAME_KEY, localFolderName.value)
+  } catch {
+    // ignore
+  }
+  return true
+}
+
 async function pickLocalFolder() {
+  if (isCapacitorNative()) {
+    return pickNativeFolder()
+  }
   const support = getLocalFolderSupport()
   if (!support.supported) {
     throw new Error(support.reason || 'unsupported')
@@ -197,14 +272,7 @@ async function activateLocalDestination() {
     await pickLocalFolder()
   } else if (support.mode === 'native') {
     dirHandle = null
-    localFolderName.value = `${NATIVE_SUBDIR} (Documents)`
-    localFolderReady.value = true
-    setLocalMode('native')
-    try {
-      localStorage.setItem(FOLDER_NAME_KEY, localFolderName.value)
-    } catch {
-      // ignore
-    }
+    await pickNativeFolder()
   } else {
     dirHandle = null
     localFolderName.value = 'Selected browser download location'
@@ -222,11 +290,13 @@ async function activateLocalDestination() {
 
 async function clearLocalFolder() {
   dirHandle = null
+  nativeTreeUri = ''
   localFolderName.value = ''
   localFolderReady.value = false
   try {
     localStorage.removeItem(FOLDER_NAME_KEY)
     localStorage.removeItem(LOCAL_MODE_KEY)
+    localStorage.removeItem(NATIVE_URI_KEY)
   } catch {
     // ignore
   }
@@ -296,8 +366,19 @@ async function writeBlobToDevice(relativePath, blob) {
     .filter(Boolean)
   if (!segments.length) throw new Error('no-filename')
 
-  const { Filesystem, Directory } = await import('@capacitor/filesystem')
   const data = await blobToBase64(blob)
+
+  if (nativeTreeUri) {
+    await FolderPicker.writeFile({
+      uri: nativeTreeUri,
+      path: segments.join('/'),
+      data,
+      mimeType: guessMimeType(segments[segments.length - 1]),
+    })
+    return true
+  }
+
+  const { Filesystem, Directory } = await import('@capacitor/filesystem')
   const path = `${NATIVE_SUBDIR}/${segments.join('/')}`
   const dirPath = path.slice(0, path.lastIndexOf('/'))
 
@@ -352,11 +433,29 @@ async function bootstrapLocalDestination() {
   if (destination.value !== 'local') return
 
   if (isCapacitorNative()) {
-    localFolderReady.value = true
     setLocalMode('native')
-    if (!localFolderName.value) {
-      localFolderName.value = `${NATIVE_SUBDIR} (Documents)`
+    if (nativeTreeUri) {
+      try {
+        const res = await FolderPicker.checkPermission({ uri: nativeTreeUri })
+        if (res?.granted) {
+          localFolderReady.value = true
+          if (!localFolderName.value) {
+            localFolderName.value = 'Selected folder'
+          }
+          return
+        }
+      } catch {
+        // Fall through to clearing the stale URI.
+      }
+      nativeTreeUri = ''
+      try {
+        localStorage.removeItem(NATIVE_URI_KEY)
+      } catch {
+        // ignore
+      }
     }
+    localFolderReady.value = false
+    localFolderName.value = ''
     return
   }
 

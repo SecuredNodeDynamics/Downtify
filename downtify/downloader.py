@@ -136,6 +136,13 @@ def _base_ytdlp_opts() -> dict[str, Any]:
             (parts[0],) if len(parts) == 1 else (parts[0], parts[1])
         )
 
+    # On platforms where ffmpeg is not on PATH (e.g. the embedded Android
+    # build, which bundles its own binary) the location can be provided
+    # explicitly so yt-dlp's post-processing can find it.
+    ffmpeg_location = os.getenv('DOWNTIFY_FFMPEG_LOCATION', '').strip()
+    if ffmpeg_location:
+        ydl_opts['ffmpeg_location'] = ffmpeg_location
+
     return ydl_opts
 
 

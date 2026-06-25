@@ -242,11 +242,21 @@ def build_app() -> FastAPI:
         if not full.is_file():
             raise HTTPException(status_code=404, detail='File not found')
         return FileResponse(full)
-    app.mount(
-        '/',
-        SPAStaticFiles(directory=WEB_GUI_LOCATION, html=True),
-        name='static',
-    )
+
+    # The embedded mobile build serves the UI from the app's own bundled
+    # assets and only needs the API, so the SPA mount is skipped when the
+    # web assets are unavailable (or explicitly disabled).
+    serve_spa = os.getenv('DOWNTIFY_SERVE_SPA', '1').strip().lower() not in {
+        '0',
+        'false',
+        'no',
+    }
+    if serve_spa and Path(WEB_GUI_LOCATION).is_dir():
+        app.mount(
+            '/',
+            SPAStaticFiles(directory=WEB_GUI_LOCATION, html=True),
+            name='static',
+        )
     return app
 
 

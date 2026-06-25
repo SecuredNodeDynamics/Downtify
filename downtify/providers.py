@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from difflib import SequenceMatcher
@@ -64,6 +65,73 @@ def _ytm() -> YTMusic:
             if _client is None:
                 _client = YTMusic()
     return _client
+
+
+# Some self-hosted servers (depending on the ISP/region they run from) get
+# empty unauthenticated results from YouTube Music — e.g. searches returning
+# nothing for users in India. When the default client comes back empty we
+# retry against explicit region contexts so those users still get results.
+_DEFAULT_FALLBACK_REGIONS = 'US'
+_fallback_clients_cache: Optional[list[YTMusic]] = None
+_fallback_lock = Lock()
+
+
+def _ytm_fallback_regions() -> list[str]:
+    raw = os.environ.get(
+        'DOWNTIFY_YTM_FALLBACK_REGIONS', _DEFAULT_FALLBACK_REGIONS
+    )
+    regions: list[str] = []
+    for part in raw.split(','):
+        code = part.strip().upper()
+        if code and code not in regions:
+            regions.append(code)
+    return regions
+
+
+def _ytm_fallback_clients() -> list[YTMusic]:
+    global _fallback_clients_cache
+    if _fallback_clients_cache is None:
+        with _fallback_lock:
+            if _fallback_clients_cache is None:
+                clients: list[YTMusic] = []
+                for region in _ytm_fallback_regions():
+                    try:
+                        clients.append(YTMusic(location=region))
+                    except Exception:
+                        logger.exception(
+                            'Could not initialise YouTube Music client for '
+                            'region {}',
+                            region,
+                        )
+                _fallback_clients_cache = clients
+    return _fallback_clients_cache
+
+
+def _ytm_region_search(
+    query: str, *, filt: Optional[str] = None, limit: int = 20
+) -> list[dict[str, Any]]:
+    """Retry a YouTube Music search against configured fallback regions.
+
+    Only used as a last resort when the default client returns nothing, so
+    regions that already work are unaffected.
+    """
+
+    for client in _ytm_fallback_clients():
+        try:
+            results = client.search(query, filter=filt, limit=limit)
+        except Exception:
+            logger.exception('YouTube Music region fallback search failed')
+            results = []
+        if results:
+            logger.info(
+                'YouTube Music region fallback returned {} hits '
+                'filter={!r} q={!r}',
+                len(results),
+                filt,
+                query[:80],
+            )
+            return results
+    return []
 
 
 def _upgrade_thumbnail(url: str) -> str:
@@ -230,6 +298,8 @@ def search_songs(query: str, limit: int = 20) -> list[dict[str, Any]]:
         except Exception:
             logger.exception('YouTube Music video search failed')
             results = []
+    if not results:
+        results = _ytm_region_search(query, filt='songs', limit=limit)
     titles = [
         str(r.get('title') or '')[:60]
         for r in results[:8]
@@ -258,7 +328,11 @@ def _albums_from_song_search(query: str, limit: int = 10) -> list[dict[str, Any]
         results = _ytm().search(query, filter='songs', limit=max(limit, 20))
     except Exception:
         logger.exception('YouTube Music album hint search failed')
-        return []
+        results = []
+    if not results:
+        results = _ytm_region_search(
+            query, filt='songs', limit=max(limit, 20)
+        )
 
     albums: list[dict[str, Any]] = []
     seen: set[str] = set()
@@ -597,6 +671,8 @@ def find_match(
             ],
         )
         _log_ytm_response(f'find_match videos q={query[:80]!r}', results)
+    if not results:
+        results = _ytm_region_search(query, filt='songs', limit=10)
     best = _pick_best(results, duration, title, artists)
     if best is not None:
         logger.info(

@@ -8,7 +8,11 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(ApkInstallerPlugin.class);
+        registerPlugin(FolderPickerPlugin.class);
+        registerPlugin(EmbeddedServerPlugin.class);
         super.onCreate(savedInstanceState);
+        // The embedded backend is started on demand by the web layer (only in
+        // on-device mode) via EmbeddedServer.start().
         allowMixedContent();
     }
 

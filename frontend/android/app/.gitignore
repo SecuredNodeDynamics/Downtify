@@ -1,2 +1,9 @@
 /build/*
 !/build/.npmkeep
+
+# Python backend staged into the Chaquopy source set at build time.
+/src/main/python/
+
+# Bundled ffmpeg binaries (supplied per-ABI, see jniLibs/README.md).
+/src/main/jniLibs/*/libffmpeg.so
+/src/main/jniLibs/*/libffprobe.so

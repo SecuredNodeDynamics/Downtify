@@ -551,6 +551,20 @@ export default {
     serverConnectionSection: 'Servidor Downtify',
     serverConnectionHint:
       'No app movel, informe o endereco do seu servidor Downtify — um IP local (com porta) ou uma URL publica como um tunel Cloudflare. Deixe vazio ao usar o navegador no mesmo host do servidor.',
+    modeSection: 'Modo',
+    connectionModeDevice: 'Executar neste dispositivo',
+    connectionModeServer: 'Conectar a um servidor',
+    connectionModeDeviceHint:
+      'O Downtify roda totalmente neste dispositivo — busca e downloads funcionam sem nenhum servidor.',
+    connectionModeServerHint:
+      'Use um servidor Downtify na sua rede ou na internet.',
+    connectionModeServerConfigHint:
+      'Defina o endereco do servidor em Configuracoes → API.',
+    runningOnThisDevice: 'Executando neste dispositivo',
+    runningOnThisDeviceHint:
+      'Busca, downloads e conversao acontecem localmente. Nada e enviado a um servidor Downtify externo.',
+    runningOnThisDeviceSwitchHint:
+      'Para conectar a um servidor, mude para “Conectar a um servidor” nas Configuracoes gerais.',
     serverRequiredTitle: 'Conecte ao seu servidor Downtify',
     serverRequiredHint:
       'O app movel precisa do endereco do servidor antes de carregar fila, saude e outros dados. Abra Configuracoes → API e informe seu IP local ou URL do tunel.',
@@ -623,10 +637,11 @@ export default {
     downloadDestinationBrowserHint:
       'Quando um download terminar, o Downtify salvara uma copia no local de download selecionado no navegador.',
     downloadDestinationDeviceHint:
-      'Quando um download terminar, o Downtify salvara uma copia neste dispositivo em Documentos/Downtify.',
+      'Quando um download terminar, o Downtify salvara uma copia na pasta que voce escolher neste dispositivo.',
     deviceDownloadsHint:
-      'Os arquivos sao salvos no armazenamento do seu dispositivo em Documentos/Downtify.',
+      'Escolha qualquer pasta do seu dispositivo ou cartao SD. Toque em “Mudar pasta…” para escolher onde os downloads sao salvos.',
     localFolderLabel: 'Salvar downloads em',
+    localFolderNone: 'Nenhuma pasta selecionada ainda',
     localFolderNameHint:
       'O navegador mostra apenas o nome da pasta, não o caminho completo no seu computador.',
     changeLocalFolder: 'Alterar pasta…',

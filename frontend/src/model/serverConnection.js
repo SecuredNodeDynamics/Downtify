@@ -2,6 +2,51 @@ import { Capacitor } from '@capacitor/core'
 
 const STORAGE_KEY = 'downtify-server-url'
 
+// The embedded (on-device) backend listens here. Must match the port used by
+// the native EmbeddedServer plugin / downtify.mobile.DEFAULT_PORT.
+export const EMBEDDED_SERVER_PORT = 8765
+export const EMBEDDED_SERVER_URL = `http://127.0.0.1:${EMBEDDED_SERVER_PORT}`
+
+const CONNECTION_MODE_KEY = 'downtify-connection-mode'
+
+export function isEmbeddedServerAvailable() {
+  try {
+    return (
+      isCapacitorNative() &&
+      Boolean(Capacitor?.isPluginAvailable?.('EmbeddedServer'))
+    )
+  } catch {
+    return false
+  }
+}
+
+// 'device' = run the on-device embedded backend; 'server' = use a remote
+// Downtify server. The embedded APK defaults to 'device'; everything else is
+// always 'server'.
+export function getConnectionMode() {
+  if (!isEmbeddedServerAvailable()) return 'server'
+  try {
+    const value = localStorage.getItem(CONNECTION_MODE_KEY)
+    if (value === 'server' || value === 'device') return value
+  } catch {
+    // ignore storage errors
+  }
+  return 'device'
+}
+
+export function setConnectionMode(mode) {
+  const normalized = mode === 'server' ? 'server' : 'device'
+  try {
+    localStorage.setItem(CONNECTION_MODE_KEY, normalized)
+  } catch {
+    // ignore storage errors
+  }
+}
+
+export function usesEmbeddedServer() {
+  return isEmbeddedServerAvailable() && getConnectionMode() === 'device'
+}
+
 const SPA_ROUTE_PREFIXES = [
   '/monitor',
   '/player',
@@ -69,6 +114,7 @@ export function isCapacitorNative() {
 }
 
 export function needsServerConnection() {
+  if (usesEmbeddedServer()) return false
   return isCapacitorNative() && !usesCustomServerUrl()
 }
 
@@ -120,6 +166,9 @@ function envOrLocation() {
 }
 
 export function getServerConfig() {
+  if (usesEmbeddedServer()) {
+    return parseServerUrl(EMBEDDED_SERVER_URL) || envOrLocation()
+  }
   const stored = getStoredServerUrl()
   const parsed = stored ? parseServerUrl(stored) : null
   return parsed || envOrLocation()

@@ -9,6 +9,12 @@ buildscript {
     dependencies {
         classpath 'com.android.tools.build:gradle:8.13.0'
         classpath 'com.google.gms:google-services:4.4.4'
+        // Embeds a Python runtime so the APK can run the Downtify backend
+        // on-device (serverless mode). See docs/android-embedded-backend.md.
+        // NOTE: Chaquopy must support the Android Gradle Plugin version above;
+        // if the build fails, align the AGP and Chaquopy versions per
+        // https://chaquo.com/chaquopy/doc/current/versions.html
+        classpath 'com.chaquo.python:gradle:16.1.0'
 
         // NOTE: Do not place your application dependencies here; they belong
         // in the individual module build.gradle files

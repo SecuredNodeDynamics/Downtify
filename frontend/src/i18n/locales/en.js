@@ -541,6 +541,20 @@ export default {
     serverConnectionSection: 'Downtify server',
     serverConnectionHint:
       'For the mobile app, enter your Downtify server address — a home LAN IP (with port) or a public URL such as a Cloudflare tunnel. Leave empty when using the browser on the same host as the server.',
+    modeSection: 'Mode',
+    connectionModeDevice: 'Run on this device',
+    connectionModeServer: 'Connect to a server',
+    connectionModeDeviceHint:
+      'Downtify runs entirely on this device — search and downloads work without any server.',
+    connectionModeServerHint:
+      'Use a Downtify server on your network or the internet.',
+    connectionModeServerConfigHint:
+      'Set the server address in Settings → API.',
+    runningOnThisDevice: 'Running on this device',
+    runningOnThisDeviceHint:
+      'Search, downloads and conversion all happen locally. Nothing is sent to an external Downtify server.',
+    runningOnThisDeviceSwitchHint:
+      'To connect to a server instead, switch to “Connect to a server” in General settings.',
     serverRequiredTitle: 'Connect to your Downtify server',
     serverRequiredHint:
       'The mobile app needs your server address before it can load queue, health, and other server data. Open Settings → API and enter your home IP or tunnel URL.',
@@ -613,10 +627,11 @@ export default {
     downloadDestinationBrowserHint:
       'When a download finishes, Downtify saves a copy to your selected browser download location.',
     downloadDestinationDeviceHint:
-      'When a download finishes, Downtify saves a copy to this device under Documents/Downtify.',
+      'When a download finishes, Downtify saves a copy to the folder you choose on this device.',
     deviceDownloadsHint:
-      'Files are saved to your device storage under Documents/Downtify.',
+      'Pick any folder on your device or SD card. Tap “Change folder…” to choose where downloads are saved.',
     localFolderLabel: 'Save downloads to',
+    localFolderNone: 'No folder selected yet',
     localFolderNameHint:
       'Browsers only show the folder name, not the full path on your computer.',
     changeLocalFolder: 'Change folder…',

@@ -553,6 +553,20 @@ export default {
     serverConnectionSection: 'Servidor Downtify',
     serverConnectionHint:
       'Para la app movil, introduce la direccion de tu servidor Downtify: una IP local (con puerto) o una URL publica como un tunel de Cloudflare. Dejalo vacio si usas el navegador en el mismo host que el servidor.',
+    modeSection: 'Modo',
+    connectionModeDevice: 'Ejecutar en este dispositivo',
+    connectionModeServer: 'Conectar a un servidor',
+    connectionModeDeviceHint:
+      'Downtify se ejecuta totalmente en este dispositivo: la busqueda y las descargas funcionan sin ningun servidor.',
+    connectionModeServerHint:
+      'Usa un servidor Downtify en tu red o en internet.',
+    connectionModeServerConfigHint:
+      'Configura la direccion del servidor en Ajustes → API.',
+    runningOnThisDevice: 'Ejecutandose en este dispositivo',
+    runningOnThisDeviceHint:
+      'La busqueda, las descargas y la conversion ocurren localmente. No se envia nada a un servidor Downtify externo.',
+    runningOnThisDeviceSwitchHint:
+      'Para conectar a un servidor, cambia a «Conectar a un servidor» en Ajustes generales.',
     serverRequiredTitle: 'Conecta tu servidor Downtify',
     serverRequiredHint:
       'La app movil necesita la direccion del servidor antes de cargar cola, salud y otros datos. Abre Ajustes → API e introduce tu IP local o URL del tunel.',
@@ -625,10 +639,11 @@ export default {
     downloadDestinationBrowserHint:
       'Cuando termine una descarga, Downtify guardara una copia en la ubicacion de descarga seleccionada en tu navegador.',
     downloadDestinationDeviceHint:
-      'Cuando termine una descarga, Downtify guardara una copia en este dispositivo en Documentos/Downtify.',
+      'Cuando termine una descarga, Downtify guardara una copia en la carpeta que elijas en este dispositivo.',
     deviceDownloadsHint:
-      'Los archivos se guardan en el almacenamiento de tu dispositivo en Documentos/Downtify.',
+      'Elige cualquier carpeta de tu dispositivo o tarjeta SD. Toca «Cambiar carpeta…» para elegir donde se guardan las descargas.',
     localFolderLabel: 'Guardar descargas en',
+    localFolderNone: 'Aun no se ha seleccionado ninguna carpeta',
     localFolderNameHint:
       'El navegador solo muestra el nombre de la carpeta, no la ruta completa en tu equipo.',
     changeLocalFolder: 'Cambiar carpeta…',

@@ -26,6 +26,51 @@
     </div>
 
     <div v-if="activeTab === 'general'" class="px-4 pb-5 space-y-6 sm:px-6">
+      <!-- App mode: on-device (serverless) vs remote server -->
+      <div v-if="embeddedAvailable">
+        <label
+          class="block text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2"
+        >
+          {{ t('settings.modeSection') }}
+        </label>
+        <div class="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            class="rounded-xl border px-3 py-2 text-sm transition-colors text-left"
+            :class="[
+              isDeviceMode
+                ? 'border-primary/50 bg-primary/10 text-primary'
+                : 'border-white/10 hover:border-white/20 hover:bg-white/5',
+            ]"
+            @click="selectConnectionMode('device')"
+          >
+            {{ t('settings.connectionModeDevice') }}
+          </button>
+          <button
+            type="button"
+            class="rounded-xl border px-3 py-2 text-sm transition-colors text-left"
+            :class="[
+              !isDeviceMode
+                ? 'border-primary/50 bg-primary/10 text-primary'
+                : 'border-white/10 hover:border-white/20 hover:bg-white/5',
+            ]"
+            @click="selectConnectionMode('server')"
+          >
+            {{ t('settings.connectionModeServer') }}
+          </button>
+        </div>
+        <p class="text-[11px] text-base-content/40 mt-1.5">
+          {{
+            isDeviceMode
+              ? t('settings.connectionModeDeviceHint')
+              : t('settings.connectionModeServerHint')
+          }}
+        </p>
+        <p v-if="!isDeviceMode" class="text-[11px] text-base-content/40 mt-1">
+          {{ t('settings.connectionModeServerConfigHint') }}
+        </p>
+      </div>
+
       <!-- Language -->
       <div>
         <label
@@ -47,8 +92,9 @@
         </p>
       </div>
 
-      <!-- Download destination -->
-      <div>
+      <!-- Download destination (irrelevant in on-device mode: files are
+           always saved locally by the embedded backend). -->
+      <div v-if="!isDeviceMode">
         <label
           class="block text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2"
         >
@@ -121,7 +167,7 @@
                 {{ t('settings.localFolderLabel') }}
               </p>
               <p class="truncate text-sm text-base-content/80">
-                {{ localFolderName }}
+                {{ localFolderName || t('settings.localFolderNone') }}
               </p>
               <p class="mt-1 text-[11px] text-base-content/40">
                 {{ localFolderDetailHint }}
@@ -129,7 +175,7 @@
             </div>
           </div>
           <div
-            v-if="!usesBrowserDownloads && !usesNativeDownloads"
+            v-if="!usesBrowserDownloads"
             class="flex flex-wrap items-center gap-2"
           >
             <button
@@ -457,7 +503,26 @@
         <p class="mb-3 text-sm text-base-content/60">
           {{ t('settings.serverConnectionHint') }}
         </p>
-        <div class="space-y-3">
+
+        <div
+          v-if="isDeviceMode"
+          class="flex items-start gap-3 rounded-xl border border-primary/30 bg-primary/10 px-3 py-3"
+        >
+          <Icon
+            icon="clarity:mobile-line"
+            class="mt-0.5 h-5 w-5 shrink-0 text-primary"
+          />
+          <div class="min-w-0">
+            <p class="text-sm font-medium text-primary">
+              {{ t('settings.runningOnThisDevice') }}
+            </p>
+            <p class="mt-1 text-[11px] text-base-content/50">
+              {{ t('settings.runningOnThisDeviceSwitchHint') }}
+            </p>
+          </div>
+        </div>
+
+        <div v-else class="space-y-3">
           <div class="surface rounded-xl px-3 py-2.5 text-sm">
             <span class="text-base-content/50">
               {{ t('settings.serverUrlCurrent') }}:
@@ -1102,12 +1167,15 @@ import {
   canConnectToCurrentPage,
   canSaveServerUrlInput,
   formatServerDisplay,
+  getConnectionMode,
   getCurrentPageServerUrl,
   getServerConfig,
   getStoredServerUrl,
   isCapacitorNative,
   isConnectedToCurrentPage,
+  isEmbeddedServerAvailable,
   parseServerUrl,
+  setConnectionMode,
   setStoredServerUrl,
   usesCustomServerUrl,
 } from '../model/serverConnection'
@@ -1176,6 +1244,11 @@ const serverTestLoading = ref(false)
 const serverTestMessage = ref('')
 const serverTestError = ref(false)
 const usesCustomServer = computed(() => usesCustomServerUrl())
+const embeddedAvailable = computed(() => isEmbeddedServerAvailable())
+const connectionMode = ref(getConnectionMode())
+const isDeviceMode = computed(
+  () => embeddedAvailable.value && connectionMode.value === 'device'
+)
 const activeServerDisplay = computed(() =>
   formatServerDisplay(getServerConfig())
 )
@@ -1765,6 +1838,14 @@ function saveServerConnection() {
 
 function resetServerConnection() {
   setStoredServerUrl('')
+  reloadAfterServerChange()
+}
+
+function selectConnectionMode(mode) {
+  const normalized = mode === 'server' ? 'server' : 'device'
+  if (connectionMode.value === normalized) return
+  connectionMode.value = normalized
+  setConnectionMode(normalized)
   reloadAfterServerChange()
 }
 

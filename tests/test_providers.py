@@ -150,6 +150,60 @@ def test_search_songs_falls_back_to_broad_search(monkeypatch):
     assert results[0]['name'] == 'Fallback Song'
 
 
+def test_search_songs_uses_region_fallback_when_empty(monkeypatch):
+    class EmptyYTMusic:
+        def search(self, query, filter=None, limit=20):
+            return []
+
+    class RegionYTMusic:
+        def search(self, query, filter=None, limit=20):
+            return [
+                {
+                    'videoId': 'region123456',
+                    'title': 'Region Song',
+                    'artists': [{'name': 'Region Artist'}],
+                    'duration_seconds': 200,
+                }
+            ]
+
+    monkeypatch.setattr(providers, '_ytm', lambda: EmptyYTMusic())
+    monkeypatch.setattr(
+        providers, '_ytm_fallback_clients', lambda: [RegionYTMusic()]
+    )
+
+    results = providers.search_songs('forever young', limit=5)
+
+    assert results
+    assert results[0]['song_id'] == 'region123456'
+    assert results[0]['name'] == 'Region Song'
+
+
+def test_search_songs_skips_region_fallback_when_primary_has_hits(monkeypatch):
+    calls = {'fallback': 0}
+
+    class PrimaryYTMusic:
+        def search(self, query, filter=None, limit=20):
+            return [
+                {
+                    'videoId': 'primary12345',
+                    'title': 'Primary Song',
+                    'artists': [{'name': 'Primary Artist'}],
+                }
+            ]
+
+    def fake_fallback():
+        calls['fallback'] += 1
+        return []
+
+    monkeypatch.setattr(providers, '_ytm', lambda: PrimaryYTMusic())
+    monkeypatch.setattr(providers, '_ytm_fallback_clients', fake_fallback)
+
+    results = providers.search_songs('forever young', limit=5)
+
+    assert results[0]['song_id'] == 'primary12345'
+    assert calls['fallback'] == 0
+
+
 def test_search_media_derives_albums_from_song_hits(monkeypatch):
     class FakeYTMusic:
         def search(self, query, filter=None, limit=20):
