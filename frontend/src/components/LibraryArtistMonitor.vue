@@ -24,36 +24,16 @@
     <button
       v-else
       type="button"
-      class="btn btn-sm inline-flex h-10 items-center gap-1.5 rounded-full px-3 sm:px-4"
-      :class="
-        artistNotFound
-          ? 'border-error bg-error/5 text-error hover:bg-error/10'
-          : 'border-white/10 bg-base-100/85 hover:bg-base-100'
-      "
+      class="btn btn-sm inline-flex h-10 items-center gap-1.5 rounded-full border-white/10 bg-base-100/85 px-3 hover:bg-base-100 sm:px-4"
       :disabled="busy"
       @click="startMonitor"
     >
       <span v-if="busy" class="loading loading-spinner loading-xs" />
-      <Icon
-        v-else
-        :icon="artistNotFound ? 'clarity:warning-standard-line' : 'clarity:eye-line'"
-        class="h-4 w-4 shrink-0"
-      />
+      <Icon v-else icon="clarity:eye-line" class="h-4 w-4 shrink-0" />
       <span class="text-xs sm:text-sm">
-        {{
-          artistNotFound
-            ? t('library.monitorArtistNotFoundShort')
-            : t('library.monitorArtist')
-        }}
+        {{ t('library.monitorArtist') }}
       </span>
     </button>
-
-    <p
-      v-if="pickerError && !pickerOpen"
-      class="mt-1 max-w-[14rem] text-right text-xs leading-snug text-error sm:max-w-xs"
-    >
-      {{ pickerError }}
-    </p>
 
     <div
       v-if="pickerOpen"
@@ -160,7 +140,6 @@ const { t } = useI18n()
 const router = useRouter()
 
 const busy = ref(false)
-const artistNotFound = ref(false)
 const pickerError = ref('')
 const pickerOpen = ref(false)
 const pickerMatches = ref([])
@@ -169,6 +148,48 @@ const monitoredEntry = computed(() => {
   monitoredArtistMap.value
   return findMonitoredArtist(props.artistName)
 })
+
+function dedupeArtistMatches(matches = []) {
+  const seenIds = new Set()
+  const seenNames = new Set()
+  const deduped = []
+
+  for (const match of matches) {
+    const spotifyId = String(match?.spotify_id || '').trim()
+    const nameKey = normalizeMonitoredArtistName(match?.name)
+    if (spotifyId && seenIds.has(spotifyId)) continue
+    if (nameKey && seenNames.has(nameKey)) continue
+    if (spotifyId) seenIds.add(spotifyId)
+    if (nameKey) seenNames.add(nameKey)
+    deduped.push(match)
+  }
+
+  return deduped.sort(
+    (left, right) => (right?.match_score || 0) - (left?.match_score || 0)
+  )
+}
+
+function findMonitoredArtistBySpotifyId(spotifyId) {
+  const id = String(spotifyId || '').trim()
+  if (!id) return null
+  return (
+    monitoredArtists.value.find(
+      (item) => item.kind === 'artist' && String(item.spotify_id || '').trim() === id
+    ) || null
+  )
+}
+
+function linkExistingMonitoredArtist(match) {
+  const linked =
+    findMonitoredArtist(props.artistName) ||
+    findMonitoredArtist(match?.name) ||
+    findMonitoredArtistBySpotifyId(match?.spotify_id)
+  if (linked) {
+    upsertMonitoredArtist(linked, props.artistName)
+    return true
+  }
+  return false
+}
 
 async function lookupSpotifyArtistsWithRetry(artistName, limit = 5) {
   const lookup = () =>
@@ -188,15 +209,13 @@ async function lookupSpotifyArtistsWithRetry(artistName, limit = 5) {
 async function startMonitor() {
   if (!props.artistName || busy.value) return
   busy.value = true
-  artistNotFound.value = false
   pickerError.value = ''
   try {
-    const { matches } = await lookupSpotifyArtistsWithRetry(props.artistName)
-    if (matches.length === 0) {
-      artistNotFound.value = true
-      pickerError.value = t('library.monitorArtistNotFound')
-      return
-    }
+    const { matches: rawMatches } = await lookupSpotifyArtistsWithRetry(
+      props.artistName
+    )
+    const matches = dedupeArtistMatches(rawMatches)
+    if (matches.length === 0) return
 
     const strongMatches = matches.filter((match) => match.match_score >= 0.72)
     if (strongMatches.length === 1) {
@@ -210,10 +229,8 @@ async function startMonitor() {
 
     pickerMatches.value = matches
     pickerOpen.value = true
-  } catch (err) {
-    artistNotFound.value = true
-    pickerError.value =
-      err?.response?.data?.detail || t('library.monitorArtistLookupFailed')
+  } catch {
+    // Lookup failures are handled silently in the library drill header.
   } finally {
     busy.value = false
   }
@@ -234,30 +251,25 @@ async function addMatch(match) {
     return
   }
 
+  if (linkExistingMonitoredArtist(match)) {
+    pickerOpen.value = false
+    pickerMatches.value = []
+    return
+  }
+
   busy.value = true
   pickerError.value = ''
   try {
     const res = await monitorAPI.addMonitoredPlaylist(url, 60, 'artist')
     pickerOpen.value = false
     pickerMatches.value = []
-    artistNotFound.value = false
     upsertMonitoredArtist(res.data, props.artistName)
     await refreshMonitoredArtists({ force: true })
   } catch (err) {
     if (err?.response?.status === 409) {
       pickerOpen.value = false
       await refreshMonitoredArtists({ force: true })
-      if (!findMonitoredArtist(props.artistName)) {
-        const linked =
-          findMonitoredArtist(match?.name) ||
-          monitoredArtists.value.find(
-            (item) =>
-              item.kind === 'artist' &&
-              normalizeMonitoredArtistName(item.name) ===
-                normalizeMonitoredArtistName(match?.name)
-          )
-        if (linked) upsertMonitoredArtist(linked, props.artistName)
-      }
+      linkExistingMonitoredArtist(match)
       return
     }
     pickerError.value =
@@ -280,7 +292,6 @@ function goToMonitor() {
 watch(
   () => props.artistName,
   () => {
-    artistNotFound.value = false
     pickerError.value = ''
   }
 )

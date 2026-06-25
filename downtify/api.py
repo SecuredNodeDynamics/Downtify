@@ -4384,6 +4384,24 @@ async def add_monitor_playlist(request: Request) -> dict[str, Any]:
         logger.exception('Failed to resolve {} {}', kind, spotify_id)
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
+    if kind == 'artist':
+        target_key = re.sub(r'[^a-z0-9]+', '', str(name or '').strip().lower())
+        if target_key:
+            playlists = await asyncio.to_thread(db.list_playlists)
+            for playlist in playlists:
+                if playlist.kind != 'artist':
+                    continue
+                existing_key = re.sub(
+                    r'[^a-z0-9]+',
+                    '',
+                    str(playlist.name or '').strip().lower(),
+                )
+                if existing_key == target_key:
+                    raise HTTPException(
+                        status_code=409,
+                        detail='This artist is already being monitored',
+                    )
+
     image_url = ''
     try:
         image_url = await asyncio.to_thread(

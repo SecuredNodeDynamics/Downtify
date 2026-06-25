@@ -55,4 +55,24 @@ describe('monitoredArtists', () => {
     expect(findMonitoredArtist('Weeknd')).toEqual(monitoredArtists.value[0])
     expect(findMonitoredArtist('The Weeknd')).toEqual(monitoredArtists.value[0])
   })
+
+  it('dedupes monitored artists by spotify id and name', () => {
+    upsertMonitoredArtist({
+      id: 1,
+      kind: 'artist',
+      spotify_id: 'abc',
+      name: 'Taylor Swift',
+      enabled: true,
+    })
+    upsertMonitoredArtist({
+      id: 2,
+      kind: 'artist',
+      spotify_id: 'abc',
+      name: 'Taylor Swift',
+      enabled: true,
+    })
+
+    expect(monitoredArtists.value).toHaveLength(1)
+    expect(monitoredArtists.value[0].id).toBe(2)
+  })
 })

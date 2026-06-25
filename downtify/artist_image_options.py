@@ -237,7 +237,32 @@ def list_spotify_artist_matches(
             if artist_image_sources._spotify_search_blocked():
                 break
     results.sort(key=lambda item: item['match_score'], reverse=True)
-    return results[:limit]
+    return _dedupe_spotify_artist_matches(results[:limit])
+
+
+def _dedupe_spotify_artist_matches(
+    results: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    seen_ids: set[str] = set()
+    seen_names: set[str] = set()
+    deduped: list[dict[str, Any]] = []
+    for item in results:
+        spotify_id = str(item.get('spotify_id') or '').strip()
+        name_key = re.sub(
+            r'[^a-z0-9]+',
+            '',
+            str(item.get('name') or '').strip().lower(),
+        )
+        if spotify_id and spotify_id in seen_ids:
+            continue
+        if name_key and name_key in seen_names:
+            continue
+        if spotify_id:
+            seen_ids.add(spotify_id)
+        if name_key:
+            seen_names.add(name_key)
+        deduped.append(item)
+    return deduped
 
 
 def list_spotify_artist_image_options(

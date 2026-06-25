@@ -22,10 +22,39 @@ function readCachedPlaylists() {
 
 function writeCachedPlaylists(items) {
   try {
-    sessionStorage.setItem(CACHE_KEY, JSON.stringify(items))
+    sessionStorage.setItem(CACHE_KEY, JSON.stringify(dedupeMonitoredPlaylists(items)))
   } catch {
     // Ignore quota or privacy errors.
   }
+}
+
+function normalizeMonitoredArtistName(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+}
+
+function dedupeMonitoredPlaylists(items) {
+  const seenIds = new Set()
+  const seenArtistNames = new Set()
+  const deduped = []
+
+  for (const item of items || []) {
+    if (!item || typeof item !== 'object') continue
+
+    if (item.kind === 'artist') {
+      const spotifyId = String(item.spotify_id || '').trim()
+      const nameKey = normalizeMonitoredArtistName(item.name)
+      if (spotifyId && seenIds.has(spotifyId)) continue
+      if (nameKey && seenArtistNames.has(nameKey)) continue
+      if (spotifyId) seenIds.add(spotifyId)
+      if (nameKey) seenArtistNames.add(nameKey)
+    }
+
+    deduped.push(item)
+  }
+
+  return deduped
 }
 
 function listMonitoredPlaylists({ useCache = true } = {}) {
@@ -33,7 +62,10 @@ function listMonitoredPlaylists({ useCache = true } = {}) {
     timeout: 15000,
   }).then((res) => {
     writeCachedPlaylists(res.data || [])
-    return res
+    return {
+      ...res,
+      data: dedupeMonitoredPlaylists(res.data || []),
+    }
   })
 
   const cached = useCache ? readCachedPlaylists() : null
@@ -42,7 +74,7 @@ function listMonitoredPlaylists({ useCache = true } = {}) {
   }
 
   return Promise.resolve({
-    data: cached,
+    data: dedupeMonitoredPlaylists(cached),
     fromCache: true,
     refresh: liveRequest,
   })

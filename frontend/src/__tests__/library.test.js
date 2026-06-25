@@ -78,6 +78,27 @@ describe('library path helpers', () => {
     ).toBe(true)
   })
 
+  it('merges artist names that only differ by casing', () => {
+    const items = [
+      {
+        file: 'Taylor Swift/1989/01.flac',
+        artist: 'Taylor Swift',
+        album: '1989',
+        title: 'Welcome',
+      },
+      {
+        file: 'taylor swift/Reputation/01.flac',
+        artist: 'taylor swift',
+        album: 'Reputation',
+        title: 'Track',
+      },
+    ]
+
+    const artists = groupArtists(items)
+    expect(artists).toHaveLength(1)
+    expect(artists[0].files).toHaveLength(2)
+  })
+
   it('normalizes sparse items and buckets unknown genres', () => {
     const item = normalizeLibraryItem({
       file: 'Artist/Album/track.flac',

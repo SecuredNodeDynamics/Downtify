@@ -179,6 +179,39 @@ def test_list_spotify_artist_matches_returns_urls_and_scores(monkeypatch):
     assert result[0]['match_score'] >= 0.99
 
 
+def test_list_spotify_artist_matches_dedupes_same_name(monkeypatch):
+    monkeypatch.setattr(
+        options,
+        '_musicbrainz_spotify_artist_matches',
+        lambda *_args, **_kwargs: [
+            {
+                'spotify_id': 'abc123',
+                'name': 'Taylor Swift',
+                'url': 'https://open.spotify.com/artist/abc123',
+                'image_url': '',
+                'match_score': 0.95,
+            },
+            {
+                'spotify_id': 'def456',
+                'name': 'taylor swift',
+                'url': 'https://open.spotify.com/artist/def456',
+                'image_url': '',
+                'match_score': 0.7,
+            },
+        ],
+    )
+    monkeypatch.setattr(
+        options.artist_image_sources,
+        '_spotify_search_blocked',
+        lambda: True,
+    )
+
+    result = options.list_spotify_artist_matches('Taylor Swift')
+
+    assert len(result) == 1
+    assert result[0]['spotify_id'] == 'abc123'
+
+
 def test_list_spotify_artist_matches_falls_back_to_musicbrainz(monkeypatch):
     monkeypatch.setattr(
         options,

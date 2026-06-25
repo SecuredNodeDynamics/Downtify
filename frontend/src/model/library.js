@@ -111,6 +111,23 @@ export function albumKey(artist, album) {
   return `${artist}\u0000${album}`
 }
 
+export function artistBrowseKey(name) {
+  return String(name || '')
+    .trim()
+    .toLocaleLowerCase()
+}
+
+function chooseArtistDisplayName(current, candidate) {
+  const currentName = String(current || '').trim()
+  const candidateName = String(candidate || '').trim()
+  if (!currentName) return candidateName
+  if (!candidateName) return currentName
+  if (artistBrowseKey(currentName) !== artistBrowseKey(candidateName)) {
+    return currentName
+  }
+  return candidateName.length > currentName.length ? candidateName : currentName
+}
+
 export function libraryCoverFolders(file) {
   const parts = pathParts(file)
   const folders = []
@@ -129,15 +146,20 @@ export function groupArtists(items, options = {}) {
   for (const raw of items) {
     const item = normalizeLibraryItem(raw, options)
     for (const name of libraryItemArtists(item, options)) {
-      if (!grouped.has(name)) {
-        grouped.set(name, {
+      const key = artistBrowseKey(name)
+      if (!key) continue
+
+      if (!grouped.has(key)) {
+        grouped.set(key, {
           name,
           files: [],
           albums: new Set(),
           fileSet: new Set(),
         })
       }
-      const artist = grouped.get(name)
+
+      const artist = grouped.get(key)
+      artist.name = chooseArtistDisplayName(artist.name, name)
       if (!artist.fileSet.has(item.file)) {
         artist.fileSet.add(item.file)
         artist.files.push(item.file)

@@ -69,19 +69,52 @@ export function findMonitoredArtist(artistName) {
   return monitoredArtistMap.value.get(target) || null
 }
 
+function dedupeMonitoredItems(items) {
+  const seenIds = new Set()
+  const seenArtistNames = new Set()
+  const deduped = []
+
+  for (const item of items || []) {
+    if (!item || typeof item !== 'object') continue
+
+    if (item.kind === 'artist') {
+      const spotifyId = String(item.spotify_id || '').trim()
+      const nameKey = normalizeMonitoredArtistName(item.name)
+      if (spotifyId && seenIds.has(spotifyId)) continue
+      if (nameKey && seenArtistNames.has(nameKey)) continue
+      if (spotifyId) seenIds.add(spotifyId)
+      if (nameKey) seenArtistNames.add(nameKey)
+    }
+
+    deduped.push(item)
+  }
+
+  return deduped
+}
+
 function applyMonitoredArtists(items) {
-  monitoredArtists.value = Array.isArray(items) ? items : []
+  monitoredArtists.value = dedupeMonitoredItems(items)
   rebuildMonitoredArtistMap(monitoredArtists.value)
 }
 
 export function upsertMonitoredArtist(item, libraryArtistName = '') {
   if (!item || item.kind !== 'artist') return
 
-  const items = [...monitoredArtists.value]
-  const index = items.findIndex((entry) => entry.id === item.id)
-  if (index >= 0) items[index] = item
-  else items.unshift(item)
+  const spotifyId = String(item.spotify_id || '').trim()
+  const nameKey = normalizeMonitoredArtistName(item.name)
+  const items = monitoredArtists.value.filter((entry) => {
+    if (entry.id === item.id) return false
+    if (entry.kind !== 'artist') return true
+    if (spotifyId && String(entry.spotify_id || '').trim() === spotifyId) {
+      return false
+    }
+    if (nameKey && normalizeMonitoredArtistName(entry.name) === nameKey) {
+      return false
+    }
+    return true
+  })
 
+  items.unshift(item)
   applyMonitoredArtists(items)
   lastRefreshAt = Date.now()
 
