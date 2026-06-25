@@ -86,6 +86,7 @@ chaquopy {
             install "yt-dlp"
             install "ytmusicapi"
             install "mutagen"
+            install "Pillow"
             install "requests"
             install "loguru"
             install "load-dotenv"

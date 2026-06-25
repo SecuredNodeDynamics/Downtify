@@ -1406,7 +1406,7 @@ function metadataCoverUrl(item) {
   if (!file || metadataCoverFailed.value[file]) {
     return ''
   }
-  return apiPreviewSrc(API.coverFileURL(file))
+  return apiPreviewSrc(API.coverFileURL(file, 0))
 }
 
 function markMetadataCoverFailed(file) {

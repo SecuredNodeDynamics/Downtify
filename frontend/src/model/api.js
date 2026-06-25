@@ -265,32 +265,49 @@ function downloadFileURL(fileName) {
   return path
 }
 
-function coverFileURL(fileName) {
-  const file = String(fileName || '').trim()
-  if (!file) return ''
-  return apiAssetUrl(`/cover?${new URLSearchParams({ file })}`)
+// Grids and lists only ever show covers at small sizes, so request downscaled
+// thumbnails by default. This dramatically cuts transfer + decode time on the
+// embedded Android (loopback) backend where full-resolution embedded artwork
+// (often 1000x1000+) made the library feel slow. The full-screen player asks
+// for a larger size, and metadata editing uses the original (size 0).
+const DEFAULT_COVER_SIZE = 320
+
+function withCoverSize(params, size) {
+  const value = Number(size)
+  if (Number.isFinite(value) && value > 0) {
+    params.size = String(Math.round(value))
+  }
+  return params
 }
 
-function coverFolderURL(folderPath) {
-  const folder = String(folderPath || '').trim()
-  if (!folder) return ''
+function coverFileURL(fileName, size = DEFAULT_COVER_SIZE) {
+  const file = String(fileName || '').trim()
+  if (!file) return ''
   return apiAssetUrl(
-    `/api/metadata/artist-images/folder-preview?${new URLSearchParams({
-      folder,
-    })}`
+    `/cover?${new URLSearchParams(withCoverSize({ file }, size))}`
   )
 }
 
-function coverUrlsForLibraryFile(fileName) {
-  const urls = [coverFileURL(fileName)]
+function coverFolderURL(folderPath, size = DEFAULT_COVER_SIZE) {
+  const folder = String(folderPath || '').trim()
+  if (!folder) return ''
+  return apiAssetUrl(
+    `/api/metadata/artist-images/folder-preview?${new URLSearchParams(
+      withCoverSize({ folder }, size)
+    )}`
+  )
+}
+
+function coverUrlsForLibraryFile(fileName, size = DEFAULT_COVER_SIZE) {
+  const urls = [coverFileURL(fileName, size)]
   for (const folder of libraryCoverFolders(fileName)) {
-    urls.push(coverFolderURL(folder))
+    urls.push(coverFolderURL(folder, size))
   }
   return [...new Set(urls.filter(Boolean))]
 }
 
-function coverFallbackUrls(fileName) {
-  return coverUrlsForLibraryFile(fileName).slice(1)
+function coverFallbackUrls(fileName, size = DEFAULT_COVER_SIZE) {
+  return coverUrlsForLibraryFile(fileName, size).slice(1)
 }
 
 const EMPTY_COVER_SOURCES = Object.freeze({
@@ -300,36 +317,41 @@ const EMPTY_COVER_SOURCES = Object.freeze({
 
 const coverSourcesCache = new Map()
 
-function coverSourcesForFile(fileName) {
+function coverSourcesForFile(fileName, size = DEFAULT_COVER_SIZE) {
   const file = String(fileName || '').trim()
   if (!file) return EMPTY_COVER_SOURCES
 
-  const cached = coverSourcesCache.get(file)
+  const cacheKey = `${size}\0${file}`
+  const cached = coverSourcesCache.get(cacheKey)
   if (cached) return cached
 
-  const urls = coverUrlsForLibraryFile(file)
+  const urls = coverUrlsForLibraryFile(file, size)
   const entry = Object.freeze({
     src: urls[0] || '',
     fallbacks: Object.freeze(urls.slice(1)),
   })
-  coverSourcesCache.set(file, entry)
+  coverSourcesCache.set(cacheKey, entry)
   return entry
 }
 
-function coverSourcesForArtist(artistName, previewFiles = []) {
+function coverSourcesForArtist(
+  artistName,
+  previewFiles = [],
+  size = DEFAULT_COVER_SIZE
+) {
   const name = String(artistName || '').trim()
   const files = (previewFiles || [])
     .map((file) => String(file || '').trim())
     .filter(Boolean)
-  const cacheKey = `artist:${name}\0${files.join('\0')}`
+  const cacheKey = `artist:${size}\0${name}\0${files.join('\0')}`
   const cached = coverSourcesCache.get(cacheKey)
   if (cached) return cached
 
   const urls = []
   for (const file of files) {
-    urls.push(...coverUrlsForLibraryFile(file))
+    urls.push(...coverUrlsForLibraryFile(file, size))
   }
-  if (name) urls.push(coverFolderURL(name))
+  if (name) urls.push(coverFolderURL(name, size))
   const deduped = [...new Set(urls.filter(Boolean))]
   const entry = Object.freeze({
     src: deduped[0] || '',

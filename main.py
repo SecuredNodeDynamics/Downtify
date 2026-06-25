@@ -220,16 +220,18 @@ def build_app() -> FastAPI:
         library_index.notify_library_changed()
         return {'deleted': True}
 
-    def _cover_response(file: str):
-        return cover_art.cover_response_for_file(api._active_download_dir(), file)
+    def _cover_response(file: str, size: int = 0):
+        return cover_art.cover_response_for_file(
+            api._active_download_dir(), file, size
+        )
 
     @app.get('/cover')
-    def get_cover(file: str):
-        return _cover_response(file)
+    def get_cover(file: str, size: int = 0):
+        return _cover_response(file, size)
 
     @app.get('/cover/{file_path:path}')
-    def get_cover_path(file_path: str):
-        return _cover_response(file_path)
+    def get_cover_path(file_path: str, size: int = 0):
+        return _cover_response(file_path, size)
 
     @app.get('/downloads/{file_path:path}')
     def get_download(file_path: str):

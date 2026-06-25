@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 from collections import OrderedDict
+from io import BytesIO
 from pathlib import Path
 from threading import Lock
 
@@ -28,11 +29,70 @@ _COVER_CACHE_MAX_BYTES = int(
     os.getenv('DOWNTIFY_COVER_CACHE_BYTES', str(48 * 1024 * 1024))
 )
 
-_cover_cache: 'OrderedDict[tuple[str, int, int], tuple[bytes, str | None]]' = (
+# The cache key includes the requested thumbnail size so the original artwork
+# and each downscaled variant are cached independently. A size of 0 represents
+# the untouched original bytes.
+_CoverCacheKey = 'tuple[str, int, int, int]'
+
+_cover_cache: 'OrderedDict[tuple[str, int, int, int], tuple[bytes, str | None]]' = (
     OrderedDict()
 )
 _cover_cache_lock = Lock()
 _cover_cache_bytes = 0
+
+# Pillow is optional. When unavailable (e.g. a stripped-down build) covers are
+# served at their original resolution instead of failing.
+_pillow_checked = False
+_pillow_available = False
+
+
+def _pillow_image():
+    global _pillow_checked, _pillow_available
+    if not _pillow_checked:
+        _pillow_checked = True
+        try:
+            from PIL import Image  # noqa: PLC0415
+
+            _pillow_available = True
+            return Image
+        except Exception:
+            _pillow_available = False
+            return None
+    if not _pillow_available:
+        return None
+    try:
+        from PIL import Image  # noqa: PLC0415
+
+        return Image
+    except Exception:
+        return None
+
+
+def resize_image_bytes(data: bytes, size: int) -> bytes | None:
+    """Downscale image bytes to fit ``size`` x ``size``, returning JPEG bytes.
+
+    Returns ``None`` when resizing is unnecessary (already small enough) or not
+    possible (Pillow missing, unsupported/corrupt image), so callers fall back
+    to the original bytes.
+    """
+
+    if size <= 0 or not data:
+        return None
+    image_mod = _pillow_image()
+    if image_mod is None:
+        return None
+    try:
+        with image_mod.open(BytesIO(data)) as img:
+            width, height = img.size
+            if max(width, height) <= size:
+                return None
+            thumb = img.convert('RGB') if img.mode not in {'RGB', 'L'} else img
+            thumb.thumbnail((size, size), image_mod.LANCZOS)
+            out = BytesIO()
+            thumb.save(out, format='JPEG', quality=82, optimize=True)
+            return out.getvalue()
+    except Exception:
+        return None
 
 
 def _cover_cache_key(path: Path) -> tuple[str, int, int] | None:
@@ -44,7 +104,7 @@ def _cover_cache_key(path: Path) -> tuple[str, int, int] | None:
 
 
 def _cover_cache_get(
-    key: tuple[str, int, int],
+    key: tuple[str, int, int, int],
 ) -> tuple[bytes, str | None] | None:
     with _cover_cache_lock:
         value = _cover_cache.get(key)
@@ -54,7 +114,7 @@ def _cover_cache_get(
 
 
 def _cover_cache_put(
-    key: tuple[str, int, int], data: bytes, mime: str | None
+    key: tuple[str, int, int, int], data: bytes, mime: str | None
 ) -> None:
     global _cover_cache_bytes
     size = len(data)
@@ -122,7 +182,20 @@ def resolve_cover_bytes(path: Path) -> tuple[bytes | None, str | None]:
     return None, None
 
 
-def cover_response_for_file(root: Path, file: str) -> Response:
+def _resolve_original(
+    full: Path, base_key: tuple[str, int, int] | None
+) -> tuple[bytes | None, str | None]:
+    if base_key is not None:
+        cached = _cover_cache_get((*base_key, 0))
+        if cached is not None:
+            return cached
+    data, mime = resolve_cover_bytes(full)
+    if data is not None and base_key is not None:
+        _cover_cache_put((*base_key, 0), data, mime)
+    return data, mime
+
+
+def cover_response_for_file(root: Path, file: str, size: int = 0) -> Response:
     base = root.resolve()
     try:
         full = (base / file).resolve()
@@ -132,14 +205,21 @@ def cover_response_for_file(root: Path, file: str) -> Response:
     if not full.is_file():
         raise HTTPException(status_code=404, detail='File not found')
 
-    cache_key = _cover_cache_key(full)
-    cached = _cover_cache_get(cache_key) if cache_key is not None else None
+    size = max(0, int(size or 0))
+    base_key = _cover_cache_key(full)
+    target_key = (*base_key, size) if base_key is not None else None
+
+    cached = _cover_cache_get(target_key) if target_key is not None else None
     if cached is not None:
         data, mime = cached
     else:
-        data, mime = resolve_cover_bytes(full)
-        if data is not None and cache_key is not None:
-            _cover_cache_put(cache_key, data, mime)
+        data, mime = _resolve_original(full, base_key)
+        if data is not None and size > 0:
+            resized = resize_image_bytes(data, size)
+            if resized is not None:
+                data, mime = resized, 'image/jpeg'
+        if data is not None and target_key is not None:
+            _cover_cache_put(target_key, data, mime)
 
     if data is None:
         raise HTTPException(status_code=404, detail='No cover art found')

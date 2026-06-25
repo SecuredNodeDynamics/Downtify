@@ -59,6 +59,7 @@ from . import (
     spotify,
 )
 from .cover_art import cover_response_for_file
+from .cover_art import resize_image_bytes as cover_art_resize
 from .downloader import Downloader, preview_audio_for_song
 from .history import DownloadHistoryDB
 from .image_proxy import fetch_remote_image, is_allowed_image_url
@@ -1841,13 +1842,13 @@ def image_proxy(url: str = Query('')) -> Response:
 
 
 @router.get('/api/library/cover')
-def library_cover(file: str = Query('')) -> Response:
+def library_cover(file: str = Query(''), size: int = 0) -> Response:
     download_dir = (
         _active_download_dir()
         if state.downloader is not None
         else state.default_download_dir
     )
-    return cover_response_for_file(download_dir, file)
+    return cover_response_for_file(download_dir, file, size)
 
 
 def _metadata_scan_status() -> dict[str, Any]:
@@ -2439,7 +2440,9 @@ def _with_clean_artist_image_preview(
 
 
 @router.get('/api/metadata/artist-images/folder-preview')
-def artist_folder_image_preview(folder: str = Query(...)) -> Response:
+def artist_folder_image_preview(
+    folder: str = Query(...), size: int = 0
+) -> Response:
     if state.downloader is None:
         raise HTTPException(status_code=500, detail='Downloader not ready')
     download_dir = _active_download_dir().resolve()
@@ -2460,9 +2463,16 @@ def artist_folder_image_preview(folder: str = Query(...)) -> Response:
         raise HTTPException(
             status_code=404, detail='Artist image not found'
         ) from exc
+    media_type = artist_art.media_type_for_image(data)
+    size = max(0, int(size or 0))
+    if size > 0:
+        resized = cover_art_resize(data, size)
+        if resized is not None:
+            data = resized
+            media_type = 'image/jpeg'
     return Response(
         content=data,
-        media_type=artist_art.media_type_for_image(data),
+        media_type=media_type,
         headers={
             'Cache-Control': 'public, max-age=86400',
             'Access-Control-Allow-Origin': '*',

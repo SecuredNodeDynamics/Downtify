@@ -258,9 +258,16 @@
           <div
             class="player-details flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-3 sm:gap-5 sm:p-5"
           >
-            <template v-if="hasActiveTrack && (currentArtistEntry || currentArtistAlbums.length)">
+            <template
+              v-if="
+                hasActiveTrack &&
+                (currentArtistEntry || currentArtistAlbums.length)
+              "
+            >
               <section v-if="currentArtistEntry" class="space-y-2">
-                <h2 class="player-detail-heading">{{ t('library.artists') }}</h2>
+                <h2 class="player-detail-heading">
+                  {{ t('library.artists') }}
+                </h2>
                 <article class="player-detail-card">
                   <div class="player-detail-main">
                     <div class="player-detail-cover">
@@ -271,7 +278,9 @@
                         "
                         :key="`player-artist:${currentArtistEntry.name}`"
                         :src="artistCoverFor(currentArtistEntry).src"
-                        :fallbacks="artistCoverFor(currentArtistEntry).fallbacks"
+                        :fallbacks="
+                          artistCoverFor(currentArtistEntry).fallbacks
+                        "
                         :alt="currentArtistEntry.name"
                         img-class="absolute inset-0 h-full w-full object-cover"
                       >
@@ -289,7 +298,9 @@
                       />
                     </div>
                     <div class="min-w-0 flex-1">
-                      <p class="player-detail-title">{{ currentArtistEntry.name }}</p>
+                      <p class="player-detail-title">
+                        {{ currentArtistEntry.name }}
+                      </p>
                       <p class="player-detail-meta">
                         {{
                           t('library.artistMeta', {
@@ -372,7 +383,9 @@
               v-else
               class="flex flex-1 items-center justify-center py-10 text-center"
             >
-              <p class="text-sm text-base-content/50">{{ t('player.detailsEmpty') }}</p>
+              <p class="text-sm text-base-content/50">
+                {{ t('player.detailsEmpty') }}
+              </p>
             </div>
           </div>
         </aside>
@@ -470,7 +483,9 @@ const currentArtistEntry = computed(() => {
   const name =
     currentLibraryItem.value?.artist || player.currentTrack.value?.artist || ''
   if (!name) return null
-  return artists.value.find((artist) => artistNamesMatch(artist.name, name)) || null
+  return (
+    artists.value.find((artist) => artistNamesMatch(artist.name, name)) || null
+  )
 })
 
 const currentAlbumKey = computed(() => {
@@ -482,13 +497,16 @@ const currentAlbumKey = computed(() => {
 const currentArtistAlbums = computed(() => {
   const entry = currentArtistEntry.value
   if (!entry) return []
-  return albums.value.filter((album) => artistNamesMatch(album.artist, entry.name))
+  return albums.value.filter((album) =>
+    artistNamesMatch(album.artist, entry.name)
+  )
 })
 
 const currentCoverSources = computed(() => {
   const file = player.currentTrack.value?.file || ''
   if (!file) return API.coverSourcesForFile('')
-  return API.coverSourcesForFile(file)
+  // Full-screen art needs a higher resolution than the small grid thumbnails.
+  return API.coverSourcesForFile(file, 640)
 })
 
 const artistCoverMap = computed(() => {
@@ -600,7 +618,9 @@ async function refreshLibraryMetadataInBackground(force = false) {
 
 function libraryItemsUnchanged(nextItems) {
   const options = libraryGroupOptions.value
-  const normalized = nextItems.map((item) => normalizeLibraryItem(item, options))
+  const normalized = nextItems.map((item) =>
+    normalizeLibraryItem(item, options)
+  )
   return libraryItemsEqual(libraryItems.value, normalized)
 }
 
