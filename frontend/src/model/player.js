@@ -1,7 +1,12 @@
 import { ref, computed } from 'vue'
 
 import API from './api.js'
-import { isSameAudioUrl } from './playerAudioUrl.js'
+import {
+  isSameAudioFile,
+  isSameAudioUrl,
+  resolvePlaybackUrl,
+} from './playerAudioUrl.js'
+import { usesEmbeddedServer } from './serverConnection.js'
 
 const VOLUME_KEY = 'downtify-player-volume'
 
@@ -19,9 +24,11 @@ let audio = null
 let shuffleOrder = []
 let shufflePos = 0
 let progressRaf = 0
+let isSeeking = false
+let playingFile = ''
 
 function tickProgress() {
-  if (audio && !audio.paused) {
+  if (audio && !audio.paused && !isSeeking) {
     currentTime.value = audio.currentTime
     progressRaf = requestAnimationFrame(tickProgress)
   } else {
@@ -45,12 +52,19 @@ function stopProgressTicker() {
 function ensureAudio() {
   if (audio) return audio
   audio = new Audio()
-  audio.preload = 'metadata'
+  audio.preload = usesEmbeddedServer() ? 'auto' : 'metadata'
   audio.volume = volume.value
   audio.addEventListener('timeupdate', () => {
-    if (!progressRaf) {
+    if (!progressRaf && !isSeeking) {
       currentTime.value = audio.currentTime
     }
+  })
+  audio.addEventListener('seeking', () => {
+    isSeeking = true
+  })
+  audio.addEventListener('seeked', () => {
+    isSeeking = false
+    if (audio) currentTime.value = audio.currentTime
   })
   audio.addEventListener('loadedmetadata', () => {
     duration.value = isFinite(audio.duration) ? audio.duration : 0
@@ -115,31 +129,47 @@ function buildShuffleOrder() {
 }
 
 function selectAt(index) {
+  void applyTrack(index, { autoplay: false, resetTime: false })
+}
+
+async function applyTrack(index, { autoplay = false, resetTime = true } = {}) {
   if (index < 0 || index >= playlist.value.length) return
   const a = ensureAudio()
   const wasPlaying = isPlaying.value
+  const track = playlist.value[index]
   currentIndex.value = index
   if (shuffle.value) {
     if (shuffleOrder.length !== playlist.value.length) buildShuffleOrder()
     const pos = shuffleOrder.indexOf(index)
     if (pos >= 0) shufflePos = pos
   }
-  const nextUrl = playlist.value[index].url
-  if (!isSameAudioUrl(a.src, nextUrl)) {
+
+  const nextUrl = await resolvePlaybackUrl(track.file)
+  track.url = nextUrl
+
+  const sameSource =
+    playingFile === track.file &&
+    (isSameAudioFile(a.src, track.file) || isSameAudioUrl(a.src, nextUrl))
+
+  if (!sameSource) {
     a.pause()
     isPlaying.value = false
     stopProgressTicker()
+    playingFile = track.file
     a.src = nextUrl
-    a.currentTime = 0
-    currentTime.value = 0
-    duration.value = 0
-    if (wasPlaying) {
-      a.play().catch(() => {})
+    if (resetTime) {
+      a.currentTime = 0
+      currentTime.value = 0
+      duration.value = 0
+    }
+    if (autoplay || wasPlaying) {
+      await a.play().catch(() => {})
     }
     return
   }
-  if (wasPlaying && a.paused) {
-    a.play().catch(() => {})
+
+  if ((autoplay || wasPlaying) && a.paused) {
+    await a.play().catch(() => {})
   }
 }
 
@@ -148,9 +178,7 @@ export function syncPlaylistFromFiles(files, options = {}) {
   if (!paths.length) return
 
   const currentFile =
-    currentIndex.value >= 0
-      ? playlist.value[currentIndex.value]?.file
-      : null
+    currentIndex.value >= 0 ? playlist.value[currentIndex.value]?.file : null
 
   const pathsUnchanged =
     paths.length === playlist.value.length &&
@@ -166,7 +194,7 @@ export function syncPlaylistFromFiles(files, options = {}) {
 
     const track = playlist.value[currentIndex.value]
     const a = ensureAudio()
-    if (track && !isSameAudioUrl(a.src, track.url)) {
+    if (track && !isSameAudioFile(a.src, track.file)) {
       selectAt(currentIndex.value)
       return
     }
@@ -209,18 +237,7 @@ function setPlaylist(files, options = {}) {
 }
 
 function playAt(index) {
-  if (index < 0 || index >= playlist.value.length) return
-  const a = ensureAudio()
-  currentIndex.value = index
-  if (shuffle.value) {
-    if (shuffleOrder.length !== playlist.value.length) buildShuffleOrder()
-    const pos = shuffleOrder.indexOf(index)
-    if (pos >= 0) shufflePos = pos
-  }
-  a.src = playlist.value[index].url
-  a.currentTime = 0
-  currentTime.value = 0
-  a.play().catch(() => {})
+  void applyTrack(index, { autoplay: true, resetTime: true })
 }
 
 function play() {
@@ -230,8 +247,11 @@ function play() {
     playAt(0)
     return
   }
-  if (!a.src) {
-    a.src = playlist.value[currentIndex.value].url
+  const track = playlist.value[currentIndex.value]
+  if (!track) return
+  if (!a.src || !isSameAudioFile(a.src, track.file)) {
+    void applyTrack(currentIndex.value, { autoplay: true, resetTime: false })
+    return
   }
   a.play().catch(() => {})
 }
@@ -249,6 +269,7 @@ function seek(seconds) {
   const a = ensureAudio()
   const max = duration.value || 0
   const clamped = Math.max(0, Math.min(max, seconds))
+  isSeeking = true
   a.currentTime = clamped
   currentTime.value = clamped
 }

@@ -56,6 +56,10 @@ export function loadSettings() {
 
 loadSettings()
 
+export function getServerMediaLocation() {
+  return String(settings.value.server_media_location || '').trim()
+}
+
 export function useSettingsManager() {
   const isSaved = ref()
   function saveSettings() {
