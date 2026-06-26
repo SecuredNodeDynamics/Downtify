@@ -35,10 +35,16 @@ bump_version() {
 
   case "$part" in
     patch) patch=$((patch + 1)) ;;
-    minor) minor=$((minor + 1)); patch=0 ;;
-    major) major=$((major + 1)); minor=0; patch=0 ;;
+    minor) minor=$((minor + 1)); patch=1 ;;
+    major) major=$((major + 1)); minor=0; patch=1 ;;
     *) echo "Error: unknown bump part '$part'" >&2; exit 1 ;;
   esac
+
+  # Keep every semver section to at most two digits (<= 99) by cascading any
+  # overflow up to the next section. Patch is 1-based, so a fresh minor or
+  # major starts at X.Y.1 (never X.Y.0) — e.g. 2.10.99 -> 2.11.1.
+  if (( patch > 99 )); then patch=1; minor=$((minor + 1)); fi
+  if (( minor > 99 )); then minor=0; major=$((major + 1)); fi
 
   echo "${major}.${minor}.${patch}"
 }

@@ -62,9 +62,9 @@ describe('library path helpers', () => {
 
     const albums = groupAlbums(items)
     expect(albums).toHaveLength(3)
-    expect(
-      albums.find((album) => album.artist === 'Nic D')?.files
-    ).toEqual(['Connor Price/Swing/01.flac'])
+    expect(albums.find((album) => album.artist === 'Nic D')?.files).toEqual([
+      'Connor Price/Swing/01.flac',
+    ])
     expect(matchesLibraryTrackItem(items[0], 'Nic D')).toBe(true)
     expect(
       matchesLibraryAlbumEntry(
@@ -76,6 +76,72 @@ describe('library path helpers', () => {
         '4Korners'
       )
     ).toBe(true)
+  })
+
+  it('never creates a combined card for collaborating artists', () => {
+    const items = [
+      {
+        file: 'Ariana Grande/Sweetener/01 - Side To Side.mp3',
+        artist: 'Ariana Grande',
+        artists: ['Ariana Grande'],
+        album: 'Sweetener',
+        title: 'Side To Side',
+      },
+      {
+        file: 'Ariana Grande, Nicki Minaj/Collab/01 - Bang Bang.mp3',
+        artist: 'Ariana Grande, Nicki Minaj',
+        artists: ['Ariana Grande', 'Nicki Minaj'],
+        album: 'Collab',
+        title: 'Bang Bang',
+      },
+    ]
+
+    const artists = groupArtists(items)
+    expect(artists.map((artist) => artist.name).sort()).toEqual([
+      'Ariana Grande',
+      'Nicki Minaj',
+    ])
+
+    const ariana = artists.find((artist) => artist.name === 'Ariana Grande')
+    expect(ariana.files).toHaveLength(2)
+    expect(ariana.albumCount).toBe(2)
+
+    const nicki = artists.find((artist) => artist.name === 'Nicki Minaj')
+    expect(nicki.files).toEqual([
+      'Ariana Grande, Nicki Minaj/Collab/01 - Bang Bang.mp3',
+    ])
+  })
+
+  it('splits a combined artist string when no per-artist list is present', () => {
+    const items = [
+      {
+        file: 'Various/Bang Bang.mp3',
+        artist: 'Ariana Grande, Nicki Minaj',
+        album: 'Singles',
+        title: 'Bang Bang',
+      },
+    ]
+
+    const artists = groupArtists(items)
+    expect(artists.map((artist) => artist.name).sort()).toEqual([
+      'Ariana Grande',
+      'Nicki Minaj',
+    ])
+  })
+
+  it('keeps single artist names that contain separators intact', () => {
+    const items = [
+      {
+        file: 'Tyler, The Creator/IGOR/01 - Earfquake.mp3',
+        artist: 'Tyler, The Creator',
+        artists: ['Tyler, The Creator'],
+        album: 'IGOR',
+        title: 'Earfquake',
+      },
+    ]
+
+    const artists = groupArtists(items)
+    expect(artists.map((artist) => artist.name)).toEqual(['Tyler, The Creator'])
   })
 
   it('merges artist names that only differ by casing', () => {

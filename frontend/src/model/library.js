@@ -58,14 +58,34 @@ export function libraryItemArtists(item, options = {}) {
     artists.push(trimmed)
   }
 
-  if (Array.isArray(item?.artists)) {
-    for (const artist of item.artists) add(artist)
+  // Add a combined artist string only when it represents a single artist.
+  // Splitting first means a collaboration ("A, B") becomes one entry per
+  // individual artist instead of a combined card, while single artists whose
+  // names legitimately contain separators are preserved verbatim.
+  const addNames = (value) => {
+    const names = splitArtistNames(value)
+    if (names.length > 1) {
+      for (const name of names) add(name)
+    } else {
+      add(value)
+    }
   }
-  for (const artist of splitArtistNames(primary)) add(artist)
-  add(primary)
 
-  const parts = pathParts(file)
-  if (parts.length > 1) add(parts[0])
+  // Prefer the explicit per-artist list when present: these are already the
+  // individual credited artists, so they are trusted as-is (no further
+  // splitting) to keep names like "Tyler, The Creator" intact.
+  if (Array.isArray(item?.artists) && item.artists.length) {
+    for (const artist of item.artists) add(artist)
+  } else {
+    addNames(primary)
+  }
+
+  // Fall back to the folder name only when nothing else identified an artist,
+  // splitting a combined collaboration folder into individual artists too.
+  if (!artists.length) {
+    const parts = pathParts(file)
+    if (parts.length > 1) addNames(parts[0])
+  }
 
   if (!artists.length) add(unknownArtist)
   return artists
@@ -308,7 +328,10 @@ export function groupGenres(items, unknownLabel = 'Unknown', options = {}) {
     }
     const bucket = grouped.get(name)
     bucket.files.push(item.file)
-    if (item.browse_genre && normalizeGenreDisplayName(item.browse_genre) !== name) {
+    if (
+      item.browse_genre &&
+      normalizeGenreDisplayName(item.browse_genre) !== name
+    ) {
       bucket.subgenres.add(normalizeGenreDisplayName(item.browse_genre))
     } else if (item.genre && normalizeGenreDisplayName(item.genre) !== name) {
       bucket.subgenres.add(normalizeGenreDisplayName(item.genre))

@@ -38,10 +38,16 @@ function bump(version, part) {
   let patch = Number(m[3]);
 
   if (part === 'patch') patch += 1;
-  else if (part === 'minor') { minor += 1; patch = 0; }
-  else if (part === 'major') { major += 1; minor = 0; patch = 0; }
+  else if (part === 'minor') { minor += 1; patch = 1; }
+  else if (part === 'major') { major += 1; minor = 0; patch = 1; }
   else if (/^\d+\.\d+\.\d+$/.test(part)) return part;
   else throw new Error(`Invalid bump part: ${part}`);
+
+  // Keep every semver section to at most two digits (<= 99) by cascading any
+  // overflow up to the next section. Patch is 1-based, so a fresh minor or
+  // major starts at X.Y.1 (never X.Y.0) — e.g. 2.10.99 -> 2.11.1.
+  if (patch > 99) { patch = 1; minor += 1; }
+  if (minor > 99) { minor = 0; major += 1; }
 
   return `${major}.${minor}.${patch}`;
 }
