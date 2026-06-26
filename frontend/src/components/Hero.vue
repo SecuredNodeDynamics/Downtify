@@ -36,7 +36,7 @@
       </p>
 
       <div class="mt-10">
-        <SearchInput class="w-full" />
+        <SearchInput class="w-full" :keep-visible-on-focus="true" />
         <div
           class="mt-4 flex flex-wrap items-center justify-center gap-2 text-xs text-base-content/60"
         >

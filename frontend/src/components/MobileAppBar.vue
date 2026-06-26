@@ -51,6 +51,20 @@
           />
           <Icon v-else icon="clarity:refresh-line" class="h-5 w-5" />
         </button>
+        <button
+          v-if="showDownloadRefresh"
+          type="button"
+          class="mobile-app-bar-icon shrink-0"
+          :title="t('common.refresh')"
+          :disabled="downloadRefreshLoading"
+          @click="refreshDownload()"
+        >
+          <Icon
+            icon="clarity:refresh-line"
+            class="h-5 w-5 transition-colors"
+            :class="downloadRefreshLoading ? 'animate-spin text-primary' : ''"
+          />
+        </button>
       </div>
     </div>
   </header>
@@ -62,6 +76,7 @@ import { Icon } from '@iconify/vue'
 import { useRoute } from 'vue-router'
 
 import router from '../router'
+import { useDownloadRefresh } from '../model/downloadRefresh'
 import { useHealthRefresh } from '../model/healthRefresh'
 import { useLibraryRefresh } from '../model/libraryRefresh'
 import { useI18n } from '../i18n'
@@ -77,9 +92,17 @@ const {
   failed: libraryRefreshFailed,
   refresh: refreshLibrary,
 } = useLibraryRefresh()
+const {
+  loading: downloadRefreshLoading,
+  visible: downloadRefreshVisible,
+  refresh: refreshDownload,
+} = useDownloadRefresh()
 
 const showHealthRefresh = computed(() => route.name === 'Health')
 const showLibraryRefresh = computed(() => route.name === 'List')
+const showDownloadRefresh = computed(
+  () => route.name === 'Download' && downloadRefreshVisible.value
+)
 
 const pageTitle = computed(() => {
   const key = route.meta?.mobileTitleKey

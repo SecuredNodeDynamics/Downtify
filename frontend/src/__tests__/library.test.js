@@ -129,19 +129,44 @@ describe('library path helpers', () => {
     ])
   })
 
-  it('keeps single artist names that contain separators intact', () => {
+  it('keeps multi-entry artist lists with separators intact', () => {
+    // A name that legitimately contains a comma is preserved when it arrives as
+    // its own element in a multi-entry list (the correct way to tag it).
     const items = [
       {
-        file: 'Tyler, The Creator/IGOR/01 - Earfquake.mp3',
-        artist: 'Tyler, The Creator',
-        artists: ['Tyler, The Creator'],
-        album: 'IGOR',
-        title: 'Earfquake',
+        file: 'Tyler, The Creator/Call Me If You Get Lost/01 - Wusyaname.mp3',
+        artist: 'Tyler, The Creator, YoungBoy Never Broke Again',
+        artists: ['Tyler, The Creator', 'YoungBoy Never Broke Again'],
+        album: 'Call Me If You Get Lost',
+        title: 'Wusyaname',
       },
     ]
 
     const artists = groupArtists(items)
-    expect(artists.map((artist) => artist.name)).toEqual(['Tyler, The Creator'])
+    expect(artists.map((artist) => artist.name).sort()).toEqual([
+      'Tyler, The Creator',
+      'YoungBoy Never Broke Again',
+    ])
+  })
+
+  it('splits a single combined artist list entry into separate cards', () => {
+    // Some sources hand back a collaboration as one combined string even inside
+    // the artists list; it must still become one card per performer.
+    const items = [
+      {
+        file: 'Ariana Grande, Nicki Minaj/Collab/01 - Bang Bang.m4a',
+        artist: 'Ariana Grande, Nicki Minaj',
+        artists: ['Ariana Grande, Nicki Minaj'],
+        album: 'Collab',
+        title: 'Bang Bang',
+      },
+    ]
+
+    const artists = groupArtists(items)
+    expect(artists.map((artist) => artist.name).sort()).toEqual([
+      'Ariana Grande',
+      'Nicki Minaj',
+    ])
   })
 
   it('merges artist names that only differ by casing', () => {

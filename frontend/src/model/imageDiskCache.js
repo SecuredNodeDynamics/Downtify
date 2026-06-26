@@ -122,6 +122,21 @@ export async function writePersistedImage(url, blob) {
   void trimCache(db)
 }
 
+export async function deletePersistedImage(url) {
+  const key = cacheKey(url)
+  if (!key) return
+
+  const db = await openDb()
+  if (!db) return
+
+  await new Promise((resolve) => {
+    const tx = db.transaction(STORE_NAME, 'readwrite')
+    tx.oncomplete = () => resolve()
+    tx.onerror = () => resolve()
+    tx.objectStore(STORE_NAME).delete(key)
+  })
+}
+
 export async function clearPersistedImageCache() {
   const db = await openDb()
   if (!db) return

@@ -35,6 +35,58 @@ def test_artists_ignores_invalid_tag_keys():
     assert artists == ['Fallback Artist']
 
 
+def test_apply_text_tags_falls_back_to_format_class_for_m4a(
+    tmp_path,
+    monkeypatch,
+):
+    # An m4a whose container makes MutagenFile's quick sniff return None must
+    # still be tagged via the format-specific class instead of raising
+    # "Unsupported audio file" (the failure seen on the embedded Android build).
+    track = tmp_path / 'song.m4a'
+    track.write_bytes(b'not really audio')
+
+    monkeypatch.setattr(metadata_repair, 'MutagenFile', lambda *_a, **_k: None)
+
+    written: dict[str, object] = {}
+
+    class FakeEasyMP4(dict):
+        def __init__(self, _path):
+            super().__init__()
+            self.tags = self
+
+        def save(self):
+            written['saved'] = dict(self)
+
+    import mutagen.easymp4
+
+    monkeypatch.setattr(mutagen.easymp4, 'EasyMP4', FakeEasyMP4)
+
+    metadata_repair.apply_text_tags(
+        track,
+        {'name': 'Song', 'artists': ['Ariana Grande', 'Nicki Minaj']},
+    )
+
+    assert written['saved']['title'] == ['Song']
+    assert written['saved']['artist'] == ['Ariana Grande', 'Nicki Minaj']
+
+
+def test_apply_text_tags_rejects_truly_unparseable_file(tmp_path, monkeypatch):
+    track = tmp_path / 'broken.m4a'
+    track.write_bytes(b'not really audio')
+
+    monkeypatch.setattr(metadata_repair, 'MutagenFile', lambda *_a, **_k: None)
+
+    import mutagen.easymp4
+
+    def explode(_path):
+        raise ValueError('cannot parse')
+
+    monkeypatch.setattr(mutagen.easymp4, 'EasyMP4', explode)
+
+    with pytest.raises(ValueError, match='Unsupported audio file'):
+        metadata_repair.apply_text_tags(track, {'name': 'Song'})
+
+
 def test_safe_library_path_rejects_traversal(tmp_path):
     with pytest.raises(ValueError, match='Invalid library path'):
         metadata_repair.safe_library_path(tmp_path, '../outside.mp3')
@@ -51,6 +103,55 @@ def test_expand_artist_names_splits_featured_artists():
     )
 
     assert names == ['Lana Del Rey', 'A$AP Rocky', 'Katy Perry', '21 Savage']
+
+
+def test_artist_image_paths_prefers_named_artist_image(tmp_path):
+    folder = tmp_path / 'Ariana Grande'
+    folder.mkdir()
+    (folder / 'folder.jpg').write_bytes(b'old-generic')
+    named = folder / 'Ariana Grande.jpg'
+    named.write_bytes(b'new-named')
+
+    paths = artist_art.artist_image_paths(folder)
+
+    assert paths[0] == named
+
+
+def test_prune_stale_artist_sidecars_removes_generic_files(tmp_path):
+    folder = tmp_path / 'Ariana Grande'
+    folder.mkdir()
+    named = folder / 'Ariana Grande.jpg'
+    named.write_bytes(b'new-named')
+    thumb = folder / 'thumb.jpg'
+    thumb.write_bytes(b'old-thumb')
+
+    removed = artist_art.prune_stale_artist_sidecars(
+        folder,
+        artist_name='Ariana Grande',
+        keep=named,
+    )
+
+    assert 'thumb.jpg' in removed
+    assert not thumb.exists()
+    assert named.exists()
+
+
+def test_repair_artist_image_bytes_removes_stale_generic_sidecars(tmp_path):
+    folder = tmp_path / 'Ariana Grande'
+    folder.mkdir()
+    (folder / 'folder.jpg').write_bytes(b'old-generic')
+
+    metadata_repair.repair_artist_image_bytes(
+        tmp_path,
+        '',
+        {'id': '', 'name': 'Ariana Grande'},
+        b'replacement-image',
+        target_folder='Ariana Grande',
+    )
+
+    assert not (folder / 'folder.jpg').exists()
+    assert (folder / 'Ariana Grande.jpg').read_bytes() == b'replacement-image'
+    assert artist_art.artist_image_paths(folder)[0].name == 'Ariana Grande.jpg'
 
 
 def test_ensure_named_artist_image_migrates_legacy_folder_sidecar(tmp_path):

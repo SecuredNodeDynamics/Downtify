@@ -7,6 +7,7 @@
     :submit-icon="'search'"
     :submit-disabled="dm.loading.value || !canSubmit"
     :submit-loading="dm.loading.value"
+    :keep-visible-on-focus="keepVisibleOnFocus"
     @update:model-value="sm.searchTerm.value = $event"
     @submit="lookUp(sm.searchTerm.value)"
   />
@@ -24,6 +25,7 @@ import SearchField from './SearchField.vue'
 
 defineProps({
   compact: { type: Boolean, default: false },
+  keepVisibleOnFocus: { type: Boolean, default: false },
 })
 
 const sm = useSearchManager()

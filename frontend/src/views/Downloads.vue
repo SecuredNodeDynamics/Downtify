@@ -1006,8 +1006,10 @@ function hydrateLibraryFromSession() {
 }
 
 async function refreshFromHeader() {
+  // The shared library-refresh store owns the header spinner (including a
+  // minimum visible duration); this handler only fetches fresh data and reports
+  // failure so the two never fight over the loading flag.
   libraryRefresh.setFailed(false)
-  libraryRefresh.setLoading(true)
   error.value = ''
   try {
     resetLibraryPrefetch()
@@ -1025,8 +1027,6 @@ async function refreshFromHeader() {
   } catch {
     libraryRefresh.setFailed(true)
     error.value = t('library.failedLoad')
-  } finally {
-    libraryRefresh.setLoading(false)
   }
 }
 

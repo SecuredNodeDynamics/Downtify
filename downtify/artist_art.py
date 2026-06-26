@@ -167,26 +167,87 @@ def has_artist_image(folder: Path) -> bool:
     )
 
 
-def artist_image_paths(folder: Path) -> list[Path]:
-    paths = [
+def artist_image_paths(folder: Path, *, artist_name: str = '') -> list[Path]:
+    target_stem = _target_image_stem(folder, artist_name).casefold()
+
+    def is_image(path: Path) -> bool:
+        return path.is_file() and path.suffix.casefold() in IMAGE_EXTENSIONS
+
+    # Prefer the canonical ``{ArtistName}.{ext}`` file so a manual repair/replace
+    # is not masked by older generic sidecars such as ``folder.jpg``.
+    named = sorted(
+        (
+            path
+            for path in folder.iterdir()
+            if is_image(path) and path.stem.casefold() == target_stem
+        ),
+        key=lambda path: path.name.casefold(),
+    )
+    generic = [
         folder / name
         for name in IMAGE_NAMES
         if (folder / name).is_file()
     ]
-    paths.extend(
-        path
-        for path in folder.iterdir()
-        if path.is_file() and path.suffix.casefold() in IMAGE_EXTENSIONS
+    others = sorted(
+        (path for path in folder.iterdir() if is_image(path)),
+        key=lambda path: path.name.casefold(),
     )
     seen: set[Path] = set()
     unique: list[Path] = []
-    for path in paths:
+    for path in named + generic + others:
         resolved = path.resolve()
         if resolved in seen:
             continue
         seen.add(resolved)
         unique.append(path)
     return unique
+
+
+_GENERIC_IMAGE_STEMS = frozenset({
+    'folder',
+    'artist',
+    'thumb',
+    'poster',
+    'cover',
+    'default',
+})
+
+
+def prune_stale_artist_sidecars(
+    folder: Path,
+    *,
+    artist_name: str = '',
+    keep: Path | None = None,
+) -> list[str]:
+    """Drop legacy generic sidecars once a canonical named artist image exists."""
+
+    if not has_named_artist_image(folder, artist_name=artist_name):
+        return []
+    canonical_stem = _target_image_stem(folder, artist_name).casefold()
+    keep_resolved = keep.resolve() if keep is not None else None
+    generic_names = {name.casefold() for name in IMAGE_NAMES}
+    removed: list[str] = []
+    for path in list(folder.iterdir()):
+        if not path.is_file():
+            continue
+        if path.suffix.casefold() not in IMAGE_EXTENSIONS:
+            continue
+        resolved = path.resolve()
+        if keep_resolved is not None and resolved == keep_resolved:
+            continue
+        if path.stem.casefold() == canonical_stem:
+            continue
+        name_key = path.name.casefold()
+        if (
+            name_key in generic_names
+            or path.stem.casefold() in _GENERIC_IMAGE_STEMS
+        ):
+            try:
+                path.unlink()
+                removed.append(path.name)
+            except OSError:
+                continue
+    return removed
 
 
 def _wikidata_id_from_url(url: str) -> str:
@@ -463,6 +524,11 @@ def ensure_named_artist_image(
     if named_targets:
         for legacy in _legacy_folder_sidecar_paths(folder):
             legacy.unlink(missing_ok=True)
+        prune_stale_artist_sidecars(
+            folder,
+            artist_name=artist_name,
+            keep=named_targets[0],
+        )
         return migrated
 
     source: Path | None = None

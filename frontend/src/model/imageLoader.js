@@ -1,6 +1,10 @@
 import { Capacitor, CapacitorHttp } from '@capacitor/core'
 
-import { readPersistedImage, writePersistedImage } from './imageDiskCache.js'
+import {
+  deletePersistedImage,
+  readPersistedImage,
+  writePersistedImage,
+} from './imageDiskCache.js'
 import {
   buildApiBaseUrl,
   getServerConfig,
@@ -127,6 +131,45 @@ export function rememberCoverDisplay(sourceKey, displaySrc, failed = false) {
 export function invalidateFailedCoverDisplays() {
   for (const [key, value] of sourceCache.entries()) {
     if (value?.failed) sourceCache.delete(key)
+  }
+}
+
+function urlMatchesArtistFolder(url, artistName) {
+  const value = String(url || '').trim()
+  const name = String(artistName || '').trim()
+  if (!value || !name) return false
+  if (!value.includes('artist-images/folder-preview')) return false
+  try {
+    const parsed = new URL(value, 'http://downtify.local')
+    const folder = parsed.searchParams.get('folder') || ''
+    return folder === name
+  } catch {
+    return value.includes(`folder=${encodeURIComponent(name)}`)
+  }
+}
+
+/** Drop cached artist-folder cover URLs after a manual image repair/replace. */
+export async function invalidateArtistCoverCaches(artistName = '') {
+  const name = String(artistName || '').trim()
+  if (!name) return
+
+  for (const key of [...urlCache.keys()]) {
+    if (urlMatchesArtistFolder(key, name)) {
+      urlCache.delete(key)
+      preloadPromises.delete(key)
+      await deletePersistedImage(key)
+    }
+  }
+
+  for (const [key, value] of sourceCache.entries()) {
+    const display = String(value?.displaySrc || '')
+    if (
+      key.includes(name) ||
+      urlMatchesArtistFolder(display, name) ||
+      display.includes(name)
+    ) {
+      sourceCache.delete(key)
+    }
   }
 }
 

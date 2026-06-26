@@ -71,11 +71,15 @@ export function libraryItemArtists(item, options = {}) {
     }
   }
 
-  // Prefer the explicit per-artist list when present: these are already the
-  // individual credited artists, so they are trusted as-is (no further
-  // splitting) to keep names like "Tyler, The Creator" intact.
-  if (Array.isArray(item?.artists) && item.artists.length) {
+  // A multi-entry list is already split into individual credited artists, so
+  // trust it verbatim. A single entry, however, can still be a combined
+  // collaboration string ("Ariana Grande, Nicki Minaj") produced by a source
+  // that didn't separate the artists — split it so each performer gets their
+  // own card instead of one merged card.
+  if (Array.isArray(item?.artists) && item.artists.length > 1) {
     for (const artist of item.artists) add(artist)
+  } else if (Array.isArray(item?.artists) && item.artists.length === 1) {
+    addNames(item.artists[0])
   } else {
     addNames(primary)
   }

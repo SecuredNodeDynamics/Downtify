@@ -18,6 +18,8 @@
       :class="[sizeClasses.input, sizeClasses.inputPad]"
       @input="onInput"
       @keyup.enter="onEnter"
+      @focus="onFocus"
+      @blur="onBlur"
     />
     <button
       type="button"
@@ -40,11 +42,7 @@
         class="loading loading-spinner"
         :class="sizeClasses.spinner"
       />
-      <Icon
-        v-else-if="showClear"
-        icon="clarity:times-line"
-        class="h-4 w-4"
-      />
+      <Icon v-else-if="showClear" icon="clarity:times-line" class="h-4 w-4" />
       <Icon
         v-else-if="submitIcon === 'download'"
         icon="clarity:download-line"
@@ -56,9 +54,14 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, ref } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useI18n } from '/src/i18n'
+import {
+  FIELD_VISIBILITY_RETRY_DELAYS_MS,
+  isFieldHiddenByKeyboard,
+  shouldTrackFieldVisibility,
+} from '/src/model/searchFieldVisibility'
 
 const props = defineProps({
   modelValue: {
@@ -131,12 +134,21 @@ const props = defineProps({
     type: String,
     default: '',
   },
+  // When true, keep the field scrolled above the on-screen keyboard on focus.
+  // Used by the full-screen Home hero, whose centered layout would otherwise
+  // leave the field hidden behind the keyboard on mobile/APK.
+  keepVisibleOnFocus: {
+    type: Boolean,
+    default: false,
+  },
 })
 
 const emit = defineEmits(['update:modelValue', 'submit', 'clear'])
 
 const { t } = useI18n()
 const inputRef = ref(null)
+const retryTimers = []
+let viewportResizeCleanup = null
 
 const hasText = computed(() => Boolean(String(props.modelValue || '').trim()))
 const showClear = computed(() => hasText.value && !props.submitLoading)
@@ -209,6 +221,74 @@ function onEnter() {
   }
   emit('submit')
 }
+
+function ensureFieldVisible() {
+  const input = inputRef.value
+  if (!input || !input.isConnected) return
+
+  const viewport = typeof window !== 'undefined' ? window.visualViewport : null
+  let hidden = true
+  if (viewport) {
+    const rect = input.getBoundingClientRect()
+    hidden = isFieldHiddenByKeyboard({
+      fieldTop: rect.top,
+      fieldBottom: rect.bottom,
+      viewportOffsetTop: viewport.offsetTop,
+      viewportHeight: viewport.height,
+      margin: 16,
+    })
+  }
+  if (!hidden) return
+
+  try {
+    input.scrollIntoView({ block: 'center' })
+  } catch {
+    input.scrollIntoView()
+  }
+}
+
+function clearVisibilityWatchers() {
+  while (retryTimers.length) {
+    window.clearTimeout(retryTimers.pop())
+  }
+  if (viewportResizeCleanup) {
+    viewportResizeCleanup()
+    viewportResizeCleanup = null
+  }
+}
+
+function onFocus() {
+  if (typeof window === 'undefined') return
+  if (
+    !shouldTrackFieldVisibility({
+      enabled: props.keepVisibleOnFocus,
+      viewportWidth: window.innerWidth,
+    })
+  ) {
+    return
+  }
+
+  clearVisibilityWatchers()
+
+  // The keyboard and (on Android) the viewport resize asynchronously, so react
+  // to the visualViewport resize when available and fall back to timed passes.
+  const viewport = window.visualViewport
+  if (viewport) {
+    const onResize = () => ensureFieldVisible()
+    viewport.addEventListener('resize', onResize)
+    viewportResizeCleanup = () =>
+      viewport.removeEventListener('resize', onResize)
+  }
+  for (const delay of FIELD_VISIBILITY_RETRY_DELAYS_MS) {
+    retryTimers.push(window.setTimeout(ensureFieldVisible, delay))
+  }
+}
+
+function onBlur() {
+  clearVisibilityWatchers()
+}
+
+onBeforeUnmount(clearVisibilityWatchers)
 
 function focus(options) {
   inputRef.value?.focus(options)

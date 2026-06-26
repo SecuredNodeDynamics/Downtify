@@ -18,6 +18,7 @@ from .artist_art import (
     ensure_named_artist_image,
     has_named_artist_image,
     missing_artist_image_items,
+    prune_stale_artist_sidecars,
     resolve_artist_mbid,
     save_missing_artist_images,
 )
@@ -193,8 +194,55 @@ def _artists(tags: Any) -> list[str]:
     return [str(value).strip()]
 
 
-def _song_from_file(path: Path) -> dict[str, Any]:
+def _open_easy_audio(path: Path) -> Any:
+    """Open *path* for easy (string-keyed) tag access.
+
+    ``MutagenFile(easy=True)`` only sniffs the first bytes of a file and returns
+    ``None`` for some otherwise-valid m4a/mp4 containers (notably yt-dlp output on
+    the embedded Android backend, where the ``ftyp`` atom isn't where the quick
+    sniff looks).     The format-specific classes parse the full atom tree, so fall
+    back to one chosen by extension before giving up. Returns ``None`` only when
+    the file genuinely cannot be parsed.
+
+    ``MutagenFile`` exceptions are intentionally left to propagate so callers
+    that already handle them (and rely on the raise to trigger their own
+    fallbacks) keep behaving exactly as before; the extension fallback only
+    kicks in for the silent ``None`` sniff result.
+    """
+
     audio = MutagenFile(str(path), easy=True)
+    if audio is not None:
+        return audio
+
+    ext = path.suffix.lower()
+    try:
+        if ext in {'.m4a', '.mp4', '.aac'}:
+            from mutagen.easymp4 import EasyMP4
+
+            return EasyMP4(str(path))
+        if ext == '.mp3':
+            from mutagen.mp3 import EasyMP3
+
+            return EasyMP3(str(path))
+        if ext == '.flac':
+            from mutagen.flac import FLAC
+
+            return FLAC(str(path))
+        if ext in {'.ogg', '.oga'}:
+            from mutagen.oggvorbis import OggVorbis
+
+            return OggVorbis(str(path))
+        if ext == '.opus':
+            from mutagen.oggopus import OggOpus
+
+            return OggOpus(str(path))
+    except Exception:
+        return None
+    return None
+
+
+def _song_from_file(path: Path) -> dict[str, Any]:
+    audio = _open_easy_audio(path)
     if audio is None:
         stem = path.stem
         if ' - ' in stem:
@@ -538,7 +586,7 @@ def safe_library_path(root: Path, relative_file: str) -> Path:
 
 
 def apply_text_tags(path: Path, metadata: dict[str, Any]) -> None:
-    audio = MutagenFile(str(path), easy=True)
+    audio = _open_easy_audio(path)
     if audio is None:
         raise ValueError('Unsupported audio file')
     if audio.tags is None and hasattr(audio, 'add_tags'):
@@ -685,6 +733,11 @@ def repair_artist_image_bytes(
         artist_name=artist_name,
     )
     target.write_bytes(image)
+    prune_stale_artist_sidecars(
+        folder,
+        artist_name=artist_name,
+        keep=target,
+    )
     saved = sorted(
         {
             target.relative_to(root).as_posix(),

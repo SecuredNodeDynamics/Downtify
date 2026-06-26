@@ -116,6 +116,21 @@
             <Icon v-else icon="clarity:refresh-line" class="h-5 w-5" />
           </button>
 
+          <button
+            v-if="route.name === 'Download' && downloadRefreshVisible"
+            type="button"
+            class="icon-btn"
+            :title="t('common.refresh')"
+            :disabled="downloadRefreshLoading"
+            @click="refreshDownload()"
+          >
+            <Icon
+              icon="clarity:refresh-line"
+              class="h-5 w-5 transition-colors"
+              :class="downloadRefreshLoading ? 'animate-spin text-primary' : ''"
+            />
+          </button>
+
           <HeaderUpdateNotice />
 
           <button
@@ -161,6 +176,7 @@ import router from '../router'
 import { useBinaryThemeManager } from '../model/theme'
 import { useSearchManager } from '../model/search'
 import { buildSearchRoute } from '../model/searchNavigation'
+import { useDownloadRefresh } from '../model/downloadRefresh'
 import { useHealthRefresh } from '../model/healthRefresh'
 import { useLibraryRefresh } from '../model/libraryRefresh'
 import { useI18n } from '../i18n'
@@ -184,4 +200,9 @@ const {
   failed: libraryRefreshFailed,
   refresh: refreshLibrary,
 } = useLibraryRefresh()
+const {
+  loading: downloadRefreshLoading,
+  visible: downloadRefreshVisible,
+  refresh: refreshDownload,
+} = useDownloadRefresh()
 </script>

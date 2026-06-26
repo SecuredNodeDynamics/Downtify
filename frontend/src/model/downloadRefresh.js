@@ -1,27 +1,30 @@
 import { ref } from 'vue'
 
 const loading = ref(false)
-const failed = ref(false)
+// The Queue page only needs a header refresh on the tabs that fetch data
+// (History/Manage); the live Queue tab updates over the WebSocket. The view
+// toggles this so the header button hides when refreshing would do nothing.
+const visible = ref(false)
 let refreshHandler = null
 
 // Keep the spinner visible long enough to register as feedback even when the
 // underlying refresh resolves almost instantly (a warm cache or the embedded
-// on-device backend can return before the browser paints a single frame, which
-// made the button look like it did nothing).
+// on-device backend can return before the browser paints a single frame).
 const MIN_VISIBLE_MS = 500
 
-export function useLibraryRefresh() {
+export function useDownloadRefresh() {
   function register(handler) {
     refreshHandler = handler || null
   }
 
   function unregister() {
     refreshHandler = null
+    visible.value = false
+    loading.value = false
   }
 
   async function refresh() {
     if (!refreshHandler || loading.value) return
-    failed.value = false
     loading.value = true
     const startedAt = Date.now()
     try {
@@ -39,17 +42,17 @@ export function useLibraryRefresh() {
     loading.value = Boolean(value)
   }
 
-  function setFailed(value) {
-    failed.value = Boolean(value)
+  function setVisible(value) {
+    visible.value = Boolean(value)
   }
 
   return {
     loading,
-    failed,
+    visible,
     register,
     unregister,
     refresh,
     setLoading,
-    setFailed,
+    setVisible,
   }
 }

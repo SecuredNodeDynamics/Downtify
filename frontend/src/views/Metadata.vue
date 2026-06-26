@@ -1551,6 +1551,20 @@ function firstSavedFolder(result) {
   return path ? String(path).split('/', 1)[0] : ''
 }
 
+async function invalidateRepairedArtistCover(item, result) {
+  const artistName = String(
+    result?.artist ||
+      item?.artist ||
+      item?.name ||
+      result?.folder ||
+      item?.folder ||
+      firstSavedFolder(result) ||
+      ''
+  ).trim()
+  if (!artistName) return
+  await API.invalidateArtistCoverArt(artistName)
+}
+
 function folderPreviewUrl(folder) {
   const value = String(folder || '').trim()
   if (!value) return ''
@@ -2152,6 +2166,7 @@ async function applyArtistImageWithSelection(item, selection = {}) {
       return false
     }
     markArtistRepairSucceeded(key)
+    await invalidateRepairedArtistCover(item, res.data)
     const completedItem = {
       ...res.data,
       preview_url: folderPreviewUrl(
@@ -2230,6 +2245,7 @@ async function applyJellyfinArtistImage(item, options = {}) {
       throw new Error(t('metadata.failedArtistImageApply'))
     }
     markArtistRepairSucceeded(key)
+    await invalidateRepairedArtistCover(item, res.data)
     const completedItem = {
       ...res.data,
       preview_url: folderPreviewUrl(

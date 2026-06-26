@@ -10,12 +10,16 @@ import {
 } from './serverConnection.js'
 import { libraryCoverFolders } from './library.js'
 import {
+  notifyLibraryChanged,
   persistLibraryCache,
   refreshLibraryInBackground as refreshLibrarySession,
   resetLibraryPrefetch,
   startLibraryPrefetch,
 } from './librarySession.js'
-import { preloadCoverSourcesBatch } from './imageLoader.js'
+import {
+  invalidateArtistCoverCaches,
+  preloadCoverSourcesBatch,
+} from './imageLoader.js'
 import {
   getBundledAppVersion,
   getInstalledClientVersionSync,
@@ -407,6 +411,14 @@ function clearCoverSourcesCache() {
   coverSourcesCache.clear()
 }
 
+async function invalidateArtistCoverArt(artistName = '') {
+  const name = String(artistName || '').trim()
+  if (!name) return
+  clearCoverSourcesCache()
+  await invalidateArtistCoverCaches(name)
+  notifyLibraryChanged()
+}
+
 function warmLibraryCovers(items = []) {
   const native = isCapacitorNative()
   const entries = []
@@ -699,6 +711,7 @@ export default {
   coverSourcesForArtist,
   coverSourcesForNowPlaying,
   clearCoverSourcesCache,
+  invalidateArtistCoverArt,
   warmLibraryCovers,
   refreshLibraryInBackground,
   libraryServerKey,

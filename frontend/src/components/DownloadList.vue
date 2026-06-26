@@ -63,47 +63,15 @@
           <span class="hidden sm:inline">{{ t('queue.clearAll') }}</span>
         </button>
 
-        <template v-else-if="activeTab === 'history'">
-          <button
-            type="button"
-            class="queue-action-btn"
-            @click="refreshHistory"
-            :disabled="historyLoading"
-            :title="t('common.refresh')"
-          >
-            <span
-              v-if="historyLoading"
-              class="loading loading-spinner loading-xs"
-            />
-            <Icon v-else icon="clarity:refresh-line" class="h-4 w-4" />
-            <span class="hidden sm:inline">{{ t('common.refresh') }}</span>
-          </button>
-          <button
-            v-if="sortedHistory.length > 0"
-            type="button"
-            class="queue-action-btn text-error/70 hover:text-error"
-            @click="onClearHistory"
-            :title="t('history.clear')"
-          >
-            <Icon icon="clarity:trash-line" class="h-4 w-4" />
-            <span class="hidden sm:inline">{{ t('history.clear') }}</span>
-          </button>
-        </template>
-
         <button
-          v-else-if="activeTab === 'manage'"
+          v-else-if="activeTab === 'history' && sortedHistory.length > 0"
           type="button"
-          class="queue-action-btn"
-          @click="refreshManage"
-          :disabled="manageLoading"
-          :title="t('manage.refresh')"
+          class="queue-action-btn text-error/70 hover:text-error"
+          @click="onClearHistory"
+          :title="t('history.clear')"
         >
-          <span
-            v-if="manageLoading"
-            class="loading loading-spinner loading-xs"
-          />
-          <Icon v-else icon="clarity:refresh-line" class="h-4 w-4" />
-          <span class="hidden sm:inline">{{ t('manage.refresh') }}</span>
+          <Icon icon="clarity:trash-line" class="h-4 w-4" />
+          <span class="hidden sm:inline">{{ t('history.clear') }}</span>
         </button>
       </div>
     </div>
@@ -686,6 +654,7 @@ import {
   onMounted,
   onActivated,
   onDeactivated,
+  onUnmounted,
   watch,
 } from 'vue'
 import { useRouter } from 'vue-router'
@@ -714,9 +683,11 @@ import {
   getCachedLibraryItems,
   onLibraryChanged,
 } from '../model/librarySession'
+import { useDownloadRefresh } from '../model/downloadRefresh'
 import { useI18n } from '../i18n'
 
 const router = useRouter()
+const downloadRefresh = useDownloadRefresh()
 
 const pt = useProgressTracker()
 const dm = useDownloadManager()
@@ -992,12 +963,28 @@ function openHistoryInPlayer(item) {
   router.push({ name: 'Player' })
 }
 
+// Refresh whatever the active tab shows; the live Queue tab streams over the
+// WebSocket so it has nothing to pull. Returning the promise lets the header
+// refresh store await the fetch (and keep its spinner up) before settling.
+function refreshActiveTab() {
+  if (activeTab.value === 'history') return refreshHistory()
+  if (activeTab.value === 'manage') return refreshManage()
+  return Promise.resolve()
+}
+
+function syncDownloadRefreshVisibility() {
+  downloadRefresh.setVisible(
+    activeTab.value === 'history' || activeTab.value === 'manage'
+  )
+}
+
 watch(activeTab, (tab) => {
   if (tab === 'history') void refreshHistory()
   if (tab === 'manage') {
     loadManageFromCache()
     void refreshManage({ background: manageItems.value.length > 0 })
   }
+  syncDownloadRefreshVisibility()
 })
 
 watch(
@@ -1020,11 +1007,15 @@ onMounted(() => {
   void refreshHistory()
   loadManageFromCache()
   registerManageLibraryListener()
+  downloadRefresh.register(refreshActiveTab)
+  syncDownloadRefreshVisibility()
 })
 
 onActivated(() => {
   void refreshHistory()
   registerManageLibraryListener()
+  downloadRefresh.register(refreshActiveTab)
+  syncDownloadRefreshVisibility()
   if (activeTab.value === 'manage') {
     void refreshManage({ background: manageItems.value.length > 0 })
   }
@@ -1035,6 +1026,11 @@ onDeactivated(() => {
     stopManageLibraryListener()
     stopManageLibraryListener = null
   }
+  downloadRefresh.unregister()
+})
+
+onUnmounted(() => {
+  downloadRefresh.unregister()
 })
 </script>
 
