@@ -22,7 +22,10 @@ function readCachedPlaylists() {
 
 function writeCachedPlaylists(items) {
   try {
-    sessionStorage.setItem(CACHE_KEY, JSON.stringify(dedupeMonitoredPlaylists(items)))
+    sessionStorage.setItem(
+      CACHE_KEY,
+      JSON.stringify(dedupeMonitoredPlaylists(items))
+    )
   } catch {
     // Ignore quota or privacy errors.
   }
@@ -83,7 +86,7 @@ function listMonitoredPlaylists({ useCache = true } = {}) {
 function lookupSpotifyArtists(artistName, limit = 5) {
   return API.get('/api/monitor/artists/lookup', {
     params: { artist: artistName, limit },
-    timeout: 30000,
+    timeout: 60000,
   })
 }
 

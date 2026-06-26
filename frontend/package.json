@@ -19,6 +19,7 @@
     "@capacitor/core": "^8.4.1",
     "@capacitor/filesystem": "^8.1.2",
     "@capacitor/status-bar": "^8.0.2",
+    "@capgo/capacitor-media-session": "^8.0.28",
     "axios": "^1.5.0",
     "daisyui": "^4.7.2",
     "uuid": "^14.0.0",

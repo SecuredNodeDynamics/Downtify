@@ -35,6 +35,14 @@
       </span>
     </button>
 
+    <p
+      v-if="actionError"
+      class="mt-1 max-w-[14rem] text-right text-xs text-error"
+      role="alert"
+    >
+      {{ actionError }}
+    </p>
+
     <div
       v-if="pickerOpen"
       class="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-4 sm:items-center"
@@ -115,10 +123,16 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import monitorAPI from '/src/model/monitor.js'
+import { EMBEDDED_SERVER_READY_EVENT } from '../model/embeddedServer.js'
+import {
+  buildApiBaseUrl,
+  getServerConfig,
+  usesEmbeddedServer,
+} from '../model/serverConnection.js'
 import {
   findMonitoredArtist,
   monitoredArtistMap,
@@ -140,9 +154,25 @@ const { t } = useI18n()
 const router = useRouter()
 
 const busy = ref(false)
+const actionError = ref('')
 const pickerError = ref('')
 const pickerOpen = ref(false)
 const pickerMatches = ref([])
+
+async function ensureBackendReady() {
+  if (!usesEmbeddedServer()) return true
+  const baseUrl = buildApiBaseUrl(getServerConfig())
+  for (let attempt = 0; attempt < 30; attempt += 1) {
+    try {
+      const res = await fetch(`${baseUrl}/api/version`, { cache: 'no-store' })
+      if (res.ok) return true
+    } catch {
+      // Embedded server still starting.
+    }
+    await new Promise((resolve) => setTimeout(resolve, 500))
+  }
+  return false
+}
 
 const monitoredEntry = computed(() => {
   monitoredArtistMap.value
@@ -174,7 +204,8 @@ function findMonitoredArtistBySpotifyId(spotifyId) {
   if (!id) return null
   return (
     monitoredArtists.value.find(
-      (item) => item.kind === 'artist' && String(item.spotify_id || '').trim() === id
+      (item) =>
+        item.kind === 'artist' && String(item.spotify_id || '').trim() === id
     ) || null
   )
 }
@@ -209,13 +240,22 @@ async function lookupSpotifyArtistsWithRetry(artistName, limit = 5) {
 async function startMonitor() {
   if (!props.artistName || busy.value) return
   busy.value = true
+  actionError.value = ''
   pickerError.value = ''
   try {
+    if (!(await ensureBackendReady())) {
+      actionError.value = t('library.monitorArtistLookupFailed')
+      return
+    }
+
     const { matches: rawMatches } = await lookupSpotifyArtistsWithRetry(
       props.artistName
     )
     const matches = dedupeArtistMatches(rawMatches)
-    if (matches.length === 0) return
+    if (matches.length === 0) {
+      actionError.value = t('library.monitorArtistNotFound')
+      return
+    }
 
     const strongMatches = matches.filter((match) => match.match_score >= 0.72)
     if (strongMatches.length === 1) {
@@ -230,7 +270,7 @@ async function startMonitor() {
     pickerMatches.value = matches
     pickerOpen.value = true
   } catch {
-    // Lookup failures are handled silently in the library drill header.
+    actionError.value = t('library.monitorArtistLookupFailed')
   } finally {
     busy.value = false
   }
@@ -254,6 +294,7 @@ async function addMatch(match) {
   if (linkExistingMonitoredArtist(match)) {
     pickerOpen.value = false
     pickerMatches.value = []
+    actionError.value = ''
     return
   }
 
@@ -263,6 +304,7 @@ async function addMatch(match) {
     const res = await monitorAPI.addMonitoredPlaylist(url, 60, 'artist')
     pickerOpen.value = false
     pickerMatches.value = []
+    actionError.value = ''
     upsertMonitoredArtist(res.data, props.artistName)
     await refreshMonitoredArtists({ force: true })
   } catch (err) {
@@ -293,10 +335,31 @@ watch(
   () => props.artistName,
   () => {
     pickerError.value = ''
+    actionError.value = ''
   }
 )
 
+function handleEmbeddedServerReady() {
+  if (!usesEmbeddedServer()) return
+  if (actionError.value) actionError.value = ''
+}
+
 onMounted(() => {
   void refreshMonitoredArtists()
+  if (usesEmbeddedServer()) {
+    window.addEventListener(
+      EMBEDDED_SERVER_READY_EVENT,
+      handleEmbeddedServerReady
+    )
+  }
+})
+
+onUnmounted(() => {
+  if (usesEmbeddedServer()) {
+    window.removeEventListener(
+      EMBEDDED_SERVER_READY_EVENT,
+      handleEmbeddedServerReady
+    )
+  }
 })
 </script>

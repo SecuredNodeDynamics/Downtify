@@ -207,6 +207,70 @@ def _musicbrainz_spotify_artist_matches(
     return results
 
 
+def _spotify_api_artist_matches(
+    artist_name: str,
+    *,
+    limit: int = 5,
+) -> list[dict[str, Any]]:
+    """Fast Spotify search API matches (no MusicBrainz round-trips)."""
+    if artist_image_sources._spotify_search_blocked():
+        return []
+
+    results: list[dict[str, Any]] = []
+    seen_ids: set[str] = set()
+    search_names = artist_search_names(artist_name) or [artist_name]
+    for search_name in search_names:
+        for item in _spotify_artist_items(search_name, limit=limit):
+            _append_spotify_artist_match(
+                results,
+                seen_ids,
+                spotify_id=str(item.get('id') or '').strip(),
+                name=str(item.get('name') or '').strip(),
+                artist_name=artist_name,
+                image_url=_best_spotify_image_url(item),
+            )
+        if len(results) >= limit:
+            break
+        if artist_image_sources._spotify_search_blocked():
+            break
+    results.sort(key=lambda item: item['match_score'], reverse=True)
+    return results
+
+
+def _youtube_music_spotify_artist_matches(
+    artist_name: str,
+    *,
+    limit: int = 5,
+) -> list[dict[str, Any]]:
+    """Use YouTube Music artist search, then resolve each hit on Spotify."""
+    if artist_image_sources._spotify_search_blocked():
+        return []
+
+    results: list[dict[str, Any]] = []
+    seen_ids: set[str] = set()
+    for item in artist_image_sources._youtube_music_artist_items(
+        artist_name, limit=limit
+    ):
+        ytm_name = str(item.get('artist') or item.get('name') or '').strip()
+        if not ytm_name:
+            continue
+        for spotify_item in _spotify_artist_items(ytm_name, limit=3):
+            _append_spotify_artist_match(
+                results,
+                seen_ids,
+                spotify_id=str(spotify_item.get('id') or '').strip(),
+                name=str(spotify_item.get('name') or '').strip(),
+                artist_name=artist_name,
+                image_url=_best_spotify_image_url(spotify_item),
+            )
+        if len(results) >= limit:
+            break
+        if artist_image_sources._spotify_search_blocked():
+            break
+    results.sort(key=lambda item: item['match_score'], reverse=True)
+    return results
+
+
 def list_spotify_artist_matches(
     artist_name: str,
     *,
@@ -214,28 +278,26 @@ def list_spotify_artist_matches(
 ) -> list[dict[str, Any]]:
     seen_ids: set[str] = set()
     results: list[dict[str, Any]] = []
-    for item in _musicbrainz_spotify_artist_matches(artist_name, limit=limit):
-        spotify_id = str(item.get('spotify_id') or '').strip()
-        if not spotify_id or spotify_id in seen_ids:
-            continue
-        seen_ids.add(spotify_id)
-        results.append(item)
-    if len(results) < limit and not artist_image_sources._spotify_search_blocked():
-        search_names = artist_search_names(artist_name) or [artist_name]
-        for search_name in search_names:
-            for item in _spotify_artist_items(search_name, limit=limit):
-                _append_spotify_artist_match(
-                    results,
-                    seen_ids,
-                    spotify_id=str(item.get('id') or '').strip(),
-                    name=str(item.get('name') or '').strip(),
-                    artist_name=artist_name,
-                    image_url=_best_spotify_image_url(item),
-                )
+
+    def absorb(candidates: list[dict[str, Any]]) -> None:
+        for item in candidates:
+            spotify_id = str(item.get('spotify_id') or '').strip()
+            if not spotify_id or spotify_id in seen_ids:
+                continue
+            seen_ids.add(spotify_id)
+            results.append(item)
             if len(results) >= limit:
-                break
-            if artist_image_sources._spotify_search_blocked():
-                break
+                return
+
+    # Spotify search is a single round-trip and should win on common names.
+    # MusicBrainz can take 10–30s (search + per-artist URL lookups) and was
+    # causing the mobile lookup request to time out before any match returned.
+    absorb(_spotify_api_artist_matches(artist_name, limit=limit))
+    if len(results) < limit:
+        absorb(_musicbrainz_spotify_artist_matches(artist_name, limit=limit))
+    if len(results) < limit:
+        absorb(_youtube_music_spotify_artist_matches(artist_name, limit=limit))
+
     results.sort(key=lambda item: item['match_score'], reverse=True)
     return _dedupe_spotify_artist_matches(results[:limit])
 

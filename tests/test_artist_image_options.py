@@ -220,6 +220,11 @@ def test_list_spotify_artist_matches_falls_back_to_musicbrainz(monkeypatch):
     )
     monkeypatch.setattr(
         options.artist_image_sources,
+        '_youtube_music_artist_items',
+        lambda *_args, **_kwargs: [],
+    )
+    monkeypatch.setattr(
+        options.artist_image_sources,
         '_spotify_search_blocked',
         lambda: False,
     )
@@ -241,6 +246,45 @@ def test_list_spotify_artist_matches_falls_back_to_musicbrainz(monkeypatch):
 
     assert len(result) == 1
     assert result[0]['spotify_id'] == 'abc123'
+
+
+def test_list_spotify_artist_matches_skips_musicbrainz_when_spotify_fills_limit(
+    monkeypatch,
+):
+    musicbrainz_called = False
+
+    def _fake_musicbrainz(*_args, **_kwargs):
+        nonlocal musicbrainz_called
+        musicbrainz_called = True
+        return []
+
+    monkeypatch.setattr(
+        options,
+        '_musicbrainz_spotify_artist_matches',
+        _fake_musicbrainz,
+    )
+    monkeypatch.setattr(
+        options.artist_image_sources,
+        '_spotify_search_blocked',
+        lambda: False,
+    )
+    monkeypatch.setattr(
+        options,
+        '_spotify_artist_items',
+        lambda *_args, **_kwargs: [
+            {
+                'id': 'abc123',
+                'name': 'Olivia Dean',
+                'images': [{'url': 'https://i.scdn.co/image/good.jpg', 'width': 640}],
+            }
+        ],
+    )
+
+    result = options.list_spotify_artist_matches('Olivia Dean', limit=1)
+
+    assert len(result) == 1
+    assert result[0]['spotify_id'] == 'abc123'
+    assert musicbrainz_called is False
 
 
 def test_list_spotify_artist_matches_skips_spotify_when_rate_limited(monkeypatch):

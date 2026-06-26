@@ -7,6 +7,12 @@ import {
   resolvePlaybackUrl,
 } from './playerAudioUrl.js'
 import { recoveryDelayMs, shouldRecoverPlayback } from './playbackRecovery.js'
+import {
+  initPlayerMediaSession,
+  syncMediaSessionMetadata,
+  syncMediaSessionPlaybackState,
+  syncMediaSessionPosition,
+} from './playerMediaSession.js'
 import { usesEmbeddedServer } from './serverConnection.js'
 
 const VOLUME_KEY = 'downtify-player-volume'
@@ -34,6 +40,65 @@ let playbackIntent = false
 let recoverTimer = 0
 let recoverAttempts = 0
 let recovering = false
+let mediaSessionReady = false
+let lastMediaPositionSyncAt = 0
+
+function currentTrackForMediaSession() {
+  return currentIndex.value >= 0 && currentIndex.value < playlist.value.length
+    ? playlist.value[currentIndex.value]
+    : null
+}
+
+function syncMediaSessionNow({ position = false } = {}) {
+  if (!mediaSessionReady) return
+  const track = currentTrackForMediaSession()
+  const a = audio
+  const idle = !track || (!playbackIntent && (!a || a.paused))
+
+  void syncMediaSessionPlaybackState({
+    playing: Boolean(a && !a.paused),
+    paused: Boolean(a && a.paused && playbackIntent),
+    idle,
+  })
+
+  if (track) {
+    void syncMediaSessionMetadata(track)
+  }
+
+  if (!position || !a) return
+  const now = Date.now()
+  if (now - lastMediaPositionSyncAt < 1500) return
+  lastMediaPositionSyncAt = now
+  void syncMediaSessionPosition({
+    position: a.currentTime,
+    duration: duration.value || a.duration,
+    playbackRate: a.playbackRate || 1,
+  })
+}
+
+function resumePlaybackIfNeeded() {
+  const a = audio
+  if (!a || !playbackIntent || !a.paused) return
+  a.play().catch(() => {})
+}
+
+async function ensureMediaSession() {
+  if (mediaSessionReady) return
+  await initPlayerMediaSession({
+    play,
+    pause,
+    prev,
+    next,
+    seek,
+    seekBy: (delta) => {
+      const a = ensureAudio()
+      seek((a.currentTime || 0) + delta)
+    },
+    onForeground: resumePlaybackIfNeeded,
+  })
+  mediaSessionReady = true
+  syncMediaSessionNow({ position: true })
+}
 
 function isStreamedPlayback() {
   // Embedded builds play local files via the Capacitor file bridge and never
@@ -168,6 +233,7 @@ function ensureAudio() {
     if (!progressRaf && !isSeeking) {
       currentTime.value = audio.currentTime
     }
+    syncMediaSessionNow({ position: true })
   })
   audio.addEventListener('seeking', () => {
     isSeeking = true
@@ -195,16 +261,20 @@ function ensureAudio() {
   audio.addEventListener('play', () => {
     isPlaying.value = true
     startProgressTicker()
+    void ensureMediaSession()
+    syncMediaSessionNow({ position: true })
   })
   audio.addEventListener('playing', () => {
     isPlaying.value = true
     resetRecovery()
     startProgressTicker()
+    syncMediaSessionNow({ position: true })
   })
   audio.addEventListener('pause', () => {
     isPlaying.value = false
     stopProgressTicker()
     if (audio) currentTime.value = audio.currentTime
+    syncMediaSessionNow({ position: true })
   })
   return audio
 }
@@ -263,6 +333,7 @@ async function applyTrack(index, { autoplay = false, resetTime = true } = {}) {
     const pos = shuffleOrder.indexOf(index)
     if (pos >= 0) shufflePos = pos
   }
+  syncMediaSessionNow({ position: true })
 
   const nextUrl = await resolvePlaybackUrl(track.file)
   track.url = nextUrl
@@ -365,6 +436,7 @@ function playAt(index) {
 
 function play() {
   if (playlist.value.length === 0) return
+  void ensureMediaSession()
   const a = ensureAudio()
   if (currentIndex.value < 0) {
     playAt(0)
@@ -398,6 +470,8 @@ function seek(seconds) {
   isSeeking = true
   a.currentTime = clamped
   currentTime.value = clamped
+  lastMediaPositionSyncAt = 0
+  syncMediaSessionNow({ position: true })
 }
 
 function seekRatio(ratio) {

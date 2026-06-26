@@ -33,7 +33,25 @@
           "{{ sm.searchTerm.value }}"
         </span>
       </p>
-      <SearchResultFilter />
+      <div class="flex items-center gap-2">
+        <div class="min-w-0 flex-1">
+          <SearchResultFilter />
+        </div>
+        <button
+          type="button"
+          class="icon-btn shrink-0"
+          :title="t('common.refresh')"
+          :aria-label="t('common.refresh')"
+          :disabled="sm.isSearching.value"
+          @click="refreshSearch"
+        >
+          <Icon
+            icon="clarity:refresh-line"
+            class="h-5 w-5 transition-colors"
+            :class="sm.isSearching.value ? 'animate-spin text-primary' : ''"
+          />
+        </button>
+      </div>
     </div>
 
     <!-- Error -->
@@ -167,49 +185,49 @@
           </div>
 
           <div class="flex shrink-0 items-center gap-1">
-          <button
-            class="icon-btn text-primary hover:bg-primary/10"
-            @click="openDemo(song)"
-            :title="t('search.demo')"
-          >
-            <Icon icon="clarity:play-solid" class="h-4 w-4" />
-          </button>
+            <button
+              class="icon-btn text-primary hover:bg-primary/10"
+              @click="openDemo(song)"
+              :title="t('search.demo')"
+            >
+              <Icon icon="clarity:play-solid" class="h-4 w-4" />
+            </button>
 
-          <a
-            v-if="externalServiceUrl(song)"
-            class="icon-btn"
-            :href="externalServiceUrl(song)"
-            target="_blank"
-            rel="noopener"
-            :title="externalServiceLabel()"
-          >
-            <Icon icon="clarity:pop-out-line" class="h-4 w-4" />
-          </a>
+            <a
+              v-if="externalServiceUrl(song)"
+              class="icon-btn"
+              :href="externalServiceUrl(song)"
+              target="_blank"
+              rel="noopener"
+              :title="externalServiceLabel()"
+            >
+              <Icon icon="clarity:pop-out-line" class="h-4 w-4" />
+            </a>
 
-          <button
-            v-if="downloadState(song) === 'owned'"
-            class="icon-btn text-success hover:bg-success/10"
-            @click="viewOwnedInLibrary(song)"
-            :title="t('search.viewInLibrary')"
-          >
-            <Icon icon="clarity:library-solid" class="h-5 w-5" />
-          </button>
-          <button
-            v-else-if="downloadState(song) === 'queued'"
-            class="icon-btn text-primary cursor-default"
-            :title="t('search.inQueue')"
-            disabled
-          >
-            <Icon icon="clarity:check-circle-line" class="h-5 w-5" />
-          </button>
-          <button
-            v-else
-            class="icon-btn text-primary hover:bg-primary/10"
-            @click="download(song)"
-            :title="t('search.download')"
-          >
-            <Icon icon="clarity:download-line" class="h-5 w-5" />
-          </button>
+            <button
+              v-if="downloadState(song) === 'owned'"
+              class="icon-btn text-success hover:bg-success/10"
+              @click="viewOwnedInLibrary(song)"
+              :title="t('search.viewInLibrary')"
+            >
+              <Icon icon="clarity:library-solid" class="h-5 w-5" />
+            </button>
+            <button
+              v-else-if="downloadState(song) === 'queued'"
+              class="icon-btn text-primary cursor-default"
+              :title="t('search.inQueue')"
+              disabled
+            >
+              <Icon icon="clarity:check-circle-line" class="h-5 w-5" />
+            </button>
+            <button
+              v-else
+              class="icon-btn text-primary hover:bg-primary/10"
+              @click="download(song)"
+              :title="t('search.download')"
+            >
+              <Icon icon="clarity:download-line" class="h-5 w-5" />
+            </button>
           </div>
         </div>
       </li>
@@ -303,265 +321,268 @@
               <p>{{ demoError }}</p>
             </div>
 
-            <div
-              v-else
-              class="demo-modal-body flex min-h-0 flex-1 flex-col"
-            >
+            <div v-else class="demo-modal-body flex min-h-0 flex-1 flex-col">
               <div class="demo-modal-hero shrink-0 p-5">
                 <div class="grid gap-5 sm:grid-cols-[160px_1fr]">
-                <div
-                  class="demo-modal-cover relative mx-auto aspect-square w-full max-w-44 overflow-hidden rounded-2xl bg-base-content/10 shadow-lg sm:mx-0 sm:max-w-none"
-                >
-                  <CoverImage
-                    v-if="activeDemoTrack?.cover_url"
-                    :src="coverSrc(activeDemoTrack?.cover_url)"
-                    :alt="activeDemoTrack.name"
-                    img-class="h-full w-full object-cover"
-                  >
-                    <template #fallback>
-                      <div
-                        class="flex h-full w-full items-center justify-center text-base-content/30"
-                      >
-                        <Icon
-                          icon="clarity:music-note-line"
-                          class="h-12 w-12"
-                        />
-                      </div>
-                    </template>
-                  </CoverImage>
                   <div
-                    v-else
-                    class="flex h-full w-full items-center justify-center text-base-content/30"
+                    class="demo-modal-cover relative mx-auto aspect-square w-full max-w-44 overflow-hidden rounded-2xl bg-base-content/10 shadow-lg sm:mx-0 sm:max-w-none"
                   >
-                    <Icon icon="clarity:music-note-line" class="h-12 w-12" />
-                  </div>
-                  <button
-                    class="absolute inset-0 flex items-center justify-center transition disabled:cursor-not-allowed"
-                    :class="activeDemoPlayButtonClass"
-                    :disabled="isDemoPlayDisabled(activeDemoTrack)"
-                    @click="toggleDemoPlay(activeDemoTrack)"
-                    :title="playButtonTitle"
-                  >
-                    <Icon
-                      :icon="playIconForTrack(activeDemoTrack)"
-                      class="h-12 w-12 drop-shadow"
-                      :class="demoPlayIconClass(activeDemoTrack, 'text-white')"
-                    />
-                  </button>
-                </div>
-
-                <div class="min-w-0">
-                  <h3 class="truncate text-xl font-bold">
-                    {{ activeDemoTrack?.name }}
-                  </h3>
-                  <p class="truncate text-sm text-base-content/60">
-                    {{ activeDemoTrack ? artistsOf(activeDemoTrack) : '' }}
-                  </p>
-                  <p
-                    v-if="activeDemoTrack?.album_name"
-                    class="mt-1 truncate text-xs text-base-content/40"
-                  >
-                    {{ activeDemoTrack.album_name }}
-                    <span v-if="activeDemoTrack.year">
-                      · {{ activeDemoTrack.year }}</span
+                    <CoverImage
+                      v-if="activeDemoTrack?.cover_url"
+                      :src="coverSrc(activeDemoTrack?.cover_url, 480)"
+                      :alt="activeDemoTrack.name"
+                      img-class="h-full w-full object-cover"
                     >
-                  </p>
-
-                  <div class="mt-5 flex items-center gap-2">
-                    <span
-                      class="w-9 text-right text-xs tabular-nums text-base-content/40"
-                    >
-                      {{ formatDuration(Math.floor(demoProgress)) }}
-                    </span>
-                    <input
-                      type="range"
-                      min="0"
-                      :max="demoDuration || 30"
-                      :value="demoProgress"
-                      class="h-1 flex-1 cursor-pointer accent-primary"
-                      :disabled="!activeDemoAudioUrl"
-                      @input="seekDemo($event.target.value)"
-                    />
-                    <span class="w-9 text-xs tabular-nums text-base-content/40">
-                      {{ formatDuration(Math.floor(demoDuration)) }}
-                    </span>
-                    <div ref="demoVolumeRoot" class="relative shrink-0">
-                      <button
-                        class="icon-btn h-8 w-8 text-base-content/60 hover:text-base-content"
-                        :class="{
-                          'bg-white/10 text-base-content': demoVolumeOpen,
-                        }"
-                        type="button"
-                        :aria-label="t('player.volume')"
-                        :aria-expanded="demoVolumeOpen"
-                        @click="toggleDemoVolume"
-                      >
-                        <Icon :icon="demoVolumeIcon" class="h-4 w-4" />
-                      </button>
-                      <div
-                        v-if="demoVolumeOpen"
-                        class="absolute bottom-full right-0 z-20 mb-2 flex flex-col items-center gap-1 rounded-2xl border border-white/10 bg-base-100/95 px-3 py-3 text-base-content/60 shadow-2xl backdrop-blur"
-                        @pointerdown.stop
-                      >
-                        <span class="text-[10px] tabular-nums leading-none">
-                          {{ Math.round(demoVolume * 100) }}
-                        </span>
-                        <div class="volume-slider-shell">
-                          <input
-                            type="range"
-                            min="0"
-                            max="1"
-                            step="0.01"
-                            :value="demoVolume"
-                            class="volume-slider-vertical"
-                            :aria-label="t('player.volume')"
-                            @input="setDemoVolume($event.target.value)"
+                      <template #fallback>
+                        <div
+                          class="flex h-full w-full items-center justify-center text-base-content/30"
+                        >
+                          <Icon
+                            icon="clarity:music-note-line"
+                            class="h-12 w-12"
                           />
+                        </div>
+                      </template>
+                    </CoverImage>
+                    <div
+                      v-else
+                      class="flex h-full w-full items-center justify-center text-base-content/30"
+                    >
+                      <Icon icon="clarity:music-note-line" class="h-12 w-12" />
+                    </div>
+                    <button
+                      class="absolute inset-0 flex items-center justify-center transition disabled:cursor-not-allowed"
+                      :class="activeDemoPlayButtonClass"
+                      :disabled="isDemoPlayDisabled(activeDemoTrack)"
+                      @click="toggleDemoPlay(activeDemoTrack)"
+                      :title="playButtonTitle"
+                    >
+                      <Icon
+                        :icon="playIconForTrack(activeDemoTrack)"
+                        class="h-12 w-12 drop-shadow"
+                        :class="
+                          demoPlayIconClass(activeDemoTrack, 'text-white')
+                        "
+                      />
+                    </button>
+                  </div>
+
+                  <div class="min-w-0">
+                    <h3 class="truncate text-xl font-bold">
+                      {{ activeDemoTrack?.name }}
+                    </h3>
+                    <p class="truncate text-sm text-base-content/60">
+                      {{ activeDemoTrack ? artistsOf(activeDemoTrack) : '' }}
+                    </p>
+                    <p
+                      v-if="activeDemoTrack?.album_name"
+                      class="mt-1 truncate text-xs text-base-content/40"
+                    >
+                      {{ activeDemoTrack.album_name }}
+                      <span v-if="activeDemoTrack.year">
+                        · {{ activeDemoTrack.year }}</span
+                      >
+                    </p>
+
+                    <div class="mt-5 flex items-center gap-2">
+                      <span
+                        class="w-9 text-right text-xs tabular-nums text-base-content/40"
+                      >
+                        {{ formatDuration(Math.floor(demoProgress)) }}
+                      </span>
+                      <input
+                        type="range"
+                        min="0"
+                        :max="demoDuration || 30"
+                        :value="demoProgress"
+                        class="h-1 flex-1 cursor-pointer accent-primary"
+                        :disabled="!activeDemoAudioUrl"
+                        @input="seekDemo($event.target.value)"
+                      />
+                      <span
+                        class="w-9 text-xs tabular-nums text-base-content/40"
+                      >
+                        {{ formatDuration(Math.floor(demoDuration)) }}
+                      </span>
+                      <div ref="demoVolumeRoot" class="relative shrink-0">
+                        <button
+                          class="icon-btn h-8 w-8 text-base-content/60 hover:text-base-content"
+                          :class="{
+                            'bg-white/10 text-base-content': demoVolumeOpen,
+                          }"
+                          type="button"
+                          :aria-label="t('player.volume')"
+                          :aria-expanded="demoVolumeOpen"
+                          @click="toggleDemoVolume"
+                        >
+                          <Icon :icon="demoVolumeIcon" class="h-4 w-4" />
+                        </button>
+                        <div
+                          v-if="demoVolumeOpen"
+                          class="absolute bottom-full right-0 z-20 mb-2 flex flex-col items-center gap-1 rounded-2xl border border-white/10 bg-base-100/95 px-3 py-3 text-base-content/60 shadow-2xl backdrop-blur"
+                          @pointerdown.stop
+                        >
+                          <span class="text-[10px] tabular-nums leading-none">
+                            {{ Math.round(demoVolume * 100) }}
+                          </span>
+                          <div class="volume-slider-shell">
+                            <input
+                              type="range"
+                              min="0"
+                              max="1"
+                              step="0.01"
+                              :value="demoVolume"
+                              class="volume-slider-vertical"
+                              :aria-label="t('player.volume')"
+                              @input="setDemoVolume($event.target.value)"
+                            />
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
 
-                  <p
-                    v-if="isDemoTrackResolving(activeDemoTrack)"
-                    class="mt-3 text-xs italic text-base-content/40"
-                  >
-                    Preparing preview...
-                  </p>
+                    <p
+                      v-if="isDemoTrackResolving(activeDemoTrack)"
+                      class="mt-3 text-xs italic text-base-content/40"
+                    >
+                      Preparing preview...
+                    </p>
 
-                  <p
-                    v-else-if="demoAudioError"
-                    class="mt-3 text-xs italic text-error"
-                  >
-                    {{ demoAudioError }}
-                  </p>
+                    <p
+                      v-else-if="demoAudioError"
+                      class="mt-3 text-xs italic text-error"
+                    >
+                      {{ demoAudioError }}
+                    </p>
 
-                  <p
-                    v-else-if="
-                      !isDemoTrackReady(activeDemoTrack) &&
-                      !isDemoTrackFailed(activeDemoTrack)
-                    "
-                    class="mt-3 text-xs italic text-base-content/40"
-                  >
-                    Preview will be available shortly.
-                  </p>
-
-                  <div
-                    class="demo-modal-actions mt-5 flex flex-col gap-2 sm:flex-row sm:flex-wrap lg:flex-nowrap"
-                  >
-                    <template
-                      v-if="
-                        demoType === 'album' &&
-                        demoSourceItem &&
-                        downloadState(demoSourceItem) === 'owned'
+                    <p
+                      v-else-if="
+                        !isDemoTrackReady(activeDemoTrack) &&
+                        !isDemoTrackFailed(activeDemoTrack)
                       "
+                      class="mt-3 text-xs italic text-base-content/40"
                     >
-                      <button
-                        class="btn btn-primary btn-sm gap-2 rounded-full sm:shrink-0"
-                        @click="viewOwnedInLibrary(demoSourceItem)"
-                      >
-                        <Icon icon="clarity:library-solid" class="h-4 w-4" />
-                        {{ t('search.viewAlbum') }}
-                      </button>
-                      <button
-                        class="btn btn-sm gap-2 rounded-full border border-white/10 bg-base-100/85 hover:bg-base-100 sm:shrink-0"
-                        @click="playOwnedMedia(demoSourceItem)"
-                      >
-                        <Icon icon="clarity:play-solid" class="h-4 w-4" />
-                        {{ t('library.playAlbum') }}
-                      </button>
-                    </template>
-                    <template
-                      v-else-if="demoType === 'album' && demoSourceItem"
+                      Preview will be available shortly.
+                    </p>
+
+                    <div
+                      class="demo-modal-actions mt-5 flex flex-col gap-2 sm:flex-row sm:flex-wrap lg:flex-nowrap"
                     >
+                      <template
+                        v-if="
+                          demoType === 'album' &&
+                          demoSourceItem &&
+                          downloadState(demoSourceItem) === 'owned'
+                        "
+                      >
+                        <button
+                          class="btn btn-primary btn-sm gap-2 rounded-full sm:shrink-0"
+                          @click="viewOwnedInLibrary(demoSourceItem)"
+                        >
+                          <Icon icon="clarity:library-solid" class="h-4 w-4" />
+                          {{ t('search.viewAlbum') }}
+                        </button>
+                        <button
+                          class="btn btn-sm gap-2 rounded-full border border-white/10 bg-base-100/85 hover:bg-base-100 sm:shrink-0"
+                          @click="playOwnedMedia(demoSourceItem)"
+                        >
+                          <Icon icon="clarity:play-solid" class="h-4 w-4" />
+                          {{ t('library.playAlbum') }}
+                        </button>
+                      </template>
+                      <template
+                        v-else-if="demoType === 'album' && demoSourceItem"
+                      >
+                        <button
+                          class="btn btn-primary btn-sm gap-2 rounded-full sm:shrink-0"
+                          :disabled="downloadState(demoSourceItem) !== 'idle'"
+                          @click="downloadAlbumFromDemo"
+                        >
+                          <Icon icon="clarity:download-line" class="h-4 w-4" />
+                          {{
+                            downloadState(demoSourceItem) === 'queued'
+                              ? t('search.inQueue')
+                              : t('search.downloadAlbum')
+                          }}
+                        </button>
+                        <button
+                          class="btn btn-sm gap-2 rounded-full border border-white/10 bg-base-100/85 hover:bg-base-100 sm:shrink-0"
+                          :disabled="
+                            downloadState(activeDemoTrack) === 'queued'
+                          "
+                          @click="
+                            downloadState(activeDemoTrack) === 'owned'
+                              ? viewOwnedInLibrary(activeDemoTrack)
+                              : downloadFromDemo()
+                          "
+                        >
+                          <Icon
+                            :icon="
+                              downloadState(activeDemoTrack) === 'owned'
+                                ? 'clarity:library-solid'
+                                : 'clarity:download-line'
+                            "
+                            class="h-4 w-4"
+                          />
+                          {{
+                            downloadState(activeDemoTrack) === 'owned'
+                              ? t('search.viewInLibrary')
+                              : downloadState(activeDemoTrack) === 'queued'
+                              ? t('search.inQueue')
+                              : t('search.downloadTrack')
+                          }}
+                        </button>
+                      </template>
+                      <template
+                        v-else-if="
+                          demoType !== 'album' &&
+                          downloadState(activeDemoTrack) === 'owned'
+                        "
+                      >
+                        <button
+                          class="btn btn-primary btn-sm gap-2 rounded-full sm:shrink-0"
+                          @click="viewOwnedInLibrary(activeDemoTrack)"
+                        >
+                          <Icon icon="clarity:library-solid" class="h-4 w-4" />
+                          {{ t('search.viewInLibrary') }}
+                        </button>
+                        <button
+                          class="btn btn-sm gap-2 rounded-full border border-white/10 bg-base-100/85 hover:bg-base-100 sm:shrink-0"
+                          @click="playOwnedMedia(activeDemoTrack)"
+                        >
+                          <Icon icon="clarity:play-solid" class="h-4 w-4" />
+                          {{ t('search.playTrack') }}
+                        </button>
+                      </template>
                       <button
+                        v-else-if="demoType !== 'album'"
                         class="btn btn-primary btn-sm gap-2 rounded-full sm:shrink-0"
-                        :disabled="downloadState(demoSourceItem) !== 'idle'"
-                        @click="downloadAlbumFromDemo"
+                        :disabled="downloadState(activeDemoTrack) !== 'idle'"
+                        @click="downloadFromDemo"
                       >
                         <Icon icon="clarity:download-line" class="h-4 w-4" />
                         {{
-                          downloadState(demoSourceItem) === 'queued'
-                            ? t('search.inQueue')
-                            : t('search.downloadAlbum')
-                        }}
-                      </button>
-                      <button
-                        class="btn btn-sm gap-2 rounded-full border border-white/10 bg-base-100/85 hover:bg-base-100 sm:shrink-0"
-                        :disabled="downloadState(activeDemoTrack) === 'queued'"
-                        @click="
                           downloadState(activeDemoTrack) === 'owned'
-                            ? viewOwnedInLibrary(activeDemoTrack)
-                            : downloadFromDemo()
-                        "
-                      >
-                        <Icon
-                          :icon="
-                            downloadState(activeDemoTrack) === 'owned'
-                              ? 'clarity:library-solid'
-                              : 'clarity:download-line'
-                          "
-                          class="h-4 w-4"
-                        />
-                        {{
-                          downloadState(activeDemoTrack) === 'owned'
-                            ? t('search.viewInLibrary')
+                            ? t('search.inLibrary')
                             : downloadState(activeDemoTrack) === 'queued'
                             ? t('search.inQueue')
-                            : t('search.downloadTrack')
+                            : t('search.download')
                         }}
                       </button>
-                    </template>
-                    <template
-                      v-else-if="
-                        demoType !== 'album' &&
-                        downloadState(activeDemoTrack) === 'owned'
-                      "
-                    >
-                      <button
-                        class="btn btn-primary btn-sm gap-2 rounded-full sm:shrink-0"
-                        @click="viewOwnedInLibrary(activeDemoTrack)"
+                      <a
+                        v-if="externalServiceUrl(activeDemoTrack)"
+                        class="btn btn-sm gap-2 rounded-full bg-base-100/85 sm:shrink-0"
+                        :class="externalServiceButtonClass()"
+                        :href="externalServiceUrl(activeDemoTrack)"
+                        target="_blank"
+                        rel="noopener"
                       >
-                        <Icon icon="clarity:library-solid" class="h-4 w-4" />
-                        {{ t('search.viewInLibrary') }}
-                      </button>
-                      <button
-                        class="btn btn-sm gap-2 rounded-full border border-white/10 bg-base-100/85 hover:bg-base-100 sm:shrink-0"
-                        @click="playOwnedMedia(activeDemoTrack)"
-                      >
-                        <Icon icon="clarity:play-solid" class="h-4 w-4" />
-                        {{ t('search.playTrack') }}
-                      </button>
-                    </template>
-                    <button
-                      v-else-if="demoType !== 'album'"
-                      class="btn btn-primary btn-sm gap-2 rounded-full sm:shrink-0"
-                      :disabled="downloadState(activeDemoTrack) !== 'idle'"
-                      @click="downloadFromDemo"
-                    >
-                      <Icon icon="clarity:download-line" class="h-4 w-4" />
-                      {{
-                        downloadState(activeDemoTrack) === 'owned'
-                          ? t('search.inLibrary')
-                          : downloadState(activeDemoTrack) === 'queued'
-                          ? t('search.inQueue')
-                          : t('search.download')
-                      }}
-                    </button>
-                    <a
-                      v-if="externalServiceUrl(activeDemoTrack)"
-                      class="btn btn-sm gap-2 rounded-full bg-base-100/85 sm:shrink-0"
-                      :class="externalServiceButtonClass()"
-                      :href="externalServiceUrl(activeDemoTrack)"
-                      target="_blank"
-                      rel="noopener"
-                    >
-                      <Icon icon="clarity:pop-out-line" class="h-4 w-4" />
-                      {{ externalServiceLabel() }}
-                    </a>
+                        <Icon icon="clarity:pop-out-line" class="h-4 w-4" />
+                        {{ externalServiceLabel() }}
+                      </a>
+                    </div>
                   </div>
                 </div>
-              </div>
               </div>
 
               <div
@@ -670,8 +691,14 @@ const router = useRouter()
 const player = usePlayer()
 const { t } = useI18n()
 
-function coverSrc(url) {
-  return API.mediaUrl(url)
+function coverSrc(url, size) {
+  return API.searchCoverUrl(url, size)
+}
+
+function refreshSearch() {
+  const term = sm.searchTerm.value
+  if (!term || sm.isSearching.value) return
+  sm.searchFor(term)
 }
 
 const currentPage = ref(1)
@@ -962,8 +989,7 @@ async function viewOwnedInLibrary(item) {
 async function playOwnedMedia(item) {
   if (!item) return
   const items = await libraryItemsForOwned()
-  const album =
-    item.media_type === 'album' ? findOwnedAlbum(item, items) : null
+  const album = item.media_type === 'album' ? findOwnedAlbum(item, items) : null
   const track = album ? null : findOwnedTrack(item, items)
 
   if (album?.files?.length) {
@@ -1119,7 +1145,10 @@ function onDemoVolumeOutsideClick(event) {
 }
 
 function downloadFromDemo() {
-  if (!activeDemoTrack.value || downloadState(activeDemoTrack.value) !== 'idle') {
+  if (
+    !activeDemoTrack.value ||
+    downloadState(activeDemoTrack.value) !== 'idle'
+  ) {
     return
   }
   download(activeDemoTrack.value)

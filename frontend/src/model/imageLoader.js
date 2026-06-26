@@ -193,6 +193,22 @@ export async function resolveImageSrc(url) {
   if (cached) return cached
 
   if (!isCapacitorNative()) {
+    // Serve a previously persisted copy first. The browser/WebView HTTP cache
+    // is volatile and frequently evicted between sessions, which made covers
+    // blank out and reload slowly after the app was closed and reopened. The
+    // IndexedDB-backed disk cache survives restarts, so prefer it and fall back
+    // to a normal network load (which repopulates the disk cache) on a miss.
+    try {
+      const persisted = await readPersistedImage(value)
+      if (persisted) {
+        const blobUrl = URL.createObjectURL(persisted)
+        rememberResolvedUrl(value, blobUrl)
+        return blobUrl
+      }
+    } catch (error) {
+      console.warn('Failed to read persisted image:', value, error)
+    }
+
     try {
       await preloadHttpImage(value)
       return urlCache.get(value) || value

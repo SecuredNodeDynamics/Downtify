@@ -82,4 +82,23 @@ describe('resolveImageSrc direct URLs', () => {
     const url = 'http://downtify.local:8000/cover?file=Artist%2Ftrack.mp3'
     await expect(resolveImageSrc(url)).resolves.toBe(url)
   })
+
+  it('serves a persisted blob from disk on web so covers survive a reopen', async () => {
+    const { isCapacitorNative } = await import('../model/serverConnection.js')
+    const { readPersistedImage } = await import('../model/imageDiskCache.js')
+    isCapacitorNative.mockReturnValue(false)
+
+    const blob = new Blob(['fake-bytes'], { type: 'image/jpeg' })
+    readPersistedImage.mockResolvedValueOnce(blob)
+
+    const createObjectURL = vi
+      .spyOn(URL, 'createObjectURL')
+      .mockReturnValue('blob:persisted-cover')
+
+    const url = 'https://web.test/cover?file=Artist%2Funique-web-track.mp3'
+    await expect(resolveImageSrc(url)).resolves.toBe('blob:persisted-cover')
+    expect(createObjectURL).toHaveBeenCalledWith(blob)
+
+    createObjectURL.mockRestore()
+  })
 })

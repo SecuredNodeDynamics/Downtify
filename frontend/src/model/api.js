@@ -464,6 +464,44 @@ function shouldProxyRemoteImage(url) {
   return isCdnImageUrl(url)
 }
 
+// Search results upgrade every YouTube Music / Google thumbnail to 600x600 so
+// the full-resolution image is available for album-art embedding on download.
+// Rendering those full-size images in tiny list tiles is wasteful — and on the
+// embedded Android APK each one is pulled through the Capacitor HTTP bridge as
+// base64, so a page of 600x600 covers loads slowly. These CDNs accept a size
+// suffix, so request a small thumbnail sized for the tile instead. The original
+// (full-res) cover_url is untouched and still used for the actual download.
+const GOOGLE_THUMB_HOST_SUFFIXES = ['googleusercontent.com', 'ggpht.com']
+
+function cdnThumbnailUrl(url, size) {
+  const value = String(url || '').trim()
+  const px = Math.round(Number(size) || 0)
+  if (!value || px <= 0) return value
+  let host = ''
+  try {
+    host = new URL(value).hostname.toLowerCase()
+  } catch {
+    return value
+  }
+  const isGoogleThumb = GOOGLE_THUMB_HOST_SUFFIXES.some(
+    (suffix) => host === suffix || host.endsWith(`.${suffix}`)
+  )
+  if (!isGoogleThumb) return value
+  // Replace an existing "=w600-h600-..." sizing suffix, or append one.
+  if (/=w\d+-h\d+/i.test(value)) {
+    return value.replace(/=w\d+-h\d+[^/]*$/i, `=w${px}-h${px}-l90-rj`)
+  }
+  return `${value}=w${px}-h${px}-l90-rj`
+}
+
+// Display size for remote search-result thumbnails. Tiles render ~56-64px; 256
+// keeps them crisp on high-DPI screens while staying far smaller than 600x600.
+const SEARCH_THUMBNAIL_SIZE = 256
+
+function searchCoverUrl(url, size = SEARCH_THUMBNAIL_SIZE) {
+  return mediaUrl(cdnThumbnailUrl(url, size))
+}
+
 function mediaUrl(src) {
   const value = String(src || '').trim()
   if (!value) return ''
@@ -666,6 +704,7 @@ export default {
   libraryServerKey,
   apiAssetUrl,
   mediaUrl,
+  searchCoverUrl,
   listDownloads,
   getLibraryFiles,
   checkLibraryOwned,
