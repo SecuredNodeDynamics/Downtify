@@ -6,6 +6,7 @@ import {
   isSameAudioUrl,
   resolvePlaybackUrl,
 } from './playerAudioUrl.js'
+import { recoveryDelayMs, shouldRecoverPlayback } from './playbackRecovery.js'
 import { usesEmbeddedServer } from './serverConnection.js'
 
 const VOLUME_KEY = 'downtify-player-volume'
@@ -26,6 +27,115 @@ let shufflePos = 0
 let progressRaf = 0
 let isSeeking = false
 let playingFile = ''
+// Whether the user wants audio playing right now. Distinct from `isPlaying`,
+// which mirrors the element's actual play/pause state: during a network stall
+// the stream is paused by the browser even though playback is still intended.
+let playbackIntent = false
+let recoverTimer = 0
+let recoverAttempts = 0
+let recovering = false
+
+function isStreamedPlayback() {
+  // Embedded builds play local files via the Capacitor file bridge and never
+  // suffer network underruns; everything else streams over HTTP.
+  return !usesEmbeddedServer()
+}
+
+function clearRecoverTimer() {
+  if (recoverTimer) {
+    clearTimeout(recoverTimer)
+    recoverTimer = 0
+  }
+}
+
+function resetRecovery() {
+  recoverAttempts = 0
+  recovering = false
+  clearRecoverTimer()
+}
+
+function recoveryContext() {
+  return {
+    playbackIntent,
+    streamed: isStreamedPlayback(),
+    paused: audio ? audio.paused : true,
+    seeking: isSeeking,
+    readyState: audio ? audio.readyState : 0,
+    attempts: recoverAttempts,
+  }
+}
+
+function scheduleRecovery() {
+  if (!audio || recoverTimer || recovering) return
+  if (!shouldRecoverPlayback(recoveryContext())) return
+  const delay = recoveryDelayMs(recoverAttempts)
+  recoverTimer = setTimeout(() => {
+    recoverTimer = 0
+    void attemptRecovery()
+  }, delay)
+}
+
+function attemptRecovery() {
+  if (!audio || recovering) return
+  if (!shouldRecoverPlayback(recoveryContext())) return
+
+  recovering = true
+  recoverAttempts += 1
+  const el = audio
+  const resumeAt = Number.isFinite(el.currentTime) ? el.currentTime : 0
+
+  const finishFailure = () => {
+    recovering = false
+    scheduleRecovery()
+  }
+
+  const resume = () => {
+    if (el !== audio) {
+      recovering = false
+      return
+    }
+    try {
+      if (resumeAt > 0) {
+        const dur = el.duration
+        el.currentTime =
+          Number.isFinite(dur) && dur > 0
+            ? Math.min(resumeAt, dur - 0.25)
+            : resumeAt
+      }
+    } catch {
+      // Seeking can throw if the element isn't ready yet; play anyway.
+    }
+    el.play()
+      .then(() => {
+        // Success is finalized by the 'playing' listener (resetRecovery).
+      })
+      .catch(finishFailure)
+  }
+
+  const onLoaded = () => {
+    el.removeEventListener('loadedmetadata', onLoaded)
+    resume()
+  }
+  el.addEventListener('loadedmetadata', onLoaded, { once: true })
+
+  // Re-fetch the stream from scratch; load() resets currentTime, hence the
+  // resumeAt bookkeeping above.
+  try {
+    el.load()
+  } catch {
+    el.removeEventListener('loadedmetadata', onLoaded)
+    finishFailure()
+    return
+  }
+
+  // If the reload never reports metadata (dead connection), retry with back-off.
+  setTimeout(() => {
+    if (recovering && el === audio) {
+      el.removeEventListener('loadedmetadata', onLoaded)
+      finishFailure()
+    }
+  }, 6000)
+}
 
 function tickProgress() {
   if (audio && !audio.paused && !isSeeking) {
@@ -76,9 +186,19 @@ function ensureAudio() {
   audio.addEventListener('error', () => {
     isPlaying.value = false
     stopProgressTicker()
+    scheduleRecovery()
   })
+  // A network underrun on a streamed source: the browser pauses to rebuffer.
+  // Give it a moment to recover on its own, then reload-and-resume if not.
+  audio.addEventListener('waiting', scheduleRecovery)
+  audio.addEventListener('stalled', scheduleRecovery)
   audio.addEventListener('play', () => {
     isPlaying.value = true
+    startProgressTicker()
+  })
+  audio.addEventListener('playing', () => {
+    isPlaying.value = true
+    resetRecovery()
     startProgressTicker()
   })
   audio.addEventListener('pause', () => {
@@ -155,6 +275,7 @@ async function applyTrack(index, { autoplay = false, resetTime = true } = {}) {
     a.pause()
     isPlaying.value = false
     stopProgressTicker()
+    resetRecovery()
     playingFile = track.file
     a.src = nextUrl
     if (resetTime) {
@@ -163,12 +284,14 @@ async function applyTrack(index, { autoplay = false, resetTime = true } = {}) {
       duration.value = 0
     }
     if (autoplay || wasPlaying) {
+      playbackIntent = true
       await a.play().catch(() => {})
     }
     return
   }
 
   if ((autoplay || wasPlaying) && a.paused) {
+    playbackIntent = true
     await a.play().catch(() => {})
   }
 }
@@ -253,10 +376,13 @@ function play() {
     void applyTrack(currentIndex.value, { autoplay: true, resetTime: false })
     return
   }
+  playbackIntent = true
   a.play().catch(() => {})
 }
 
 function pause() {
+  playbackIntent = false
+  resetRecovery()
   if (audio) audio.pause()
 }
 
@@ -350,7 +476,10 @@ function prev() {
 function onEnded() {
   if (repeatMode.value === 'one') {
     seek(0)
-    if (audio) audio.play().catch(() => {})
+    if (audio) {
+      playbackIntent = true
+      audio.play().catch(() => {})
+    }
     return
   }
   next()
