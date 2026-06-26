@@ -52,12 +52,12 @@ function semverToVersionCode(version) {
   const major = Number(m[1]);
   const minor = Number(m[2]);
   const patch = Number(m[3]);
-  if (minor > 99 || patch > 99) {
+  if (minor > 999 || patch > 999) {
     throw new Error(
-      `Android versionCode supports minor/patch <= 99: ${version}`
+      `Android versionCode supports minor/patch <= 999: ${version}`
     );
   }
-  return major * 10000 + minor * 100 + patch;
+  return major * 1000000 + minor * 1000 + patch;
 }
 
 function syncAndroidGradle(version) {

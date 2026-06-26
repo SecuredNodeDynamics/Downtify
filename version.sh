@@ -139,11 +139,11 @@ if gradle.exists():
     major = int(major_s)
     minor = int(minor_s)
     patch = int(patch_s)
-    if minor > 99 or patch > 99:
+    if minor > 999 or patch > 999:
         raise SystemExit(
-            f"Android versionCode supports minor/patch <= 99: {new}"
+            f"Android versionCode supports minor/patch <= 999: {new}"
         )
-    version_code = major * 10000 + minor * 100 + patch
+    version_code = major * 1000000 + minor * 1000 + patch
     text = gradle.read_text(encoding="utf-8")
     updated = re.sub(r"versionCode\s+\d+", f"versionCode {version_code}", text)
     updated = re.sub(r'versionName\s+"[^"]+"', f'versionName "{new}"', updated)
