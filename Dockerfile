@@ -7,7 +7,10 @@ COPY requirements.txt .
 RUN pip install --upgrade pip && \
     pip install --no-cache-dir --root-user-action ignore -r requirements.txt
 
-FROM node:22-alpine AS frontend-builder
+# Pin the frontend build to the native build platform: its output is static,
+# architecture-independent JS/CSS, so running npm under arm64 QEMU emulation
+# only makes multi-arch builds drastically slower (and prone to timeouts).
+FROM --platform=$BUILDPLATFORM node:22-alpine AS frontend-builder
 
 WORKDIR /build/frontend
 
