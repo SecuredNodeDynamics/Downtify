@@ -26,11 +26,4 @@ onMounted(() => window.scroll(0, 0))
   );
 }
 
-@media (min-width: 1024px) {
-  .queue-view {
-    height: auto;
-    max-height: none;
-    overflow: visible;
-  }
-}
 </style>

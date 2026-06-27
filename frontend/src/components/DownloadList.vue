@@ -1329,23 +1329,5 @@ onUnmounted(() => {
   .queue-page {
     @apply gap-4 py-8;
   }
-
-  .queue-chrome {
-    @apply sticky top-16 z-20 -mx-6 bg-base-100/90 px-6 pb-3 backdrop-blur-md;
-  }
-
-  .queue-body-slot {
-    flex: none;
-  }
-
-  .queue-panel {
-    flex: none;
-    min-height: auto;
-  }
-
-  .queue-scroll-body {
-    overflow: visible;
-    max-height: none;
-  }
 }
 </style>
