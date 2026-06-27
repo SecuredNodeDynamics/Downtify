@@ -92,50 +92,84 @@
         <p v-if="addError" class="mt-2 text-xs text-error">{{ addError }}</p>
       </div>
 
-      <!-- Loading skeleton -->
-      <div v-if="loading" class="space-y-3">
-        <div v-for="n in 3" :key="n" class="skeleton h-24 rounded-2xl" />
-      </div>
-
-      <div
-        v-else-if="loadError"
-        class="surface rounded-2xl p-4 text-sm text-error flex items-center gap-3"
-      >
-        <Icon icon="clarity:exclamation-circle-line" class="h-5 w-5 shrink-0" />
-        <span>{{ loadError }}</span>
-      </div>
-
-      <!-- Empty state -->
-      <div
-        v-else-if="filteredPlaylists.length === 0"
-        class="surface rounded-2xl p-12 flex flex-col items-center text-center"
-      >
-        <Icon
-          icon="clarity:music-note-line"
-          class="h-12 w-12 text-base-content/20 mb-4"
-        />
-        <p class="text-base-content/50 text-sm">
-          {{ t('monitor.empty') }}
-        </p>
-        <p class="text-base-content/40 text-xs mt-1">
-          {{ t('monitor.emptyHint') }}
-        </p>
-      </div>
-
-      <!-- Item cards -->
-      <ul v-else class="space-y-3">
-        <li
-          v-for="pl in filteredPlaylists"
-          :key="pl.id"
-          class="surface rounded-2xl p-4 sm:p-5"
+      <!-- Monitored items -->
+      <section class="surface rounded-2xl p-3 sm:p-4 mb-6 sm:mb-8 min-w-0">
+        <div
+          class="mb-3 flex items-center justify-between gap-3 px-1 sm:px-0"
         >
-          <div class="flex gap-4 min-w-0">
-            <div class="shrink-0">
+          <div class="min-w-0">
+            <h2
+              class="text-sm font-semibold uppercase tracking-wider text-base-content/50"
+            >
+              {{
+                newKind === 'artist'
+                  ? t('monitor.kindArtist')
+                  : t('monitor.kindPlaylist')
+              }}
+            </h2>
+            <p class="mt-0.5 text-xs text-base-content/40">
+              {{
+                `${filteredPlaylists.length} ${
+                  newKind === 'artist'
+                    ? t('monitor.kindArtist')
+                    : t('monitor.kindPlaylist')
+                }`
+              }}
+            </p>
+          </div>
+          <button
+            type="button"
+            class="icon-btn h-10 w-10 shrink-0"
+            :title="t('monitor.checkNow')"
+            @click="load"
+          >
+            <Icon icon="clarity:refresh-line" class="h-4 w-4" />
+          </button>
+        </div>
+
+        <div v-if="loading" class="grid gap-3 sm:grid-cols-2">
+          <div v-for="n in 4" :key="n" class="skeleton h-56 rounded-2xl" />
+        </div>
+
+        <div
+          v-else-if="loadError"
+          class="rounded-2xl border border-error/20 bg-error/10 p-4 text-sm text-error flex items-center gap-3"
+        >
+          <Icon
+            icon="clarity:exclamation-circle-line"
+            class="h-5 w-5 shrink-0"
+          />
+          <span>{{ loadError }}</span>
+        </div>
+
+        <div
+          v-else-if="filteredPlaylists.length === 0"
+          class="rounded-2xl border border-white/10 bg-base-100/30 p-10 flex flex-col items-center text-center"
+        >
+          <Icon
+            icon="clarity:music-note-line"
+            class="h-12 w-12 text-base-content/20 mb-4"
+          />
+          <p class="text-base-content/50 text-sm">
+            {{ t('monitor.empty') }}
+          </p>
+          <p class="text-base-content/40 text-xs mt-1">
+            {{ t('monitor.emptyHint') }}
+          </p>
+        </div>
+
+        <ul v-else class="grid gap-3 sm:grid-cols-2">
+          <li
+            v-for="pl in filteredPlaylists"
+            :key="pl.id"
+            class="monitor-card rounded-2xl border border-white/10 bg-base-100/55 p-3 shadow-lg shadow-black/10"
+          >
+            <div class="flex gap-3 min-w-0">
               <CoverImage
                 :src="coverForItem(pl).src"
                 :fallbacks="coverForItem(pl).fallbacks"
                 :alt="pl.name"
-                img-class="h-16 w-16 sm:h-20 sm:w-20 rounded-2xl object-cover border border-white/10 bg-base-100/60"
+                img-class="h-20 w-20 rounded-2xl object-cover border border-white/10 bg-base-100/60"
               >
                 <template #fallback>
                   <Icon
@@ -148,140 +182,144 @@
                   />
                 </template>
               </CoverImage>
+
+              <div class="min-w-0 flex-1">
+                <div class="mb-1 flex items-start justify-between gap-2">
+                  <h3
+                    class="monitor-card-title text-sm font-semibold leading-snug"
+                  >
+                    {{ pl.name }}
+                  </h3>
+                  <span
+                    class="pill shrink-0 text-xs"
+                    :class="pl.enabled ? 'badge-soft' : 'badge-neutral-soft'"
+                  >
+                    {{ pl.enabled ? t('monitor.active') : t('monitor.paused') }}
+                  </span>
+                </div>
+                <div class="space-y-1 text-xs text-base-content/50">
+                  <p class="flex items-center gap-1">
+                    <Icon icon="clarity:refresh-line" class="h-3 w-3" />
+                    <span>
+                      {{
+                        t('monitor.everyInterval', {
+                          interval: formatInterval(pl.interval_minutes),
+                        })
+                      }}
+                    </span>
+                  </p>
+                  <p class="flex items-center gap-1">
+                    <Icon icon="clarity:music-note-line" class="h-3 w-3" />
+                    <span>
+                      {{
+                        pl.last_track_count === 1
+                          ? t('monitor.tracksOne', {
+                              count: pl.last_track_count,
+                            })
+                          : t('monitor.tracksMany', {
+                              count: pl.last_track_count,
+                            })
+                      }}
+                    </span>
+                  </p>
+                  <p class="flex items-center gap-1">
+                    <Icon icon="clarity:clock-line" class="h-3 w-3" />
+                    <span v-if="pl.last_checked">
+                      {{
+                        t('monitor.checked', {
+                          when: timeAgo(pl.last_checked),
+                        })
+                      }}
+                    </span>
+                    <span v-else class="italic">
+                      {{ t('monitor.notChecked') }}
+                    </span>
+                  </p>
+                </div>
+              </div>
             </div>
 
-            <div class="min-w-0 flex-1">
-              <div class="flex items-center gap-2 mb-1 flex-wrap">
-                <span class="font-semibold truncate">{{ pl.name }}</span>
-                <span class="pill shrink-0 badge-neutral-soft text-xs">
-                  {{
-                    pl.kind === 'artist'
-                      ? t('monitor.kindArtist')
-                      : t('monitor.kindPlaylist')
-                  }}
-                </span>
-                <span
-                  class="pill shrink-0"
-                  :class="pl.enabled ? 'badge-soft' : 'badge-neutral-soft'"
-                >
-                  {{ pl.enabled ? t('monitor.active') : t('monitor.paused') }}
-                </span>
-              </div>
-              <div
-                class="flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-base-content/50"
+            <div class="mt-3 grid grid-cols-[1fr_auto] gap-2">
+              <select
+                :value="draftInterval(pl)"
+                class="select select-sm h-11 min-w-0 rounded-xl border border-white/10 bg-base-100/80 text-sm focus:border-primary/60"
+                @change="onIntervalDraftChange(pl, $event)"
               >
-                <span>
-                  <Icon
-                    icon="clarity:refresh-line"
-                    class="inline h-3 w-3 mr-0.5"
-                  />
-                  {{
-                    t('monitor.everyInterval', {
-                      interval: formatInterval(pl.interval_minutes),
-                    })
-                  }}
-                </span>
-                <span>
-                  <Icon
-                    icon="clarity:music-note-line"
-                    class="inline h-3 w-3 mr-0.5"
-                  />
-                  {{
-                    pl.last_track_count === 1
-                      ? t('monitor.tracksOne', { count: pl.last_track_count })
-                      : t('monitor.tracksMany', { count: pl.last_track_count })
-                  }}
-                </span>
-                <span v-if="pl.last_checked">
-                  <Icon
-                    icon="clarity:clock-line"
-                    class="inline h-3 w-3 mr-0.5"
-                  />
-                  {{ t('monitor.checked', { when: timeAgo(pl.last_checked) }) }}
-                </span>
-                <span v-else class="italic">{{ t('monitor.notChecked') }}</span>
-              </div>
+                <option :value="15">{{ t('monitor.short15') }}</option>
+                <option :value="30">{{ t('monitor.short30') }}</option>
+                <option :value="60">{{ t('monitor.short1h') }}</option>
+                <option :value="180">{{ t('monitor.short3h') }}</option>
+                <option :value="360">{{ t('monitor.short6h') }}</option>
+                <option :value="720">{{ t('monitor.short12h') }}</option>
+                <option :value="1440">{{ t('monitor.short1d') }}</option>
+                <option :value="10080">{{ t('monitor.short1w') }}</option>
+                <option :value="20160">{{ t('monitor.short2w') }}</option>
+                <option :value="43200">{{ t('monitor.short1mo') }}</option>
+              </select>
+
+              <button
+                type="button"
+                class="btn btn-sm h-11 rounded-xl px-4"
+                :class="
+                  intervalDirty(pl)
+                    ? 'btn-primary'
+                    : 'border-white/10 bg-base-100/40 text-base-content/40'
+                "
+                :disabled="!intervalDirty(pl) || applyingInterval[pl.id]"
+                @click="onApplyInterval(pl)"
+              >
+                <span
+                  v-if="applyingInterval[pl.id]"
+                  class="loading loading-spinner loading-xs"
+                />
+                <span v-else>{{ t('monitor.applyInterval') }}</span>
+              </button>
             </div>
-          </div>
 
-          <div
-            class="mt-4 flex flex-wrap items-center justify-end gap-2 border-t border-white/5 pt-4"
-          >
-            <select
-              :value="draftInterval(pl)"
-              class="select select-sm rounded-full border border-white/10 bg-base-100/60 text-xs focus:border-primary/60 min-w-[6.5rem]"
-              @change="onIntervalDraftChange(pl, $event)"
-            >
-              <option :value="15">{{ t('monitor.short15') }}</option>
-              <option :value="30">{{ t('monitor.short30') }}</option>
-              <option :value="60">{{ t('monitor.short1h') }}</option>
-              <option :value="180">{{ t('monitor.short3h') }}</option>
-              <option :value="360">{{ t('monitor.short6h') }}</option>
-              <option :value="720">{{ t('monitor.short12h') }}</option>
-              <option :value="1440">{{ t('monitor.short1d') }}</option>
-              <option :value="10080">{{ t('monitor.short1w') }}</option>
-              <option :value="20160">{{ t('monitor.short2w') }}</option>
-              <option :value="43200">{{ t('monitor.short1mo') }}</option>
-            </select>
+            <div class="mt-2 grid grid-cols-3 gap-2">
+              <button
+                class="monitor-action-btn"
+                :title="pl.enabled ? t('monitor.pause') : t('monitor.resume')"
+                @click="onToggle(pl)"
+              >
+                <Icon
+                  :icon="
+                    pl.enabled ? 'clarity:pause-line' : 'clarity:play-line'
+                  "
+                  class="h-4 w-4"
+                />
+              </button>
 
-            <button
-              type="button"
-              class="btn btn-sm h-9 rounded-full px-4"
-              :class="
-                intervalDirty(pl)
-                  ? 'btn-primary'
-                  : 'border-white/10 bg-base-100/40 text-base-content/40'
-              "
-              :disabled="!intervalDirty(pl) || applyingInterval[pl.id]"
-              @click="onApplyInterval(pl)"
-            >
-              <span
-                v-if="applyingInterval[pl.id]"
-                class="loading loading-spinner loading-xs"
-              />
-              <span v-else>{{ t('monitor.applyInterval') }}</span>
-            </button>
+              <button
+                class="monitor-action-btn"
+                :title="t('monitor.checkNow')"
+                :disabled="checking[pl.id]"
+                @click="onCheck(pl)"
+              >
+                <span
+                  v-if="checking[pl.id]"
+                  class="loading loading-spinner loading-xs"
+                />
+                <Icon v-else icon="clarity:refresh-line" class="h-4 w-4" />
+              </button>
 
-            <button
-              class="icon-btn"
-              :title="pl.enabled ? t('monitor.pause') : t('monitor.resume')"
-              @click="onToggle(pl)"
+              <button
+                class="monitor-action-btn text-error/75 hover:text-error hover:bg-error/10"
+                :title="t('monitor.stop')"
+                @click="onDelete(pl)"
+              >
+                <Icon icon="clarity:trash-line" class="h-4 w-4" />
+              </button>
+            </div>
+            <p
+              v-if="intervalErrors[pl.id] || actionErrors[pl.id]"
+              class="mt-2 text-[11px] leading-snug text-error"
             >
-              <Icon
-                :icon="pl.enabled ? 'clarity:pause-line' : 'clarity:play-line'"
-                class="h-4 w-4"
-              />
-            </button>
-
-            <button
-              class="icon-btn"
-              :title="t('monitor.checkNow')"
-              :disabled="checking[pl.id]"
-              @click="onCheck(pl)"
-            >
-              <span
-                v-if="checking[pl.id]"
-                class="loading loading-spinner loading-xs"
-              />
-              <Icon v-else icon="clarity:refresh-line" class="h-4 w-4" />
-            </button>
-
-            <button
-              class="icon-btn text-error/70 hover:text-error hover:bg-error/10"
-              :title="t('monitor.stop')"
-              @click="onDelete(pl)"
-            >
-              <Icon icon="clarity:trash-line" class="h-4 w-4" />
-            </button>
-          </div>
-          <p
-            v-if="intervalErrors[pl.id] || actionErrors[pl.id]"
-            class="mt-2 text-right text-[11px] leading-snug text-error"
-          >
-            {{ intervalErrors[pl.id] || actionErrors[pl.id] }}
-          </p>
-        </li>
-      </ul>
+              {{ intervalErrors[pl.id] || actionErrors[pl.id] }}
+            </p>
+          </li>
+        </ul>
+      </section>
 
       <!-- Info banner -->
       <div
@@ -560,3 +598,20 @@ function timeAgo(isoString) {
 
 onMounted(load)
 </script>
+
+<style scoped>
+.monitor-card {
+  min-height: 13.5rem;
+}
+
+.monitor-card-title {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.monitor-action-btn {
+  @apply flex h-11 items-center justify-center rounded-xl border border-white/10 bg-base-100/55 text-base-content/80 transition-colors hover:border-primary/40 hover:bg-primary/10 hover:text-primary disabled:cursor-not-allowed disabled:opacity-50;
+}
+</style>
