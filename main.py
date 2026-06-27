@@ -17,9 +17,9 @@ import os
 import sys
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from load_dotenv import load_dotenv
 from loguru import logger
@@ -93,6 +93,22 @@ class SPAStaticFiles(StaticFiles):
             return await super().get_response('index.html', scope)
 
 
+def _is_api_document_navigation(request: Request) -> bool:
+    path = request.url.path
+    if not (path == '/list' or path.startswith('/api/')):
+        return False
+    if request.method.upper() != 'GET':
+        return False
+
+    fetch_dest = request.headers.get('sec-fetch-dest', '').lower()
+    if fetch_dest == 'document':
+        return True
+
+    accept = request.headers.get('accept', '').lower()
+    requested_with = request.headers.get('x-requested-with', '').lower()
+    return 'text/html' in accept and requested_with != 'xmlhttprequest'
+
+
 def _fix_mime_types() -> None:
     mimetypes.add_type('application/javascript', '.js')
     mimetypes.add_type('application/javascript', '.mjs')
@@ -119,6 +135,12 @@ def build_app() -> FastAPI:
         allow_methods=['*'],
         allow_headers=['*'],
     )
+
+    @app.middleware('http')
+    async def _redirect_api_document_navigations(request, call_next):
+        if _is_api_document_navigation(request):
+            return RedirectResponse('/', status_code=303)
+        return await call_next(request)
 
     settings_path = DATABASE_DIR / 'settings.json'
     api.state.settings_path = settings_path

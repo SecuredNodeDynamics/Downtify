@@ -57,6 +57,20 @@ function sanitizeStoredVersion() {
   sanitizeStoredVersions()
 }
 
+function isBrowserOnApiRoute() {
+  if (typeof window === 'undefined') return false
+  return /^\/api(?:\/|$)/.test(window.location?.pathname || '')
+}
+
+function reloadAppShell() {
+  if (typeof window === 'undefined') return
+  if (isBrowserOnApiRoute()) {
+    window.location.replace('/')
+    return
+  }
+  window.location.reload()
+}
+
 function attachWebSocketHandlers(socket) {
   socket.onopen = (event) => {
     console.log('websocket connection opened', event)
@@ -121,17 +135,16 @@ function getVersion() {
       const prevItem = localStorage.getItem('version')
       console.log('Backend version: ', version)
       localStorage.setItem('version', version)
-      if (prevItem != version) {
-        location.reload()
+      if (isValidVersion(prevItem) && prevItem !== version) {
+        reloadAppShell()
+      } else if (isBrowserOnApiRoute()) {
+        reloadAppShell()
       }
       prefetchLibrary()
     })
     .catch((error) => {
       console.error(error)
-      console.log('Error getting version, using 0')
-      if (typeof localStorage !== 'undefined') {
-        localStorage.setItem('version', '0.0.0')
-      }
+      console.log('Error getting version; keeping last known version')
     })
 }
 
