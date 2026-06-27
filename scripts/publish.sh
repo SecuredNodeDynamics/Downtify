@@ -41,16 +41,51 @@ require_cmd node
 require_cmd npm
 require_cmd gh
 
+has_worktree_changes() {
+  [[ -n "$(git status --porcelain)" ]]
+}
+
+abort_if_unresolved_git_state() {
+  local status
+  status="$(git status --porcelain)"
+  if [[ -z "$status" ]]; then
+    return
+  fi
+  if [[ -d .git/rebase-merge || -d .git/rebase-apply || -f .git/MERGE_HEAD || -f .git/CHERRY_PICK_HEAD ]]; then
+    echo "Git has an unfinished merge/rebase/cherry-pick. Resolve it before publishing." >&2
+    git status --short >&2
+    exit 1
+  fi
+  if printf '%s\n' "$status" | grep -Eq '^(UU|AA|DD|AU|UA|DU|UD) '; then
+    echo "Git has unresolved conflicts. Resolve them before publishing." >&2
+    git status --short >&2
+    exit 1
+  fi
+}
+
+commit_worktree_changes() {
+  local message="$1"
+  if ! has_worktree_changes; then
+    return
+  fi
+
+  abort_if_unresolved_git_state
+  echo "==> Working tree has changes; committing them before continuing"
+  git status --short
+  git add -A
+  if git diff --cached --quiet; then
+    echo "Working tree changed but nothing could be staged." >&2
+    exit 1
+  fi
+  git commit -m "$message"
+}
+
 if [[ "$(git branch --show-current)" != "main" ]]; then
   echo "Publish must be run from the main branch." >&2
   exit 1
 fi
 
-if ! git diff --quiet || ! git diff --cached --quiet; then
-  echo "Working tree has uncommitted changes. Commit or stash them first." >&2
-  git status --short >&2
-  exit 1
-fi
+commit_worktree_changes "chore: prepare changes for publish"
 
 if ! gh auth status >/dev/null 2>&1; then
   echo "GitHub CLI is not authenticated. Run: gh auth login" >&2
@@ -146,11 +181,7 @@ version metadata for the matching release-signed APK.
 EOF
 )"
 
-if ! git diff --quiet || ! git diff --cached --quiet; then
-  echo "Release commit left uncommitted changes:" >&2
-  git status --short >&2
-  exit 1
-fi
+commit_worktree_changes "chore: sync post-release generated files"
 
 echo "==> Pushing main"
 git pull --rebase origin main
