@@ -172,7 +172,12 @@
                 />
               </button>
               <button
-                class="player-play-btn inline-flex items-center justify-center rounded-full bg-primary text-primary-content shadow-glow-sm transition hover:scale-105 active:scale-95 disabled:opacity-50"
+                class="player-play-btn inline-flex items-center justify-center rounded-full shadow-glow-sm transition hover:scale-105 active:scale-95 disabled:opacity-50"
+                :class="
+                  player.isPlaying.value
+                    ? 'bg-amber-300 text-amber-950 hover:bg-amber-200'
+                    : 'bg-primary text-primary-content'
+                "
                 @click="player.toggle()"
                 :disabled="files.length === 0"
                 :title="
@@ -215,7 +220,85 @@
                   1
                 </span>
               </button>
+              <button
+                v-if="lyricsAvailable"
+                class="icon-btn h-9 w-9 sm:h-10 sm:w-10"
+                :class="{ 'icon-btn-active': lyricsOpen }"
+                @click="lyricsOpen = !lyricsOpen"
+                :title="t('player.lyrics')"
+              >
+                <Icon
+                  icon="clarity:music-note-line"
+                  class="h-4 w-4 sm:h-5 sm:w-5"
+                />
+              </button>
             </div>
+
+            <section
+              v-if="lyricsAvailable && lyricsOpen"
+              class="lyrics-preview mt-4 w-full rounded-2xl border border-white/10 bg-base-100/55 p-3 text-left sm:mt-5 sm:p-4"
+            >
+              <div class="mb-2 flex items-center justify-between gap-3">
+                <h2
+                  class="text-xs font-semibold uppercase tracking-wider text-base-content/45"
+                >
+                  {{ t('player.lyrics') }}
+                </h2>
+                <div class="flex items-center gap-1.5">
+                  <span class="text-xs tabular-nums text-base-content/40">
+                    {{ formatTime(player.currentTime.value) }}
+                  </span>
+                  <div
+                    v-if="syncedLyrics.length"
+                    class="lyrics-offset-controls"
+                    :aria-label="t('player.lyricsOffset')"
+                  >
+                    <button
+                      type="button"
+                      class="lyrics-offset-btn"
+                      :title="t('player.lyricsEarlier')"
+                      @click="adjustLyricsOffset(-0.1)"
+                    >
+                      <Icon icon="clarity:minus-line" class="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      class="lyrics-offset-value"
+                      :title="t('player.lyricsReset')"
+                      @click="resetLyricsOffset"
+                    >
+                      {{ lyricsOffsetLabel }}
+                    </button>
+                    <button
+                      type="button"
+                      class="lyrics-offset-btn"
+                      :title="t('player.lyricsLater')"
+                      @click="adjustLyricsOffset(0.1)"
+                    >
+                      <Icon icon="clarity:plus-line" class="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div
+                v-if="syncedLyrics.length"
+                ref="lyricsScroller"
+                class="lyrics-scroll"
+              >
+                <p
+                  v-for="(line, index) in syncedLyrics"
+                  :key="`${line.time}:${index}`"
+                  :ref="(el) => setLyricLineRef(el, index)"
+                  class="lyrics-line"
+                  :class="{ 'lyrics-line-active': index === activeLyricIndex }"
+                >
+                  {{ line.text }}
+                </p>
+              </div>
+              <p v-else class="lyrics-plain">
+                {{ lyricsPlain }}
+              </p>
+            </section>
 
             <!-- Volume (desktop only — mobile uses device volume) -->
             <div class="mt-6 hidden w-full max-w-xs items-center gap-3 lg:flex">
@@ -395,7 +478,15 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, onActivated, computed } from 'vue'
+import {
+  ref,
+  onMounted,
+  onUnmounted,
+  onActivated,
+  computed,
+  watch,
+  nextTick,
+} from 'vue'
 import { Icon } from '@iconify/vue'
 import Navbar from '/src/components/Navbar.vue'
 import CoverImage from '/src/components/CoverImage.vue'
@@ -424,6 +515,8 @@ import { useI18n } from '/src/i18n'
 
 defineOptions({ name: 'Player' })
 
+const LYRICS_OFFSET_KEY = 'downtify-player-lyrics-offset'
+
 const playerServerKey = buildApiBaseUrl(getServerConfig())
 const initialPlayerSnapshot = getInitialLibrarySnapshot(playerServerKey)
 
@@ -437,6 +530,14 @@ const progressBar = ref(null)
 const progressTrack = ref(null)
 const isScrubbing = ref(false)
 const scrubPct = ref(0)
+const lyricsOpen = ref(false)
+const lyricsLoading = ref(false)
+const syncedLyrics = ref([])
+const lyricsPlain = ref('')
+const lyricsScroller = ref(null)
+const lyricLineRefs = ref([])
+const lyricsOffset = ref(readLyricsOffset())
+let lyricsRequestSeq = 0
 let seekRaf = 0
 let pendingSeekRatio = null
 
@@ -461,6 +562,32 @@ const albums = computed(() =>
 const hasActiveTrack = computed(
   () => player.currentIndex.value >= 0 && !!player.currentTrack.value
 )
+
+const lyricsAvailable = computed(
+  () => syncedLyrics.value.length > 0 || Boolean(lyricsPlain.value)
+)
+
+const syncedLyricsTime = computed(() =>
+  Math.max(0, player.currentTime.value + lyricsOffset.value)
+)
+
+const lyricsOffsetLabel = computed(() => {
+  const offset = lyricsOffset.value
+  if (Math.abs(offset) < 0.05) return '0.0s'
+  return `${offset > 0 ? '+' : ''}${offset.toFixed(1)}s`
+})
+
+const activeLyricIndex = computed(() => {
+  const lines = syncedLyrics.value
+  if (!lines.length) return -1
+  const current = syncedLyricsTime.value
+  let active = 0
+  for (let i = 0; i < lines.length; i += 1) {
+    if (Number(lines[i]?.time || 0) > current) break
+    active = i
+  }
+  return active
+})
 
 const currentLibraryItem = computed(() => {
   const file = player.currentTrack.value?.file
@@ -526,6 +653,74 @@ function artistCoverFor(artist) {
 
 function coverSourcesFor(file) {
   return API.coverSourcesForFile(file)
+}
+
+function readLyricsOffset() {
+  try {
+    const value = Number.parseFloat(
+      localStorage.getItem(LYRICS_OFFSET_KEY) || '0'
+    )
+    return Number.isFinite(value) ? Math.max(-5, Math.min(5, value)) : 0
+  } catch {
+    return 0
+  }
+}
+
+function persistLyricsOffset() {
+  try {
+    localStorage.setItem(LYRICS_OFFSET_KEY, lyricsOffset.value.toFixed(1))
+  } catch {
+    // Ignore private-mode storage errors.
+  }
+}
+
+function adjustLyricsOffset(delta) {
+  const next = Math.round((lyricsOffset.value + delta) * 10) / 10
+  lyricsOffset.value = Math.max(-5, Math.min(5, next))
+  persistLyricsOffset()
+}
+
+function resetLyricsOffset() {
+  lyricsOffset.value = 0
+  persistLyricsOffset()
+}
+
+function setLyricLineRef(el, index) {
+  if (el) lyricLineRefs.value[index] = el
+}
+
+async function loadLyricsForFile(file) {
+  lyricsRequestSeq += 1
+  const seq = lyricsRequestSeq
+  syncedLyrics.value = []
+  lyricsPlain.value = ''
+  lyricLineRefs.value = []
+  lyricsLoading.value = Boolean(file)
+  if (!file) {
+    lyricsOpen.value = false
+    lyricsLoading.value = false
+    return
+  }
+
+  try {
+    const res = await API.getLibraryLyrics(file)
+    if (seq !== lyricsRequestSeq) return
+    const data = res.data || {}
+    syncedLyrics.value = Array.isArray(data.lines) ? data.lines : []
+    lyricsPlain.value = syncedLyrics.value.length
+      ? ''
+      : String(data.plain || '').trim()
+    if (!lyricsAvailable.value) lyricsOpen.value = false
+  } catch {
+    if (seq !== lyricsRequestSeq) return
+    syncedLyrics.value = []
+    lyricsPlain.value = ''
+    lyricsOpen.value = false
+  } finally {
+    if (seq === lyricsRequestSeq) {
+      lyricsLoading.value = false
+    }
+  }
 }
 
 function fallbackLibraryItems(paths) {
@@ -845,6 +1040,23 @@ function onSeekKeydown(e) {
   }
 }
 
+watch(
+  () => player.currentTrack.value?.file || '',
+  (file) => {
+    void loadLyricsForFile(file)
+  },
+  { immediate: true }
+)
+
+watch(activeLyricIndex, async (index) => {
+  if (!lyricsOpen.value || index < 0) return
+  await nextTick()
+  lyricLineRefs.value[index]?.scrollIntoView({
+    block: 'center',
+    behavior: 'smooth',
+  })
+})
+
 onMounted(() => {
   window.scroll(0, 0)
   if (libraryItems.value.length) {
@@ -881,6 +1093,54 @@ onUnmounted(() => {
 <style scoped>
 .player-view {
   @apply flex min-h-0 flex-col overflow-x-hidden;
+}
+
+.lyrics-preview {
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04);
+}
+
+.lyrics-scroll {
+  max-height: clamp(7.5rem, 22dvh, 13rem);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+  scrollbar-width: none;
+}
+
+.lyrics-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.lyrics-line {
+  @apply py-1.5 text-center text-sm font-medium leading-snug text-base-content/40 transition-all duration-200 sm:text-base;
+}
+
+.lyrics-line-active {
+  @apply text-primary;
+  transform: scale(1.04);
+  text-shadow: 0 0 18px rgb(var(--color-primary) / 0.24);
+}
+
+.lyrics-offset-controls {
+  @apply flex h-7 items-center overflow-hidden rounded-full border border-white/10 bg-base-100/60 text-xs text-base-content/55;
+}
+
+.lyrics-offset-btn,
+.lyrics-offset-value {
+  @apply flex h-full items-center justify-center transition-colors hover:bg-primary/10 hover:text-primary focus-visible:bg-primary/10 focus-visible:text-primary focus-visible:outline-none;
+}
+
+.lyrics-offset-btn {
+  @apply w-7;
+}
+
+.lyrics-offset-value {
+  @apply min-w-12 px-2 font-medium tabular-nums;
+}
+
+.lyrics-plain {
+  @apply max-h-40 overflow-y-auto whitespace-pre-line text-center text-sm leading-relaxed text-base-content/60;
+  -webkit-overflow-scrolling: touch;
 }
 
 @media (max-width: 1023px) {

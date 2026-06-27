@@ -1,10 +1,10 @@
 <template>
-  <div class="min-h-0 overflow-x-hidden">
+  <div class="monitor-view">
     <Navbar />
 
-    <div class="mx-auto max-w-4xl w-full min-w-0 px-4 py-4 sm:py-8 sm:px-6">
+    <div class="monitor-page">
       <!-- Header -->
-      <div class="mb-6 sm:mb-8 mobile-page-header">
+      <div class="monitor-header mb-6 sm:mb-8 mobile-page-header">
         <h1 class="text-2xl font-bold tracking-tight">
           {{ t('monitor.title') }}
         </h1>
@@ -15,7 +15,7 @@
 
       <!-- Add form -->
       <div
-        class="surface rounded-2xl p-4 sm:p-5 mb-6 sm:mb-8 min-w-0 overflow-hidden"
+        class="monitor-add-panel surface rounded-2xl p-4 sm:p-5 mb-6 sm:mb-8 min-w-0 overflow-hidden"
       >
         <h2
           class="text-sm font-semibold uppercase tracking-wider text-base-content/50 mb-4"
@@ -51,17 +51,125 @@
               {{ t('monitor.typeArtist') }}
             </button>
           </div>
-          <input
-            v-model="newUrl"
-            type="url"
-            inputmode="url"
-            autocapitalize="off"
-            autocorrect="off"
-            spellcheck="false"
-            :placeholder="urlPlaceholder"
-            class="input-modern input-modern-plain w-full min-w-0 h-12 text-base sm:text-sm"
-            :disabled="adding"
-          />
+          <div class="monitor-target-search relative min-w-0">
+            <div class="relative">
+              <Icon
+                icon="clarity:search-line"
+                class="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-base-content/35"
+              />
+              <input
+                v-model="newUrl"
+                type="search"
+                inputmode="search"
+                autocapitalize="off"
+                autocorrect="off"
+                spellcheck="false"
+                :placeholder="urlPlaceholder"
+                class="input-modern input-modern-plain h-12 w-full min-w-0 pl-10 pr-10 text-base sm:text-sm"
+                :disabled="adding"
+              />
+              <button
+                v-if="newUrl"
+                type="button"
+                class="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-base-content/45 transition-colors hover:bg-white/10 hover:text-base-content"
+                :title="t('monitor.clearSearch')"
+                :disabled="adding"
+                @click="clearTargetSearch"
+              >
+                <Icon icon="clarity:times-line" class="h-4 w-4" />
+              </button>
+            </div>
+
+            <div
+              v-if="selectedTarget"
+              class="mt-2 flex items-center gap-2 rounded-2xl border border-primary/30 bg-primary/10 px-3 py-2 text-sm text-primary"
+            >
+              <CoverImage
+                :src="resultCover(selectedTarget)"
+                :alt="selectedTarget.name"
+                img-class="h-9 w-9 shrink-0 rounded-xl object-cover border border-primary/20 bg-base-100/60"
+              >
+                <template #fallback>
+                  <Icon
+                    :icon="
+                      newKind === 'artist'
+                        ? 'clarity:user-line'
+                        : 'clarity:music-note-line'
+                    "
+                    class="h-4 w-4 text-primary/70"
+                  />
+                </template>
+              </CoverImage>
+              <div class="min-w-0 flex-1">
+                <p class="truncate font-medium">{{ selectedTarget.name }}</p>
+                <p class="truncate text-xs text-primary/70">
+                  {{ selectedTarget.subtitle || t('monitor.selectedTarget') }}
+                </p>
+              </div>
+              <Icon icon="clarity:check-circle-line" class="h-5 w-5 shrink-0" />
+            </div>
+
+            <div
+              v-else-if="showTargetResults"
+              class="monitor-search-results mt-2 overflow-hidden rounded-2xl border border-white/10 bg-base-100/95 shadow-2xl shadow-black/25"
+            >
+              <div
+                v-if="targetSearchLoading"
+                class="flex items-center gap-2 px-3 py-3 text-sm text-base-content/55"
+              >
+                <span class="loading loading-spinner loading-xs" />
+                <span>{{ t('monitor.searching') }}</span>
+              </div>
+              <template v-else>
+                <button
+                  v-for="result in targetSearchResults"
+                  :key="`${result.kind}:${result.spotify_id}`"
+                  type="button"
+                  class="flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-primary/10"
+                  @click="selectTarget(result)"
+                >
+                  <CoverImage
+                    :src="resultCover(result)"
+                    :alt="result.name"
+                    img-class="h-11 w-11 shrink-0 rounded-xl object-cover border border-white/10 bg-base-100/60"
+                  >
+                    <template #fallback>
+                      <Icon
+                        :icon="
+                          newKind === 'artist'
+                            ? 'clarity:user-line'
+                            : 'clarity:music-note-line'
+                        "
+                        class="h-5 w-5 text-base-content/25"
+                      />
+                    </template>
+                  </CoverImage>
+                  <div class="min-w-0 flex-1">
+                    <p class="truncate text-sm font-medium">{{ result.name }}</p>
+                    <p class="truncate text-xs text-base-content/45">
+                      {{ result.subtitle || t('monitor.selectTarget') }}
+                    </p>
+                  </div>
+                  <Icon
+                    icon="clarity:plus-circle-line"
+                    class="h-5 w-5 shrink-0 text-primary"
+                  />
+                </button>
+              </template>
+              <p
+                v-if="targetSearchError"
+                class="px-3 py-3 text-sm text-error"
+              >
+                {{ targetSearchError }}
+              </p>
+              <p
+                v-else-if="showNoTargetResults"
+                class="px-3 py-3 text-sm text-base-content/45"
+              >
+                {{ t('monitor.noSearchResults') }}
+              </p>
+            </div>
+          </div>
           <div class="flex flex-col gap-2 sm:flex-row sm:items-stretch">
             <select
               v-model="newInterval"
@@ -82,7 +190,7 @@
             <button
               type="submit"
               class="btn btn-primary h-12 w-full sm:w-auto sm:shrink-0 px-6 rounded-2xl"
-              :disabled="adding || !newUrl.trim()"
+              :disabled="adding || !monitorTargetUrl"
             >
               <span v-if="adding" class="loading loading-spinner loading-xs" />
               <span v-else>{{ t('monitor.watch') }}</span>
@@ -93,7 +201,9 @@
       </div>
 
       <!-- Monitored items -->
-      <section class="surface rounded-2xl p-3 sm:p-4 mb-6 sm:mb-8 min-w-0">
+      <section
+        class="monitor-list-panel surface rounded-2xl p-3 sm:p-4 mb-6 sm:mb-8 min-w-0"
+      >
         <div
           class="mb-3 flex items-center justify-between gap-3 px-1 sm:px-0"
         >
@@ -127,203 +237,208 @@
           </button>
         </div>
 
-        <div v-if="loading" class="grid gap-3 sm:grid-cols-2">
-          <div v-for="n in 4" :key="n" class="skeleton h-56 rounded-2xl" />
-        </div>
+        <div class="monitor-list-scroll">
+          <div v-if="loading" class="grid gap-3 sm:grid-cols-2">
+            <div v-for="n in 4" :key="n" class="skeleton h-56 rounded-2xl" />
+          </div>
 
-        <div
-          v-else-if="loadError"
-          class="rounded-2xl border border-error/20 bg-error/10 p-4 text-sm text-error flex items-center gap-3"
-        >
-          <Icon
-            icon="clarity:exclamation-circle-line"
-            class="h-5 w-5 shrink-0"
-          />
-          <span>{{ loadError }}</span>
-        </div>
-
-        <div
-          v-else-if="filteredPlaylists.length === 0"
-          class="rounded-2xl border border-white/10 bg-base-100/30 p-10 flex flex-col items-center text-center"
-        >
-          <Icon
-            icon="clarity:music-note-line"
-            class="h-12 w-12 text-base-content/20 mb-4"
-          />
-          <p class="text-base-content/50 text-sm">
-            {{ t('monitor.empty') }}
-          </p>
-          <p class="text-base-content/40 text-xs mt-1">
-            {{ t('monitor.emptyHint') }}
-          </p>
-        </div>
-
-        <ul v-else class="grid gap-3 sm:grid-cols-2">
-          <li
-            v-for="pl in filteredPlaylists"
-            :key="pl.id"
-            class="monitor-card rounded-2xl border border-white/10 bg-base-100/55 p-3 shadow-lg shadow-black/10"
+          <div
+            v-else-if="loadError"
+            class="rounded-2xl border border-error/20 bg-error/10 p-4 text-sm text-error flex items-center gap-3"
           >
-            <div class="flex gap-3 min-w-0">
-              <CoverImage
+            <Icon
+              icon="clarity:exclamation-circle-line"
+              class="h-5 w-5 shrink-0"
+            />
+            <span>{{ loadError }}</span>
+          </div>
+
+          <div
+            v-else-if="filteredPlaylists.length === 0"
+            class="rounded-2xl border border-white/10 bg-base-100/30 p-10 flex flex-col items-center text-center"
+          >
+            <Icon
+              icon="clarity:music-note-line"
+              class="h-12 w-12 text-base-content/20 mb-4"
+            />
+            <p class="text-base-content/50 text-sm">
+              {{ t('monitor.empty') }}
+            </p>
+            <p class="text-base-content/40 text-xs mt-1">
+              {{ t('monitor.emptyHint') }}
+            </p>
+          </div>
+
+          <ul v-else class="monitor-card-grid">
+            <li
+              v-for="pl in filteredPlaylists"
+              :key="pl.id"
+              class="monitor-card rounded-2xl border border-white/10 bg-base-100/55 p-3 shadow-lg shadow-black/10"
+            >
+              <div class="flex gap-3 min-w-0 overflow-hidden">
+                <CoverImage
                 :src="coverForItem(pl).src"
                 :fallbacks="coverForItem(pl).fallbacks"
                 :alt="pl.name"
-                img-class="h-20 w-20 rounded-2xl object-cover border border-white/10 bg-base-100/60"
-              >
-                <template #fallback>
-                  <Icon
-                    :icon="
-                      pl.kind === 'artist'
-                        ? 'clarity:user-line'
-                        : 'clarity:music-note-line'
-                    "
-                    class="h-7 w-7 text-base-content/25"
-                  />
-                </template>
-              </CoverImage>
+                img-class="monitor-card-cover h-20 w-20 rounded-2xl object-cover border border-white/10 bg-base-100/60"
+                >
+                  <template #fallback>
+                    <Icon
+                      :icon="
+                        pl.kind === 'artist'
+                          ? 'clarity:user-line'
+                          : 'clarity:music-note-line'
+                      "
+                      class="h-7 w-7 text-base-content/25"
+                    />
+                  </template>
+                </CoverImage>
 
-              <div class="min-w-0 flex-1">
-                <div class="mb-1 flex items-start justify-between gap-2">
-                  <h3
-                    class="monitor-card-title text-sm font-semibold leading-snug"
-                  >
-                    {{ pl.name }}
-                  </h3>
-                  <span
-                    class="pill shrink-0 text-xs"
-                    :class="pl.enabled ? 'badge-soft' : 'badge-neutral-soft'"
-                  >
-                    {{ pl.enabled ? t('monitor.active') : t('monitor.paused') }}
-                  </span>
-                </div>
-                <div class="space-y-1 text-xs text-base-content/50">
-                  <p class="flex items-center gap-1">
-                    <Icon icon="clarity:refresh-line" class="h-3 w-3" />
-                    <span>
+                <div class="min-w-0 flex-1 overflow-hidden">
+                  <div class="mb-1 flex items-start justify-between gap-2">
+                    <h3
+                      class="monitor-card-title text-sm font-semibold leading-snug"
+                    >
+                      {{ pl.name }}
+                    </h3>
+                    <span
+                      class="pill shrink-0 text-xs"
+                      :class="pl.enabled ? 'badge-soft' : 'badge-neutral-soft'"
+                    >
                       {{
-                        t('monitor.everyInterval', {
-                          interval: formatInterval(pl.interval_minutes),
-                        })
+                        pl.enabled ? t('monitor.active') : t('monitor.paused')
                       }}
                     </span>
-                  </p>
-                  <p class="flex items-center gap-1">
-                    <Icon icon="clarity:music-note-line" class="h-3 w-3" />
-                    <span>
-                      {{
-                        pl.last_track_count === 1
-                          ? t('monitor.tracksOne', {
-                              count: pl.last_track_count,
-                            })
-                          : t('monitor.tracksMany', {
-                              count: pl.last_track_count,
-                            })
-                      }}
-                    </span>
-                  </p>
-                  <p class="flex items-center gap-1">
-                    <Icon icon="clarity:clock-line" class="h-3 w-3" />
-                    <span v-if="pl.last_checked">
-                      {{
-                        t('monitor.checked', {
-                          when: timeAgo(pl.last_checked),
-                        })
-                      }}
-                    </span>
-                    <span v-else class="italic">
-                      {{ t('monitor.notChecked') }}
-                    </span>
-                  </p>
+                  </div>
+                  <div class="space-y-1 text-xs text-base-content/50">
+                    <p class="flex items-center gap-1">
+                      <Icon icon="clarity:refresh-line" class="h-3 w-3" />
+                      <span>
+                        {{
+                          t('monitor.everyInterval', {
+                            interval: formatInterval(pl.interval_minutes),
+                          })
+                        }}
+                      </span>
+                    </p>
+                    <p class="flex items-center gap-1">
+                      <Icon icon="clarity:music-note-line" class="h-3 w-3" />
+                      <span>
+                        {{
+                          pl.last_track_count === 1
+                            ? t('monitor.tracksOne', {
+                                count: pl.last_track_count,
+                              })
+                            : t('monitor.tracksMany', {
+                                count: pl.last_track_count,
+                              })
+                        }}
+                      </span>
+                    </p>
+                    <p class="flex items-center gap-1">
+                      <Icon icon="clarity:clock-line" class="h-3 w-3" />
+                      <span v-if="pl.last_checked">
+                        {{
+                          t('monitor.checked', {
+                            when: timeAgo(pl.last_checked),
+                          })
+                        }}
+                      </span>
+                      <span v-else class="italic">
+                        {{ t('monitor.notChecked') }}
+                      </span>
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div class="mt-3 grid grid-cols-[1fr_auto] gap-2">
-              <select
-                :value="draftInterval(pl)"
-                class="select select-sm h-11 min-w-0 rounded-xl border border-white/10 bg-base-100/80 text-sm focus:border-primary/60"
-                @change="onIntervalDraftChange(pl, $event)"
-              >
-                <option :value="15">{{ t('monitor.short15') }}</option>
-                <option :value="30">{{ t('monitor.short30') }}</option>
-                <option :value="60">{{ t('monitor.short1h') }}</option>
-                <option :value="180">{{ t('monitor.short3h') }}</option>
-                <option :value="360">{{ t('monitor.short6h') }}</option>
-                <option :value="720">{{ t('monitor.short12h') }}</option>
-                <option :value="1440">{{ t('monitor.short1d') }}</option>
-                <option :value="10080">{{ t('monitor.short1w') }}</option>
-                <option :value="20160">{{ t('monitor.short2w') }}</option>
-                <option :value="43200">{{ t('monitor.short1mo') }}</option>
-              </select>
+              <div class="mt-3 grid grid-cols-[1fr_auto] gap-2">
+                <select
+                  :value="draftInterval(pl)"
+                  class="select select-sm h-11 min-w-0 rounded-xl border border-white/10 bg-base-100/80 text-sm focus:border-primary/60"
+                  @change="onIntervalDraftChange(pl, $event)"
+                >
+                  <option :value="15">{{ t('monitor.short15') }}</option>
+                  <option :value="30">{{ t('monitor.short30') }}</option>
+                  <option :value="60">{{ t('monitor.short1h') }}</option>
+                  <option :value="180">{{ t('monitor.short3h') }}</option>
+                  <option :value="360">{{ t('monitor.short6h') }}</option>
+                  <option :value="720">{{ t('monitor.short12h') }}</option>
+                  <option :value="1440">{{ t('monitor.short1d') }}</option>
+                  <option :value="10080">{{ t('monitor.short1w') }}</option>
+                  <option :value="20160">{{ t('monitor.short2w') }}</option>
+                  <option :value="43200">{{ t('monitor.short1mo') }}</option>
+                </select>
 
-              <button
-                type="button"
-                class="btn btn-sm h-11 rounded-xl px-4"
-                :class="
-                  intervalDirty(pl)
-                    ? 'btn-primary'
-                    : 'border-white/10 bg-base-100/40 text-base-content/40'
-                "
-                :disabled="!intervalDirty(pl) || applyingInterval[pl.id]"
-                @click="onApplyInterval(pl)"
-              >
-                <span
-                  v-if="applyingInterval[pl.id]"
-                  class="loading loading-spinner loading-xs"
-                />
-                <span v-else>{{ t('monitor.applyInterval') }}</span>
-              </button>
-            </div>
+                <button
+                  type="button"
+                  class="btn btn-sm h-11 rounded-xl px-4"
+                  :class="
+                    intervalDirty(pl)
+                      ? 'btn-primary'
+                      : 'border-white/10 bg-base-100/40 text-base-content/40'
+                  "
+                  :disabled="!intervalDirty(pl) || applyingInterval[pl.id]"
+                  @click="onApplyInterval(pl)"
+                >
+                  <span
+                    v-if="applyingInterval[pl.id]"
+                    class="loading loading-spinner loading-xs"
+                  />
+                  <span v-else>{{ t('monitor.applyInterval') }}</span>
+                </button>
+              </div>
 
-            <div class="mt-2 grid grid-cols-3 gap-2">
-              <button
-                class="monitor-action-btn"
-                :title="pl.enabled ? t('monitor.pause') : t('monitor.resume')"
-                @click="onToggle(pl)"
-              >
+              <div class="mt-2 grid grid-cols-3 gap-2">
+                <button
+                  class="monitor-action-btn"
+                  :class="{ 'monitor-action-btn-pause': pl.enabled }"
+                  :title="pl.enabled ? t('monitor.pause') : t('monitor.resume')"
+                  @click="onToggle(pl)"
+                >
                 <Icon
                   :icon="
                     pl.enabled ? 'clarity:pause-line' : 'clarity:play-line'
                   "
                   class="h-4 w-4"
                 />
-              </button>
+                </button>
 
-              <button
-                class="monitor-action-btn"
-                :title="t('monitor.checkNow')"
-                :disabled="checking[pl.id]"
-                @click="onCheck(pl)"
-              >
-                <span
-                  v-if="checking[pl.id]"
-                  class="loading loading-spinner loading-xs"
-                />
-                <Icon v-else icon="clarity:refresh-line" class="h-4 w-4" />
-              </button>
+                <button
+                  class="monitor-action-btn"
+                  :title="t('monitor.checkNow')"
+                  :disabled="checking[pl.id]"
+                  @click="onCheck(pl)"
+                >
+                  <span
+                    v-if="checking[pl.id]"
+                    class="loading loading-spinner loading-xs"
+                  />
+                  <Icon v-else icon="clarity:refresh-line" class="h-4 w-4" />
+                </button>
 
-              <button
-                class="monitor-action-btn text-error/75 hover:text-error hover:bg-error/10"
-                :title="t('monitor.stop')"
-                @click="onDelete(pl)"
+                <button
+                  class="monitor-action-btn monitor-action-btn-danger"
+                  :title="t('monitor.stop')"
+                  @click="onDelete(pl)"
               >
-                <Icon icon="clarity:trash-line" class="h-4 w-4" />
-              </button>
-            </div>
-            <p
-              v-if="intervalErrors[pl.id] || actionErrors[pl.id]"
-              class="mt-2 text-[11px] leading-snug text-error"
-            >
-              {{ intervalErrors[pl.id] || actionErrors[pl.id] }}
-            </p>
-          </li>
-        </ul>
+                  <Icon icon="clarity:trash-line" class="h-4 w-4" />
+                </button>
+              </div>
+              <p
+                v-if="intervalErrors[pl.id] || actionErrors[pl.id]"
+                class="mt-2 text-[11px] leading-snug text-error"
+              >
+                {{ intervalErrors[pl.id] || actionErrors[pl.id] }}
+              </p>
+            </li>
+          </ul>
+        </div>
       </section>
 
       <!-- Info banner -->
       <div
-        class="mt-8 surface rounded-2xl p-4 flex gap-3 text-sm text-base-content/60"
+        class="monitor-info mt-8 surface rounded-2xl p-4 flex gap-3 text-sm text-base-content/60"
       >
         <Icon
           icon="clarity:info-standard-line"
@@ -336,7 +451,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import Navbar from '/src/components/Navbar.vue'
 import CoverImage from '/src/components/CoverImage.vue'
@@ -355,6 +470,12 @@ const addError = ref('')
 const newUrl = ref('')
 const newKind = ref('artist')
 const newInterval = ref(60)
+const selectedTarget = ref(null)
+const targetSearchResults = ref([])
+const targetSearchLoading = ref(false)
+const targetSearchError = ref('')
+let targetSearchTimer = 0
+let targetSearchSeq = 0
 const checking = ref({})
 const applyingInterval = ref({})
 const intervalDrafts = ref({})
@@ -366,8 +487,111 @@ const urlPlaceholder = computed(() =>
     ? t('monitor.urlPlaceholderArtist')
     : t('monitor.urlPlaceholderPlaylist')
 )
+const trimmedTargetQuery = computed(() => newUrl.value.trim())
+const monitorTargetUrl = computed(() => {
+  if (selectedTarget.value?.url) return selectedTarget.value.url
+  return isSpotifyMonitorUrl(trimmedTargetQuery.value)
+    ? trimmedTargetQuery.value
+    : ''
+})
+const showNoTargetResults = computed(
+  () =>
+    trimmedTargetQuery.value.length >= 2 &&
+    !isSpotifyMonitorUrl(trimmedTargetQuery.value) &&
+    !targetSearchLoading.value &&
+    !targetSearchError.value &&
+    targetSearchResults.value.length === 0
+)
+const showTargetResults = computed(
+  () =>
+    targetSearchLoading.value ||
+    targetSearchError.value ||
+    targetSearchResults.value.length > 0 ||
+    showNoTargetResults.value
+)
 const filteredPlaylists = computed(() =>
   playlists.value.filter((pl) => pl.kind === newKind.value)
+)
+
+function isSpotifyMonitorUrl(value) {
+  return /^https?:\/\/open\.spotify\.com\/(artist|playlist)\//i.test(
+    String(value || '').trim()
+  )
+}
+
+function clearTargetSearch() {
+  newUrl.value = ''
+  selectedTarget.value = null
+  targetSearchResults.value = []
+  targetSearchError.value = ''
+}
+
+function selectTarget(result) {
+  selectedTarget.value = result
+  newUrl.value = result.name || ''
+  targetSearchResults.value = []
+  targetSearchError.value = ''
+}
+
+function resultCover(result) {
+  const imageUrl = String(result?.image_url || '').trim()
+  return imageUrl ? API.searchCoverUrl(imageUrl, 160) : ''
+}
+
+async function runTargetSearch(seq, query, kind) {
+  targetSearchLoading.value = true
+  targetSearchError.value = ''
+  try {
+    const res = await monitorAPI.searchMonitorTargets(query, kind, 6)
+    if (seq !== targetSearchSeq) return
+    targetSearchResults.value = res.data?.results || []
+  } catch (err) {
+    if (seq !== targetSearchSeq) return
+    targetSearchResults.value = []
+    targetSearchError.value =
+      err?.response?.data?.detail || err?.message || t('monitor.searchFailed')
+  } finally {
+    if (seq === targetSearchSeq) {
+      targetSearchLoading.value = false
+    }
+  }
+}
+
+watch(
+  [trimmedTargetQuery, newKind],
+  ([query, kind]) => {
+    window.clearTimeout(targetSearchTimer)
+    targetSearchSeq += 1
+    targetSearchError.value = ''
+
+    if (
+      selectedTarget.value?.name === query &&
+      selectedTarget.value?.kind === kind
+    ) {
+      targetSearchLoading.value = false
+      targetSearchResults.value = []
+      return
+    }
+
+    if (
+      selectedTarget.value &&
+      (selectedTarget.value.name !== query || selectedTarget.value.kind !== kind)
+    ) {
+      selectedTarget.value = null
+    }
+
+    if (query.length < 2 || isSpotifyMonitorUrl(query)) {
+      targetSearchLoading.value = false
+      targetSearchResults.value = []
+      return
+    }
+
+    const seq = targetSearchSeq
+    targetSearchTimer = window.setTimeout(() => {
+      runTargetSearch(seq, query, kind)
+    }, 300)
+  },
+  { flush: 'post' }
 )
 
 async function load() {
@@ -457,12 +681,12 @@ async function onAdd() {
   adding.value = true
   try {
     const res = await monitorAPI.addMonitoredPlaylist(
-      newUrl.value.trim(),
+      monitorTargetUrl.value,
       newInterval.value,
       newKind.value
     )
     setPlaylists([res.data, ...playlists.value])
-    newUrl.value = ''
+    clearTargetSearch()
   } catch (e) {
     addError.value = e?.response?.data?.detail || t('monitor.failedAdd')
   } finally {
@@ -600,8 +824,202 @@ onMounted(load)
 </script>
 
 <style scoped>
+.monitor-view {
+  @apply flex min-h-0 flex-col overflow-hidden;
+  height: calc(
+    100dvh - var(--app-header-height) - var(--app-safe-top) -
+      var(--app-bottom-nav-height) - var(--app-safe-bottom)
+  );
+  max-height: calc(
+    100dvh - var(--app-header-height) - var(--app-safe-top) -
+      var(--app-bottom-nav-height) - var(--app-safe-bottom)
+  );
+}
+
+.monitor-page {
+  @apply mx-auto flex w-full max-w-4xl flex-1 flex-col min-w-0 min-h-0 overflow-hidden px-4 py-3 sm:px-6 sm:py-8;
+}
+
+.monitor-page > .mobile-page-header,
+.monitor-page > .surface:not(.monitor-list-panel),
+.monitor-page > .mt-8 {
+  @apply shrink-0;
+}
+
 .monitor-card {
-  min-height: 13.5rem;
+  @apply min-w-0 overflow-hidden;
+  min-height: 12.25rem;
+}
+
+.monitor-list-panel {
+  @apply flex min-h-0 flex-1 flex-col overflow-hidden;
+}
+
+.monitor-list-scroll {
+  @apply min-h-0 flex-1 overflow-x-hidden overflow-y-auto pr-1;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.monitor-list-scroll::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.monitor-card-grid {
+  @apply grid min-w-0 grid-cols-1 gap-3;
+}
+
+.monitor-target-search {
+  z-index: 2;
+}
+
+.monitor-search-results {
+  max-height: min(18rem, 42dvh);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 719px) {
+  .monitor-header {
+    @apply mb-3;
+  }
+
+  .monitor-add-panel {
+    @apply mb-3 p-4;
+  }
+
+  .monitor-add-panel h2 {
+    @apply mb-3;
+  }
+
+  .monitor-add-form {
+    @apply space-y-2;
+  }
+
+  .monitor-add-form input,
+  .monitor-add-form select,
+  .monitor-add-form button {
+    height: 2.875rem;
+  }
+
+  .monitor-target-search {
+    z-index: 3;
+  }
+
+  .monitor-list-panel {
+    @apply mb-3 p-3;
+  }
+
+  .monitor-list-panel > div:first-child {
+    @apply mb-2;
+  }
+
+  .monitor-card-grid {
+    @apply gap-2;
+  }
+
+  .monitor-card {
+    min-height: 10.25rem;
+    padding: 0.625rem;
+  }
+
+  .monitor-card :deep(.monitor-card-cover) {
+    height: 4.25rem;
+    width: 4.25rem;
+    border-radius: 0.875rem;
+  }
+
+  .monitor-card .monitor-action-btn,
+  .monitor-card .select {
+    height: 2.25rem;
+  }
+
+  .monitor-card .btn {
+    height: 2.25rem;
+    min-height: 2.25rem;
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+
+  .monitor-info {
+    @apply hidden;
+  }
+}
+
+@media (min-width: 720px) {
+  .monitor-card-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  .monitor-page {
+    @apply py-5;
+  }
+
+  .monitor-header {
+    @apply mb-4;
+  }
+
+  .monitor-add-panel {
+    @apply mb-4 p-4;
+  }
+
+  .monitor-add-panel h2 {
+    @apply mb-3;
+  }
+
+  .monitor-add-form {
+    display: grid;
+    grid-template-columns: minmax(13rem, 1fr) minmax(18rem, 2fr) minmax(
+        18rem,
+        1.35fr
+      );
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+
+  .monitor-add-form > * {
+    min-width: 0;
+  }
+
+  .monitor-add-form > :not([hidden]) ~ :not([hidden]) {
+    margin-top: 0;
+  }
+
+  .monitor-list-panel {
+    @apply mb-4;
+  }
+
+  .monitor-info {
+    @apply hidden;
+  }
+
+  .monitor-card {
+    min-height: 8.9rem;
+  }
+
+  .monitor-card :deep(.monitor-card-cover) {
+    height: 4rem;
+    width: 4rem;
+    border-radius: 0.875rem;
+  }
+
+  .monitor-card .monitor-action-btn,
+  .monitor-card .select {
+    height: 2.25rem;
+  }
+
+  .monitor-card .btn {
+    height: 2.25rem;
+    min-height: 2.25rem;
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
 }
 
 .monitor-card-title {
@@ -613,5 +1031,17 @@ onMounted(load)
 
 .monitor-action-btn {
   @apply flex h-11 items-center justify-center rounded-xl border border-white/10 bg-base-100/55 text-base-content/80 transition-colors hover:border-primary/40 hover:bg-primary/10 hover:text-primary disabled:cursor-not-allowed disabled:opacity-50;
+}
+
+.monitor-action-btn-danger {
+  @apply border-error/20 text-error/75 hover:border-error/55 hover:bg-error/10 hover:text-error focus-visible:border-error/60 focus-visible:bg-error/10 focus-visible:text-error;
+}
+
+.monitor-action-btn-pause {
+  @apply border-amber-300/25 text-amber-200 hover:border-amber-300/60 hover:bg-amber-300/10 hover:text-amber-100 focus-visible:border-amber-300/70 focus-visible:bg-amber-300/10 focus-visible:text-amber-100;
+}
+
+[data-theme='downtify-light'] .monitor-action-btn-pause {
+  @apply border-amber-500/30 text-amber-700 hover:border-amber-500/60 hover:bg-amber-400/15 hover:text-amber-800 focus-visible:border-amber-500/70 focus-visible:bg-amber-400/15 focus-visible:text-amber-800;
 }
 </style>

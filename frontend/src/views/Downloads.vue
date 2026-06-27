@@ -498,7 +498,7 @@
                           <Icon icon="clarity:download-line" class="h-4 w-4" />
                         </a>
                         <button
-                          class="icon-btn text-error/70 hover:text-error hover:bg-error/10"
+                          class="icon-btn icon-btn-danger"
                           :disabled="deleting[file] === true"
                           @click="onDelete(file)"
                           :title="t('library.deleteFile')"

@@ -591,6 +591,67 @@ function getLibraryFiles() {
   return API.get('/api/library/files')
 }
 
+const LRC_TIMESTAMP_RE = /\[(\d{1,3}):(\d{2})(?:\.(\d{1,3}))?\]/g
+
+function parseLrcText(text) {
+  const lines = []
+  for (const rawLine of String(text || '').split(/\r?\n/)) {
+    const matches = [...rawLine.matchAll(LRC_TIMESTAMP_RE)]
+    if (!matches.length) continue
+    const lyric = rawLine.replace(LRC_TIMESTAMP_RE, '').trim()
+    if (!lyric) continue
+    for (const match of matches) {
+      const minutes = Number.parseInt(match[1] || '0', 10)
+      const seconds = Number.parseInt(match[2] || '0', 10)
+      const fraction = match[3] ? Number.parseFloat(`0.${match[3]}`) : 0
+      lines.push({
+        time: Math.round((minutes * 60 + seconds + fraction) * 1000) / 1000,
+        text: lyric,
+      })
+    }
+  }
+  lines.sort((a, b) => a.time - b.time)
+  return lines
+}
+
+async function getLibraryLyricsSidecar(file) {
+  const lrcFile = String(file || '').replace(/\.[^/.]+$/, '.lrc')
+  if (!lrcFile || lrcFile === file) {
+    return {
+      data: { available: false, synced: false, lines: [], plain: '' },
+    }
+  }
+  const res = await axios.get(apiAssetUrl(`/downloads/${encodePath(lrcFile)}`), {
+    responseType: 'text',
+    timeout: 10000,
+  })
+  const text = String(res.data || '')
+  const lines = parseLrcText(text)
+  return {
+    data: {
+      available: Boolean(lines.length || text.trim()),
+      synced: Boolean(lines.length),
+      lines,
+      plain: lines.length ? '' : text.trim(),
+    },
+  }
+}
+
+function getLibraryLyrics(file) {
+  return API.get('/api/library/lyrics', {
+    params: { file },
+    timeout: 10000,
+    headers: { Accept: 'application/json' },
+  }).then((res) => {
+    if (typeof res.data === 'string') {
+      return getLibraryLyricsSidecar(file)
+    }
+    return res
+  }).catch(() => {
+    return getLibraryLyricsSidecar(file)
+  })
+}
+
 function checkLibraryOwned(items) {
   return API.post('/api/library/owned', { items })
 }
@@ -765,6 +826,7 @@ export default {
   searchCoverUrl,
   listDownloads,
   getLibraryFiles,
+  getLibraryLyrics,
   checkLibraryOwned,
   fetchAlbumTrackCounts,
   getLibraryGenresStatus,

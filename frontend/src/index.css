@@ -176,6 +176,15 @@
   .icon-btn-error {
     @apply border-error/40 text-error hover:border-error/60 hover:bg-error/10 hover:text-error;
   }
+  .icon-btn-danger {
+    @apply border-error/25 text-error/75 hover:border-error/60 hover:bg-error/10 hover:text-error focus-visible:border-error/60 focus-visible:bg-error/10 focus-visible:text-error;
+  }
+  .icon-btn-pause {
+    @apply border-amber-300/30 text-amber-200 hover:border-amber-300/65 hover:bg-amber-300/10 hover:text-amber-100 focus-visible:border-amber-300/70 focus-visible:bg-amber-300/10 focus-visible:text-amber-100;
+  }
+  [data-theme='downtify-light'] .icon-btn-pause {
+    @apply border-amber-500/30 text-amber-700 hover:border-amber-500/60 hover:bg-amber-400/15 hover:text-amber-800 focus-visible:border-amber-500/70 focus-visible:bg-amber-400/15 focus-visible:text-amber-800;
+  }
 
   .header-update-notice {
     @apply border-primary/40 text-primary shadow-glow-sm hover:border-primary hover:bg-primary/15 hover:text-primary;

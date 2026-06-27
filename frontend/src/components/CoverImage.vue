@@ -12,6 +12,7 @@
       @error="onError"
     />
     <div
+      ref="rootRef"
       v-show="!displaySrc || failed"
       :class="imgClass"
       class="flex items-center justify-center"
@@ -22,7 +23,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 
 import { EMBEDDED_SERVER_READY_EVENT } from '../model/embeddedServer'
 import {
@@ -57,9 +58,12 @@ const props = defineProps({
 const displaySrc = ref('')
 const failed = ref(false)
 const restoredFromCache = ref(false)
+const rootRef = ref(null)
+const isNearViewport = ref(false)
 let requestId = 0
 let candidateUrls = []
 let candidateIndex = 0
+let observer = null
 
 const sourceKey = computed(() =>
   buildCoverSourceKey(props.src, props.fallbacks)
@@ -101,7 +105,7 @@ function retryLoad() {
   failed.value = false
   restoredFromCache.value = false
   resetCandidates(props.src, props.fallbacks)
-  void loadCurrentCandidate()
+  if (shouldLoadNow.value) void loadCurrentCandidate()
 }
 
 function handleEmbeddedServerReady() {
@@ -157,6 +161,30 @@ async function loadCurrentCandidate() {
   await applyCandidate(url)
 }
 
+const shouldLoadNow = computed(() => isNearViewport.value || restoredFromCache.value)
+
+function observeVisibility() {
+  if (isNearViewport.value) return
+  if (typeof IntersectionObserver === 'undefined') {
+    isNearViewport.value = true
+    return
+  }
+
+  const target = rootRef.value
+  if (!target) return
+
+  observer = new IntersectionObserver(
+    (entries) => {
+      if (!entries.some((entry) => entry.isIntersecting)) return
+      isNearViewport.value = true
+      observer?.disconnect()
+      observer = null
+    },
+    { root: null, rootMargin: '700px 0px', threshold: 0.01 }
+  )
+  observer.observe(target)
+}
+
 function onError() {
   if (candidateIndex < candidateUrls.length - 1) {
     candidateIndex += 1
@@ -193,12 +221,18 @@ watch(
       restoredFromCache.value = false
     }
 
-    void loadCurrentCandidate()
+    if (shouldLoadNow.value) void loadCurrentCandidate()
   },
   { immediate: true }
 )
 
+watch(shouldLoadNow, (ready) => {
+  if (!ready || displaySrc.value || failed.value || !sourceKey.value) return
+  void loadCurrentCandidate()
+})
+
 onMounted(() => {
+  void nextTick(observeVisibility)
   if (usesEmbeddedServer()) {
     window.addEventListener(
       EMBEDDED_SERVER_READY_EVENT,
@@ -208,6 +242,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  observer?.disconnect()
   window.removeEventListener(
     EMBEDDED_SERVER_READY_EVENT,
     handleEmbeddedServerReady

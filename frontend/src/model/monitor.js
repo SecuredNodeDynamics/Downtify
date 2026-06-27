@@ -90,6 +90,13 @@ function lookupSpotifyArtists(artistName, limit = 5) {
   })
 }
 
+function searchMonitorTargets(query, kind = 'artist', limit = 6) {
+  return API.get('/api/monitor/search', {
+    params: { q: query, kind, limit },
+    timeout: 30000,
+  })
+}
+
 function addMonitoredPlaylist(url, intervalMinutes = 60, kind = 'playlist') {
   return API.post('/api/monitor/playlists', {
     url,
@@ -136,6 +143,7 @@ function checkMonitoredPlaylist(id) {
 export default {
   listMonitoredPlaylists,
   lookupSpotifyArtists,
+  searchMonitorTargets,
   addMonitoredPlaylist,
   updateMonitoredPlaylist,
   deleteMonitoredPlaylist,

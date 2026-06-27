@@ -249,7 +249,11 @@
 
         <!-- Controls -->
         <div class="flex items-center gap-2 shrink-0">
-          <button class="icon-btn" @click="togglePlay(currentTrack)">
+          <button
+            class="icon-btn"
+            :class="{ 'icon-btn-pause': isPlaying }"
+            @click="togglePlay(currentTrack)"
+          >
             <Icon
               :icon="isPlaying ? 'clarity:pause-solid' : 'clarity:play-solid'"
               class="h-5 w-5"

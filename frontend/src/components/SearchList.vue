@@ -836,6 +836,9 @@ const activeDemoPlayButtonClass = computed(() => {
   if (isDemoPlayDisabled(activeDemoTrack.value)) {
     return 'bg-black/25 opacity-55'
   }
+  if (demoPlaying.value) {
+    return 'border-amber-300/40 bg-amber-300/20 text-amber-100 hover:border-amber-300/65 hover:bg-amber-300/25'
+  }
   return 'bg-black/35 hover:bg-black/45'
 })
 

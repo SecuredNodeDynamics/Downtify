@@ -93,7 +93,7 @@
 
     <div class="queue-body-slot">
       <div
-        class="panel-glow-shell panel-glow-shell-grow surface min-h-0 rounded-3xl"
+        class="queue-body-shell panel-glow-shell panel-glow-shell-grow surface min-h-0 rounded-3xl"
       >
         <div class="queue-panel panel-glow-inner p-3 sm:p-5">
           <div class="queue-scroll-body">
@@ -249,7 +249,7 @@
                     <div class="flex shrink-0 items-center gap-1">
                       <button
                         type="button"
-                        class="icon-btn text-error/70 hover:bg-error/10 hover:text-error"
+                        class="icon-btn icon-btn-danger"
                         :disabled="
                           manageDeleting[`artist:${artist.name}`] === true
                         "
@@ -311,7 +311,7 @@
                     <div class="flex shrink-0 items-center gap-1">
                       <button
                         type="button"
-                        class="icon-btn text-error/70 hover:bg-error/10 hover:text-error"
+                        class="icon-btn icon-btn-danger"
                         :disabled="
                           manageDeleting[`album:${album.key}`] === true
                         "
@@ -372,7 +372,7 @@
                     <div class="flex shrink-0 items-center gap-1">
                       <button
                         type="button"
-                        class="icon-btn text-error/70 hover:bg-error/10 hover:text-error"
+                        class="icon-btn icon-btn-danger"
                         :disabled="manageDeleting[item.file] === true"
                         @click="onManageDelete(item)"
                         :title="t('manage.delete')"
@@ -474,7 +474,7 @@
 
                     <button
                       type="button"
-                      class="icon-btn text-error/70 hover:bg-error/10 hover:text-error"
+                      class="icon-btn icon-btn-danger"
                       @click="dm.remove(item.song)"
                       :title="t('queue.removeFromQueue')"
                     >
@@ -1192,15 +1192,18 @@ onUnmounted(() => {
 
 <style scoped>
 .queue-page {
-  @apply mx-auto flex w-full max-w-4xl flex-1 flex-col gap-2 min-h-0 px-4 py-3 sm:px-6 lg:py-8;
+  @apply mx-auto flex w-full max-w-4xl flex-1 flex-col gap-2 min-h-0 overflow-hidden px-4 py-3 sm:px-6 lg:py-8;
 }
 
 .queue-chrome {
   @apply shrink-0 space-y-3;
+  background: transparent;
 }
 
 .queue-toolbar {
   @apply flex items-center gap-2;
+  background: transparent;
+  box-shadow: none;
 }
 
 .queue-tabs {
@@ -1228,11 +1231,15 @@ onUnmounted(() => {
 }
 
 .queue-body-slot {
-  @apply flex min-h-0 flex-1 flex-col;
+  @apply flex min-h-0 flex-1 flex-col overflow-hidden;
+}
+
+.queue-body-shell {
+  @apply overflow-hidden;
 }
 
 .queue-panel {
-  @apply flex min-h-0 flex-1 flex-col;
+  @apply flex min-h-0 flex-1 flex-col overflow-hidden;
 }
 
 .queue-scroll-body {

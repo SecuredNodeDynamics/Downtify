@@ -1642,6 +1642,74 @@ def get_library_files() -> list[dict[str, Any]]:
     return items
 
 
+_LRC_TIMESTAMP_RE = re.compile(
+    r'\[(?P<minutes>\d{1,3}):(?P<seconds>\d{2})(?:\.(?P<fraction>\d{1,3}))?\]'
+)
+
+
+def _parse_lrc_lines(text: str) -> list[dict[str, Any]]:
+    lines: list[dict[str, Any]] = []
+    for raw_line in text.splitlines():
+        timestamps = list(_LRC_TIMESTAMP_RE.finditer(raw_line))
+        if not timestamps:
+            continue
+        lyric = _LRC_TIMESTAMP_RE.sub('', raw_line).strip()
+        if not lyric:
+            continue
+        for match in timestamps:
+            minutes = int(match.group('minutes') or 0)
+            seconds = int(match.group('seconds') or 0)
+            fraction = match.group('fraction') or ''
+            fraction_seconds = float(f'0.{fraction}') if fraction else 0.0
+            lines.append(
+                {
+                    'time': round(minutes * 60 + seconds + fraction_seconds, 3),
+                    'text': lyric,
+                }
+            )
+    lines.sort(key=lambda item: item['time'])
+    return lines
+
+
+@router.get('/api/library/lyrics')
+def get_library_lyrics(file: str = Query('')) -> dict[str, Any]:
+    file_name = str(file or '').strip()
+    if not file_name:
+        raise HTTPException(status_code=400, detail='file is required')
+
+    download_dir = (
+        _active_download_dir()
+        if state.downloader is not None
+        else state.default_download_dir
+    )
+    base = download_dir.resolve()
+    try:
+        audio_path = (base / file_name).resolve()
+        audio_path.relative_to(base)
+    except (ValueError, RuntimeError):
+        raise HTTPException(status_code=400, detail='Invalid path')
+
+    lyrics_path = audio_path.with_suffix('.lrc')
+    if not audio_path.is_file() or not lyrics_path.is_file():
+        return {'available': False, 'synced': False, 'lines': [], 'plain': ''}
+
+    try:
+        text = lyrics_path.read_text(encoding='utf-8')
+    except UnicodeDecodeError:
+        text = lyrics_path.read_text(encoding='utf-8', errors='replace')
+    except Exception as exc:
+        logger.opt(exception=True).debug('Lyrics read failed for {}', lyrics_path)
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    lines = _parse_lrc_lines(text)
+    return {
+        'available': bool(lines or text.strip()),
+        'synced': bool(lines),
+        'lines': lines,
+        'plain': '' if lines else text.strip(),
+    }
+
+
 @router.post('/api/library/owned')
 def check_library_owned(payload: dict[str, Any]) -> dict[str, Any]:
     items = payload.get('items') if isinstance(payload.get('items'), list) else []
@@ -4394,6 +4462,121 @@ async def lookup_monitor_artists(
         limit=limit,
     )
     return {'artist': artist_name, 'matches': matches}
+
+
+def _best_spotify_search_image(item: dict[str, Any]) -> str:
+    images = [
+        image
+        for image in item.get('images') or []
+        if isinstance(image, dict) and str(image.get('url') or '').strip()
+    ]
+    if not images:
+        return ''
+    best = max(images, key=lambda image: int(image.get('width') or 0))
+    return str(best.get('url') or '').strip()
+
+
+def _spotify_monitor_search(
+    query: str,
+    *,
+    kind: str,
+    limit: int,
+) -> list[dict[str, Any]]:
+    if artist_image_sources._spotify_search_blocked():
+        return []
+    token = artist_image_sources._spotify_access_token()
+    if not token:
+        return []
+    response = requests.get(
+        'https://api.spotify.com/v1/search',
+        headers={
+            'Authorization': f'Bearer {token}',
+            'User-Agent': artist_image_sources._SPOTIFY_UA,
+        },
+        params={'q': query, 'type': kind, 'limit': limit},
+        timeout=10,
+    )
+    if response.status_code in {401, 403, 429}:
+        artist_image_sources._mark_spotify_search_rate_limited(response)
+        return []
+    response.raise_for_status()
+
+    payload_key = 'artists' if kind == 'artist' else 'playlists'
+    results: list[dict[str, Any]] = []
+    seen_ids: set[str] = set()
+    for item in response.json().get(payload_key, {}).get('items') or []:
+        if not isinstance(item, dict):
+            continue
+        spotify_id = str(item.get('id') or '').strip()
+        name = str(item.get('name') or '').strip()
+        if not spotify_id or not name or spotify_id in seen_ids:
+            continue
+        seen_ids.add(spotify_id)
+        subtitle = ''
+        if kind == 'playlist':
+            owner = item.get('owner') if isinstance(item.get('owner'), dict) else {}
+            subtitle = str(owner.get('display_name') or '').strip()
+        else:
+            followers = item.get('followers')
+            if isinstance(followers, dict):
+                total = int(followers.get('total') or 0)
+                if total > 0:
+                    subtitle = f'{total:,} followers'
+        results.append(
+            {
+                'spotify_id': spotify_id,
+                'name': name,
+                'kind': kind,
+                'url': f'https://open.spotify.com/{kind}/{spotify_id}',
+                'image_url': _best_spotify_search_image(item),
+                'subtitle': subtitle,
+            }
+        )
+    return results
+
+
+@router.get('/api/monitor/search')
+async def search_monitor_targets(
+    q: str = Query(..., min_length=2),
+    kind: str = Query('artist'),
+    limit: int = Query(6, ge=1, le=10),
+) -> dict[str, Any]:
+    query = str(q or '').strip()
+    target_kind = str(kind or '').strip().lower()
+    if target_kind not in {'artist', 'playlist'}:
+        raise HTTPException(status_code=400, detail='kind must be artist or playlist')
+
+    try:
+        if target_kind == 'artist':
+            matches = await asyncio.to_thread(
+                artist_image_options.list_spotify_artist_matches,
+                query,
+                limit=limit,
+            )
+            results = [
+                {
+                    'spotify_id': str(item.get('spotify_id') or '').strip(),
+                    'name': str(item.get('name') or '').strip(),
+                    'kind': 'artist',
+                    'url': str(item.get('url') or '').strip(),
+                    'image_url': str(item.get('image_url') or '').strip(),
+                    'subtitle': 'Spotify artist',
+                }
+                for item in matches
+                if str(item.get('spotify_id') or '').strip()
+            ]
+        else:
+            results = await asyncio.to_thread(
+                _spotify_monitor_search,
+                query,
+                kind='playlist',
+                limit=limit,
+            )
+    except Exception as exc:
+        logger.exception('Monitor {} search failed for {!r}', target_kind, query)
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    return {'query': query, 'kind': target_kind, 'results': results}
 
 
 @router.post('/api/monitor/playlists')
