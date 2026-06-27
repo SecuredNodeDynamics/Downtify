@@ -125,6 +125,7 @@ git add \
   pyproject.toml \
   Makefile \
   Dockerfile \
+  uv.lock \
   version.js \
   version.sh \
   frontend/package.json \
@@ -144,6 +145,12 @@ Bump Downtify to ${VERSION}, rebuild frontend assets, and sync Android
 version metadata for the matching release-signed APK.
 EOF
 )"
+
+if ! git diff --quiet || ! git diff --cached --quiet; then
+  echo "Release commit left uncommitted changes:" >&2
+  git status --short >&2
+  exit 1
+fi
 
 echo "==> Pushing main"
 git pull --rebase origin main
