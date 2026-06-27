@@ -17,6 +17,9 @@ let theme = 'dark'
 let reduceMotion = false
 let observer = null
 let motionQuery = null
+let isMounted = false
+let isActive = true
+let nativeAppListener = null
 
 const pointer = {
   x: 0,
@@ -168,7 +171,7 @@ function updateStars(now) {
 }
 
 function draw(now) {
-  if (!context) return
+  if (!context || !isActive) return
 
   context.clearRect(0, 0, width, height)
   updateStars(now)
@@ -197,11 +200,38 @@ function draw(now) {
   animationFrame = requestAnimationFrame(draw)
 }
 
+function startAnimation() {
+  if (!isMounted || !isActive || animationFrame) return
+  animationFrame = requestAnimationFrame(draw)
+}
+
+function stopAnimation() {
+  if (!animationFrame) return
+  cancelAnimationFrame(animationFrame)
+  animationFrame = 0
+}
+
+function setActive(nextActive) {
+  isActive = Boolean(nextActive)
+  if (isActive) {
+    startAnimation()
+  } else {
+    releasePointer()
+    stopAnimation()
+  }
+}
+
+function handleVisibilityChange() {
+  setActive(document.visibilityState !== 'hidden')
+}
+
 function handleMotionPreferenceChange(event) {
   reduceMotion = event.matches
 }
 
 onMounted(() => {
+  isMounted = true
+  isActive = document.visibilityState !== 'hidden'
   updateTheme()
   motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)')
   reduceMotion = motionQuery.matches
@@ -214,23 +244,41 @@ onMounted(() => {
   })
 
   resizeCanvas()
+  if (!isActive) stopAnimation()
   window.addEventListener('resize', resizeCanvas)
   window.addEventListener('pointermove', handlePointerMove, { passive: true })
   window.addEventListener('pointerleave', releasePointer)
   window.addEventListener('blur', releasePointer)
   window.addEventListener('touchmove', handleTouchMove, { passive: true })
   window.addEventListener('touchend', releasePointer)
+  document.addEventListener('visibilitychange', handleVisibilityChange)
+
+  import('@capacitor/app')
+    .then(({ App }) =>
+      App.addListener('appStateChange', ({ isActive: nativeActive }) => {
+        setActive(nativeActive && document.visibilityState !== 'hidden')
+      })
+    )
+    .then((listener) => {
+      nativeAppListener = listener
+    })
+    .catch(() => {
+      // Browser builds rely on document visibility events.
+    })
 })
 
 onBeforeUnmount(() => {
-  cancelAnimationFrame(animationFrame)
+  isMounted = false
+  stopAnimation()
   observer?.disconnect()
   motionQuery?.removeEventListener('change', handleMotionPreferenceChange)
+  void nativeAppListener?.remove?.()
   window.removeEventListener('resize', resizeCanvas)
   window.removeEventListener('pointermove', handlePointerMove)
   window.removeEventListener('pointerleave', releasePointer)
   window.removeEventListener('blur', releasePointer)
   window.removeEventListener('touchmove', handleTouchMove)
   window.removeEventListener('touchend', releasePointer)
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
 })
 </script>

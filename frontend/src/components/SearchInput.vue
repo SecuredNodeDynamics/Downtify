@@ -50,6 +50,7 @@ const canSubmit = computed(() => {
 })
 
 const polling = setInterval(() => {
+  if (document.visibilityState === 'hidden') return
   rotationIndex.value = (rotationIndex.value + 1) % placeHolderKeys.length
 }, 5000)
 onBeforeUnmount(() => clearInterval(polling))

@@ -15,8 +15,10 @@ let lastRefreshAttemptAt = 0
 const NATIVE_RETRY_DELAYS_MS = [2000, 5000, 15000, 30000, 60000]
 // Re-check periodically so an update published while the app stays open is
 // surfaced without requiring a relaunch.
-const PERIODIC_INTERVAL_MS = 15 * 60 * 1000
-const FOREGROUND_REFRESH_MIN_MS = 5 * 60 * 1000
+const WEB_PERIODIC_INTERVAL_MS = 15 * 60 * 1000
+const NATIVE_PERIODIC_INTERVAL_MS = 60 * 60 * 1000
+const WEB_FOREGROUND_REFRESH_MIN_MS = 5 * 60 * 1000
+const NATIVE_FOREGROUND_REFRESH_MIN_MS = 15 * 60 * 1000
 
 export { appUpdateAvailable }
 
@@ -54,21 +56,35 @@ async function attemptUpdateCheck(refreshCache) {
 
 async function bootstrapNativeUpdateCheck() {
   for (const wait of NATIVE_RETRY_DELAYS_MS) {
+    if (document.visibilityState === 'hidden') return
     await delay(wait)
     if (await attemptUpdateCheck(true)) return
   }
 }
 
+function periodicIntervalMs() {
+  return isCapacitorNative()
+    ? NATIVE_PERIODIC_INTERVAL_MS
+    : WEB_PERIODIC_INTERVAL_MS
+}
+
+function foregroundRefreshMinMs() {
+  return isCapacitorNative()
+    ? NATIVE_FOREGROUND_REFRESH_MIN_MS
+    : WEB_FOREGROUND_REFRESH_MIN_MS
+}
+
 function startPeriodicUpdateChecks() {
   if (periodicTimer) return
   periodicTimer = window.setInterval(() => {
+    if (document.visibilityState === 'hidden') return
     void refreshAppUpdateNotice(true)
-  }, PERIODIC_INTERVAL_MS)
+  }, periodicIntervalMs())
 }
 
 function refreshWhenForegrounded() {
   if (document.visibilityState === 'hidden') return
-  if (Date.now() - lastRefreshAttemptAt < FOREGROUND_REFRESH_MIN_MS) return
+  if (Date.now() - lastRefreshAttemptAt < foregroundRefreshMinMs()) return
   void refreshAppUpdateNotice(true)
 }
 

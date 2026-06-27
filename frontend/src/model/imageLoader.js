@@ -345,6 +345,8 @@ export function preloadCoverSourcesBatch(
   entries = [],
   { limit = 24, concurrency = 6 } = {}
 ) {
+  if (document.visibilityState === 'hidden') return
+
   const queue = (entries || [])
     .map((entry) => ({
       src: entry?.src || '',
