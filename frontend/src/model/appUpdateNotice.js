@@ -5,6 +5,8 @@ import { openSettingsModal } from './settingsModal'
 let checkPromise = null
 let bootstrapped = false
 let periodicTimer = null
+let foregroundListenersStarted = false
+let lastRefreshAttemptAt = 0
 
 // On native the launch check can fail because connectivity isn't ready yet
 // right after a cold start (and the embedded-server reload). Retry with a
@@ -13,7 +15,8 @@ let periodicTimer = null
 const NATIVE_RETRY_DELAYS_MS = [2000, 5000, 15000, 30000, 60000]
 // Re-check periodically so an update published while the app stays open is
 // surfaced without requiring a relaunch.
-const PERIODIC_INTERVAL_MS = 6 * 60 * 60 * 1000
+const PERIODIC_INTERVAL_MS = 15 * 60 * 1000
+const FOREGROUND_REFRESH_MIN_MS = 5 * 60 * 1000
 
 export { appUpdateAvailable }
 
@@ -22,6 +25,7 @@ function delay(ms) {
 }
 
 export async function refreshAppUpdateNotice(refreshCache = false) {
+  lastRefreshAttemptAt = Date.now()
   if (!refreshCache && checkPromise) {
     await checkPromise
     return appUpdateAvailable.value
@@ -62,6 +66,34 @@ function startPeriodicUpdateChecks() {
   }, PERIODIC_INTERVAL_MS)
 }
 
+function refreshWhenForegrounded() {
+  if (document.visibilityState === 'hidden') return
+  if (Date.now() - lastRefreshAttemptAt < FOREGROUND_REFRESH_MIN_MS) return
+  void refreshAppUpdateNotice(true)
+}
+
+function startForegroundUpdateChecks() {
+  if (foregroundListenersStarted) return
+  foregroundListenersStarted = true
+
+  window.addEventListener('focus', refreshWhenForegrounded)
+  window.addEventListener('online', refreshWhenForegrounded)
+  document.addEventListener('visibilitychange', refreshWhenForegrounded)
+
+  if (!isCapacitorNative()) return
+
+  import('@capacitor/app')
+    .then(({ App }) => {
+      App.addListener('appStateChange', ({ isActive }) => {
+        if (isActive) refreshWhenForegrounded()
+      })
+    })
+    .catch(() => {
+      // Native app lifecycle notifications are best-effort; the browser
+      // focus/visibility listeners still keep the web app refreshed.
+    })
+}
+
 export function bootstrapAppUpdateNotice() {
   if (bootstrapped) return
   bootstrapped = true
@@ -73,6 +105,7 @@ export function bootstrapAppUpdateNotice() {
   }
 
   startPeriodicUpdateChecks()
+  startForegroundUpdateChecks()
 }
 
 export function useAppUpdateNotice() {
