@@ -132,6 +132,7 @@ function getVersion() {
         prefetchLibrary()
         return
       }
+      writeCachedServerVersion(version)
       const prevItem = localStorage.getItem('version')
       console.log('Backend version: ', version)
       localStorage.setItem('version', version)

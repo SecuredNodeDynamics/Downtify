@@ -59,28 +59,54 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import SearchInput from './SearchInput.vue'
 import { useI18n } from '../i18n'
+import {
+  getBundledAppVersion,
+  readCachedServerVersion,
+  readCachedWebVersion,
+  refreshConnectedServerVersion,
+} from '../model/appVersion'
 
 const { t } = useI18n()
-const backendVersion = ref('')
+const backendVersion = ref(readCachedServerVersion() || readCachedWebVersion())
+let versionRefreshTimer = 0
 
 const versionLabel = computed(() => {
-  const version = backendVersion.value || __APP_VERSION__
+  const version = backendVersion.value || getBundledAppVersion()
   if (version === '0.0.0') return 'Swag Daddy Version'
   return `v${version}`
 })
 
-onMounted(async () => {
+async function refreshVersionLabel() {
   try {
-    const res = await fetch(`/api/version?t=${Date.now()}`, {
-      cache: 'no-store',
-    })
-    const version = String(await res.json()).trim()
+    const version = await refreshConnectedServerVersion()
     if (/^\d+\.\d+\.\d+$/.test(version)) backendVersion.value = version
   } catch {
-    backendVersion.value = ''
+    backendVersion.value =
+      readCachedServerVersion() ||
+      readCachedWebVersion() ||
+      backendVersion.value
   }
+}
+
+function refreshVersionWhenVisible() {
+  if (document.visibilityState === 'visible') {
+    void refreshVersionLabel()
+  }
+}
+
+onMounted(() => {
+  void refreshVersionLabel()
+  versionRefreshTimer = window.setInterval(refreshVersionLabel, 5 * 60 * 1000)
+  window.addEventListener('focus', refreshVersionLabel)
+  document.addEventListener('visibilitychange', refreshVersionWhenVisible)
+})
+
+onUnmounted(() => {
+  if (versionRefreshTimer) window.clearInterval(versionRefreshTimer)
+  window.removeEventListener('focus', refreshVersionLabel)
+  document.removeEventListener('visibilitychange', refreshVersionWhenVisible)
 })
 </script>

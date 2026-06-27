@@ -148,7 +148,14 @@ async function fetchConnectedServerVersion() {
   try {
     const response = await axios.get(
       `${buildApiBaseUrl(getServerConfig())}/api/version`,
-      { timeout: 15000 }
+      {
+        params: { t: Date.now() },
+        timeout: 15000,
+        headers: {
+          Accept: 'application/json',
+          'Cache-Control': 'no-cache',
+        },
+      }
     )
     const version = String(response.data || '').trim()
     if (!isValidSemver(version)) return readCachedServerVersion()
@@ -157,6 +164,10 @@ async function fetchConnectedServerVersion() {
   } catch {
     return readCachedServerVersion()
   }
+}
+
+export async function refreshConnectedServerVersion() {
+  return fetchConnectedServerVersion()
 }
 
 function buildNativeUpdateStatus(installedVersion, serverVersion, release) {
