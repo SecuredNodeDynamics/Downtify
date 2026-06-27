@@ -45,7 +45,7 @@
             "
             @click="activeTab = 'failed'"
           >
-            {{ t('failed.tab') }}
+            {{ t('history.failed') }}
             <span v-if="failedHistory.length > 0" class="queue-tab-count">
               {{ failedHistory.length }}
             </span>
