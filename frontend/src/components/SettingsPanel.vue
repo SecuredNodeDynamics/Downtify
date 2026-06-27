@@ -932,56 +932,144 @@
     </div>
 
     <div v-else-if="activeTab === 'about'" class="px-4 pb-5 space-y-5 sm:px-6">
-      <div>
-        <label
-          class="block text-xs font-semibold uppercase tracking-wider text-base-content/50"
-        >
-          {{ t('settings.aboutTitle') }}
-        </label>
-        <p class="mt-1 text-sm text-base-content/60">
-          {{ t('settings.aboutSubtitle') }}
-        </p>
-      </div>
+      <template v-if="!activeAboutSection">
+        <div>
+          <label
+            class="block text-xs font-semibold uppercase tracking-wider text-base-content/50"
+          >
+            {{ t('settings.aboutTitle') }}
+          </label>
+          <p class="mt-1 text-sm text-base-content/60">
+            {{ t('settings.aboutSubtitle') }}
+          </p>
+        </div>
 
-      <div class="grid gap-3 md:grid-cols-2">
-        <div
-          v-for="section in aboutSections"
-          :key="section.title"
-          class="surface rounded-2xl p-4"
+        <div class="grid gap-3 md:grid-cols-2">
+          <button
+            v-for="section in aboutSections"
+            :key="section.id"
+            type="button"
+            class="surface rounded-2xl p-4 text-left transition-colors hover:border-primary/40 hover:bg-primary/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/70"
+            @click="openAboutSection(section.id)"
+          >
+            <div class="flex items-start gap-3">
+              <Icon
+                :icon="section.icon"
+                class="mt-0.5 h-5 w-5 shrink-0 text-primary"
+              />
+              <div class="min-w-0 flex-1">
+                <div class="flex items-start justify-between gap-3">
+                  <p class="text-sm font-semibold">
+                    {{ section.title }}
+                  </p>
+                  <Icon
+                    icon="clarity:angle-line"
+                    class="mt-0.5 h-4 w-4 shrink-0 rotate-90 text-base-content/35"
+                  />
+                </div>
+                <p class="mt-1 text-xs leading-relaxed text-base-content/55">
+                  {{ section.text }}
+                </p>
+              </div>
+            </div>
+          </button>
+        </div>
+
+        <button
+          type="button"
+          class="surface w-full rounded-2xl p-4 text-left transition-colors hover:border-primary/40 hover:bg-primary/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/70"
+          @click="openAboutSection('workflow')"
         >
           <div class="flex items-start gap-3">
             <Icon
-              :icon="section.icon"
+              icon="clarity:flow-chart-line"
               class="mt-0.5 h-5 w-5 shrink-0 text-primary"
             />
-            <div class="min-w-0">
-              <p class="text-sm font-semibold">
-                {{ section.title }}
-              </p>
+            <div class="min-w-0 flex-1">
+              <div class="flex items-start justify-between gap-3">
+                <p class="text-sm font-semibold">
+                  {{ t('settings.aboutWorkflowTitle') }}
+                </p>
+                <Icon
+                  icon="clarity:angle-line"
+                  class="mt-0.5 h-4 w-4 shrink-0 rotate-90 text-base-content/35"
+                />
+              </div>
               <p class="mt-1 text-xs leading-relaxed text-base-content/55">
-                {{ section.text }}
+                {{ t('settings.aboutWorkflowText') }}
+              </p>
+            </div>
+          </div>
+        </button>
+      </template>
+
+      <template v-else>
+        <button
+          type="button"
+          class="btn btn-sm h-9 rounded-full border-white/10 bg-base-100/85 hover:bg-base-100"
+          @click="closeAboutSection"
+        >
+          <Icon icon="clarity:arrow-line" class="mr-2 h-4 w-4 rotate-180" />
+          {{ t('settings.aboutBack') }}
+        </button>
+
+        <div class="surface rounded-2xl p-5">
+          <div class="flex items-start gap-3">
+            <Icon
+              :icon="activeAboutSection.icon"
+              class="mt-0.5 h-6 w-6 shrink-0 text-primary"
+            />
+            <div class="min-w-0">
+              <p class="text-lg font-semibold">
+                {{ activeAboutSection.title }}
+              </p>
+              <p class="mt-2 text-sm leading-relaxed text-base-content/65">
+                {{ activeAboutSection.detail }}
               </p>
             </div>
           </div>
         </div>
-      </div>
 
-      <div class="surface rounded-2xl p-4">
-        <div class="flex items-start gap-3">
-          <Icon
-            icon="clarity:flow-chart-line"
-            class="mt-0.5 h-5 w-5 shrink-0 text-primary"
-          />
-          <div>
-            <p class="text-sm font-semibold">
-              {{ t('settings.aboutWorkflowTitle') }}
+        <div class="grid gap-3 md:grid-cols-2">
+          <div class="surface rounded-2xl p-4">
+            <p class="text-xs font-semibold uppercase tracking-wider text-base-content/45">
+              {{ t('settings.aboutWhatItDoes') }}
             </p>
-            <p class="mt-1 text-xs leading-relaxed text-base-content/55">
-              {{ t('settings.aboutWorkflowText') }}
+            <ul class="mt-3 space-y-2">
+              <li
+                v-for="item in activeAboutSection.points"
+                :key="item"
+                class="flex gap-2 text-sm leading-relaxed text-base-content/65"
+              >
+                <Icon
+                  icon="clarity:check-circle-line"
+                  class="mt-0.5 h-4 w-4 shrink-0 text-primary"
+                />
+                <span>{{ item }}</span>
+              </li>
+            </ul>
+          </div>
+
+          <div class="surface rounded-2xl p-4">
+            <p class="text-xs font-semibold uppercase tracking-wider text-base-content/45">
+              {{ t('settings.aboutTips') }}
             </p>
+            <ul class="mt-3 space-y-2">
+              <li
+                v-for="item in activeAboutSection.tips"
+                :key="item"
+                class="flex gap-2 text-sm leading-relaxed text-base-content/65"
+              >
+                <Icon
+                  icon="clarity:lightbulb-line"
+                  class="mt-0.5 h-4 w-4 shrink-0 text-primary"
+                />
+                <span>{{ item }}</span>
+              </li>
+            </ul>
           </div>
         </div>
-      </div>
+      </template>
     </div>
 
     <div v-else-if="activeTab === 'help'" class="px-4 pb-5 space-y-5 sm:px-6">
@@ -1280,6 +1368,7 @@ const { t, locale, setLocale, locales } = useI18n()
 const folderPickerError = ref('')
 const activeTab = ref('general')
 const tabShellRef = ref(null)
+const activeAboutSectionId = ref('')
 
 const settingsTabs = [
   { id: 'general', labelKey: 'settings.generalTab' },
@@ -1495,56 +1584,172 @@ const jellyfinLibraryOptions = computed(() =>
 
 const aboutSections = computed(() => [
   {
+    id: 'search',
     icon: 'clarity:search-line',
     title: t('settings.aboutSearchTitle'),
     text: t('settings.aboutSearchText'),
+    detail: t('settings.aboutSearchDetail'),
+    points: [
+      t('settings.aboutSearchPoint1'),
+      t('settings.aboutSearchPoint2'),
+      t('settings.aboutSearchPoint3'),
+    ],
+    tips: [t('settings.aboutSearchTip1'), t('settings.aboutSearchTip2')],
   },
   {
+    id: 'library',
     icon: 'clarity:library-line',
     title: t('settings.aboutLibraryTitle'),
     text: t('settings.aboutLibraryText'),
+    detail: t('settings.aboutLibraryDetail'),
+    points: [
+      t('settings.aboutLibraryPoint1'),
+      t('settings.aboutLibraryPoint2'),
+      t('settings.aboutLibraryPoint3'),
+    ],
+    tips: [t('settings.aboutLibraryTip1'), t('settings.aboutLibraryTip2')],
   },
   {
+    id: 'queue',
     icon: 'clarity:download-line',
     title: t('settings.aboutQueueTitle'),
     text: t('settings.aboutQueueText'),
+    detail: t('settings.aboutQueueDetail'),
+    points: [
+      t('settings.aboutQueuePoint1'),
+      t('settings.aboutQueuePoint2'),
+      t('settings.aboutQueuePoint3'),
+    ],
+    tips: [t('settings.aboutQueueTip1'), t('settings.aboutQueueTip2')],
   },
   {
+    id: 'player',
     icon: 'clarity:headphones-line',
     title: t('settings.aboutPlayerTitle'),
     text: t('settings.aboutPlayerText'),
+    detail: t('settings.aboutPlayerDetail'),
+    points: [
+      t('settings.aboutPlayerPoint1'),
+      t('settings.aboutPlayerPoint2'),
+      t('settings.aboutPlayerPoint3'),
+    ],
+    tips: [t('settings.aboutPlayerTip1'), t('settings.aboutPlayerTip2')],
   },
   {
+    id: 'monitor',
     icon: 'clarity:eye-line',
     title: t('settings.aboutMonitorTitle'),
     text: t('settings.aboutMonitorText'),
+    detail: t('settings.aboutMonitorDetail'),
+    points: [
+      t('settings.aboutMonitorPoint1'),
+      t('settings.aboutMonitorPoint2'),
+      t('settings.aboutMonitorPoint3'),
+    ],
+    tips: [t('settings.aboutMonitorTip1'), t('settings.aboutMonitorTip2')],
   },
   {
+    id: 'metadata',
     icon: 'clarity:tag-line',
     title: t('settings.aboutMetadataTitle'),
     text: t('settings.aboutMetadataText'),
+    detail: t('settings.aboutMetadataDetail'),
+    points: [
+      t('settings.aboutMetadataPoint1'),
+      t('settings.aboutMetadataPoint2'),
+      t('settings.aboutMetadataPoint3'),
+    ],
+    tips: [t('settings.aboutMetadataTip1'), t('settings.aboutMetadataTip2')],
   },
   {
+    id: 'artistImages',
     icon: 'clarity:image-gallery-line',
     title: t('settings.aboutArtistImagesTitle'),
     text: t('settings.aboutArtistImagesText'),
+    detail: t('settings.aboutArtistImagesDetail'),
+    points: [
+      t('settings.aboutArtistImagesPoint1'),
+      t('settings.aboutArtistImagesPoint2'),
+      t('settings.aboutArtistImagesPoint3'),
+    ],
+    tips: [
+      t('settings.aboutArtistImagesTip1'),
+      t('settings.aboutArtistImagesTip2'),
+    ],
   },
   {
+    id: 'jellyfin',
     icon: 'clarity:server-line',
     title: t('settings.aboutJellyfinTitle'),
     text: t('settings.aboutJellyfinText'),
+    detail: t('settings.aboutJellyfinDetail'),
+    points: [
+      t('settings.aboutJellyfinPoint1'),
+      t('settings.aboutJellyfinPoint2'),
+      t('settings.aboutJellyfinPoint3'),
+    ],
+    tips: [t('settings.aboutJellyfinTip1'), t('settings.aboutJellyfinTip2')],
   },
   {
+    id: 'health',
     icon: 'clarity:info-standard-line',
     title: t('settings.aboutHealthTitle'),
     text: t('settings.aboutHealthText'),
+    detail: t('settings.aboutHealthDetail'),
+    points: [
+      t('settings.aboutHealthPoint1'),
+      t('settings.aboutHealthPoint2'),
+      t('settings.aboutHealthPoint3'),
+    ],
+    tips: [t('settings.aboutHealthTip1'), t('settings.aboutHealthTip2')],
   },
   {
+    id: 'settings',
     icon: 'clarity:cog-line',
     title: t('settings.aboutSettingsTitle'),
     text: t('settings.aboutSettingsText'),
+    detail: t('settings.aboutSettingsDetail'),
+    points: [
+      t('settings.aboutSettingsPoint1'),
+      t('settings.aboutSettingsPoint2'),
+      t('settings.aboutSettingsPoint3'),
+    ],
+    tips: [t('settings.aboutSettingsTip1'), t('settings.aboutSettingsTip2')],
   },
 ])
+
+const aboutWorkflowSection = computed(() => ({
+  id: 'workflow',
+  icon: 'clarity:flow-chart-line',
+  title: t('settings.aboutWorkflowTitle'),
+  text: t('settings.aboutWorkflowText'),
+  detail: t('settings.aboutWorkflowDetail'),
+  points: [
+    t('settings.aboutWorkflowPoint1'),
+    t('settings.aboutWorkflowPoint2'),
+    t('settings.aboutWorkflowPoint3'),
+  ],
+  tips: [t('settings.aboutWorkflowTip1'), t('settings.aboutWorkflowTip2')],
+}))
+
+const activeAboutSection = computed(() => {
+  if (activeAboutSectionId.value === 'workflow') {
+    return aboutWorkflowSection.value
+  }
+  return (
+    aboutSections.value.find(
+      (section) => section.id === activeAboutSectionId.value
+    ) || null
+  )
+})
+
+function openAboutSection(id) {
+  activeAboutSectionId.value = id
+}
+
+function closeAboutSection() {
+  activeAboutSectionId.value = ''
+}
 
 const currentAppVersion = computed(() => {
   const version = updateStatus.value?.current_version
@@ -2042,6 +2247,9 @@ async function testJellyfinApi() {
 }
 
 watch(activeTab, (newTab) => {
+  if (newTab !== 'about') {
+    closeAboutSection()
+  }
   if (newTab === 'api') {
     const hasUrl = sm.settings.value.jellyfin_url?.trim()
     const hasApiKey = sm.settings.value.jellyfin_api_key?.trim()

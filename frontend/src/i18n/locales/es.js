@@ -483,6 +483,139 @@ export default {
     aboutWorkflowTitle: 'Flujo recomendado',
     aboutWorkflowText:
       'Busca y descarga musica, revisa la cola, explora la biblioteca y usa Metadatos e Imagenes antes de actualizar Jellyfin.',
+    aboutBack: 'Back to About',
+    aboutWhatItDoes: 'What it does',
+    aboutTips: 'Tips',
+    aboutSearchDetail:
+      'Search is the starting point for finding music before it enters your local Downtify library.',
+    aboutSearchPoint1:
+      'Search by track, artist, album, playlist, or paste a supported Spotify or YouTube Music link.',
+    aboutSearchPoint2:
+      'Preview results when a preview source is available before adding them to the queue.',
+    aboutSearchPoint3:
+      'Queue single tracks, whole albums, playlists, or monitored artist catalogs.',
+    aboutSearchTip1:
+      'Paste direct Spotify links when you want Downtify to preserve better title, artist, album, and cover metadata.',
+    aboutSearchTip2:
+      'Use specific artist and album names when search results are too broad.',
+    aboutLibraryDetail:
+      'Library is the main browser for music that already exists in your selected download folder.',
+    aboutLibraryPoint1:
+      'Browse by artist, album, track, or genre with quick search across downloaded files.',
+    aboutLibraryPoint2:
+      'Open albums or genres in the Player without returning to Search.',
+    aboutLibraryPoint3:
+      'Review cover art, track counts, local ownership, and monitor badges.',
+    aboutLibraryTip1:
+      'Use the refresh button after importing files outside Downtify or after metadata repairs.',
+    aboutLibraryTip2:
+      'Genre and cover browsing improves as metadata and artist images are repaired.',
+    aboutQueueDetail:
+      'Queue and downloads shows what Downtify is doing right now and what happened recently.',
+    aboutQueuePoint1:
+      'Watch pending, active, completed, and failed download jobs.',
+    aboutQueuePoint2:
+      'Retry failed jobs or clear completed history when the list gets noisy.',
+    aboutQueuePoint3:
+      'Confirm where downloaded files landed and whether metadata work succeeded.',
+    aboutQueueTip1:
+      'If repeated failures appear, check Health for missing tools or storage permission issues.',
+    aboutQueueTip2:
+      'Large playlists may keep working in the background while the app remains open.',
+    aboutPlayerDetail:
+      'Player turns the downloaded library into a simple local listening experience.',
+    aboutPlayerPoint1:
+      'Play tracks, albums, artists, genres, or queued library selections.',
+    aboutPlayerPoint2:
+      'Use shuffle, repeat, next, previous, seek, and volume controls.',
+    aboutPlayerPoint3:
+      'See now-playing cover art and upcoming tracks from the current playlist.',
+    aboutPlayerTip1:
+      'If artwork looks wrong, repair metadata or artist images, then refresh the Library.',
+    aboutPlayerTip2:
+      'On Android, keep storage permission enabled so local playback can read saved files.',
+    aboutMonitorDetail:
+      'Monitor keeps selected Spotify artists and playlists up to date without requiring manual searches.',
+    aboutMonitorPoint1:
+      'Add a Spotify artist or playlist URL and choose how often it should be checked.',
+    aboutMonitorPoint2:
+      'Pause, resume, force-check, change frequency, or remove monitored items.',
+    aboutMonitorPoint3:
+      'New tracks are added to the download queue when the monitor sees additions.',
+    aboutMonitorTip1:
+      'Use artist monitoring for catalogs that grow over time and playlist monitoring for curated lists.',
+    aboutMonitorTip2:
+      'If covers are missing, wait for the image cache or refresh the Monitor page after the backend catches up.',
+    aboutMetadataDetail:
+      'Metadata repairs help Jellyfin, genre browsing, album grouping, and player displays stay accurate.',
+    aboutMetadataPoint1:
+      'Scan files for missing or inconsistent title, artist, album, track, date, and genre tags.',
+    aboutMetadataPoint2:
+      'Compare local metadata against MusicBrainz-style matches before applying changes.',
+    aboutMetadataPoint3:
+      'Review the repair log to see what changed and whether it succeeded.',
+    aboutMetadataTip1:
+      'Repair metadata before refreshing Jellyfin so the server imports cleaner information.',
+    aboutMetadataTip2:
+      'Work in smaller batches when a large library has many uncertain matches.',
+    aboutArtistImagesDetail:
+      'Artist Images focuses on local artist artwork files, especially for Jellyfin-compatible folder layouts.',
+    aboutArtistImagesPoint1:
+      'Scan for missing, mismatched, or folder-only artist images.',
+    aboutArtistImagesPoint2:
+      'Choose local, Jellyfin, MusicBrainz, or remote candidate images.',
+    aboutArtistImagesPoint3:
+      'Save approved images into artist folders so Library and Jellyfin can reuse them.',
+    aboutArtistImagesTip1:
+      'A named artist image usually gives better artist cards than album-cover fallbacks.',
+    aboutArtistImagesTip2:
+      'Refresh Jellyfin after applying images so server-side artwork updates.',
+    aboutJellyfinDetail:
+      'Jellyfin tools connect Downtify cleanup work to your Jellyfin music server.',
+    aboutJellyfinPoint1:
+      'Configure Jellyfin URL, API key, and library name in the API tab.',
+    aboutJellyfinPoint2:
+      'Compare Jellyfin artists with local artist folders and image files.',
+    aboutJellyfinPoint3:
+      'Trigger Jellyfin refreshes after metadata or image changes.',
+    aboutJellyfinTip1:
+      'Use the exact Jellyfin music library name when multiple libraries exist.',
+    aboutJellyfinTip2:
+      'If Jellyfin does not update immediately, check its scan status and cache behavior.',
+    aboutHealthDetail:
+      'Health is the troubleshooting dashboard for backend, storage, and tool availability.',
+    aboutHealthPoint1:
+      'Confirm the backend is reachable and serving the expected version.',
+    aboutHealthPoint2:
+      'Check download directory visibility, queue state, and recent failures.',
+    aboutHealthPoint3:
+      'See whether required helper tools are available for downloading and conversion.',
+    aboutHealthTip1:
+      'Start here when downloads fail, files disappear, or the app cannot read the library.',
+    aboutHealthTip2:
+      'On Android, Health can reveal storage or embedded-server issues quickly.',
+    aboutSettingsDetail:
+      'Settings controls the defaults Downtify uses for new downloads and integrations.',
+    aboutSettingsPoint1:
+      'Choose audio format, bitrate, lyrics behavior, and organization rules.',
+    aboutSettingsPoint2:
+      'Configure download destination behavior for web, server, and Android modes.',
+    aboutSettingsPoint3:
+      'Set Jellyfin connection details and inspect maintenance logs.',
+    aboutSettingsTip1:
+      'Changes affect future work; existing files may need Metadata or Artist Images repairs.',
+    aboutSettingsTip2:
+      'Save settings before leaving the panel so backend behavior updates.',
+    aboutWorkflowDetail:
+      'This workflow keeps downloads, local tags, cover art, and Jellyfin in sync with fewer surprises.',
+    aboutWorkflowPoint1:
+      'Search or monitor music, then let the Queue finish downloading.',
+    aboutWorkflowPoint2:
+      'Browse Library and Player to spot missing tags, genres, or artwork.',
+    aboutWorkflowPoint3:
+      'Run Metadata and Artist Images repairs, then refresh Jellyfin when local files look right.',
+    aboutWorkflowTip1: 'Treat Jellyfin refresh as the final step after local cleanup.',
+    aboutWorkflowTip2: 'For large libraries, repeat the workflow in small batches.',
     helpTitle: 'Ayuda y actualizaciones',
     helpSubtitle:
       'Revisa la version instalada de Downtify, busca actualizaciones en GitHub y actualiza instalaciones compatibles.',
