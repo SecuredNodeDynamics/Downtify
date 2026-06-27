@@ -1267,32 +1267,18 @@ onUnmounted(() => {
 
 @media (min-width: 1024px) {
   .library-view {
-    height: auto;
-    max-height: none;
-    overflow: visible;
+    height: 100dvh;
+    max-height: 100dvh;
+    overflow: hidden;
   }
 
-  .library-chrome {
-    @apply sticky top-16 z-20 -mx-4 bg-base-100/90 px-4 pb-3 backdrop-blur-md sm:-mx-6 sm:px-6;
-  }
-
-  .library-browse-slot {
-    flex: none;
-  }
-
-  .library-browse {
-    flex: none;
-    min-height: auto;
-  }
-
-  .library-browse-body {
-    overflow: visible;
-    max-height: none;
+  .library-page {
+    overflow: hidden;
   }
 }
 
 .library-page {
-  @apply mx-auto flex w-full max-w-4xl flex-1 flex-col gap-2 min-h-0 px-4 py-3 sm:px-6 lg:overflow-visible lg:py-8;
+  @apply mx-auto flex w-full max-w-4xl flex-1 flex-col gap-2 min-h-0 px-4 py-3 sm:px-6 lg:py-8;
 }
 
 .library-chrome {
