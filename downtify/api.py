@@ -4324,10 +4324,15 @@ def _monitor_playlist_dict(
     fetch_image: bool = False,
 ) -> dict[str, Any]:
     data = playlist.to_dict()
-    if data.get('image_url') or not fetch_image:
+    if data.get('image_url'):
         return data
     cache_key = f'{playlist.kind}:{playlist.spotify_id}'
     image_url = _MONITOR_IMAGE_CACHE.get(cache_key, '')
+    if image_url:
+        data['image_url'] = image_url
+        return data
+    if not fetch_image:
+        return data
     if not image_url:
         image_url = _monitor_item_image_url(playlist.kind, playlist.spotify_id)
     data['image_url'] = image_url
@@ -4358,7 +4363,10 @@ async def _apply_monitor_playlist_update(
 @router.get('/api/monitor/playlists')
 async def list_monitor_playlists() -> list[dict[str, Any]]:
     db = _require_monitor_db()
-    return [playlist.to_dict() for playlist in db.list_playlists()]
+    return [
+        _monitor_playlist_dict(playlist, fetch_image=False)
+        for playlist in db.list_playlists()
+    ]
 
 
 @router.get('/api/monitor/artists/lookup')

@@ -107,7 +107,7 @@
 
       <!-- Empty state -->
       <div
-        v-else-if="playlists.length === 0"
+        v-else-if="filteredPlaylists.length === 0"
         class="surface rounded-2xl p-12 flex flex-col items-center text-center"
       >
         <Icon
@@ -125,7 +125,7 @@
       <!-- Item cards -->
       <ul v-else class="space-y-3">
         <li
-          v-for="pl in playlists"
+          v-for="pl in filteredPlaylists"
           :key="pl.id"
           class="surface rounded-2xl p-4 sm:p-5"
         >
@@ -315,7 +315,7 @@ const loadError = ref('')
 const adding = ref(false)
 const addError = ref('')
 const newUrl = ref('')
-const newKind = ref('playlist')
+const newKind = ref('artist')
 const newInterval = ref(60)
 const checking = ref({})
 const applyingInterval = ref({})
@@ -327,6 +327,9 @@ const urlPlaceholder = computed(() =>
   newKind.value === 'artist'
     ? t('monitor.urlPlaceholderArtist')
     : t('monitor.urlPlaceholderPlaylist')
+)
+const filteredPlaylists = computed(() =>
+  playlists.value.filter((pl) => pl.kind === newKind.value)
 )
 
 async function load() {
@@ -391,19 +394,19 @@ function onIntervalDraftChange(pl, event) {
 
 function coverForItem(pl) {
   const spotifyUrl = String(pl?.image_url || '').trim()
+  const remote = spotifyUrl ? API.searchCoverUrl(spotifyUrl, 320) : ''
   if (pl?.kind === 'artist') {
     const local = API.coverSourcesForArtist(pl.name)
-    const fallbacks = []
-    if (spotifyUrl && local.src) fallbacks.push(local.src)
+    const fallbacks = [remote, spotifyUrl, local.src]
     fallbacks.push(...local.fallbacks)
     return {
-      src: spotifyUrl || local.src,
+      src: remote || spotifyUrl || local.src,
       fallbacks: [...new Set(fallbacks.filter(Boolean))],
     }
   }
   return {
-    src: spotifyUrl,
-    fallbacks: [],
+    src: remote || spotifyUrl,
+    fallbacks: [...new Set([spotifyUrl].filter(Boolean))],
   }
 }
 

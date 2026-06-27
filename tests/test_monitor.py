@@ -63,6 +63,7 @@ async def test_list_monitor_playlists_does_not_block_on_spotify_images(
     tmp_path: Path,
 ) -> None:
     old_monitor_db = api.state.monitor_db
+    old_cache = dict(api._MONITOR_IMAGE_CACHE)
     try:
         db = PlaylistMonitorDB(tmp_path / 'monitor.db')
         db.add_playlist(
@@ -73,6 +74,7 @@ async def test_list_monitor_playlists_does_not_block_on_spotify_images(
             kind='playlist',
         )
         api.state.monitor_db = db
+        api._MONITOR_IMAGE_CACHE.clear()
 
         with patch(
             'downtify.api.spotify.embed_image_url',
@@ -86,6 +88,45 @@ async def test_list_monitor_playlists_does_not_block_on_spotify_images(
         assert payload[0]['image_url'] == ''
     finally:
         api.state.monitor_db = old_monitor_db
+        api._MONITOR_IMAGE_CACHE.clear()
+        api._MONITOR_IMAGE_CACHE.update(old_cache)
+
+
+@pytest.mark.asyncio
+async def test_list_monitor_playlists_uses_cached_image_without_spotify_fetch(
+    tmp_path: Path,
+) -> None:
+    old_monitor_db = api.state.monitor_db
+    old_cache = dict(api._MONITOR_IMAGE_CACHE)
+    try:
+        db = PlaylistMonitorDB(tmp_path / 'monitor.db')
+        db.add_playlist(
+            'ar123',
+            'Test Artist',
+            'https://open.spotify.com/artist/ar123',
+            interval_minutes=30,
+            kind='artist',
+        )
+        api.state.monitor_db = db
+        api._MONITOR_IMAGE_CACHE.clear()
+        api._MONITOR_IMAGE_CACHE['artist:ar123'] = (
+            'https://example.test/artist.jpg'
+        )
+
+        with patch(
+            'downtify.api.spotify.embed_image_url',
+            side_effect=AssertionError('list should not fetch Spotify covers'),
+        ):
+            payload = await api.list_monitor_playlists()
+
+        assert len(payload) == 1
+        assert payload[0]['name'] == 'Test Artist'
+        assert payload[0]['kind'] == 'artist'
+        assert payload[0]['image_url'] == 'https://example.test/artist.jpg'
+    finally:
+        api.state.monitor_db = old_monitor_db
+        api._MONITOR_IMAGE_CACHE.clear()
+        api._MONITOR_IMAGE_CACHE.update(old_cache)
 
 
 @pytest.mark.asyncio
