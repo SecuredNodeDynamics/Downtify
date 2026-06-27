@@ -1779,8 +1779,7 @@ const latestVersionLabel = computed(() => {
 const canRunUpdate = computed(() => {
   if (usesApkUpdateFlow()) {
     return Boolean(
-      updateStatus.value?.needs_apk_update &&
-        updateStatus.value?.apk_download_url
+      updateStatus.value?.update_available || updateStatus.value?.needs_apk_update
     )
   }
   return Boolean(updateStatus.value?.update_available)
@@ -1925,14 +1924,31 @@ async function loadUpdateStatus(refresh = false) {
 }
 
 async function runNativeApkUpdate() {
-  const downloadUrl = updateStatus.value?.apk_download_url
-  if (!downloadUrl) {
-    markUpdateFailed(t('settings.updateError'))
-    return
-  }
-
-  updateWaiting.value = true
   try {
+    let downloadUrl = updateStatus.value?.apk_download_url
+    if (!downloadUrl && updateStatus.value?.update_available) {
+      helpLoading.value = true
+      try {
+        updateStatus.value = await checkDowntifyVersion({ refresh: true })
+        downloadUrl = updateStatus.value?.apk_download_url
+      } catch (err) {
+        markUpdateFailed(
+          err?.response?.data?.detail ||
+            err?.message ||
+            t('settings.updateCheckError')
+        )
+        return
+      } finally {
+        helpLoading.value = false
+      }
+    }
+
+    if (!downloadUrl) {
+      markUpdateFailed(t('settings.updateError'))
+      return
+    }
+
+    updateWaiting.value = true
     await installApkUpdate(downloadUrl)
     updateResult.value = {
       success: true,

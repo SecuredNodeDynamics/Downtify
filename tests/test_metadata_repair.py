@@ -105,6 +105,69 @@ def test_expand_artist_names_splits_featured_artists():
     assert names == ['Lana Del Rey', 'A$AP Rocky', 'Katy Perry', '21 Savage']
 
 
+def test_scan_grouped_artists_reports_compound_artist_tag(
+    tmp_path,
+    monkeypatch,
+):
+    track = tmp_path / 'song.mp3'
+    track.write_bytes(b'not really audio')
+
+    monkeypatch.setattr(
+        metadata_repair,
+        '_song_from_file',
+        lambda _path: {
+            'name': 'Song',
+            'artists': ['Artist One feat. Artist Two'],
+            'album_name': 'Album',
+        },
+    )
+
+    result = metadata_repair.scan_grouped_artists(tmp_path)
+
+    assert result['matched'] == 1
+    assert result['items'][0]['current']['artists'] == [
+        'Artist One feat. Artist Two'
+    ]
+    assert result['items'][0]['candidate']['artists'] == [
+        'Artist One',
+        'Artist Two',
+    ]
+
+
+def test_repair_grouped_artists_writes_split_artist_tags(
+    tmp_path,
+    monkeypatch,
+):
+    track = tmp_path / 'song.mp3'
+    track.write_bytes(b'not really audio')
+    reads = iter([
+        {'name': 'Song', 'artists': ['Artist One, Artist Two']},
+        {'name': 'Song', 'artists': ['Artist One', 'Artist Two']},
+    ])
+    written = {}
+
+    monkeypatch.setattr(
+        metadata_repair,
+        '_song_from_file',
+        lambda _path: next(reads),
+    )
+
+    def fake_apply(path, artists):
+        written['path'] = path
+        written['artists'] = artists
+
+    monkeypatch.setattr(metadata_repair, 'apply_artist_tags', fake_apply)
+
+    result = metadata_repair.repair_grouped_artists(tmp_path, 'song.mp3')
+
+    assert written == {
+        'path': track.resolve(),
+        'artists': ['Artist One', 'Artist Two'],
+    }
+    assert result['changes'] == []
+    assert result['current']['artists'] == ['Artist One', 'Artist Two']
+
+
 def test_artist_image_paths_prefers_named_artist_image(tmp_path):
     folder = tmp_path / 'Ariana Grande'
     folder.mkdir()
@@ -629,6 +692,52 @@ def test_repair_file_applies_high_confidence_metadata(tmp_path, monkeypatch):
     assert applied['path'] == track.resolve()
     assert applied['metadata']['name'] == 'Fixed Song'
     assert result['matched'] is True
+    assert result['changes'] == []
+
+
+def test_repair_file_uses_provided_candidate(tmp_path, monkeypatch):
+    track = tmp_path / 'song.mp3'
+    track.write_bytes(b'not really audio')
+    applied = {}
+
+    reads = iter([
+        {'name': 'Song', 'artists': ['Artist']},
+        {'name': 'Scanned Fix', 'artists': ['Artist']},
+    ])
+    monkeypatch.setattr(
+        metadata_repair, '_song_from_file', lambda _path: next(reads)
+    )
+    monkeypatch.setattr(
+        metadata_repair,
+        'enrich_song_metadata',
+        lambda _song: pytest.fail('repair_file should use provided candidate'),
+    )
+
+    candidate = {
+        'name': 'Scanned Fix',
+        'artists': ['Artist'],
+        'musicbrainz_recording_id': 'mbid-recording',
+    }
+
+    def fake_apply(path, metadata):
+        applied['path'] = path
+        applied['metadata'] = metadata
+
+    monkeypatch.setattr(metadata_repair, 'apply_text_tags', fake_apply)
+    monkeypatch.setattr(
+        metadata_repair,
+        'save_missing_artist_images',
+        lambda *_args, **_kwargs: [],
+    )
+
+    result = metadata_repair.repair_file(
+        tmp_path,
+        'song.mp3',
+        candidate=candidate,
+    )
+
+    assert applied['path'] == track.resolve()
+    assert applied['metadata'] == candidate
     assert result['changes'] == []
 
 

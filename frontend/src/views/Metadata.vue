@@ -40,6 +40,18 @@
           {{ t('metadata.artistImagesTab') }}
         </button>
         <button
+          class="metadata-tab-btn"
+          :class="
+            activeToolTab === 'artist-tags'
+              ? 'bg-primary text-primary-content shadow-glow-sm'
+              : 'text-base-content/60 hover:text-base-content'
+          "
+          @click="activeToolTab = 'artist-tags'"
+        >
+          <Icon icon="clarity:users-line" class="mr-2 inline h-4 w-4" />
+          {{ t('metadata.artistRepairTab') }}
+        </button>
+        <button
           v-if="sm.settings.value.enable_jellyfin_tools"
           class="metadata-tab-btn"
           :class="
@@ -625,6 +637,247 @@
         </div>
       </section>
 
+      <section v-if="activeToolTab === 'artist-tags'" class="metadata-section">
+        <div class="metadata-header">
+          <div class="metadata-toolbar">
+            <select
+              v-model.number="artistTagLimit"
+              class="metadata-select"
+              :disabled="artistTagLoading"
+              :title="t('metadata.artistTagLimit')"
+            >
+              <option :value="25">25</option>
+              <option :value="50">50</option>
+              <option :value="100">100</option>
+            </select>
+            <button
+              class="btn btn-primary btn-sm metadata-btn px-5"
+              :disabled="artistTagLoading"
+              @click="scanArtistTags"
+            >
+              <span
+                v-if="artistTagLoading"
+                class="loading loading-spinner loading-xs mr-2"
+              />
+              <Icon v-else icon="clarity:users-line" class="h-4 w-4 mr-2" />
+              {{ t('metadata.scanArtistTags') }}
+            </button>
+            <button
+              class="btn btn-sm metadata-btn border-white/10 bg-base-100/85 hover:bg-base-100"
+              :disabled="artistTagLoading"
+              @click="scanAllArtistTags"
+            >
+              <Icon icon="clarity:fast-forward-line" class="h-4 w-4 mr-2" />
+              {{ t('metadata.scanAll') }}
+            </button>
+            <button
+              class="btn btn-sm metadata-btn border-white/10 bg-base-100/85 hover:bg-base-100"
+              :disabled="artistTagItems.length === 0 || repairingAllArtistTags"
+              @click="repairAllArtistTags"
+            >
+              <span
+                v-if="repairingAllArtistTags"
+                class="loading loading-spinner loading-xs mr-2"
+              />
+              <Icon
+                v-else
+                icon="clarity:check-circle-line"
+                class="h-4 w-4 mr-2"
+              />
+              {{ t('metadata.fixAllArtistTags') }}
+            </button>
+          </div>
+        </div>
+
+        <div
+          v-if="artistTagError"
+          class="surface mb-4 flex items-start gap-3 rounded-2xl p-4 text-sm text-error"
+        >
+          <Icon
+            icon="clarity:exclamation-circle-line"
+            class="h-5 w-5 shrink-0"
+          />
+          <span class="min-w-0 break-words">{{ artistTagError }}</span>
+        </div>
+
+        <section class="metadata-stat-grid">
+          <div class="metadata-stat-card surface rounded-2xl">
+            <p class="metadata-stat-label">
+              {{ t('metadata.scanned') }}
+            </p>
+            <p class="metadata-stat-value">
+              {{ artistTagSummary.scanned }}
+            </p>
+          </div>
+          <div class="metadata-stat-card surface rounded-2xl">
+            <p class="metadata-stat-label">
+              {{ t('metadata.groupedArtists') }}
+            </p>
+            <p class="metadata-stat-value text-primary">
+              {{ artistTagItems.length }}
+            </p>
+          </div>
+          <div class="metadata-stat-card surface rounded-2xl">
+            <p class="metadata-stat-label">
+              {{ t('metadata.completed') }}
+            </p>
+            <p class="metadata-stat-value">
+              {{ completedArtistTags.length }}
+            </p>
+          </div>
+        </section>
+
+        <p class="mb-4 text-xs text-base-content/45">
+          {{ t('metadata.artistTagsHint') }}
+        </p>
+
+        <div class="metadata-tab-shell tab-glow-shell">
+          <button
+            class="metadata-tab-btn"
+            :class="
+              activeArtistTagTab === 'needs'
+                ? 'bg-primary text-primary-content shadow-glow-sm'
+                : 'text-base-content/60 hover:text-base-content'
+            "
+            @click="activeArtistTagTab = 'needs'"
+          >
+            {{ t('metadata.needsFix') }}
+            <span class="metadata-tab-badge">{{ artistTagItems.length }}</span>
+          </button>
+          <button
+            class="metadata-tab-btn"
+            :class="
+              activeArtistTagTab === 'completed'
+                ? 'bg-primary text-primary-content shadow-glow-sm'
+                : 'text-base-content/60 hover:text-base-content'
+            "
+            @click="activeArtistTagTab = 'completed'"
+          >
+            {{ t('metadata.completed') }}
+            <span class="metadata-tab-badge">
+              {{ completedArtistTags.length }}
+            </span>
+          </button>
+          <button
+            class="metadata-tab-btn"
+            :class="
+              activeArtistTagTab === 'clean'
+                ? 'bg-primary text-primary-content shadow-glow-sm'
+                : 'text-base-content/60 hover:text-base-content'
+            "
+            @click="activeArtistTagTab = 'clean'"
+          >
+            <span class="sm:hidden">{{ t('metadata.cleanShort') }}</span>
+            <span class="hidden sm:inline">{{ t('metadata.clean') }}</span>
+            <span class="metadata-tab-badge">
+              {{ cleanArtistTagItems.length }}
+            </span>
+          </button>
+        </div>
+
+        <div class="max-h-[34rem] overflow-x-hidden overflow-y-auto pr-1 sm:pr-2">
+          <div
+            v-if="artistTagLoading && visibleArtistTagItems.length === 0"
+            class="metadata-artist-grid"
+          >
+            <div
+              v-for="n in 6"
+              :key="n"
+              class="rounded-2xl border border-white/10 bg-base-100/60 p-4"
+            >
+              <div class="skeleton h-5 w-2/3 rounded-full" />
+              <div class="mt-4 skeleton h-20 w-full rounded-xl" />
+              <div class="mt-3 skeleton h-9 w-full rounded-full" />
+            </div>
+          </div>
+
+          <div
+            v-else-if="visibleArtistTagItems.length === 0"
+            class="surface rounded-2xl p-10 text-center"
+          >
+            <Icon
+              icon="clarity:users-line"
+              class="mx-auto mb-3 h-10 w-10 text-base-content/20"
+            />
+            <p class="text-sm text-base-content/50">
+              {{
+                artistTagLoading
+                  ? t('metadata.scanning')
+                  : emptyArtistTagMessage
+              }}
+            </p>
+          </div>
+
+          <div v-else class="metadata-artist-grid">
+            <article
+              v-for="item in visibleArtistTagItems"
+              :key="item.file"
+              class="rounded-2xl border border-primary/20 bg-base-100/75 p-4 shadow-glow-sm"
+              :class="
+                applyingArtistTags[item.file]
+                  ? 'border-primary/40 ring-2 ring-primary/30'
+                  : ''
+              "
+            >
+              <div class="flex items-start gap-3">
+                <div
+                  class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10 text-primary"
+                >
+                  <Icon icon="clarity:users-line" class="h-6 w-6" />
+                </div>
+                <div class="min-w-0">
+                  <p class="line-clamp-2 text-sm font-semibold">
+                    {{ displaySong(item.current) }}
+                  </p>
+                  <p class="mt-1 truncate text-xs text-base-content/45">
+                    {{ item.file }}
+                  </p>
+                </div>
+              </div>
+              <div class="mt-4 grid gap-2">
+                <div class="rounded-xl border border-white/10 bg-base-100/70 p-3">
+                  <p class="text-[0.65rem] uppercase text-base-content/45">
+                    {{ t('metadata.currentArtists') }}
+                  </p>
+                  <p class="mt-1 text-sm text-base-content/80">
+                    {{ artistList(item.current?.artists) }}
+                  </p>
+                </div>
+                <div class="rounded-xl border border-primary/20 bg-primary/10 p-3">
+                  <p class="text-[0.65rem] uppercase text-primary/80">
+                    {{ t('metadata.proposedArtists') }}
+                  </p>
+                  <p class="mt-1 text-sm text-primary">
+                    {{ artistList(item.candidate?.artists) }}
+                  </p>
+                </div>
+              </div>
+              <button
+                v-if="activeArtistTagTab === 'needs'"
+                type="button"
+                class="btn btn-sm metadata-card-btn mt-4 w-full border-white/10 bg-base-100/85 hover:bg-base-100"
+                :class="fixedArtistTags[item.file] ? 'text-primary' : ''"
+                :disabled="applyingArtistTags[item.file] || fixedArtistTags[item.file]"
+                @click="applyArtistTagRepair(item)"
+              >
+                <span
+                  v-if="applyingArtistTags[item.file]"
+                  class="loading loading-spinner loading-xs mr-2"
+                />
+                <Icon v-else icon="clarity:check-line" class="mr-2 h-4 w-4" />
+                {{
+                  applyingArtistTags[item.file]
+                    ? t('metadata.fixing')
+                    : fixedArtistTags[item.file]
+                    ? t('metadata.fixed')
+                    : t('metadata.fixArtists')
+                }}
+              </button>
+            </article>
+          </div>
+        </div>
+      </section>
+
       <section
         v-if="
           activeToolTab === 'jellyfin' &&
@@ -867,9 +1120,13 @@
               </p>
               <p class="text-xs text-base-content/45">
                 {{
-                  t('metadata.bulkFixReady', {
-                    count: activeReconciliationBucketMeta.repairableCount,
-                  })
+                  activeReconciliationBucket === 'tag_only'
+                    ? t('metadata.bulkFixTagsReady', {
+                        count: activeReconciliationBucketMeta.repairableCount,
+                      })
+                    : t('metadata.bulkFixReady', {
+                        count: activeReconciliationBucketMeta.repairableCount,
+                      })
                 }}
               </p>
             </div>
@@ -972,7 +1229,30 @@
                     />
                   </div>
                   <button
-                    v-if="isJellyfinRepairableItem(item)"
+                    v-if="isJellyfinTagRepairItem(item)"
+                    class="btn btn-primary btn-xs metadata-card-btn"
+                    :disabled="applying[item.file] || fixed[item.file]"
+                    @click="applyJellyfinMetadataRepair(item)"
+                  >
+                    <span
+                      v-if="applying[item.file]"
+                      class="loading loading-spinner loading-xs mr-2"
+                    />
+                    <Icon
+                      v-else
+                      icon="clarity:tag-line"
+                      class="h-4 w-4 mr-2"
+                    />
+                    {{
+                      fixed[item.file]
+                        ? t('metadata.fixed')
+                        : applying[item.file]
+                        ? t('metadata.fixing')
+                        : t('metadata.fixTags')
+                    }}
+                  </button>
+                  <button
+                    v-else-if="isJellyfinRepairableItem(item)"
                     class="btn btn-primary btn-xs metadata-card-btn"
                     :disabled="
                       applyingArtistImages[jellyfinRepairKey(item)] ||
@@ -1204,7 +1484,6 @@ const JELLYFIN_IMAGE_REPAIR_BUCKETS = [
   'missing_images',
   'jellyfin_only',
   'folder_only',
-  'tag_only',
 ]
 const activeToolTab = ref('metadata')
 const loading = ref(false)
@@ -1244,6 +1523,17 @@ const artistImagePickerPreviewFailed = ref({})
 let artistImagePickerSlowTimer = null
 const repairingAllImages = ref(false)
 const artistImageSummary = ref({ scanned: 0, matched: 0, total: 0 })
+const artistTagLoading = ref(false)
+const artistTagError = ref('')
+const artistTagLimit = ref(50)
+const artistTagItems = ref([])
+const cleanArtistTagItems = ref([])
+const completedArtistTags = ref([])
+const activeArtistTagTab = ref('needs')
+const applyingArtistTags = ref({})
+const fixedArtistTags = ref({})
+const repairingAllArtistTags = ref(false)
+const artistTagSummary = ref({ scanned: 0, matched: 0, total: 0 })
 const artistReconciliation = ref(null)
 const activeReconciliationBucket = ref('missing_images')
 const reconcilingArtists = ref(false)
@@ -1255,6 +1545,7 @@ const jellyfinError = ref(false)
 const lastReconciled = ref('')
 let pollTimer = null
 let artistImagePollTimer = null
+let artistTagPollTimer = null
 
 const visibleItems = computed(() =>
   activeTab.value === 'completed'
@@ -1273,6 +1564,24 @@ const visibleArtistImageItems = computed(() =>
     ? failedArtistImages.value
     : artistImageItems.value
 )
+
+const visibleArtistTagItems = computed(() =>
+  activeArtistTagTab.value === 'completed'
+    ? completedArtistTags.value
+    : activeArtistTagTab.value === 'clean'
+    ? cleanArtistTagItems.value
+    : artistTagItems.value
+)
+
+const emptyArtistTagMessage = computed(() => {
+  if (activeArtistTagTab.value === 'completed') {
+    return t('metadata.emptyArtistTagCompleted')
+  }
+  if (activeArtistTagTab.value === 'clean') {
+    return t('metadata.emptyArtistTagClean')
+  }
+  return t('metadata.emptyArtistTags')
+})
 
 const isArtistImageUpdateTab = computed(() =>
   ['clean', 'completed'].includes(activeArtistImageTab.value)
@@ -1332,7 +1641,10 @@ const reconciliationBuckets = computed(() => {
   ]
   return buckets.map((bucket) => ({
     ...bucket,
-    repairableCount: jellyfinRepairableBucketItems(bucket.key).length,
+    repairableCount:
+      bucket.key === 'tag_only'
+        ? jellyfinTagRepairableBucketItems(bucket.key).length
+        : jellyfinRepairableBucketItems(bucket.key).length,
   }))
 })
 
@@ -1401,6 +1713,11 @@ function displaySong(song) {
   return `${artists || t('common.unknownArtist')} - ${title}${album}`
 }
 
+function artistList(artists) {
+  const values = (artists || []).filter(Boolean)
+  return values.length > 0 ? values.join(', ') : t('common.unknownArtist')
+}
+
 function metadataCoverUrl(item) {
   const file = String(item?.file || '').trim()
   if (!file || metadataCoverFailed.value[file]) {
@@ -1451,9 +1768,18 @@ function jellyfinBucketItems(bucketKey) {
 
 function isJellyfinRepairableItem(item) {
   return (
+    item?.bucketKey !== 'tag_only' &&
     item?.missing_image &&
     (item?.file || item?.folder || item?.name) &&
     !fixedArtistImages.value[jellyfinRepairKey(item)]
+  )
+}
+
+function isJellyfinTagRepairItem(item) {
+  return (
+    item?.bucketKey === 'tag_only' &&
+    !!item?.file &&
+    !fixed.value[item.file]
   )
 }
 
@@ -1538,6 +1864,13 @@ function refreshArtistImageItemPreview(item, result) {
 
 function jellyfinRepairableBucketItems(bucketKey) {
   return jellyfinBucketItems(bucketKey).filter(isJellyfinRepairableItem)
+}
+
+function jellyfinTagRepairableBucketItems(bucketKey) {
+  if (bucketKey !== 'tag_only') return []
+  return jellyfinBucketItems(bucketKey).filter(
+    (item) => item?.file && !fixed.value[item.file]
+  )
 }
 
 function pendingArtistImageItems(items) {
@@ -1843,6 +2176,22 @@ function applyArtistImageStatus(data) {
   }
 }
 
+function applyArtistTagStatus(data) {
+  artistTagLoading.value = data.status === 'scanning'
+  artistTagLimit.value = data.limit || artistTagLimit.value
+  artistTagSummary.value = {
+    scanned: data.scanned || 0,
+    matched: data.matched || 0,
+    total: data.total || 0,
+  }
+  artistTagItems.value = data.items || []
+  cleanArtistTagItems.value = data.clean || cleanArtistTagItems.value
+  completedArtistTags.value = data.completed || completedArtistTags.value
+  if (data.status === 'error') {
+    artistTagError.value = data.error || t('metadata.failedArtistTagScan')
+  }
+}
+
 function stopPolling() {
   if (pollTimer !== null) {
     clearInterval(pollTimer)
@@ -1857,6 +2206,13 @@ function stopArtistImagePolling() {
   }
 }
 
+function stopArtistTagPolling() {
+  if (artistTagPollTimer !== null) {
+    clearInterval(artistTagPollTimer)
+    artistTagPollTimer = null
+  }
+}
+
 function startPolling() {
   stopPolling()
   pollTimer = setInterval(refreshScanStatus, 2000)
@@ -1865,6 +2221,11 @@ function startPolling() {
 function startArtistImagePolling() {
   stopArtistImagePolling()
   artistImagePollTimer = setInterval(refreshArtistImageStatus, 1500)
+}
+
+function startArtistTagPolling() {
+  stopArtistTagPolling()
+  artistTagPollTimer = setInterval(refreshArtistTagStatus, 1500)
 }
 
 async function refreshScanStatus() {
@@ -1892,6 +2253,20 @@ async function refreshArtistImageStatus() {
     stopArtistImagePolling()
     artistImageLoading.value = false
     artistImageError.value = t('metadata.failedArtistImageScan')
+  }
+}
+
+async function refreshArtistTagStatus() {
+  try {
+    const res = await API.getArtistTagScanStatus()
+    applyArtistTagStatus(res.data)
+    if (res.data.status !== 'scanning') {
+      stopArtistTagPolling()
+    }
+  } catch {
+    stopArtistTagPolling()
+    artistTagLoading.value = false
+    artistTagError.value = t('metadata.failedArtistTagScan')
   }
 }
 
@@ -1924,6 +2299,38 @@ async function scanAll() {
   } catch {
     error.value = t('metadata.failedScan')
     loading.value = false
+  }
+}
+
+async function scanArtistTags() {
+  artistTagLoading.value = true
+  artistTagError.value = ''
+  fixedArtistTags.value = {}
+  try {
+    const res = await API.scanArtistTags(artistTagLimit.value)
+    applyArtistTagStatus(res.data)
+    if (res.data.status === 'scanning') {
+      startArtistTagPolling()
+    }
+  } catch {
+    artistTagError.value = t('metadata.failedArtistTagScan')
+    artistTagLoading.value = false
+  }
+}
+
+async function scanAllArtistTags() {
+  artistTagLoading.value = true
+  artistTagError.value = ''
+  fixedArtistTags.value = {}
+  try {
+    const res = await API.scanArtistTags(artistTagLimit.value, true, true)
+    applyArtistTagStatus(res.data)
+    if (res.data.status === 'scanning') {
+      startArtistTagPolling()
+    }
+  } catch {
+    artistTagError.value = t('metadata.failedArtistTagScan')
+    artistTagLoading.value = false
   }
 }
 
@@ -1987,18 +2394,28 @@ onMounted(async () => {
   } catch {
     // The page can still start a fresh artist image scan.
   }
+  try {
+    const res = await API.getArtistTagScanStatus()
+    applyArtistTagStatus(res.data)
+    if (res.data.status === 'scanning') {
+      startArtistTagPolling()
+    }
+  } catch {
+    // The page can still start a fresh artist repair scan.
+  }
 })
 
 onBeforeUnmount(() => {
   stopPolling()
   stopArtistImagePolling()
+  stopArtistTagPolling()
 })
 
 async function apply(item) {
   applying.value = { ...applying.value, [item.file]: true }
   error.value = ''
   try {
-    const res = await API.applyMetadata(item.file)
+    const res = await API.applyMetadata(item.file, item.candidate || null)
     const remainingChanges = res.data?.changes || []
     if (remainingChanges.length === 0) {
       fixed.value = { ...fixed.value, [item.file]: true }
@@ -2041,6 +2458,92 @@ async function repairAll() {
     await apply(item)
   }
   repairingAll.value = false
+}
+
+async function applyArtistTagRepair(item, options = {}) {
+  const { quiet = false } = options
+  applyingArtistTags.value = {
+    ...applyingArtistTags.value,
+    [item.file]: true,
+  }
+  if (!quiet) artistTagError.value = ''
+  try {
+    const res = await API.applyArtistTags(
+      item.file,
+      item.candidate?.artists || []
+    )
+    const remainingChanges = res.data?.changes || []
+    if (remainingChanges.length === 0) {
+      fixedArtistTags.value = {
+        ...fixedArtistTags.value,
+        [item.file]: true,
+      }
+      completedArtistTags.value = [res.data, ...completedArtistTags.value]
+      artistTagItems.value = artistTagItems.value.filter(
+        (existing) => existing.file !== item.file
+      )
+      artistTagSummary.value = {
+        ...artistTagSummary.value,
+        matched: Math.max(0, artistTagSummary.value.matched - 1),
+      }
+      return true
+    }
+    artistTagItems.value = artistTagItems.value.map((existing) =>
+      existing.file === item.file
+        ? {
+            ...existing,
+            current: res.data.current || existing.current,
+            changes: remainingChanges,
+          }
+        : existing
+    )
+    if (!quiet) artistTagError.value = t('metadata.failedVerify')
+    return false
+  } catch (err) {
+    if (!quiet) {
+      const detail = err?.response?.data?.detail
+      artistTagError.value = detail
+        ? `${t('metadata.failedArtistTagApply')} ${detail}`
+        : t('metadata.failedArtistTagApply')
+    }
+    return false
+  } finally {
+    applyingArtistTags.value = {
+      ...applyingArtistTags.value,
+      [item.file]: false,
+    }
+  }
+}
+
+async function repairAllArtistTags() {
+  const targets = [...artistTagItems.value]
+  if (targets.length === 0) return
+  repairingAllArtistTags.value = true
+  artistTagError.value = ''
+  let succeeded = 0
+  let failed = 0
+  try {
+    for (const [index, item] of targets.entries()) {
+      artistTagError.value = t('metadata.artistTagRepairProgressDetail')
+        .replace('{current}', String(index + 1))
+        .replace('{total}', String(targets.length))
+        .replace('{name}', displaySong(item.current))
+        .replace('{succeeded}', String(succeeded))
+        .replace('{failed}', String(failed))
+      // eslint-disable-next-line no-await-in-loop
+      const ok = await applyArtistTagRepair(item, { quiet: true })
+      if (ok) succeeded += 1
+      else failed += 1
+    }
+    artistTagError.value =
+      failed === 0
+        ? t('metadata.artistTagRepairOk')
+        : t('metadata.artistTagRepairPartial')
+            .replace('{succeeded}', String(succeeded))
+            .replace('{total}', String(targets.length))
+  } finally {
+    repairingAllArtistTags.value = false
+  }
 }
 
 async function scanArtistImages() {
@@ -2323,6 +2826,42 @@ async function applyJellyfinArtistImage(item, options = {}) {
   }
 }
 
+async function applyJellyfinMetadataRepair(item, options = {}) {
+  const { quiet = false } = options
+  if (!item?.file) return false
+  applying.value = { ...applying.value, [item.file]: true }
+  if (!quiet) {
+    jellyfinMessage.value = ''
+    jellyfinError.value = false
+  }
+  try {
+    const res = await API.applyMetadata(item.file)
+    const remainingChanges = res.data?.changes || []
+    if (remainingChanges.length > 0) {
+      throw new Error(t('metadata.failedVerify'))
+    }
+    fixed.value = { ...fixed.value, [item.file]: true }
+    completedItems.value = [res.data, ...completedItems.value]
+    if (!quiet) {
+      jellyfinMessage.value = t('metadata.tagRepairOk')
+      await reconcileArtists({ preserveMessage: true })
+    }
+    return true
+  } catch (err) {
+    if (!quiet) {
+      const detail =
+        err?.response?.data?.detail ||
+        err?.message ||
+        t('metadata.failedApply')
+      jellyfinError.value = true
+      jellyfinMessage.value = `${t('metadata.failedApply')} ${detail}`
+    }
+    return false
+  } finally {
+    applying.value = { ...applying.value, [item.file]: false }
+  }
+}
+
 function finishJellyfinBulkRepair(succeeded, total, synced) {
   if (succeeded === 0) {
     jellyfinError.value = true
@@ -2383,6 +2922,45 @@ async function runJellyfinBulkRepair(targets, bucketKey = '') {
   }
 }
 
+async function runJellyfinTagBulkRepair(targets) {
+  if (targets.length === 0) return
+
+  jellyfinMessage.value = ''
+  jellyfinError.value = false
+
+  let succeeded = 0
+  let failed = 0
+  for (let index = 0; index < targets.length; index += 1) {
+    const item = targets[index]
+    jellyfinMessage.value = t('metadata.tagRepairProgressDetail', {
+      current: index + 1,
+      total: targets.length,
+      name: item.name,
+      succeeded,
+      failed,
+    })
+    // eslint-disable-next-line no-await-in-loop
+    const ok = await applyJellyfinMetadataRepair(item, { quiet: true })
+    if (ok) succeeded += 1
+    else failed += 1
+  }
+
+  jellyfinError.value = succeeded === 0 || failed > 0
+  jellyfinMessage.value =
+    failed > 0
+      ? t('metadata.tagRepairPartial', { succeeded, total: targets.length })
+      : t('metadata.tagRepairOk')
+
+  if (succeeded > 0) {
+    try {
+      await reconcileArtists({ preserveMessage: true })
+    } catch {
+      jellyfinError.value = true
+      jellyfinMessage.value = t('metadata.jellyfinRepairSyncFailed')
+    }
+  }
+}
+
 async function repairAllArtistImages() {
   repairingAllImages.value = true
   for (const item of [...artistImageItems.value]) {
@@ -2401,6 +2979,19 @@ async function repairAllJellyfinArtistImages() {
 }
 
 async function repairJellyfinBucket(bucketKey) {
+  if (bucketKey === 'tag_only') {
+    const targets = [...jellyfinTagRepairableBucketItems(bucketKey)]
+    if (targets.length === 0) return
+
+    repairingJellyfinBucket.value = bucketKey
+    try {
+      await runJellyfinTagBulkRepair(targets)
+    } finally {
+      repairingJellyfinBucket.value = ''
+    }
+    return
+  }
+
   const targets = [...jellyfinRepairableBucketItems(bucketKey)]
   if (targets.length === 0) return
 

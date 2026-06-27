@@ -427,6 +427,22 @@ class AppState:
         'complete': False,
     }
     artist_image_scan_task: Optional[asyncio.Task] = None
+    artist_tag_scan: dict[str, Any] = {
+        'status': 'idle',
+        'limit': 100,
+        'scanned': 0,
+        'batch_scanned': 0,
+        'total': 0,
+        'matched': 0,
+        'items': [],
+        'clean': [],
+        'completed': [],
+        'error': '',
+        'errors': [],
+        'next_offset': 0,
+        'complete': False,
+    }
+    artist_tag_scan_task: Optional[asyncio.Task] = None
     genre_warmup: dict[str, Any] = {
         'status': 'idle',
         'phase': '',
@@ -2016,6 +2032,29 @@ def _exclude_completed_metadata_items(
     ]
 
 
+def _artist_tag_scan_status() -> dict[str, Any]:
+    return dict(state.artist_tag_scan)
+
+
+def _completed_artist_tag_files() -> set[str]:
+    return {
+        str(item.get('file') or '')
+        for item in state.artist_tag_scan.get('completed') or []
+        if item.get('file')
+    }
+
+
+def _exclude_completed_artist_tag_items(
+    items: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    completed = _completed_artist_tag_files()
+    if not completed:
+        return items
+    return [
+        item for item in items if str(item.get('file') or '') not in completed
+    ]
+
+
 def _merge_artist_image_items(
     existing: list[dict[str, Any]],
     incoming: list[dict[str, Any]],
@@ -2202,6 +2241,137 @@ async def start_metadata_scan(request: Request) -> dict[str, Any]:
 @router.get('/api/metadata/scan/status')
 def metadata_scan_status() -> dict[str, Any]:
     return _metadata_scan_status()
+
+
+async def _run_artist_tag_scan(
+    limit: int, start: int, scan_all: bool = False
+) -> None:
+    if state.downloader is None:
+        state.artist_tag_scan = {
+            **state.artist_tag_scan,
+            'status': 'error',
+            'error': 'Downloader not ready',
+        }
+        return
+
+    def progress(update: dict[str, Any]) -> None:
+        items = _merge_items_by(
+            list(state.artist_tag_scan.get('items') or []),
+            list(update.get('items') or []),
+            'file',
+        )
+        items = _exclude_completed_artist_tag_items(items)
+        clean = _merge_items_by(
+            list(state.artist_tag_scan.get('clean') or []),
+            list(update.get('clean') or []),
+            'file',
+        )
+        state.artist_tag_scan = {
+            **state.artist_tag_scan,
+            **update,
+            'items': items,
+            'clean': clean,
+            'matched': len(items),
+            'status': 'scanning',
+            'limit': limit,
+        }
+
+    try:
+        download_dir = _active_download_dir()
+        result = await asyncio.to_thread(
+            metadata_repair.scan_grouped_artists,
+            download_dir,
+            1_000_000 if scan_all else limit,
+            start,
+            progress,
+        )
+        items = _merge_items_by(
+            list(state.artist_tag_scan.get('items') or []),
+            list(result.get('items') or []),
+            'file',
+        )
+        items = _exclude_completed_artist_tag_items(items)
+        clean = _merge_items_by(
+            list(state.artist_tag_scan.get('clean') or []),
+            list(result.get('clean') or []),
+            'file',
+        )
+        state.artist_tag_scan = {
+            **state.artist_tag_scan,
+            **result,
+            'items': items,
+            'clean': clean,
+            'matched': len(items),
+            'limit': limit,
+            'status': 'done',
+            'error': '',
+            'finished_at': datetime.now(timezone.utc).isoformat(),
+        }
+    except Exception as exc:
+        logger.exception('Artist tag scan failed')
+        state.artist_tag_scan = {
+            **state.artist_tag_scan,
+            'status': 'error',
+            'error': str(exc),
+            'finished_at': datetime.now(timezone.utc).isoformat(),
+        }
+
+
+@router.post('/api/metadata/artist-tags/scan')
+async def start_artist_tag_scan(request: Request) -> dict[str, Any]:
+    if state.downloader is None:
+        raise HTTPException(status_code=500, detail='Downloader not ready')
+    download_dir = _active_download_dir()
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+    try:
+        limit = max(1, min(500, int(payload.get('limit', 100))))
+    except (TypeError, ValueError):
+        limit = 100
+    reset = bool(payload.get('reset', False))
+    scan_all = bool(payload.get('all', False))
+
+    task = state.artist_tag_scan_task
+    if task is not None and not task.done():
+        return _artist_tag_scan_status()
+
+    previous = state.artist_tag_scan
+    start, continuing = _scan_resume_start(previous, reset, download_dir)
+    previous_items = (
+        _exclude_completed_artist_tag_items(previous.get('items') or [])
+        if continuing
+        else []
+    )
+    previous_clean = (previous.get('clean') or []) if continuing else []
+
+    state.artist_tag_scan = {
+        'status': 'scanning',
+        'limit': limit,
+        'scanned': 0,
+        'batch_scanned': 0,
+        'total': 0,
+        'matched': len(previous_items),
+        'items': previous_items,
+        'clean': previous_clean,
+        'completed': previous.get('completed') or [],
+        'error': '',
+        'errors': [],
+        'root': str(download_dir.resolve()),
+        'next_offset': start,
+        'complete': False,
+        'started_at': datetime.now(timezone.utc).isoformat(),
+    }
+    state.artist_tag_scan_task = asyncio.create_task(
+        _run_artist_tag_scan(limit, start, scan_all)
+    )
+    return _artist_tag_scan_status()
+
+
+@router.get('/api/metadata/artist-tags/status')
+def artist_tag_scan_status() -> dict[str, Any]:
+    return _artist_tag_scan_status()
 
 
 async def _run_artist_image_scan(
@@ -2883,10 +3053,14 @@ async def apply_metadata(request: Request) -> dict[str, Any]:
     file = str(payload.get('file') or '').strip()
     if not file:
         raise HTTPException(status_code=400, detail='file is required')
+    candidate = payload.get('candidate')
+    if candidate is not None and not isinstance(candidate, dict):
+        raise HTTPException(status_code=400, detail='candidate must be an object')
     try:
         result = metadata_repair.repair_file(
             download_dir,
             file,
+            candidate=candidate,
             artist_folder_policy=_artist_folder_policy(),
         )
         completed = list(state.metadata_scan.get('completed') or [])
@@ -2912,6 +3086,53 @@ async def apply_metadata(request: Request) -> dict[str, Any]:
     except Exception as exc:
         logger.exception('Metadata repair failed for {}', file)
         _add_repair_log('metadata', 'failed', file, str(exc))
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@router.post('/api/metadata/artist-tags/apply')
+async def apply_artist_tags(request: Request) -> dict[str, Any]:
+    if state.downloader is None:
+        raise HTTPException(status_code=500, detail='Downloader not ready')
+    download_dir = _active_download_dir()
+    try:
+        payload = await request.json()
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail='Invalid JSON') from exc
+    file = str(payload.get('file') or '').strip()
+    if not file:
+        raise HTTPException(status_code=400, detail='file is required')
+    artists = payload.get('artists')
+    if artists is not None and not isinstance(artists, list):
+        raise HTTPException(status_code=400, detail='artists must be a list')
+    try:
+        result = metadata_repair.repair_grouped_artists(
+            download_dir,
+            file,
+            artists=artists,
+        )
+        completed = list(state.artist_tag_scan.get('completed') or [])
+        completed.append(result)
+        items = [
+            item
+            for item in state.artist_tag_scan.get('items') or []
+            if str(item.get('file') or '') != result.get('file')
+        ]
+        state.artist_tag_scan = {
+            **state.artist_tag_scan,
+            'items': items,
+            'matched': len(items),
+            'completed': completed,
+        }
+        _add_repair_log('artist_tags', 'success', file, result=result)
+        return result
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail='File not found') from exc
+    except ValueError as exc:
+        _add_repair_log('artist_tags', 'failed', file, str(exc))
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception('Artist tag repair failed for {}', file)
+        _add_repair_log('artist_tags', 'failed', file, str(exc))
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 

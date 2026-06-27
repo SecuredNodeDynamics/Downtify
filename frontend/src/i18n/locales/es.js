@@ -262,6 +262,7 @@ export default {
       'Escanea archivos existentes en el servidor y repara etiquetas con coincidencias de MusicBrainz.',
     metadataTab: 'Metadatos',
     artistImagesTab: 'Imagenes de artistas',
+    artistRepairTab: 'Reparar artistas',
     jellyfinTab: 'Jellyfin',
     scan: 'Escanear biblioteca',
     scanAll: 'Escanear todo',
@@ -280,6 +281,7 @@ export default {
     apply: 'Aplicar correccion',
     repairAll: 'Corregir todo',
     fixAllArtistImages: 'Corregir todas las imagenes de artistas',
+    fixAllArtistTags: 'Corregir todos los artistas',
     fixing: 'Corrigiendo...',
     fixed: 'Corregido',
     completed: 'Completado',
@@ -312,6 +314,27 @@ export default {
     failedApply: 'No se pudo aplicar la correccion de metadatos.',
     failedArtistImageScan: 'No se pudo escanear imagenes de artistas.',
     failedArtistImageApply: 'No se pudo reparar la imagen del artista.',
+    artistTagLimit: 'Reparaciones de artistas para mostrar',
+    scanArtistTags: 'Escanear nombres de artistas',
+    groupedArtists: 'Artistas agrupados',
+    artistTagsHint:
+      'Encuentra canciones donde varios artistas estan guardados como un solo nombre y los escribe como etiquetas de artista individuales.',
+    currentArtists: 'Artistas actuales',
+    proposedArtists: 'Artistas individuales',
+    fixArtists: 'Corregir artistas',
+    emptyArtistTags:
+      'No se encontraron etiquetas de artistas agrupados en este escaneo.',
+    emptyArtistTagCompleted:
+      'Todavia no se completaron reparaciones de etiquetas de artistas.',
+    emptyArtistTagClean:
+      'Todavia no hay resultados limpios de etiquetas de artistas.',
+    failedArtistTagScan: 'No se pudo escanear etiquetas de artistas.',
+    failedArtistTagApply: 'No se pudo reparar etiquetas de artistas.',
+    artistTagRepairOk: 'Etiquetas de artistas reparadas.',
+    artistTagRepairPartial:
+      'Se repararon {succeeded} de {total} elementos de etiquetas de artistas.',
+    artistTagRepairProgressDetail:
+      'Reparando etiquetas de artistas {current}/{total}: {name} · {succeeded} corregidos, {failed} fallidos',
     failedVerify:
       'La escritura termino, pero el archivo todavia tiene cambios pendientes.',
     jellyfinTools: 'Herramientas Jellyfin',
@@ -364,8 +387,15 @@ export default {
     bulkFixShort: 'Reparar',
     bulkFixAvailable: '{count} se pueden reparar',
     bulkFixReady: '{count} candidatos de imagen reparables en este grupo.',
+    bulkFixTagsReady: '{count} coincidencias de etiquetas reparables en este grupo.',
     noRepairFile:
       'Ejecuta el escaneo de imagenes de artistas para encontrar una fuente de reparacion.',
+    fixTags: 'Reparar etiquetas',
+    tagRepairOk: 'Etiquetas de metadata reparadas.',
+    tagRepairPartial:
+      'Se repararon {succeeded} de {total} elementos de etiquetas.',
+    tagRepairProgressDetail:
+      'Reparando etiquetas {current}/{total}: {name} · {succeeded} reparadas, {failed} fallidas',
     jellyfinOnly: 'Solo en Jellyfin',
     folderOnly: 'Solo carpeta',
     tagOnly: 'Solo etiquetas locales',

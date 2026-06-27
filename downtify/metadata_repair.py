@@ -363,6 +363,46 @@ def _scan_item(root: Path, path: Path) -> dict[str, Any]:
     }
 
 
+def _expanded_artist_repair(current: dict[str, Any]) -> dict[str, Any]:
+    artists = [
+        str(artist).strip()
+        for artist in current.get('artists') or []
+        if str(artist).strip()
+    ]
+    proposed = expand_artist_names(artists)
+    changed = bool(proposed) and proposed != artists
+    return {
+        'matched': changed,
+        'current_artists': artists,
+        'proposed_artists': proposed,
+        'changes': [
+            {
+                'field': 'artists',
+                'label': 'Artists',
+                'before': ', '.join(artists),
+                'after': ', '.join(proposed),
+            }
+        ]
+        if changed
+        else [],
+    }
+
+
+def _artist_tag_scan_item(root: Path, path: Path) -> dict[str, Any]:
+    current = _song_from_file(path)
+    repair = _expanded_artist_repair(current)
+    return {
+        'file': path.relative_to(root).as_posix(),
+        'current': _public_song(current),
+        'candidate': {
+            **_public_song(current),
+            'artists': repair['proposed_artists'],
+        },
+        'matched': repair['matched'],
+        'changes': repair['changes'],
+    }
+
+
 ProgressCallback = Callable[[dict[str, Any]], None]
 
 
@@ -443,6 +483,68 @@ def _artist_image_scan_candidates(
         artists,
         artist_folder_policy=artist_folder_policy,
     )
+
+
+def scan_grouped_artists(
+    root: Path,
+    limit: int = 100,
+    start: int = 0,
+    progress_cb: ProgressCallback | None = None,
+) -> dict[str, Any]:
+    root = root.resolve()
+    files = [
+        path
+        for path in root.rglob('*')
+        if path.is_file() and path.suffix.lower() in AUDIO_EXTENSIONS
+    ]
+    files.sort(key=lambda path: path.relative_to(root).as_posix().casefold())
+    total = len(files)
+    start = max(0, min(start, total))
+    selected = files[start : start + max(1, limit)]
+    items: list[dict[str, Any]] = []
+    clean_items: list[dict[str, Any]] = []
+    errors: list[dict[str, str]] = []
+    batch_scanned = 0
+    for path in selected:
+        batch_scanned += 1
+        current_offset = start + batch_scanned
+        try:
+            item = _artist_tag_scan_item(root, path)
+        except Exception as exc:
+            errors.append({
+                'file': path.relative_to(root).as_posix(),
+                'error': str(exc),
+            })
+            item = None
+        if item is not None and item['matched'] and item['changes']:
+            items.append(item)
+        elif item is not None:
+            clean_items.append(item)
+        if progress_cb is not None:
+            progress_cb({
+                'scanned': current_offset,
+                'batch_scanned': batch_scanned,
+                'total': total,
+                'matched': len(items),
+                'items': list(items),
+                'clean': list(clean_items),
+                'start': start,
+                'next_offset': current_offset,
+            })
+    next_offset = start + batch_scanned
+    return {
+        'root': str(root),
+        'scanned': next_offset,
+        'batch_scanned': batch_scanned,
+        'total': total,
+        'matched': len(items),
+        'items': items,
+        'clean': clean_items,
+        'errors': errors,
+        'start': start,
+        'next_offset': next_offset,
+        'complete': next_offset >= total,
+    }
 
 
 def _combined_artist_refs(
@@ -623,6 +725,19 @@ def apply_text_tags(path: Path, metadata: dict[str, Any]) -> None:
         if isinstance(artist, dict) and artist.get('id')
     ]
     set_key('musicbrainz_artistid', artist_ids, optional=True)
+    audio.save()
+
+
+def apply_artist_tags(path: Path, artists: list[str]) -> None:
+    audio = _open_easy_audio(path)
+    if audio is None:
+        raise ValueError('Unsupported audio file')
+    if audio.tags is None and hasattr(audio, 'add_tags'):
+        audio.add_tags()
+    values = [str(artist).strip() for artist in artists if str(artist).strip()]
+    if not values:
+        raise ValueError('No artist names to write')
+    audio['artist'] = values
     audio.save()
 
 
@@ -982,13 +1097,16 @@ def _finalize_artist_image_repair_result(
 def repair_file(
     root: Path,
     relative_file: str,
+    candidate: dict[str, Any] | None = None,
     artist_folder_policy: str = 'artwork_available',
 ) -> dict[str, Any]:
     path = safe_library_path(root, relative_file)
     if not path.exists() or not path.is_file():
         raise FileNotFoundError(relative_file)
     current = _song_from_file(path)
-    candidate = enrich_song_metadata(current)
+    candidate = candidate if isinstance(candidate, dict) else None
+    if candidate is None:
+        candidate = enrich_song_metadata(current)
     if not candidate.get('musicbrainz_recording_id'):
         return _scan_item(root.resolve(), path)
     apply_text_tags(path, candidate)
@@ -1013,6 +1131,49 @@ def repair_file(
         'file': path.relative_to(root.resolve()).as_posix(),
         'current': _public_song(updated),
         'candidate': _public_song(candidate),
+        'matched': True,
+        'changes': [],
+    }
+
+
+def repair_grouped_artists(
+    root: Path,
+    relative_file: str,
+    artists: list[str] | None = None,
+) -> dict[str, Any]:
+    path = safe_library_path(root, relative_file)
+    if not path.exists() or not path.is_file():
+        raise FileNotFoundError(relative_file)
+    current = _song_from_file(path)
+    proposed = [
+        str(artist).strip()
+        for artist in artists or []
+        if str(artist).strip()
+    ]
+    if not proposed:
+        proposed = _expanded_artist_repair(current)['proposed_artists']
+    if not proposed:
+        return _artist_tag_scan_item(root.resolve(), path)
+
+    apply_artist_tags(path, proposed)
+    updated = _song_from_file(path)
+    remaining = _expanded_artist_repair(updated)
+    if remaining['matched']:
+        raise ValueError('Artist tag write did not persist')
+    updated_artists = [
+        str(artist).strip()
+        for artist in updated.get('artists') or []
+        if str(artist).strip()
+    ]
+    if updated_artists != proposed:
+        raise ValueError('Artist tag write did not persist')
+    return {
+        'file': path.relative_to(root.resolve()).as_posix(),
+        'current': _public_song(updated),
+        'candidate': {
+            **_public_song(updated),
+            'artists': proposed,
+        },
         'matched': True,
         'changes': [],
     }

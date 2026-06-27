@@ -262,6 +262,7 @@ export default {
       'Escaneie arquivos existentes no servidor e repare tags com correspondencias do MusicBrainz.',
     metadataTab: 'Metadados',
     artistImagesTab: 'Imagens de artistas',
+    artistRepairTab: 'Reparar artistas',
     jellyfinTab: 'Jellyfin',
     scan: 'Escanear biblioteca',
     scanAll: 'Escanear tudo',
@@ -280,6 +281,7 @@ export default {
     apply: 'Aplicar correcao',
     repairAll: 'Corrigir tudo',
     fixAllArtistImages: 'Corrigir todas as imagens de artistas',
+    fixAllArtistTags: 'Corrigir todos os artistas',
     fixing: 'Corrigindo...',
     fixed: 'Corrigido',
     completed: 'Concluido',
@@ -312,6 +314,27 @@ export default {
     failedApply: 'Falha ao aplicar correcao de metadados.',
     failedArtistImageScan: 'Falha ao escanear imagens de artistas.',
     failedArtistImageApply: 'Falha ao reparar imagem do artista.',
+    artistTagLimit: 'Reparos de artistas para mostrar',
+    scanArtistTags: 'Escanear nomes de artistas',
+    groupedArtists: 'Artistas agrupados',
+    artistTagsHint:
+      'Encontra faixas onde varios artistas estao salvos como um unico nome e grava como tags individuais de artista.',
+    currentArtists: 'Artistas atuais',
+    proposedArtists: 'Artistas individuais',
+    fixArtists: 'Corrigir artistas',
+    emptyArtistTags:
+      'Nenhuma tag de artista agrupado foi encontrada neste escaneamento.',
+    emptyArtistTagCompleted:
+      'Nenhum reparo de tag de artista foi concluido ainda.',
+    emptyArtistTagClean:
+      'Ainda nao ha resultados limpos de tags de artistas.',
+    failedArtistTagScan: 'Falha ao escanear tags de artistas.',
+    failedArtistTagApply: 'Falha ao reparar tags de artistas.',
+    artistTagRepairOk: 'Tags de artistas reparadas.',
+    artistTagRepairPartial:
+      '{succeeded} de {total} itens de tags de artistas reparados.',
+    artistTagRepairProgressDetail:
+      'Reparando tags de artistas {current}/{total}: {name} · {succeeded} corrigidos, {failed} falharam',
     failedVerify:
       'A escrita terminou, mas o arquivo ainda tem alteracoes pendentes.',
     jellyfinTools: 'Ferramentas Jellyfin',
@@ -363,8 +386,14 @@ export default {
     bulkFixShort: 'Reparar',
     bulkFixAvailable: '{count} podem ser reparados',
     bulkFixReady: '{count} candidatos de imagem reparaveis neste grupo.',
+    bulkFixTagsReady: '{count} correspondencias de tags reparaveis neste grupo.',
     noRepairFile:
       'Execute a busca de imagens de artistas para encontrar uma fonte de reparo.',
+    fixTags: 'Reparar tags',
+    tagRepairOk: 'Tags de metadata reparadas.',
+    tagRepairPartial: 'Reparados {succeeded} de {total} itens de tags.',
+    tagRepairProgressDetail:
+      'Reparando tags {current}/{total}: {name} · {succeeded} reparadas, {failed} falharam',
     jellyfinOnly: 'So no Jellyfin',
     folderOnly: 'So pasta',
     tagOnly: 'So tags locais',

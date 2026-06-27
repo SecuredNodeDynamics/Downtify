@@ -216,8 +216,11 @@ function getMetadataScanStatus() {
   return API.get('/api/metadata/scan/status')
 }
 
-function applyMetadata(file) {
-  return API.post('/api/metadata/apply', { file })
+function applyMetadata(file, candidate = null) {
+  return API.post('/api/metadata/apply', {
+    file,
+    candidate: candidate && typeof candidate === 'object' ? candidate : null,
+  })
 }
 
 function scanArtistImages(limit = 50, scanAll = false, reset = false) {
@@ -230,6 +233,25 @@ function scanArtistImages(limit = 50, scanAll = false, reset = false) {
 
 function getArtistImageScanStatus() {
   return API.get('/api/metadata/artist-images/status')
+}
+
+function scanArtistTags(limit = 100, scanAll = false, reset = false) {
+  return API.post('/api/metadata/artist-tags/scan', {
+    limit,
+    all: scanAll,
+    reset,
+  })
+}
+
+function getArtistTagScanStatus() {
+  return API.get('/api/metadata/artist-tags/status')
+}
+
+function applyArtistTags(file, artists = []) {
+  return API.post('/api/metadata/artist-tags/apply', {
+    file,
+    artists: Array.isArray(artists) ? artists : [],
+  })
 }
 
 function getArtistImageOptions(item) {
@@ -857,6 +879,9 @@ export default {
   applyMetadata,
   scanArtistImages,
   getArtistImageScanStatus,
+  scanArtistTags,
+  getArtistTagScanStatus,
+  applyArtistTags,
   getArtistImageOptions,
   applyArtistImage,
   getRepairLog,
