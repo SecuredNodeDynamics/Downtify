@@ -39,6 +39,21 @@
             type="button"
             class="queue-tab-btn"
             :class="
+              activeTab === 'failed'
+                ? 'queue-tab-btn-active'
+                : 'queue-tab-btn-inactive'
+            "
+            @click="activeTab = 'failed'"
+          >
+            {{ t('failed.tab') }}
+            <span v-if="failedHistory.length > 0" class="queue-tab-count">
+              {{ failedHistory.length }}
+            </span>
+          </button>
+          <button
+            type="button"
+            class="queue-tab-btn"
+            :class="
               activeTab === 'manage'
                 ? 'queue-tab-btn-active'
                 : 'queue-tab-btn-inactive'
@@ -470,6 +485,127 @@
               </ul>
             </template>
 
+            <template v-else-if="activeTab === 'failed'">
+              <div
+                v-if="historyError"
+                class="mb-3 flex items-center gap-3 rounded-2xl border border-error/20 bg-error/10 p-3 text-sm text-error"
+              >
+                <Icon
+                  icon="clarity:exclamation-circle-line"
+                  class="h-5 w-5 shrink-0"
+                />
+                <span>{{ historyError }}</span>
+              </div>
+
+              <div
+                v-if="historyLoading && failedHistory.length === 0"
+                class="grid gap-3 sm:grid-cols-2"
+              >
+                <div
+                  v-for="n in 4"
+                  :key="n"
+                  class="skeleton h-40 rounded-2xl"
+                />
+              </div>
+
+              <div v-else-if="failedHistory.length === 0" class="queue-empty">
+                <Icon
+                  icon="clarity:success-standard-line"
+                  class="mb-4 h-10 w-10 text-base-content/20"
+                />
+                <p class="text-sm text-base-content/50">
+                  {{ t('failed.empty') }}
+                </p>
+                <p class="mt-1 text-xs text-base-content/40">
+                  {{ t('failed.emptyHint') }}
+                </p>
+              </div>
+
+              <ul v-else class="failed-grid">
+                <li
+                  v-for="item in failedHistory"
+                  :key="item.id"
+                  class="failed-card"
+                >
+                  <div class="flex min-w-0 gap-3">
+                    <div class="queue-item-cover h-14 w-14">
+                      <CoverImage
+                        v-if="item.song?.cover_url"
+                        :src="coverSrc(item.song.cover_url)"
+                        :alt="item.title"
+                        img-class="h-full w-full object-cover"
+                      >
+                        <template #fallback>
+                          <Icon
+                            icon="clarity:music-note-line"
+                            class="h-5 w-5 text-base-content/35"
+                          />
+                        </template>
+                      </CoverImage>
+                      <Icon
+                        v-else
+                        icon="clarity:music-note-line"
+                        class="h-5 w-5 text-base-content/35"
+                      />
+                    </div>
+
+                    <div class="min-w-0 flex-1">
+                      <div class="mb-1 flex items-start justify-between gap-2">
+                        <p class="failed-card-title text-sm font-semibold leading-snug">
+                          {{ item.title || t('common.unknownTrack') }}
+                        </p>
+                        <span class="badge-error-soft shrink-0">
+                          {{ t('history.failed') }}
+                        </span>
+                      </div>
+                      <p class="truncate text-xs text-base-content/60">
+                        {{ item.artists || t('common.unknownArtist') }}
+                      </p>
+                      <p class="mt-1 text-xs text-base-content/40">
+                        {{ formatDate(historyDate(item)) }}
+                      </p>
+                    </div>
+                  </div>
+
+                  <p
+                    v-if="item.error"
+                    class="failed-card-error mt-3 rounded-xl border border-error/15 bg-error/5 px-3 py-2 text-xs leading-relaxed text-error/80"
+                  >
+                    {{ item.error }}
+                  </p>
+
+                  <div class="mt-3 grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      class="failed-action-btn text-primary hover:border-primary/40 hover:bg-primary/10"
+                      :disabled="retrying[item.id] === true"
+                      @click="retryHistory(item)"
+                    >
+                      <span
+                        v-if="retrying[item.id] === true"
+                        class="loading loading-spinner loading-xs"
+                      />
+                      <Icon v-else icon="clarity:refresh-line" class="h-4 w-4" />
+                      <span>{{ t('history.retry') }}</span>
+                    </button>
+                    <button
+                      type="button"
+                      class="failed-action-btn text-error/75 hover:border-error/40 hover:bg-error/10 hover:text-error"
+                      :disabled="deletingHistory[item.id] === true"
+                      @click="deleteFailedHistory(item)"
+                    >
+                      <span
+                        v-if="deletingHistory[item.id] === true"
+                        class="loading loading-spinner loading-xs"
+                      />
+                      <Icon v-else icon="clarity:trash-line" class="h-4 w-4" />
+                      <span>{{ t('failed.delete') }}</span>
+                    </button>
+                  </div>
+                </li>
+              </ul>
+            </template>
+
             <template v-else>
               <div
                 v-if="historyError"
@@ -693,9 +829,11 @@ const pt = useProgressTracker()
 const dm = useDownloadManager()
 const {
   sortedHistory,
+  failedHistory,
   historyRevision,
   refreshDownloadHistory,
   clearDownloadHistoryState,
+  removeHistoryItem,
   historyDate,
 } = useDownloadHistory()
 const { t } = useI18n()
@@ -703,6 +841,7 @@ const activeTab = ref('queue')
 const historyLoading = ref(false)
 const historyError = ref('')
 const retrying = ref({})
+const deletingHistory = ref({})
 let historyFetchSeq = 0
 
 const manageItems = ref([])
@@ -935,6 +1074,19 @@ async function retryHistory(item) {
   }
 }
 
+async function deleteFailedHistory(item) {
+  if (!confirm(t('failed.deletePrompt', { title: item.title }))) return
+  deletingHistory.value = { ...deletingHistory.value, [item.id]: true }
+  try {
+    await API.deleteHistoryItem(item.id)
+    removeHistoryItem(item.id)
+  } catch {
+    historyError.value = t('failed.failedDelete')
+  } finally {
+    deletingHistory.value = { ...deletingHistory.value, [item.id]: false }
+  }
+}
+
 async function onClearHistory() {
   if (!confirm(t('history.clearPrompt'))) return
   await API.clearHistory()
@@ -967,19 +1119,23 @@ function openHistoryInPlayer(item) {
 // WebSocket so it has nothing to pull. Returning the promise lets the header
 // refresh store await the fetch (and keep its spinner up) before settling.
 function refreshActiveTab() {
-  if (activeTab.value === 'history') return refreshHistory()
+  if (activeTab.value === 'history' || activeTab.value === 'failed') {
+    return refreshHistory()
+  }
   if (activeTab.value === 'manage') return refreshManage()
   return Promise.resolve()
 }
 
 function syncDownloadRefreshVisibility() {
   downloadRefresh.setVisible(
-    activeTab.value === 'history' || activeTab.value === 'manage'
+    activeTab.value === 'history' ||
+      activeTab.value === 'failed' ||
+      activeTab.value === 'manage'
   )
 }
 
 watch(activeTab, (tab) => {
-  if (tab === 'history') void refreshHistory()
+  if (tab === 'history' || tab === 'failed') void refreshHistory()
   if (tab === 'manage') {
     loadManageFromCache()
     void refreshManage({ background: manageItems.value.length > 0 })
@@ -1131,6 +1287,26 @@ onUnmounted(() => {
 
 .queue-list {
   @apply space-y-2;
+}
+
+.failed-grid {
+  @apply grid gap-3 sm:grid-cols-2;
+}
+
+.failed-card {
+  @apply rounded-2xl border border-error/15 bg-error/[0.04] p-3 shadow-lg shadow-black/10;
+}
+
+.failed-card-title,
+.failed-card-error {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.failed-action-btn {
+  @apply flex h-11 items-center justify-center gap-2 rounded-xl border border-white/10 bg-base-100/60 px-3 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50;
 }
 
 .queue-item {

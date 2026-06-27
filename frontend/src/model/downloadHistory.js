@@ -94,21 +94,30 @@ export function clearDownloadHistoryState() {
   history.value = []
 }
 
+export function removeHistoryItem(historyId) {
+  history.value = history.value.filter((item) => item.id !== historyId)
+}
+
 export function useDownloadHistory() {
   const sortedHistory = computed(() =>
     sortHistoryItems(
       history.value.filter((item) => TERMINAL_STATUSES.has(item.status))
     )
   )
+  const failedHistory = computed(() =>
+    sortHistoryItems(history.value.filter((item) => item.status === 'error'))
+  )
 
   return {
     history,
     sortedHistory,
+    failedHistory,
     historyRevision,
     refreshDownloadHistory,
     notifyDownloadHistory,
     upsertHistoryItem,
     clearDownloadHistoryState,
+    removeHistoryItem,
     sortHistoryItems,
     historyDate,
   }

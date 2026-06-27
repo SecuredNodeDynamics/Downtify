@@ -3375,6 +3375,17 @@ async def clear_history() -> dict:
     return {'cleared': True}
 
 
+@router.delete('/api/history/{history_id}')
+async def delete_history_item(history_id: int) -> dict[str, Any]:
+    if state.history_db is None:
+        raise HTTPException(status_code=500, detail='History not ready')
+    deleted = state.history_db.delete(history_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail='History item not found')
+    await _broadcast_history_changed(None)
+    return {'deleted': True, 'id': history_id}
+
+
 @router.post('/api/history/{history_id}/retry')
 async def retry_history_item(history_id: int) -> dict[str, Any]:
     if state.downloader is None:

@@ -637,6 +637,10 @@ function retryHistoryItem(historyId) {
   return API.post(`/api/history/${historyId}/retry`)
 }
 
+function deleteHistoryItem(historyId) {
+  return API.delete(`/api/history/${historyId}`)
+}
+
 function clearHistory() {
   return API.delete('/api/history')
 }
@@ -772,6 +776,7 @@ export default {
   getHistory,
   reconcileHistory,
   retryHistoryItem,
+  deleteHistoryItem,
   clearHistory,
   getCapabilities,
   getSettings,

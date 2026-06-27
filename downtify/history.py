@@ -220,6 +220,14 @@ class DownloadHistoryDB:
         with self._connect() as conn:
             conn.execute('DELETE FROM download_history')
 
+    def delete(self, history_id: int) -> bool:
+        with self._connect() as conn:
+            cur = conn.execute(
+                'DELETE FROM download_history WHERE id = ?',
+                (history_id,),
+            )
+            return cur.rowcount > 0
+
     def count_completed_since(self, since: datetime) -> int:
         if since.tzinfo is None:
             since = since.replace(tzinfo=timezone.utc)
