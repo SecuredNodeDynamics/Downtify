@@ -134,6 +134,63 @@ def test_scan_grouped_artists_reports_compound_artist_tag(
     ]
 
 
+def test_scan_grouped_artists_reports_grouped_folder_with_split_tags(
+    tmp_path,
+    monkeypatch,
+):
+    album = tmp_path / 'Artist One & Artist Two' / 'Album'
+    album.mkdir(parents=True)
+    track = album / 'song.mp3'
+    track.write_bytes(b'not really audio')
+
+    monkeypatch.setattr(
+        metadata_repair,
+        '_song_from_file',
+        lambda _path: {
+            'name': 'Song',
+            'artists': ['Artist One', 'Artist Two'],
+            'album_name': 'Album',
+        },
+    )
+
+    result = metadata_repair.scan_grouped_artists(tmp_path)
+
+    assert result['matched'] == 1
+    assert result['items'][0]['changes'] == [
+        {
+            'field': 'artist_folder',
+            'label': 'Artist folder',
+            'before': 'Artist One & Artist Two',
+            'after': 'Artist One, Artist Two',
+        }
+    ]
+
+
+def test_scan_grouped_artists_does_not_return_unrelated_clean_tracks(
+    tmp_path,
+    monkeypatch,
+):
+    track = tmp_path / 'Artist One' / 'Album' / 'song.mp3'
+    track.parent.mkdir(parents=True)
+    track.write_bytes(b'not really audio')
+
+    monkeypatch.setattr(
+        metadata_repair,
+        '_song_from_file',
+        lambda _path: {
+            'name': 'Song',
+            'artists': ['Artist One'],
+            'album_name': 'Album',
+        },
+    )
+
+    result = metadata_repair.scan_grouped_artists(tmp_path)
+
+    assert result['matched'] == 0
+    assert result['items'] == []
+    assert result['clean'] == []
+
+
 def test_repair_grouped_artists_writes_split_artist_tags(
     tmp_path,
     monkeypatch,
@@ -208,6 +265,45 @@ def test_repair_grouped_artists_moves_file_and_removes_empty_group_folder(
         'Artist One, Artist Two'
     ]
     assert result['folder_verification']['old_folders_remaining'] == []
+
+
+def test_repair_grouped_artists_repairs_folder_when_tags_are_split(
+    tmp_path,
+    monkeypatch,
+):
+    album = tmp_path / 'Artist One & Artist Two' / 'Album'
+    album.mkdir(parents=True)
+    track = album / 'song.mp3'
+    track.write_bytes(b'not really audio')
+    reads = iter([
+        {'name': 'Song', 'artists': ['Artist One', 'Artist Two']},
+        {'name': 'Song', 'artists': ['Artist One', 'Artist Two']},
+        {'name': 'Song', 'artists': ['Artist One', 'Artist Two']},
+    ])
+
+    monkeypatch.setattr(
+        metadata_repair,
+        '_song_from_file',
+        lambda _path: next(reads),
+    )
+    monkeypatch.setattr(
+        metadata_repair,
+        'apply_artist_tags',
+        lambda *_args: pytest.fail('tags are already split'),
+    )
+
+    result = metadata_repair.repair_grouped_artists(
+        tmp_path,
+        'Artist One & Artist Two/Album/song.mp3',
+    )
+
+    assert result['file'] == 'Artist One/Album/song.mp3'
+    assert (tmp_path / 'Artist One' / 'Album' / 'song.mp3').is_file()
+    assert (tmp_path / 'Artist Two').is_dir()
+    assert not (tmp_path / 'Artist One & Artist Two').exists()
+    assert result['folder_verification']['removed_folders'] == [
+        'Artist One & Artist Two'
+    ]
 
 
 def test_artist_image_paths_prefers_named_artist_image(tmp_path):

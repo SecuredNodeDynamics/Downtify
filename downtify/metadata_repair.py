@@ -388,18 +388,55 @@ def _expanded_artist_repair(current: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _folder_artist_repair(
+    root: Path,
+    path: Path,
+    artists: list[str],
+) -> dict[str, Any]:
+    artists = [str(artist).strip() for artist in artists if str(artist).strip()]
+    if len(artists) < 2:
+        return {'matched': False, 'changes': []}
+    try:
+        relative = path.resolve().relative_to(root.resolve())
+    except ValueError:
+        return {'matched': False, 'changes': []}
+    if len(relative.parts) < 2:
+        return {'matched': False, 'changes': []}
+    folder_name = relative.parts[0]
+    artist_keys = {artist.casefold() for artist in artists}
+    folder_key = folder_name.casefold()
+    if folder_key in artist_keys:
+        return {'matched': False, 'changes': []}
+    if not any(artist.casefold() in folder_key for artist in artists):
+        return {'matched': False, 'changes': []}
+    return {
+        'matched': True,
+        'changes': [
+            {
+                'field': 'artist_folder',
+                'label': 'Artist folder',
+                'before': folder_name,
+                'after': ', '.join(artists),
+            }
+        ],
+    }
+
+
 def _artist_tag_scan_item(root: Path, path: Path) -> dict[str, Any]:
     current = _song_from_file(path)
     repair = _expanded_artist_repair(current)
+    artists = repair['proposed_artists'] or repair['current_artists']
+    folder_repair = _folder_artist_repair(root, path, artists)
+    changes = [*repair['changes'], *folder_repair['changes']]
     return {
         'file': path.relative_to(root).as_posix(),
         'current': _public_song(current),
         'candidate': {
             **_public_song(current),
-            'artists': repair['proposed_artists'],
+            'artists': artists,
         },
-        'matched': repair['matched'],
-        'changes': repair['changes'],
+        'matched': repair['matched'] or folder_repair['matched'],
+        'changes': changes,
     }
 
 
@@ -502,7 +539,6 @@ def scan_grouped_artists(
     start = max(0, min(start, total))
     selected = files[start : start + max(1, limit)]
     items: list[dict[str, Any]] = []
-    clean_items: list[dict[str, Any]] = []
     errors: list[dict[str, str]] = []
     batch_scanned = 0
     for path in selected:
@@ -518,8 +554,6 @@ def scan_grouped_artists(
             item = None
         if item is not None and item['matched'] and item['changes']:
             items.append(item)
-        elif item is not None:
-            clean_items.append(item)
         if progress_cb is not None:
             progress_cb({
                 'scanned': current_offset,
@@ -527,7 +561,7 @@ def scan_grouped_artists(
                 'total': total,
                 'matched': len(items),
                 'items': list(items),
-                'clean': list(clean_items),
+                'clean': [],
                 'start': start,
                 'next_offset': current_offset,
             })
@@ -539,7 +573,7 @@ def scan_grouped_artists(
         'total': total,
         'matched': len(items),
         'items': items,
-        'clean': clean_items,
+        'clean': [],
         'errors': errors,
         'start': start,
         'next_offset': next_offset,
@@ -764,6 +798,14 @@ def _artist_folder_verify_result(
         if first_folder.is_dir() and any(
             artist.casefold() == first_key for artist in current_compounds
         ):
+            old_folders.append(first_folder)
+    elif relative.parts and _folder_artist_repair(
+        root,
+        path,
+        proposed_artists,
+    )['matched']:
+        first_folder = (root / relative.parts[0]).resolve()
+        if first_folder.is_dir():
             old_folders.append(first_folder)
 
     artist_refs = [{'id': '', 'name': artist} for artist in proposed_artists]
@@ -1257,9 +1299,20 @@ def repair_grouped_artists(
     if not proposed:
         proposed = _expanded_artist_repair(current)['proposed_artists']
     if not proposed:
+        proposed = [
+            str(artist).strip()
+            for artist in current.get('artists') or []
+            if str(artist).strip()
+        ]
+    if not proposed:
         return _artist_tag_scan_item(root.resolve(), path)
 
-    apply_artist_tags(path, proposed)
+    if proposed != [
+        str(artist).strip()
+        for artist in current.get('artists') or []
+        if str(artist).strip()
+    ]:
+        apply_artist_tags(path, proposed)
     updated = _song_from_file(path)
     remaining = _expanded_artist_repair(updated)
     if remaining['matched']:

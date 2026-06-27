@@ -2217,7 +2217,7 @@ function applyArtistTagStatus(data) {
     total: data.total || 0,
   }
   artistTagItems.value = data.items || []
-  cleanArtistTagItems.value = data.clean || cleanArtistTagItems.value
+  cleanArtistTagItems.value = data.clean || []
   completedArtistTags.value = data.completed || completedArtistTags.value
   if (data.status === 'error') {
     artistTagError.value = data.error || t('metadata.failedArtistTagScan')
