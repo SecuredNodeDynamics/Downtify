@@ -23,8 +23,8 @@ android {
         applicationId "com.securednodedynamics.downtify"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 2011008
-        versionName "2.11.8"
+        versionCode 2011009
+        versionName "2.11.9"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         // Chaquopy (embedded Python) only ships native code for these ABIs.
         // Add "armeabi-v7a" if you also need 32-bit device support (requires
