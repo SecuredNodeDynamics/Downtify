@@ -864,6 +864,17 @@ function warmVisibleTrackCovers(trackList = []) {
   preloadCoverSourcesBatch(entries, { limit: 100, concurrency: 8 })
 }
 
+function warmVisibleGenreCovers(genreList = []) {
+  const entries = []
+  for (const genre of genreList.slice(0, 48)) {
+    for (const file of genre.coverFiles || []) {
+      const entry = API.coverSourcesForGenreFile(file)
+      if (entry.src || entry.fallbacks?.length) entries.push(entry)
+    }
+  }
+  preloadCoverSourcesBatch(entries, { limit: 96, concurrency: 12 })
+}
+
 function warmVisibleCoversForCurrentView() {
   if (viewMode.value === 'artists' && !selectedArtist.value) {
     warmVisibleArtistCovers(filteredArtists.value)
@@ -875,6 +886,11 @@ function warmVisibleCoversForCurrentView() {
     (viewMode.value === 'artists' && selectedArtist.value)
   if (inAlbumBrowse && !selectedAlbum.value) {
     warmVisibleAlbumCovers(filteredVisibleAlbums.value)
+    return
+  }
+
+  if (viewMode.value === 'genres' && !selectedGenreName.value) {
+    warmVisibleGenreCovers(filteredGenres.value)
     return
   }
 
@@ -916,6 +932,20 @@ watch(
       (viewMode.value === 'artists' && selectedArtist.value)
     if (!inAlbumBrowse) return
     warmVisibleAlbumCovers(filteredVisibleAlbums.value)
+  },
+  { immediate: true }
+)
+
+watch(
+  () =>
+    viewMode.value === 'genres' && !selectedGenreName.value
+      ? filteredGenres.value
+          .map((genre) => `${genre.name}:${genre.coverFiles.join('\0')}`)
+          .join('\u0001')
+      : '',
+  () => {
+    if (viewMode.value !== 'genres' || selectedGenreName.value) return
+    warmVisibleGenreCovers(filteredGenres.value)
   },
   { immediate: true }
 )

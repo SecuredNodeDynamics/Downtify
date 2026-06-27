@@ -63,13 +63,13 @@ const coverFiles = computed(() =>
 const coverSourceMap = computed(() => {
   const map = new Map()
   for (const file of coverFiles.value) {
-    map.set(file, API.coverSourcesForFile(file))
+    map.set(file, API.coverSourcesForGenreFile(file))
   }
   return map
 })
 
 function coverSourceFor(file) {
-  return coverSourceMap.value.get(file) || API.coverSourcesForFile(file)
+  return coverSourceMap.value.get(file) || API.coverSourcesForGenreFile(file)
 }
 
 const mosaicClass = computed(() => {

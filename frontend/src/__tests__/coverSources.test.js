@@ -48,4 +48,16 @@ describe('coverSourcesForNowPlaying', () => {
     expect(sources.src).toContain('size=320')
     expect(sources.src).not.toContain('size=640')
   })
+
+  it('uses folder previews before embedded track covers for genre tiles', async () => {
+    const API = (await import('../model/api.js')).default
+
+    const sources = API.coverSourcesForGenreFile('Artist/Album/Track.m4a')
+
+    expect(sources.src).toContain(
+      '/api/metadata/artist-images/folder-preview?'
+    )
+    expect(sources.src).toContain('folder=Artist%2FAlbum')
+    expect(sources.fallbacks.at(-1)).toContain('/cover?')
+  })
 })

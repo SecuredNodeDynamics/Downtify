@@ -323,6 +323,15 @@ function coverUrlsForLibraryFile(fileName, size = DEFAULT_COVER_SIZE) {
   return [...new Set(urls.filter(Boolean))]
 }
 
+function coverUrlsForGenreFile(fileName, size = DEFAULT_COVER_SIZE) {
+  const urls = []
+  for (const folder of libraryCoverFolders(fileName)) {
+    urls.push(coverFolderURL(folder, size))
+  }
+  urls.push(coverFileURL(fileName, size))
+  return [...new Set(urls.filter(Boolean))]
+}
+
 function coverFallbackUrls(fileName, size = DEFAULT_COVER_SIZE) {
   return coverUrlsForLibraryFile(fileName, size).slice(1)
 }
@@ -343,6 +352,23 @@ function coverSourcesForFile(fileName, size = DEFAULT_COVER_SIZE) {
   if (cached) return cached
 
   const urls = coverUrlsForLibraryFile(file, size)
+  const entry = Object.freeze({
+    src: urls[0] || '',
+    fallbacks: Object.freeze(urls.slice(1)),
+  })
+  coverSourcesCache.set(cacheKey, entry)
+  return entry
+}
+
+function coverSourcesForGenreFile(fileName, size = DEFAULT_COVER_SIZE) {
+  const file = String(fileName || '').trim()
+  if (!file) return EMPTY_COVER_SOURCES
+
+  const cacheKey = `genre:${size}\0${file}`
+  const cached = coverSourcesCache.get(cacheKey)
+  if (cached) return cached
+
+  const urls = coverUrlsForGenreFile(file, size)
   const entry = Object.freeze({
     src: urls[0] || '',
     fallbacks: Object.freeze(urls.slice(1)),
@@ -719,8 +745,10 @@ export default {
   coverFileURL,
   coverFolderURL,
   coverUrlsForLibraryFile,
+  coverUrlsForGenreFile,
   coverFallbackUrls,
   coverSourcesForFile,
+  coverSourcesForGenreFile,
   coverSourcesForArtist,
   coverSourcesForNowPlaying,
   clearCoverSourcesCache,
