@@ -312,6 +312,7 @@ export default {
       'Find tracks where multiple artists are stored as one combined name, then write them as individual artist tags.',
     currentArtists: 'Current artists',
     proposedArtists: 'Individual artists',
+    verifiedArtists: 'Verified artists',
     fixArtists: 'Fix artists',
     emptyArtistTags: 'No grouped artist tags found in this scan.',
     emptyArtistTagCompleted: 'No artist tag repairs completed yet.',
@@ -323,6 +324,11 @@ export default {
       'Repaired {succeeded} of {total} artist tag items.',
     artistTagRepairProgressDetail:
       'Repairing artist tags {current}/{total}: {name} · {succeeded} fixed, {failed} failed',
+    folderVerification: 'Folder verification',
+    artistFolderVerified:
+      '{created} individual artist folders verified; {removed} grouped folders removed.',
+    artistFolderVerifiedPartial:
+      '{created} individual artist folders verified; {remaining} grouped folders still contain files.',
     failedVerify:
       'The metadata write finished, but the file still has remaining changes.',
     jellyfinTools: 'Jellyfin tools',

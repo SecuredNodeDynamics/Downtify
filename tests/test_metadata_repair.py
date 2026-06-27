@@ -143,6 +143,7 @@ def test_repair_grouped_artists_writes_split_artist_tags(
     reads = iter([
         {'name': 'Song', 'artists': ['Artist One, Artist Two']},
         {'name': 'Song', 'artists': ['Artist One', 'Artist Two']},
+        {'name': 'Song', 'artists': ['Artist One', 'Artist Two']},
     ])
     written = {}
 
@@ -166,6 +167,47 @@ def test_repair_grouped_artists_writes_split_artist_tags(
     }
     assert result['changes'] == []
     assert result['current']['artists'] == ['Artist One', 'Artist Two']
+    assert result['folder_verification']['folder_verified'] is True
+
+
+def test_repair_grouped_artists_moves_file_and_removes_empty_group_folder(
+    tmp_path,
+    monkeypatch,
+):
+    album = tmp_path / 'Artist One, Artist Two' / 'Album'
+    album.mkdir(parents=True)
+    track = album / 'song.mp3'
+    track.write_bytes(b'not really audio')
+    reads = iter([
+        {'name': 'Song', 'artists': ['Artist One, Artist Two']},
+        {'name': 'Song', 'artists': ['Artist One', 'Artist Two']},
+        {'name': 'Song', 'artists': ['Artist One', 'Artist Two']},
+    ])
+
+    monkeypatch.setattr(
+        metadata_repair,
+        '_song_from_file',
+        lambda _path: next(reads),
+    )
+    monkeypatch.setattr(metadata_repair, 'apply_artist_tags', lambda *_args: None)
+
+    result = metadata_repair.repair_grouped_artists(
+        tmp_path,
+        'Artist One, Artist Two/Album/song.mp3',
+    )
+
+    assert result['file'] == 'Artist One/Album/song.mp3'
+    assert (tmp_path / 'Artist One' / 'Album' / 'song.mp3').is_file()
+    assert (tmp_path / 'Artist Two').is_dir()
+    assert not (tmp_path / 'Artist One, Artist Two').exists()
+    assert result['folder_verification']['created_folders'] == [
+        'Artist One',
+        'Artist Two',
+    ]
+    assert result['folder_verification']['removed_folders'] == [
+        'Artist One, Artist Two'
+    ]
+    assert result['folder_verification']['old_folders_remaining'] == []
 
 
 def test_artist_image_paths_prefers_named_artist_image(tmp_path):

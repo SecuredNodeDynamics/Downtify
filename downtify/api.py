@@ -3115,7 +3115,7 @@ async def apply_artist_tags(request: Request) -> dict[str, Any]:
         items = [
             item
             for item in state.artist_tag_scan.get('items') or []
-            if str(item.get('file') or '') != result.get('file')
+            if str(item.get('file') or '') not in {file, result.get('file')}
         ]
         state.artist_tag_scan = {
             **state.artist_tag_scan,

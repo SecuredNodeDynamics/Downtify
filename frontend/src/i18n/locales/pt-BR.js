@@ -321,6 +321,7 @@ export default {
       'Encontra faixas onde varios artistas estao salvos como um unico nome e grava como tags individuais de artista.',
     currentArtists: 'Artistas atuais',
     proposedArtists: 'Artistas individuais',
+    verifiedArtists: 'Artistas verificados',
     fixArtists: 'Corrigir artistas',
     emptyArtistTags:
       'Nenhuma tag de artista agrupado foi encontrada neste escaneamento.',
@@ -335,6 +336,11 @@ export default {
       '{succeeded} de {total} itens de tags de artistas reparados.',
     artistTagRepairProgressDetail:
       'Reparando tags de artistas {current}/{total}: {name} · {succeeded} corrigidos, {failed} falharam',
+    folderVerification: 'Verificacao de pastas',
+    artistFolderVerified:
+      '{created} pastas individuais de artistas verificadas; {removed} pastas agrupadas removidas.',
+    artistFolderVerifiedPartial:
+      '{created} pastas individuais de artistas verificadas; {remaining} pastas agrupadas ainda contem arquivos.',
     failedVerify:
       'A escrita terminou, mas o arquivo ainda tem alteracoes pendentes.',
     jellyfinTools: 'Ferramentas Jellyfin',

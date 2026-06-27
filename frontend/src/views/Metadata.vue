@@ -837,13 +837,20 @@
               <div class="mt-4 grid gap-2">
                 <div class="rounded-xl border border-white/10 bg-base-100/70 p-3">
                   <p class="text-[0.65rem] uppercase text-base-content/45">
-                    {{ t('metadata.currentArtists') }}
+                    {{
+                      activeArtistTagTab === 'needs'
+                        ? t('metadata.currentArtists')
+                        : t('metadata.verifiedArtists')
+                    }}
                   </p>
                   <p class="mt-1 text-sm text-base-content/80">
                     {{ artistList(item.current?.artists) }}
                   </p>
                 </div>
-                <div class="rounded-xl border border-primary/20 bg-primary/10 p-3">
+                <div
+                  v-if="activeArtistTagTab === 'needs'"
+                  class="rounded-xl border border-primary/20 bg-primary/10 p-3"
+                >
                   <p class="text-[0.65rem] uppercase text-primary/80">
                     {{ t('metadata.proposedArtists') }}
                   </p>
@@ -851,6 +858,17 @@
                     {{ artistList(item.candidate?.artists) }}
                   </p>
                 </div>
+              </div>
+              <div
+                v-if="item.folder_verification"
+                class="mt-3 rounded-xl border border-primary/20 bg-base-100/70 p-3 text-xs text-base-content/60"
+              >
+                <p class="font-semibold text-primary">
+                  {{ t('metadata.folderVerification') }}
+                </p>
+                <p class="mt-1">
+                  {{ artistFolderVerificationSummary(item.folder_verification) }}
+                </p>
               </div>
               <button
                 v-if="activeArtistTagTab === 'needs'"
@@ -1716,6 +1734,20 @@ function displaySong(song) {
 function artistList(artists) {
   const values = (artists || []).filter(Boolean)
   return values.length > 0 ? values.join(', ') : t('common.unknownArtist')
+}
+
+function artistFolderVerificationSummary(verification) {
+  const created = verification?.created_folders?.length || 0
+  const removed = verification?.removed_folders?.length || 0
+  const remaining = verification?.old_folders_remaining?.length || 0
+  if (remaining > 0) {
+    return t('metadata.artistFolderVerifiedPartial')
+      .replace('{created}', String(created))
+      .replace('{remaining}', String(remaining))
+  }
+  return t('metadata.artistFolderVerified')
+    .replace('{created}', String(created))
+    .replace('{removed}', String(removed))
 }
 
 function metadataCoverUrl(item) {

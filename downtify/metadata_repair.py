@@ -741,6 +741,110 @@ def apply_artist_tags(path: Path, artists: list[str]) -> None:
     audio.save()
 
 
+def _artist_folder_verify_result(
+    root: Path,
+    path: Path,
+    current_artists: list[str],
+    proposed_artists: list[str],
+) -> dict[str, Any]:
+    root = root.resolve()
+    current_compounds = [
+        artist
+        for artist in current_artists
+        if expand_artist_names([artist]) != [artist]
+    ]
+    old_folders: list[Path] = []
+    try:
+        relative = path.resolve().relative_to(root)
+    except ValueError:
+        relative = Path(path.name)
+    if relative.parts and current_compounds:
+        first_folder = (root / relative.parts[0]).resolve()
+        first_key = first_folder.name.casefold()
+        if first_folder.is_dir() and any(
+            artist.casefold() == first_key for artist in current_compounds
+        ):
+            old_folders.append(first_folder)
+
+    artist_refs = [{'id': '', 'name': artist} for artist in proposed_artists]
+    folders = artist_folders_for_file(
+        root,
+        path,
+        artist_refs,
+        include_missing=True,
+    )
+    created_folders = [
+        folder.relative_to(root).as_posix()
+        for folder in folders
+        if folder.exists()
+    ]
+
+    final_path = path
+    if old_folders and folders:
+        old_folder = old_folders[0]
+        primary_folder = folders[0]
+        try:
+            suffix_parts = path.resolve().relative_to(old_folder).parts
+        except ValueError:
+            suffix_parts = (path.name,)
+        target = primary_folder.joinpath(*suffix_parts).resolve()
+        try:
+            target.relative_to(root)
+        except ValueError as exc:
+            raise ValueError('Invalid repaired artist folder path') from exc
+        if target != path.resolve():
+            target.parent.mkdir(parents=True, exist_ok=True)
+            if target.exists():
+                raise ValueError(
+                    f'Repaired file already exists: '
+                    f'{target.relative_to(root).as_posix()}'
+                )
+            path.rename(target)
+            final_path = target
+
+    removed_folders: list[str] = []
+    remaining_folders: list[str] = []
+    for folder in old_folders:
+        if not folder.exists():
+            removed_folders.append(folder.relative_to(root).as_posix())
+            continue
+        for child in sorted(
+            (item for item in folder.rglob('*') if item.is_dir()),
+            key=lambda item: len(item.parts),
+            reverse=True,
+        ):
+            try:
+                child.rmdir()
+            except OSError:
+                pass
+        try:
+            folder.rmdir()
+            removed_folders.append(folder.relative_to(root).as_posix())
+        except OSError:
+            remaining_folders.append(folder.relative_to(root).as_posix())
+
+    missing_created = [
+        artist
+        for artist, folder in zip(proposed_artists, folders)
+        if not folder.exists()
+    ]
+    if missing_created:
+        raise ValueError(
+            'Artist folder creation did not persist for: '
+            + ', '.join(missing_created)
+        )
+    if old_folders and not removed_folders and not remaining_folders:
+        raise ValueError('Old grouped artist folder verification failed')
+
+    return {
+        'file': final_path.relative_to(root).as_posix(),
+        'created_folders': created_folders,
+        'removed_folders': removed_folders,
+        'old_folders_remaining': remaining_folders,
+        'folder_verified': bool(created_folders),
+    }
+
+
 ArtistImageFetcher = Callable[[str, dict[str, str]], tuple[bytes | None, str]]
 
 
@@ -1160,6 +1264,11 @@ def repair_grouped_artists(
     remaining = _expanded_artist_repair(updated)
     if remaining['matched']:
         raise ValueError('Artist tag write did not persist')
+    current_artists = [
+        str(artist).strip()
+        for artist in current.get('artists') or []
+        if str(artist).strip()
+    ]
     updated_artists = [
         str(artist).strip()
         for artist in updated.get('artists') or []
@@ -1167,8 +1276,16 @@ def repair_grouped_artists(
     ]
     if updated_artists != proposed:
         raise ValueError('Artist tag write did not persist')
+    folder_result = _artist_folder_verify_result(
+        root.resolve(),
+        path,
+        current_artists,
+        proposed,
+    )
+    final_path = safe_library_path(root, folder_result['file'])
+    updated = _song_from_file(final_path)
     return {
-        'file': path.relative_to(root.resolve()).as_posix(),
+        'file': folder_result['file'],
         'current': _public_song(updated),
         'candidate': {
             **_public_song(updated),
@@ -1176,4 +1293,5 @@ def repair_grouped_artists(
         },
         'matched': True,
         'changes': [],
+        'folder_verification': folder_result,
     }

@@ -321,6 +321,7 @@ export default {
       'Encuentra canciones donde varios artistas estan guardados como un solo nombre y los escribe como etiquetas de artista individuales.',
     currentArtists: 'Artistas actuales',
     proposedArtists: 'Artistas individuales',
+    verifiedArtists: 'Artistas verificados',
     fixArtists: 'Corregir artistas',
     emptyArtistTags:
       'No se encontraron etiquetas de artistas agrupados en este escaneo.',
@@ -335,6 +336,11 @@ export default {
       'Se repararon {succeeded} de {total} elementos de etiquetas de artistas.',
     artistTagRepairProgressDetail:
       'Reparando etiquetas de artistas {current}/{total}: {name} · {succeeded} corregidos, {failed} fallidos',
+    folderVerification: 'Verificacion de carpetas',
+    artistFolderVerified:
+      '{created} carpetas individuales de artistas verificadas; {removed} carpetas agrupadas eliminadas.',
+    artistFolderVerifiedPartial:
+      '{created} carpetas individuales de artistas verificadas; {remaining} carpetas agrupadas todavia contienen archivos.',
     failedVerify:
       'La escritura termino, pero el archivo todavia tiene cambios pendientes.',
     jellyfinTools: 'Herramientas Jellyfin',
