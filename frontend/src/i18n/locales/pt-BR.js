@@ -123,6 +123,15 @@ export default {
     failedLoad: 'Falha ao carregar o histórico de downloads.',
     failedRetry: 'Falha ao tentar este download novamente.',
   },
+  failed: {
+    tab: 'Falhas',
+    empty: 'Nenhum download com falha.',
+    emptyHint:
+      'Downloads com falha aparecerao aqui com acoes para tentar novamente ou excluir.',
+    delete: 'Excluir',
+    deletePrompt: 'Remover "{title}" dos downloads com falha?',
+    failedDelete: 'Falha ao remover este download com falha.',
+  },
   manage: {
     tab: 'Gerenciar',
     title: 'Gerenciar biblioteca',

@@ -95,6 +95,19 @@ def test_history_clear_removes_rows(tmp_path):
     assert db.list() == []
 
 
+def test_history_delete_removes_one_row(tmp_path):
+    db = DownloadHistoryDB(tmp_path / 'history.db')
+    keep_id = db.create({'name': 'Keep'}, status='done')
+    delete_id = db.create({'name': 'Delete'}, status='downloading')
+    db.mark_error(delete_id, 'boom')
+
+    assert db.delete(delete_id) is True
+    assert db.delete(delete_id) is False
+
+    rows = db.list()
+    assert [row['id'] for row in rows] == [keep_id]
+
+
 def test_history_can_mark_duplicate_as_skipped(tmp_path):
     db = DownloadHistoryDB(tmp_path / 'history.db')
     history_id = db.create({'name': 'Song'}, status='downloading')

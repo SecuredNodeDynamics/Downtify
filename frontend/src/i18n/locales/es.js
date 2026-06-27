@@ -124,6 +124,15 @@ export default {
     failedLoad: 'No se pudo cargar el historial de descargas.',
     failedRetry: 'No se pudo reintentar esta descarga.',
   },
+  failed: {
+    tab: 'Fallidas',
+    empty: 'No hay descargas fallidas.',
+    emptyHint:
+      'Las descargas fallidas apareceran aqui con acciones para reintentar o eliminar.',
+    delete: 'Eliminar',
+    deletePrompt: '¿Quitar "{title}" de las descargas fallidas?',
+    failedDelete: 'No se pudo quitar esta descarga fallida.',
+  },
   manage: {
     tab: 'Administrar',
     title: 'Administrar biblioteca',

@@ -122,6 +122,14 @@ export default {
     failedLoad: 'Failed to load download history.',
     failedRetry: 'Failed to retry this download.',
   },
+  failed: {
+    tab: 'Failed',
+    empty: 'No failed downloads.',
+    emptyHint: 'Failed downloads will appear here with retry and delete actions.',
+    delete: 'Delete',
+    deletePrompt: 'Remove "{title}" from failed downloads?',
+    failedDelete: 'Failed to remove this failed download.',
+  },
   manage: {
     tab: 'Manage',
     title: 'Manage Library',
