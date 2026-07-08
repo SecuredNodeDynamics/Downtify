@@ -393,7 +393,8 @@ export default {
     bulkFixShort: 'Reparar',
     bulkFixAvailable: '{count} se pueden reparar',
     bulkFixReady: '{count} candidatos de imagen reparables en este grupo.',
-    bulkFixTagsReady: '{count} coincidencias de etiquetas reparables en este grupo.',
+    bulkFixTagsReady:
+      '{count} coincidencias de etiquetas reparables en este grupo.',
     noRepairFile:
       'Ejecuta el escaneo de imagenes de artistas para encontrar una fuente de reparacion.',
     fixTags: 'Reparar etiquetas',
@@ -426,8 +427,10 @@ export default {
     urlPlaceholderPlaylist: 'Busca listas de Spotify o pega una URL...',
     urlPlaceholderArtist: 'Busca artistas de Spotify o pega una URL...',
     searching: 'Buscando en Spotify...',
-    searchFailed: 'La búsqueda falló. Pega un enlace de Spotify o inténtalo de nuevo.',
-    noSearchResults: 'No se encontraron coincidencias. Prueba con un nombre más específico.',
+    searchFailed:
+      'La búsqueda falló. Pega un enlace de Spotify o inténtalo de nuevo.',
+    noSearchResults:
+      'No se encontraron coincidencias. Prueba con un nombre más específico.',
     selectTarget: 'Seleccionar para vigilar',
     selectedTarget: 'Listo para vigilar',
     clearSearch: 'Limpiar búsqueda',
@@ -665,8 +668,10 @@ export default {
       'Browse Library and Player to spot missing tags, genres, or artwork.',
     aboutWorkflowPoint3:
       'Run Metadata and Artist Images repairs, then refresh Jellyfin when local files look right.',
-    aboutWorkflowTip1: 'Treat Jellyfin refresh as the final step after local cleanup.',
-    aboutWorkflowTip2: 'For large libraries, repeat the workflow in small batches.',
+    aboutWorkflowTip1:
+      'Treat Jellyfin refresh as the final step after local cleanup.',
+    aboutWorkflowTip2:
+      'For large libraries, repeat the workflow in small batches.',
     helpTitle: 'Ayuda y actualizaciones',
     helpSubtitle:
       'Revisa la version instalada de Downtify, busca actualizaciones en GitHub y actualiza instalaciones compatibles.',
@@ -899,6 +904,10 @@ export default {
     browseSearchPlaceholder: 'Buscar artistas, álbumes, pistas, géneros…',
     detailsEmpty:
       'Los detalles del artista y del álbum aparecen aquí mientras suena una pista.',
+    similarArtists: 'Artistas similares',
+    similarArtistsEmpty: 'No se encontraron artistas similares.',
+    artistAvailableMusic: 'Álbumes y pistas disponibles',
+    artistMusicEmpty: 'No se encontró música descargable para este artista.',
     nothingPlaying: 'Nada en reproducción',
     nothingPlayingHint:
       'Elige una pista de tu biblioteca para empezar a escuchar.',

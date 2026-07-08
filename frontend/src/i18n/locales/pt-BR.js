@@ -327,8 +327,7 @@ export default {
       'Nenhuma tag de artista agrupado foi encontrada neste escaneamento.',
     emptyArtistTagCompleted:
       'Nenhum reparo de tag de artista foi concluido ainda.',
-    emptyArtistTagClean:
-      'Ainda nao ha resultados limpos de tags de artistas.',
+    emptyArtistTagClean: 'Ainda nao ha resultados limpos de tags de artistas.',
     failedArtistTagScan: 'Falha ao escanear tags de artistas.',
     failedArtistTagApply: 'Falha ao reparar tags de artistas.',
     artistTagRepairOk: 'Tags de artistas reparadas.',
@@ -392,7 +391,8 @@ export default {
     bulkFixShort: 'Reparar',
     bulkFixAvailable: '{count} podem ser reparados',
     bulkFixReady: '{count} candidatos de imagem reparaveis neste grupo.',
-    bulkFixTagsReady: '{count} correspondencias de tags reparaveis neste grupo.',
+    bulkFixTagsReady:
+      '{count} correspondencias de tags reparaveis neste grupo.',
     noRepairFile:
       'Execute a busca de imagens de artistas para encontrar uma fonte de reparo.',
     fixTags: 'Reparar tags',
@@ -425,7 +425,8 @@ export default {
     urlPlaceholderArtist: 'Busque artistas do Spotify ou cole uma URL...',
     searching: 'Buscando no Spotify...',
     searchFailed: 'A busca falhou. Cole um link do Spotify ou tente de novo.',
-    noSearchResults: 'Nenhuma correspondência encontrada. Tente um nome mais específico.',
+    noSearchResults:
+      'Nenhuma correspondência encontrada. Tente um nome mais específico.',
     selectTarget: 'Selecionar para monitorar',
     selectedTarget: 'Pronto para monitorar',
     clearSearch: 'Limpar busca',
@@ -662,8 +663,10 @@ export default {
       'Browse Library and Player to spot missing tags, genres, or artwork.',
     aboutWorkflowPoint3:
       'Run Metadata and Artist Images repairs, then refresh Jellyfin when local files look right.',
-    aboutWorkflowTip1: 'Treat Jellyfin refresh as the final step after local cleanup.',
-    aboutWorkflowTip2: 'For large libraries, repeat the workflow in small batches.',
+    aboutWorkflowTip1:
+      'Treat Jellyfin refresh as the final step after local cleanup.',
+    aboutWorkflowTip2:
+      'For large libraries, repeat the workflow in small batches.',
     helpTitle: 'Ajuda e atualizacoes',
     helpSubtitle:
       'Veja a versao instalada do Downtify, procure atualizacoes no GitHub e atualize instalacoes compativeis.',
@@ -896,6 +899,10 @@ export default {
     browseSearchPlaceholder: 'Buscar artistas, álbuns, faixas, gêneros…',
     detailsEmpty:
       'Os detalhes do artista e do álbum aparecem aqui enquanto uma faixa estiver tocando.',
+    similarArtists: 'Artistas semelhantes',
+    similarArtistsEmpty: 'Nenhum artista semelhante encontrado.',
+    artistAvailableMusic: 'Álbuns e faixas disponíveis',
+    artistMusicEmpty: 'Nenhuma música disponível para este artista.',
     nothingPlaying: 'Nada tocando no momento',
     nothingPlayingHint:
       'Escolha uma faixa da sua biblioteca para começar a ouvir.',

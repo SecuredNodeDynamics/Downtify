@@ -125,7 +125,8 @@ export default {
   failed: {
     tab: 'Failed',
     empty: 'No failed downloads.',
-    emptyHint: 'Failed downloads will appear here with retry and delete actions.',
+    emptyHint:
+      'Failed downloads will appear here with retry and delete actions.',
     delete: 'Delete',
     deletePrompt: 'Remove "{title}" from failed downloads?',
     failedDelete: 'Failed to remove this failed download.',
@@ -320,8 +321,7 @@ export default {
     failedArtistTagScan: 'Failed to scan artist tags.',
     failedArtistTagApply: 'Failed to repair artist tags.',
     artistTagRepairOk: 'Artist tags repaired.',
-    artistTagRepairPartial:
-      'Repaired {succeeded} of {total} artist tag items.',
+    artistTagRepairPartial: 'Repaired {succeeded} of {total} artist tag items.',
     artistTagRepairProgressDetail:
       'Repairing artist tags {current}/{total}: {name} · {succeeded} fixed, {failed} failed',
     folderVerification: 'Folder verification',
@@ -408,7 +408,8 @@ export default {
     typeArtist: 'Artist',
     kindPlaylist: 'Playlist',
     kindArtist: 'Artist',
-    urlPlaceholderPlaylist: 'Search Spotify playlists or paste a playlist URL...',
+    urlPlaceholderPlaylist:
+      'Search Spotify playlists or paste a playlist URL...',
     urlPlaceholderArtist: 'Search Spotify artists or paste an artist URL...',
     searching: 'Searching Spotify...',
     searchFailed: 'Search failed. Paste a Spotify link or try again.',
@@ -883,6 +884,10 @@ export default {
     browseSearchPlaceholder: 'Search artists, albums, tracks, genres…',
     detailsEmpty:
       'Artist and album details appear here while a track is playing.',
+    similarArtists: 'Similar artists',
+    similarArtistsEmpty: 'No similar artists found.',
+    artistAvailableMusic: 'Available albums and tracks',
+    artistMusicEmpty: 'No downloadable music found for this artist.',
     nothingPlaying: 'Nothing currently playing',
     nothingPlayingHint: 'Choose a track from your library to start listening.',
     seek: 'Seek',

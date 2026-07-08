@@ -614,6 +614,13 @@ function getLibraryFiles() {
   return API.get('/api/library/files')
 }
 
+function getSimilarArtists(artist, limit = 8) {
+  return API.get('/api/library/similar-artists', {
+    params: { artist, limit },
+    timeout: 15000,
+  })
+}
+
 const LRC_TIMESTAMP_RE = /\[(\d{1,3}):(\d{2})(?:\.(\d{1,3}))?\]/g
 
 function parseLrcText(text) {
@@ -644,10 +651,13 @@ async function getLibraryLyricsSidecar(file) {
       data: { available: false, synced: false, lines: [], plain: '' },
     }
   }
-  const res = await axios.get(apiAssetUrl(`/downloads/${encodePath(lrcFile)}`), {
-    responseType: 'text',
-    timeout: 10000,
-  })
+  const res = await axios.get(
+    apiAssetUrl(`/downloads/${encodePath(lrcFile)}`),
+    {
+      responseType: 'text',
+      timeout: 10000,
+    }
+  )
   const text = String(res.data || '')
   const lines = parseLrcText(text)
   return {
@@ -665,14 +675,16 @@ function getLibraryLyrics(file) {
     params: { file },
     timeout: 10000,
     headers: { Accept: 'application/json' },
-  }).then((res) => {
-    if (typeof res.data === 'string') {
-      return getLibraryLyricsSidecar(file)
-    }
-    return res
-  }).catch(() => {
-    return getLibraryLyricsSidecar(file)
   })
+    .then((res) => {
+      if (typeof res.data === 'string') {
+        return getLibraryLyricsSidecar(file)
+      }
+      return res
+    })
+    .catch(() => {
+      return getLibraryLyricsSidecar(file)
+    })
 }
 
 function checkLibraryOwned(items) {
@@ -849,6 +861,7 @@ export default {
   searchCoverUrl,
   listDownloads,
   getLibraryFiles,
+  getSimilarArtists,
   getLibraryLyrics,
   checkLibraryOwned,
   fetchAlbumTrackCounts,

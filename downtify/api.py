@@ -105,6 +105,8 @@ _UPDATE_CACHE: dict[str, Any] = {}
 _UPDATE_CACHE_AT = 0.0
 _UPDATE_CACHE_TTL_SECONDS = 3600
 _RELEASE_TAG_RE = re.compile(r'/releases/tag/([^/?#]+)/?$', re.I)
+_SIMILAR_ARTISTS_CACHE: dict[str, tuple[float, list[dict[str, str]]]] = {}
+_SIMILAR_ARTISTS_CACHE_TTL_SECONDS = 86400
 
 
 def _effective_lyrics_providers(settings: dict[str, Any]) -> list[str]:
@@ -1656,6 +1658,150 @@ def get_library_files() -> list[dict[str, Any]]:
     items = list_library_files_fast(download_dir)
     schedule_library_files_cache_refresh()
     return items
+
+
+def _best_thumbnail_url(thumbnails: Any) -> str:
+    options = thumbnails if isinstance(thumbnails, list) else []
+    ranked = sorted(
+        (item for item in options if isinstance(item, dict)),
+        key=lambda item: int(item.get('width') or 0) * int(item.get('height') or 0),
+        reverse=True,
+    )
+    return next(
+        (str(item.get('url') or '').strip() for item in ranked if item.get('url')),
+        '',
+    )
+
+
+def _spotify_similar_artists(artist_name: str, limit: int) -> list[dict[str, str]]:
+    items = artist_image_options._spotify_artist_items(
+        artist_name,
+        limit=min(12, limit + 2),
+    )
+    target = artist_name.casefold()
+    artists: list[dict[str, str]] = []
+    for item in items:
+        name = str(item.get('name') or '').strip()
+        if not name or name.casefold() == target:
+            continue
+        image_url = artist_image_options._best_spotify_image_url(item)
+        artists.append(
+            {
+                'name': name,
+                'browse_id': str(item.get('id') or '').strip(),
+                'image_url': image_url,
+                'source': 'spotify',
+            }
+        )
+    return artists[:limit]
+
+
+def _youtube_similar_artists(artist_name: str, limit: int) -> list[dict[str, str]]:
+    cache_key = artist_name.casefold()
+    matches = providers._ytm().search(artist_name, filter='artists', limit=5)
+    exact = next(
+        (
+            item
+            for item in matches
+            if str(item.get('artist') or '').strip().casefold() == cache_key
+        ),
+        None,
+    )
+    match = exact or next(iter(matches), None)
+    browse_id = str((match or {}).get('browseId') or '').strip()
+    if not browse_id:
+        return []
+
+    payload = providers._ytm().get_artist(browse_id)
+    results = (payload.get('related') or {}).get('results') or []
+    artists: list[dict[str, str]] = []
+    for item in results:
+        artist = str(item.get('artist') or item.get('title') or '').strip()
+        if not artist or artist.casefold() == cache_key:
+            continue
+        image_url = _best_thumbnail_url(item.get('thumbnails'))
+        artists.append(
+            {
+                'name': artist,
+                'browse_id': str(item.get('browseId') or '').strip(),
+                'image_url': image_url,
+                'source': 'youtube_music',
+            }
+        )
+    return artists[:limit]
+
+
+def _merge_similar_artists(
+    sources: list[list[dict[str, str]]],
+    limit: int,
+) -> list[dict[str, str]]:
+    merged: list[dict[str, str]] = []
+    seen: set[str] = set()
+    depth = max((len(items) for items in sources), default=0)
+    for index in range(depth):
+        for items in sources:
+            if index >= len(items):
+                continue
+            item = items[index]
+            key = str(item.get('name') or '').strip().casefold()
+            if not key or key in seen:
+                continue
+            seen.add(key)
+            merged.append(item)
+            if len(merged) >= limit:
+                return merged
+    return merged
+
+
+def _similar_artists_for_name(
+    artist_name: str, limit: int = 8
+) -> list[dict[str, str]]:
+    name = str(artist_name or '').strip()
+    if not name:
+        return []
+
+    cache_key = name.casefold()
+    cached = _SIMILAR_ARTISTS_CACHE.get(cache_key)
+    if cached and time.monotonic() - cached[0] < _SIMILAR_ARTISTS_CACHE_TTL_SECONDS:
+        return cached[1][:limit]
+
+    spotify_artists: list[dict[str, str]] = []
+    youtube_artists: list[dict[str, str]] = []
+    try:
+        spotify_artists = _spotify_similar_artists(name, limit)
+    except Exception:
+        logger.opt(exception=True).debug('Spotify similar artist lookup failed')
+    try:
+        youtube_artists = _youtube_similar_artists(name, limit)
+    except Exception:
+        logger.opt(exception=True).debug('YouTube Music similar artist lookup failed')
+
+    artists = _merge_similar_artists(
+        [spotify_artists, youtube_artists],
+        limit,
+    )
+    _SIMILAR_ARTISTS_CACHE[cache_key] = (time.monotonic(), artists)
+    return artists
+
+
+@router.get('/api/library/similar-artists')
+def get_similar_artists(
+    artist: str = Query(''),
+    limit: int = Query(8, ge=1, le=12),
+) -> dict[str, Any]:
+    artist_name = str(artist or '').strip()
+    if not artist_name:
+        raise HTTPException(status_code=400, detail='artist is required')
+    try:
+        return {
+            'artist': artist_name,
+            'artists': _similar_artists_for_name(artist_name, limit),
+        }
+    except Exception:
+        logger.opt(exception=True).warning(
+            'Similar artist lookup failed for {!r}', artist_name
+        )
+        return {'artist': artist_name, 'artists': []}
 
 
 _LRC_TIMESTAMP_RE = re.compile(
