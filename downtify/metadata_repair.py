@@ -317,6 +317,7 @@ def _public_song(song: dict[str, Any]) -> dict[str, Any]:
         'musicbrainz_recording_id': song.get('musicbrainz_recording_id') or '',
         'musicbrainz_release_id': song.get('musicbrainz_release_id') or '',
         'musicbrainz_artist_ids': song.get('musicbrainz_artist_ids') or [],
+        'cover_url': song.get('cover_url') or '',
     }
 
 
@@ -359,6 +360,40 @@ def _scan_item(root: Path, path: Path) -> dict[str, Any]:
         'current': _public_song(current),
         'candidate': _public_song(candidate) if matched else None,
         'matched': matched,
+        'changes': changes,
+    }
+
+
+def _album_image_scan_item(root: Path, path: Path) -> dict[str, Any]:
+    current = _song_from_file(path)
+    candidate = enrich_song_metadata(current)
+    matched = bool(candidate.get('cover_url'))
+    try:
+        has_cover = bool(embedded_cover_bytes(path))
+    except Exception:
+        has_cover = False
+    needs_cover = matched and not has_cover
+    changes = []
+    if needs_cover:
+        changes.append({
+            'field': 'cover',
+            'label': 'Album cover',
+            'before': 'Missing embedded cover',
+            'after': 'Available cover art',
+        })
+    elif matched:
+        changes.append({
+            'field': 'cover',
+            'label': 'Album cover',
+            'before': 'Existing embedded cover',
+            'after': 'Available replacement cover art',
+        })
+    return {
+        'file': path.relative_to(root).as_posix(),
+        'current': _public_song(current),
+        'candidate': _public_song(candidate) if matched else None,
+        'matched': matched,
+        'has_cover': has_cover,
         'changes': changes,
     }
 
@@ -682,6 +717,68 @@ def scan_artist_images(
         'items': items,
         'clean': clean_items,
         'matched': len(items),
+        'start': start,
+        'next_offset': next_offset,
+        'complete': next_offset >= total,
+    }
+
+
+def scan_album_images(
+    root: Path,
+    limit: int = 100,
+    start: int = 0,
+    progress_cb: ProgressCallback | None = None,
+) -> dict[str, Any]:
+    root = root.resolve()
+    files = [
+        path
+        for path in root.rglob('*')
+        if path.is_file() and path.suffix.lower() in AUDIO_EXTENSIONS
+    ]
+    files.sort(key=lambda path: path.relative_to(root).as_posix().casefold())
+    total = len(files)
+    start = max(0, min(start, total))
+    selected = files[start : start + max(1, limit)]
+    items: list[dict[str, Any]] = []
+    clean_items: list[dict[str, Any]] = []
+    errors: list[dict[str, str]] = []
+    batch_scanned = 0
+    for path in selected:
+        batch_scanned += 1
+        current_offset = start + batch_scanned
+        try:
+            item = _album_image_scan_item(root, path)
+        except Exception as exc:
+            errors.append({
+                'file': path.relative_to(root).as_posix(),
+                'error': str(exc),
+            })
+            item = None
+        if item is not None and item['matched'] and item['changes']:
+            items.append(item)
+        elif item is not None:
+            clean_items.append(item)
+        if progress_cb is not None:
+            progress_cb({
+                'scanned': current_offset,
+                'batch_scanned': batch_scanned,
+                'total': total,
+                'matched': len(items),
+                'items': list(items),
+                'clean': list(clean_items),
+                'start': start,
+                'next_offset': current_offset,
+            })
+    next_offset = start + batch_scanned
+    return {
+        'root': str(root),
+        'scanned': next_offset,
+        'batch_scanned': batch_scanned,
+        'total': total,
+        'matched': len(items),
+        'items': items,
+        'clean': clean_items,
+        'errors': errors,
         'start': start,
         'next_offset': next_offset,
         'complete': next_offset >= total,
@@ -1277,6 +1374,37 @@ def repair_file(
         'file': path.relative_to(root.resolve()).as_posix(),
         'current': _public_song(updated),
         'candidate': _public_song(candidate),
+        'matched': True,
+        'changes': [],
+    }
+
+
+def repair_album_image(
+    root: Path,
+    relative_file: str,
+    candidate: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    path = safe_library_path(root, relative_file)
+    if not path.exists() or not path.is_file():
+        raise FileNotFoundError(relative_file)
+    current = _song_from_file(path)
+    candidate = candidate if isinstance(candidate, dict) else None
+    if candidate is None:
+        candidate = enrich_song_metadata(current)
+    if not candidate.get('cover_url'):
+        raise ValueError('No album cover source found')
+
+    # Reuse the downloader tag writer so every supported audio container gets
+    # cover art written with the same mutagen rules as fresh downloads.
+    from .downloader import embed_metadata
+
+    merged = {**current, **candidate}
+    embed_metadata(path, merged)
+    updated = _album_image_scan_item(root.resolve(), path)
+    if not updated.get('has_cover'):
+        raise ValueError('Album cover write did not persist')
+    return {
+        **updated,
         'matched': True,
         'changes': [],
     }

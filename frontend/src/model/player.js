@@ -27,6 +27,7 @@ const volume = ref(parseFloat(localStorage.getItem(VOLUME_KEY) || '0.85'))
 const isMuted = ref(false)
 const repeatMode = ref('off') // 'off' | 'all' | 'one'
 const shuffle = ref(false)
+const playlistContext = ref(null)
 
 let audio = null
 let shuffleOrder = []
@@ -58,6 +59,10 @@ function readPlayerSession() {
         ? parsed.repeatMode
         : 'off',
       shuffle: Boolean(parsed.shuffle),
+      context:
+        parsed.context && typeof parsed.context === 'object'
+          ? parsed.context
+          : null,
     }
   } catch {
     return null
@@ -79,6 +84,7 @@ function persistPlayerSession(force = false) {
         playing: playbackIntent || isPlaying.value,
         repeatMode: repeatMode.value,
         shuffle: shuffle.value,
+        context: playlistContext.value,
       })
     )
   } catch {
@@ -97,6 +103,7 @@ function restorePlayerSession(paths) {
 
   repeatMode.value = session.repeatMode
   shuffle.value = session.shuffle
+  playlistContext.value = session.context
   currentIndex.value = index
   currentTime.value = session.time
   void applyTrack(index, {
@@ -459,6 +466,15 @@ export function syncPlaylistFromFiles(files, options = {}) {
   const paths = (files || []).filter(Boolean)
   if (!paths.length) return
 
+  if (
+    playlistContext.value?.type &&
+    options.preserveContext !== false &&
+    currentIndex.value >= 0
+  ) {
+    const currentFile = playlist.value[currentIndex.value]?.file
+    if (currentFile && paths.includes(currentFile)) return
+  }
+
   const currentFile =
     currentIndex.value >= 0 ? playlist.value[currentIndex.value]?.file : null
 
@@ -499,6 +515,7 @@ function setPlaylist(files, options = {}) {
     typeof f === 'string' ? trackFromFile(f) : f
   )
   playlist.value = tracks
+  playlistContext.value = options.context || null
   if (restorePlayerSession(tracks.map((track) => track.file))) {
     if (shuffle.value) buildShuffleOrder()
     return
@@ -704,6 +721,7 @@ export function trackInfoFromFile(file) {
 export function usePlayer() {
   return {
     playlist,
+    playlistContext,
     currentIndex,
     currentTrack,
     isPlaying,

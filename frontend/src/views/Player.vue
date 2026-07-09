@@ -90,7 +90,7 @@
               </div>
 
               <!-- Title / artist -->
-              <div class="mt-3 w-full sm:mt-6">
+              <div class="mt-3 min-w-0 max-w-full w-full sm:mt-6">
                 <p class="text-lg font-bold tracking-tight truncate sm:text-xl">
                   {{ trackTitle }}
                 </p>
@@ -103,6 +103,17 @@
                     {{ t('player.nothingPlayingHint') }}
                   </span>
                 </p>
+                <div
+                  v-if="playerContextLabel"
+                  class="mt-2 flex justify-center"
+                >
+                  <span
+                    class="inline-flex max-w-full items-center gap-1.5 rounded-full border border-primary/25 bg-primary/10 px-3 py-1 text-xs font-medium text-primary"
+                  >
+                    <Icon :icon="playerContextIcon" class="h-3.5 w-3.5 shrink-0" />
+                    <span class="truncate">{{ playerContextLabel }}</span>
+                  </span>
+                </div>
               </div>
 
               <!-- Progress -->
@@ -408,7 +419,12 @@
                       <button
                         type="button"
                         class="btn btn-primary btn-sm inline-flex h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3 sm:px-4"
-                        @click="playFiles(currentArtistEntry.files)"
+                        @click="
+                          playFiles(currentArtistEntry.files, null, {
+                            type: 'artist',
+                            name: currentArtistEntry.name,
+                          })
+                        "
                       >
                         <Icon
                           icon="clarity:play-line"
@@ -470,7 +486,13 @@
                       <button
                         type="button"
                         class="btn btn-primary btn-sm inline-flex h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3 sm:px-4"
-                        @click="playFiles(album.files)"
+                        @click="
+                          playFiles(album.files, null, {
+                            type: 'album',
+                            name: album.name,
+                            artist: album.artist,
+                          })
+                        "
                       >
                         <Icon
                           icon="clarity:play-line"
@@ -1601,11 +1623,11 @@ async function load({ background = false } = {}) {
   }
 }
 
-function playFiles(fileList, startFile = null) {
+function playFiles(fileList, startFile = null, context = null) {
   const list = fileList || []
   if (!list.length) return
   const startIndex = startFile ? Math.max(0, list.indexOf(startFile)) : 0
-  player.setPlaylist(list, { startIndex })
+  player.setPlaylist(list, { startIndex, context })
 }
 
 function applyPlayerNavigationIntent() {
@@ -1619,7 +1641,7 @@ function applyPlayerNavigationIntent() {
   )
   if (!state) return
 
-  playFiles(state.playlistFiles, state.startFile)
+  playFiles(state.playlistFiles, state.startFile, state.context || null)
 }
 
 const trackTitle = computed(() => {
@@ -1632,6 +1654,31 @@ const trackArtist = computed(() => {
   const c = player.currentTrack.value
   if (c?.artist) return c.artist
   return t('common.unknownArtist')
+})
+
+const playerContextIcon = computed(() => {
+  const type = player.playlistContext.value?.type
+  if (type === 'genre') return 'clarity:tag-line'
+  if (type === 'artist') return 'clarity:user-line'
+  if (type === 'album') return 'clarity:album-line'
+  return 'clarity:playlist-line'
+})
+
+const playerContextLabel = computed(() => {
+  const context = player.playlistContext.value
+  if (!context?.type || !context?.name) return ''
+  const count = player.playlist.value.length
+  const countLabel = t('player.countMany', { count })
+  if (context.type === 'genre') {
+    return `${t('player.playingGenre')}: ${context.name} - ${countLabel}`
+  }
+  if (context.type === 'artist') {
+    return `${t('player.playingArtist')}: ${context.name} - ${countLabel}`
+  }
+  if (context.type === 'album') {
+    return `${t('player.playingAlbum')}: ${context.name} - ${countLabel}`
+  }
+  return ''
 })
 
 const repeatTitle = computed(() => {
@@ -1817,7 +1864,21 @@ onUnmounted(() => {
 }
 
 .player-content {
-  @apply flex flex-col gap-4 sm:gap-6;
+  @apply flex min-w-0 flex-col gap-4 overflow-x-hidden sm:gap-6;
+}
+
+.player-shell,
+.player-shell > section,
+.player-shell > aside,
+.player-now {
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+}
+
+.player-shell > section,
+.player-now {
+  overflow-x: hidden;
 }
 
 .similar-artists-card {
@@ -1887,6 +1948,7 @@ onUnmounted(() => {
 
   .player-page {
     min-height: 0;
+    min-width: 0;
   }
 
   .player-content {
@@ -1966,7 +2028,7 @@ onUnmounted(() => {
 
   .player-content {
     display: grid;
-    grid-template-columns: 1fr 360px;
+    grid-template-columns: minmax(0, 1fr) 360px;
     gap: 1.5rem;
   }
 
@@ -1976,18 +2038,25 @@ onUnmounted(() => {
 
   .player-shell > section {
     grid-column: 1;
+    min-width: 0;
   }
 
   .player-shell > aside {
     grid-column: 2;
+    align-self: start;
+    height: clamp(32rem, calc(100dvh - 14rem), 46rem);
+    min-width: 0;
+    overflow: hidden;
   }
 
   .similar-artists-card {
     grid-column: 1 / -1;
+    min-width: 0;
   }
 
   .player-details {
-    max-height: 640px;
+    height: 100%;
+    overflow-y: auto;
   }
 
   .player-cover {

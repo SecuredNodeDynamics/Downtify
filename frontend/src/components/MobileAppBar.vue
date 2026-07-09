@@ -20,6 +20,18 @@
         <HeaderUpdateNotice compact />
         <DownloadCounterPill compact />
         <button
+          v-if="routeAction && routeAction.routeName === route.name"
+          type="button"
+          class="mobile-app-bar-icon shrink-0"
+          :title="routeAction.title || routeAction.label || ''"
+          @click="routeAction.onClick?.()"
+        >
+          <Icon
+            :icon="routeAction.icon || 'clarity:menu-line'"
+            class="h-5 w-5"
+          />
+        </button>
+        <button
           v-if="showLibraryRefresh"
           type="button"
           class="mobile-app-bar-icon shrink-0"
@@ -71,7 +83,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useRoute } from 'vue-router'
 
@@ -97,6 +109,7 @@ const {
   visible: downloadRefreshVisible,
   refresh: refreshDownload,
 } = useDownloadRefresh()
+const routeAction = ref(null)
 
 const showHealthRefresh = computed(() => route.name === 'Health')
 const showLibraryRefresh = computed(() => route.name === 'List')
@@ -108,5 +121,32 @@ const pageTitle = computed(() => {
   const key = route.meta?.mobileTitleKey
   if (key) return t(key)
   return 'Downtify'
+})
+
+function handleRouteAction(event) {
+  routeAction.value = event?.detail || null
+}
+
+function clearRouteAction(event) {
+  const routeName = event?.detail?.routeName
+  if (!routeName || routeAction.value?.routeName === routeName) {
+    routeAction.value = null
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('downtify:mobile-route-action', handleRouteAction)
+  window.addEventListener(
+    'downtify:clear-mobile-route-action',
+    clearRouteAction
+  )
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('downtify:mobile-route-action', handleRouteAction)
+  window.removeEventListener(
+    'downtify:clear-mobile-route-action',
+    clearRouteAction
+  )
 })
 </script>

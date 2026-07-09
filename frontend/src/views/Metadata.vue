@@ -14,56 +14,44 @@
         </div>
       </div>
 
-      <div class="metadata-tab-shell tab-glow-shell">
+      <div
+        class="metadata-tab-shell tab-glow-shell"
+        :class="{ 'metadata-tool-tabs-mobile-menu': useMobileToolMenu }"
+      >
         <button
+          v-for="tab in metadataToolTabs"
+          :key="tab.id"
           class="metadata-tab-btn"
           :class="
-            activeToolTab === 'metadata'
+            activeToolTab === tab.id
               ? 'bg-primary text-primary-content shadow-glow-sm'
               : 'text-base-content/60 hover:text-base-content'
           "
-          @click="activeToolTab = 'metadata'"
+          @click="selectToolTab(tab.id)"
         >
-          <Icon icon="clarity:tag-line" class="mr-2 inline h-4 w-4" />
-          {{ t('metadata.metadataTab') }}
+          <Icon :icon="tab.icon" class="mr-2 inline h-4 w-4" />
+          {{ tab.label }}
         </button>
-        <button
-          class="metadata-tab-btn"
-          :class="
-            activeToolTab === 'images'
-              ? 'bg-primary text-primary-content shadow-glow-sm'
-              : 'text-base-content/60 hover:text-base-content'
-          "
-          @click="activeToolTab = 'images'"
-        >
-          <Icon icon="clarity:image-gallery-line" class="mr-2 inline h-4 w-4" />
-          {{ t('metadata.artistImagesTab') }}
-        </button>
-        <button
-          class="metadata-tab-btn"
-          :class="
-            activeToolTab === 'artist-tags'
-              ? 'bg-primary text-primary-content shadow-glow-sm'
-              : 'text-base-content/60 hover:text-base-content'
-          "
-          @click="activeToolTab = 'artist-tags'"
-        >
-          <Icon icon="clarity:users-line" class="mr-2 inline h-4 w-4" />
-          {{ t('metadata.artistRepairTab') }}
-        </button>
-        <button
-          v-if="sm.settings.value.enable_jellyfin_tools"
-          class="metadata-tab-btn"
-          :class="
-            activeToolTab === 'jellyfin'
-              ? 'bg-primary text-primary-content shadow-glow-sm'
-              : 'text-base-content/60 hover:text-base-content'
-          "
-          @click="activeToolTab = 'jellyfin'"
-        >
-          <Icon icon="clarity:server-line" class="mr-2 inline h-4 w-4" />
-          {{ t('metadata.jellyfinTab') }}
-        </button>
+      </div>
+
+      <div
+        v-if="useMobileToolMenu && metadataToolMenuOpen"
+        class="metadata-mobile-menu-backdrop lg:hidden"
+        @click="metadataToolMenuOpen = false"
+      >
+        <div class="metadata-mobile-menu surface" @click.stop>
+          <button
+            v-for="tab in metadataToolTabs"
+            :key="tab.id"
+            type="button"
+            class="metadata-mobile-menu-item"
+            :class="{ 'metadata-mobile-menu-item-active': activeToolTab === tab.id }"
+            @click="selectToolTab(tab.id)"
+          >
+            <Icon :icon="tab.icon" class="h-5 w-5 shrink-0" />
+            <span class="min-w-0 truncate">{{ tab.label }}</span>
+          </button>
+        </div>
       </div>
 
       <section v-if="activeToolTab === 'metadata'" class="metadata-section">
@@ -333,6 +321,252 @@
                     applying[item.file]
                       ? t('metadata.fixing')
                       : fixed[item.file]
+                      ? t('metadata.fixed')
+                      : t('metadata.apply')
+                  }}
+                </button>
+              </div>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section v-if="activeToolTab === 'album-images'" class="metadata-section">
+        <div class="metadata-header">
+          <div class="metadata-toolbar">
+            <select
+              v-model.number="albumImageLimit"
+              class="metadata-select"
+              :disabled="albumImageLoading"
+              :title="t('metadata.albumImageLimit')"
+            >
+              <option :value="25">25</option>
+              <option :value="50">50</option>
+              <option :value="100">100</option>
+            </select>
+            <button
+              class="btn btn-primary btn-sm metadata-btn px-5"
+              :disabled="albumImageLoading"
+              @click="scanAlbumImages"
+            >
+              <span
+                v-if="albumImageLoading"
+                class="loading loading-spinner loading-xs mr-2"
+              />
+              <Icon v-else icon="clarity:album-line" class="h-4 w-4 mr-2" />
+              {{ t('metadata.scanAlbumImages') }}
+            </button>
+            <button
+              class="btn btn-sm metadata-btn border-white/10 bg-base-100/85 hover:bg-base-100"
+              :disabled="albumImageLoading"
+              @click="scanAllAlbumImages"
+            >
+              <Icon icon="clarity:fast-forward-line" class="h-4 w-4 mr-2" />
+              {{ t('metadata.scanAll') }}
+            </button>
+            <button
+              class="btn btn-sm metadata-btn border-white/10 bg-base-100/85 hover:bg-base-100"
+              :disabled="
+                albumImageLoading ||
+                albumImageItems.length === 0 ||
+                repairingAllAlbumImages
+              "
+              @click="repairAllAlbumImages"
+            >
+              <span
+                v-if="repairingAllAlbumImages"
+                class="loading loading-spinner loading-xs mr-2"
+              />
+              <Icon
+                v-else
+                icon="clarity:check-circle-line"
+                class="h-4 w-4 mr-2"
+              />
+              {{ t('metadata.fixAllAlbumImages') }}
+            </button>
+          </div>
+        </div>
+
+        <div
+          v-if="albumImageError"
+          class="surface mb-4 flex items-start gap-3 rounded-2xl p-4 text-sm"
+          :class="
+            repairingAllAlbumImages ? 'text-base-content/60' : 'text-error'
+          "
+        >
+          <Icon
+            icon="clarity:exclamation-circle-line"
+            class="h-5 w-5 shrink-0"
+          />
+          <span class="min-w-0 break-words">{{ albumImageError }}</span>
+        </div>
+
+        <section class="metadata-stat-grid">
+          <div class="metadata-stat-card surface rounded-2xl">
+            <p class="metadata-stat-label">{{ t('metadata.scanned') }}</p>
+            <p class="metadata-stat-value">{{ albumImageSummary.scanned }}</p>
+          </div>
+          <div class="metadata-stat-card surface rounded-2xl">
+            <p class="metadata-stat-label">{{ t('metadata.needsFix') }}</p>
+            <p class="metadata-stat-value text-primary">
+              {{ albumImageItems.length }}
+            </p>
+          </div>
+          <div class="metadata-stat-card surface rounded-2xl">
+            <p class="metadata-stat-label">{{ t('metadata.completed') }}</p>
+            <p class="metadata-stat-value">
+              {{ completedAlbumImages.length }}
+            </p>
+          </div>
+        </section>
+
+        <div class="metadata-tab-shell tab-glow-shell">
+          <button
+            class="metadata-tab-btn"
+            :class="
+              activeAlbumImageTab === 'needs'
+                ? 'bg-primary text-primary-content shadow-glow-sm'
+                : 'text-base-content/60 hover:text-base-content'
+            "
+            @click="activeAlbumImageTab = 'needs'"
+          >
+            {{ t('metadata.needsFix') }}
+            <span class="metadata-tab-badge">{{ albumImageItems.length }}</span>
+          </button>
+          <button
+            class="metadata-tab-btn"
+            :class="
+              activeAlbumImageTab === 'completed'
+                ? 'bg-primary text-primary-content shadow-glow-sm'
+                : 'text-base-content/60 hover:text-base-content'
+            "
+            @click="activeAlbumImageTab = 'completed'"
+          >
+            {{ t('metadata.completed') }}
+            <span class="metadata-tab-badge">
+              {{ completedAlbumImages.length }}
+            </span>
+          </button>
+          <button
+            class="metadata-tab-btn"
+            :class="
+              activeAlbumImageTab === 'clean'
+                ? 'bg-primary text-primary-content shadow-glow-sm'
+                : 'text-base-content/60 hover:text-base-content'
+            "
+            @click="activeAlbumImageTab = 'clean'"
+          >
+            <span class="sm:hidden">{{ t('metadata.cleanShort') }}</span>
+            <span class="hidden sm:inline">{{ t('metadata.clean') }}</span>
+            <span class="metadata-tab-badge">
+              {{ cleanAlbumImageItems.length }}
+            </span>
+          </button>
+        </div>
+
+        <div
+          class="max-h-[34rem] overflow-x-hidden overflow-y-auto pr-1 sm:pr-2"
+        >
+          <div
+            v-if="albumImageLoading && visibleAlbumImageItems.length === 0"
+            class="metadata-artist-grid"
+          >
+            <div
+              v-for="n in 8"
+              :key="n"
+              class="overflow-hidden rounded-2xl border border-white/10 bg-base-100/60"
+            >
+              <div class="skeleton scan-skeleton-glow aspect-square w-full" />
+              <div class="space-y-2 p-3">
+                <div class="skeleton h-4 w-2/3 rounded-full" />
+                <div class="skeleton h-3 w-full rounded-full" />
+              </div>
+            </div>
+          </div>
+
+          <div
+            v-else-if="visibleAlbumImageItems.length === 0"
+            class="surface rounded-2xl p-10 text-center"
+          >
+            <Icon
+              icon="clarity:album-line"
+              class="mx-auto mb-3 h-10 w-10 text-base-content/20"
+            />
+            <p class="text-sm text-base-content/50">
+              {{
+                albumImageLoading
+                  ? t('metadata.scanning')
+                  : emptyAlbumImageMessage
+              }}
+            </p>
+          </div>
+
+          <div v-else class="metadata-artist-grid">
+            <article
+              v-for="item in visibleAlbumImageItems"
+              :key="item.file"
+              class="overflow-hidden rounded-2xl border border-primary/20 bg-base-100/75 shadow-glow-sm"
+              :class="
+                applyingAlbumImages[item.file]
+                  ? 'border-primary/40 ring-2 ring-primary/30'
+                  : ''
+              "
+            >
+              <div class="relative aspect-square bg-base-100/80">
+                <img
+                  v-if="albumImagePreviewUrl(item)"
+                  :src="albumImagePreviewUrl(item)"
+                  :alt="displaySong(item.candidate || item.current)"
+                  class="h-full w-full object-cover"
+                  loading="lazy"
+                />
+                <div
+                  v-else
+                  class="flex h-full w-full items-center justify-center text-base-content/25"
+                >
+                  <Icon icon="clarity:album-line" class="h-12 w-12" />
+                </div>
+                <span
+                  class="pill absolute left-2 top-2 max-w-[calc(100%-1rem)] truncate text-[0.65rem]"
+                  :class="albumImageStatusBadgeClass(item)"
+                >
+                  {{ albumImageStatusBadge(item) }}
+                </span>
+              </div>
+              <div class="space-y-2 p-3">
+                <p class="line-clamp-2 text-sm font-semibold leading-snug">
+                  {{ displaySong(item.current) }}
+                </p>
+                <p class="truncate text-xs text-base-content/45">
+                  {{ item.file }}
+                </p>
+                <p class="truncate text-xs text-primary">
+                  {{
+                    item.has_cover
+                      ? t('metadata.existingAlbumCover')
+                      : t('metadata.missingAlbumCover')
+                  }}
+                </p>
+                <button
+                  v-if="activeAlbumImageTab === 'needs'"
+                  type="button"
+                  class="btn btn-sm metadata-card-btn w-full border-white/10 bg-base-100/85 hover:bg-base-100"
+                  :class="fixedAlbumImages[item.file] ? 'text-primary' : ''"
+                  :disabled="
+                    applyingAlbumImages[item.file] ||
+                    fixedAlbumImages[item.file]
+                  "
+                  @click="applyAlbumImage(item)"
+                >
+                  <span
+                    v-if="applyingAlbumImages[item.file]"
+                    class="loading loading-spinner loading-xs mr-2"
+                  />
+                  <Icon v-else icon="clarity:check-line" class="mr-2 h-4 w-4" />
+                  {{
+                    applyingAlbumImages[item.file]
+                      ? t('metadata.fixing')
+                      : fixedAlbumImages[item.file]
                       ? t('metadata.fixed')
                       : t('metadata.apply')
                   }}
@@ -1508,6 +1742,7 @@ const JELLYFIN_IMAGE_REPAIR_BUCKETS = [
   'folder_only',
 ]
 const activeToolTab = ref('metadata')
+const metadataToolMenuOpen = ref(false)
 const loading = ref(false)
 const error = ref('')
 const items = ref([])
@@ -1545,6 +1780,17 @@ const artistImagePickerPreviewFailed = ref({})
 let artistImagePickerSlowTimer = null
 const repairingAllImages = ref(false)
 const artistImageSummary = ref({ scanned: 0, matched: 0, total: 0 })
+const albumImageLoading = ref(false)
+const albumImageError = ref('')
+const albumImageLimit = ref(50)
+const albumImageItems = ref([])
+const cleanAlbumImageItems = ref([])
+const completedAlbumImages = ref([])
+const activeAlbumImageTab = ref('needs')
+const applyingAlbumImages = ref({})
+const fixedAlbumImages = ref({})
+const repairingAllAlbumImages = ref(false)
+const albumImageSummary = ref({ scanned: 0, matched: 0, total: 0 })
 const artistTagLoading = ref(false)
 const artistTagError = ref('')
 const artistTagLimit = ref(50)
@@ -1567,6 +1813,7 @@ const jellyfinError = ref(false)
 const lastReconciled = ref('')
 let pollTimer = null
 let artistImagePollTimer = null
+let albumImagePollTimer = null
 let artistTagPollTimer = null
 
 const visibleItems = computed(() =>
@@ -1577,6 +1824,41 @@ const visibleItems = computed(() =>
     : items.value
 )
 
+const metadataToolTabs = computed(() => {
+  const tabs = [
+    {
+      id: 'metadata',
+      label: t('metadata.metadataTab'),
+      icon: 'clarity:tag-line',
+    },
+    {
+      id: 'album-images',
+      label: t('metadata.albumImagesTab'),
+      icon: 'clarity:album-line',
+    },
+    {
+      id: 'images',
+      label: t('metadata.artistImagesTab'),
+      icon: 'clarity:image-gallery-line',
+    },
+    {
+      id: 'artist-tags',
+      label: t('metadata.artistRepairTab'),
+      icon: 'clarity:users-line',
+    },
+  ]
+  if (sm.settings.value.enable_jellyfin_tools) {
+    tabs.push({
+      id: 'jellyfin',
+      label: t('metadata.jellyfinTab'),
+      icon: 'clarity:server-line',
+    })
+  }
+  return tabs
+})
+
+const useMobileToolMenu = computed(() => metadataToolTabs.value.length > 4)
+
 const visibleArtistImageItems = computed(() =>
   activeArtistImageTab.value === 'completed'
     ? completedArtistImages.value
@@ -1585,6 +1867,14 @@ const visibleArtistImageItems = computed(() =>
     : activeArtistImageTab.value === 'failed'
     ? failedArtistImages.value
     : artistImageItems.value
+)
+
+const visibleAlbumImageItems = computed(() =>
+  activeAlbumImageTab.value === 'completed'
+    ? completedAlbumImages.value
+    : activeAlbumImageTab.value === 'clean'
+    ? cleanAlbumImageItems.value
+    : albumImageItems.value
 )
 
 const visibleArtistTagItems = computed(() =>
@@ -1620,6 +1910,16 @@ const emptyArtistImageMessage = computed(() => {
     return t('metadata.emptyArtistImageFailed')
   }
   return t('metadata.emptyArtistImages')
+})
+
+const emptyAlbumImageMessage = computed(() => {
+  if (activeAlbumImageTab.value === 'completed') {
+    return t('metadata.emptyAlbumImageCompleted')
+  }
+  if (activeAlbumImageTab.value === 'clean') {
+    return t('metadata.emptyAlbumImageClean')
+  }
+  return t('metadata.emptyAlbumImages')
 })
 
 const reconciliationBuckets = computed(() => {
@@ -1728,6 +2028,56 @@ watch(
   }
 )
 
+watch(
+  useMobileToolMenu,
+  () => {
+    syncMetadataMobileAction()
+  },
+  { immediate: true }
+)
+
+watch(
+  activeToolTab,
+  () => {
+    metadataToolMenuOpen.value = false
+  }
+)
+
+function selectToolTab(tabId) {
+  activeToolTab.value = tabId
+  metadataToolMenuOpen.value = false
+}
+
+function syncMetadataMobileAction() {
+  if (typeof window === 'undefined') return
+  if (!useMobileToolMenu.value) {
+    clearMetadataMobileAction()
+    return
+  }
+  window.dispatchEvent(
+    new CustomEvent('downtify:mobile-route-action', {
+      detail: {
+        routeName: 'Metadata',
+        icon: 'clarity:menu-line',
+        label: t('metadata.toolsMenu'),
+        title: t('metadata.toolsMenu'),
+        onClick: () => {
+          metadataToolMenuOpen.value = !metadataToolMenuOpen.value
+        },
+      },
+    })
+  )
+}
+
+function clearMetadataMobileAction() {
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(
+    new CustomEvent('downtify:clear-mobile-route-action', {
+      detail: { routeName: 'Metadata' },
+    })
+  )
+}
+
 function displaySong(song) {
   const artists = (song?.artists || []).join(', ')
   const title = song?.name || t('common.unknownTrack')
@@ -1787,6 +2137,45 @@ function metadataStatusBadgeClass() {
     return 'badge-soft'
   }
   return 'badge-warning text-warning-content'
+}
+
+function albumImagePreviewUrl(item) {
+  const candidateCover = String(item?.candidate?.cover_url || '').trim()
+  if (candidateCover) {
+    return API.remoteCoverSources(candidateCover, 320).src
+  }
+  const file = String(item?.file || '').trim()
+  return file ? apiPreviewSrc(API.coverFileURL(file, 320)) : ''
+}
+
+function albumImageStatusBadge(item) {
+  if (activeAlbumImageTab.value === 'completed') {
+    return t('metadata.completed')
+  }
+  if (activeAlbumImageTab.value === 'clean') {
+    return t('metadata.clean')
+  }
+  if (fixedAlbumImages.value[item.file]) {
+    return t('metadata.fixed')
+  }
+  return item?.has_cover
+    ? t('metadata.replaceAlbumCover')
+    : t('metadata.missingImages')
+}
+
+function albumImageStatusBadgeClass(item) {
+  if (
+    activeAlbumImageTab.value === 'completed' ||
+    fixedAlbumImages.value[item.file]
+  ) {
+    return 'badge-success text-success-content'
+  }
+  if (activeAlbumImageTab.value === 'clean') {
+    return 'badge-soft'
+  }
+  return item?.has_cover
+    ? 'badge-info text-info-content'
+    : 'badge-warning text-warning-content'
 }
 
 function itemKey(item) {
@@ -2210,6 +2599,22 @@ function applyArtistImageStatus(data) {
   }
 }
 
+function applyAlbumImageStatus(data) {
+  albumImageLoading.value = data.status === 'scanning'
+  albumImageLimit.value = data.limit || albumImageLimit.value
+  albumImageSummary.value = {
+    scanned: data.scanned || 0,
+    matched: data.matched || 0,
+    total: data.total || 0,
+  }
+  albumImageItems.value = data.items || []
+  cleanAlbumImageItems.value = data.clean || cleanAlbumImageItems.value
+  completedAlbumImages.value = data.completed || completedAlbumImages.value
+  if (data.status === 'error') {
+    albumImageError.value = data.error || t('metadata.failedAlbumImageScan')
+  }
+}
+
 function applyArtistTagStatus(data) {
   artistTagLoading.value = data.status === 'scanning'
   artistTagLimit.value = data.limit || artistTagLimit.value
@@ -2240,6 +2645,13 @@ function stopArtistImagePolling() {
   }
 }
 
+function stopAlbumImagePolling() {
+  if (albumImagePollTimer !== null) {
+    clearInterval(albumImagePollTimer)
+    albumImagePollTimer = null
+  }
+}
+
 function stopArtistTagPolling() {
   if (artistTagPollTimer !== null) {
     clearInterval(artistTagPollTimer)
@@ -2255,6 +2667,11 @@ function startPolling() {
 function startArtistImagePolling() {
   stopArtistImagePolling()
   artistImagePollTimer = setInterval(refreshArtistImageStatus, 1500)
+}
+
+function startAlbumImagePolling() {
+  stopAlbumImagePolling()
+  albumImagePollTimer = setInterval(refreshAlbumImageStatus, 1500)
 }
 
 function startArtistTagPolling() {
@@ -2287,6 +2704,20 @@ async function refreshArtistImageStatus() {
     stopArtistImagePolling()
     artistImageLoading.value = false
     artistImageError.value = t('metadata.failedArtistImageScan')
+  }
+}
+
+async function refreshAlbumImageStatus() {
+  try {
+    const res = await API.getAlbumImageScanStatus()
+    applyAlbumImageStatus(res.data)
+    if (res.data.status !== 'scanning') {
+      stopAlbumImagePolling()
+    }
+  } catch {
+    stopAlbumImagePolling()
+    albumImageLoading.value = false
+    albumImageError.value = t('metadata.failedAlbumImageScan')
   }
 }
 
@@ -2410,6 +2841,7 @@ async function refreshJellyfin() {
 }
 
 onMounted(async () => {
+  syncMetadataMobileAction()
   try {
     const res = await API.getMetadataScanStatus()
     applyScanStatus(res.data)
@@ -2429,6 +2861,15 @@ onMounted(async () => {
     // The page can still start a fresh artist image scan.
   }
   try {
+    const res = await API.getAlbumImageScanStatus()
+    applyAlbumImageStatus(res.data)
+    if (res.data.status === 'scanning') {
+      startAlbumImagePolling()
+    }
+  } catch {
+    // The page can still start a fresh album image scan.
+  }
+  try {
     const res = await API.getArtistTagScanStatus()
     applyArtistTagStatus(res.data)
     if (res.data.status === 'scanning') {
@@ -2440,8 +2881,10 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  clearMetadataMobileAction()
   stopPolling()
   stopArtistImagePolling()
+  stopAlbumImagePolling()
   stopArtistTagPolling()
 })
 
@@ -2611,6 +3054,112 @@ async function scanAllArtistImages() {
   } catch {
     artistImageError.value = t('metadata.failedArtistImageScan')
     artistImageLoading.value = false
+  }
+}
+
+async function scanAlbumImages() {
+  albumImageLoading.value = true
+  albumImageError.value = ''
+  fixedAlbumImages.value = {}
+  try {
+    const res = await API.scanAlbumImages(albumImageLimit.value)
+    applyAlbumImageStatus(res.data)
+    if (res.data.status === 'scanning') {
+      startAlbumImagePolling()
+    }
+  } catch {
+    albumImageError.value = t('metadata.failedAlbumImageScan')
+    albumImageLoading.value = false
+  }
+}
+
+async function scanAllAlbumImages() {
+  albumImageLoading.value = true
+  albumImageError.value = ''
+  fixedAlbumImages.value = {}
+  try {
+    const res = await API.scanAlbumImages(albumImageLimit.value, true, true)
+    applyAlbumImageStatus(res.data)
+    if (res.data.status === 'scanning') {
+      startAlbumImagePolling()
+    }
+  } catch {
+    albumImageError.value = t('metadata.failedAlbumImageScan')
+    albumImageLoading.value = false
+  }
+}
+
+async function applyAlbumImage(item, options = {}) {
+  const { quiet = false } = options
+  applyingAlbumImages.value = {
+    ...applyingAlbumImages.value,
+    [item.file]: true,
+  }
+  if (!quiet) albumImageError.value = ''
+  try {
+    const res = await API.applyAlbumImage(item.file, item.candidate)
+    if (!res.data?.has_cover) {
+      if (!quiet) albumImageError.value = t('metadata.failedVerify')
+      return false
+    }
+    fixedAlbumImages.value = {
+      ...fixedAlbumImages.value,
+      [item.file]: true,
+    }
+    completedAlbumImages.value = [res.data, ...completedAlbumImages.value]
+    albumImageItems.value = albumImageItems.value.filter(
+      (existing) => existing.file !== item.file
+    )
+    albumImageSummary.value = {
+      ...albumImageSummary.value,
+      matched: albumImageItems.value.length,
+    }
+    API.clearCoverSourcesCache()
+    return true
+  } catch (err) {
+    if (!quiet) {
+      const detail = err?.response?.data?.detail
+      albumImageError.value = detail
+        ? `${t('metadata.failedAlbumImageApply')} ${detail}`
+        : t('metadata.failedAlbumImageApply')
+    }
+    return false
+  } finally {
+    applyingAlbumImages.value = {
+      ...applyingAlbumImages.value,
+      [item.file]: false,
+    }
+  }
+}
+
+async function repairAllAlbumImages() {
+  const targets = [...albumImageItems.value]
+  if (targets.length === 0) return
+  repairingAllAlbumImages.value = true
+  albumImageError.value = ''
+  let succeeded = 0
+  let failed = 0
+  try {
+    for (const [index, item] of targets.entries()) {
+      albumImageError.value = t('metadata.albumImageRepairProgressDetail')
+        .replace('{current}', String(index + 1))
+        .replace('{total}', String(targets.length))
+        .replace('{name}', displaySong(item.current))
+        .replace('{succeeded}', String(succeeded))
+        .replace('{failed}', String(failed))
+      // eslint-disable-next-line no-await-in-loop
+      const ok = await applyAlbumImage(item, { quiet: true })
+      if (ok) succeeded += 1
+      else failed += 1
+    }
+    albumImageError.value =
+      failed === 0
+        ? t('metadata.albumImageRepairOk')
+        : t('metadata.albumImageRepairPartial')
+            .replace('{succeeded}', String(succeeded))
+            .replace('{total}', String(targets.length))
+  } finally {
+    repairingAllAlbumImages.value = false
   }
 }
 
@@ -3056,6 +3605,12 @@ async function syncJellyfinAfterImageRepairs(repairedCount) {
   @apply mb-5 mx-auto flex w-full max-w-full min-w-0 gap-0.5 overflow-hidden rounded-full border border-white/10 bg-base-100/75 p-1 sm:mb-6 sm:w-max sm:gap-1;
 }
 
+@media (max-width: 1023px) {
+  .metadata-tool-tabs-mobile-menu {
+    display: none;
+  }
+}
+
 .metadata-tab-btn {
   @apply inline-flex min-w-0 flex-1 items-center justify-center whitespace-nowrap rounded-full px-1 py-2 font-medium transition-colors sm:flex-none sm:px-4 sm:text-sm;
   font-size: clamp(0.5rem, 2.45vw, 0.875rem);
@@ -3068,6 +3623,23 @@ async function syncJellyfinAfterImageRepairs(repairedCount) {
 .metadata-tab-badge {
   @apply ml-1 inline-flex min-w-[0.9rem] shrink items-center justify-center rounded-full px-1 py-0.5 text-[9px] font-bold leading-none sm:ml-2 sm:min-w-0 sm:px-2 sm:text-xs;
   background-color: color-mix(in srgb, currentColor 10%, transparent);
+}
+
+.metadata-mobile-menu-backdrop {
+  @apply fixed inset-0 z-50 bg-black/30;
+  padding-top: calc(var(--app-header-height) + var(--app-safe-top) + 0.5rem);
+}
+
+.metadata-mobile-menu {
+  @apply ml-auto mr-3 flex w-64 max-w-[calc(100vw-1.5rem)] flex-col gap-1 rounded-2xl p-2 shadow-2xl;
+}
+
+.metadata-mobile-menu-item {
+  @apply flex min-w-0 items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium text-base-content/70 transition-colors active:bg-white/10;
+}
+
+.metadata-mobile-menu-item-active {
+  @apply bg-primary text-primary-content shadow-glow-sm;
 }
 
 .metadata-header {

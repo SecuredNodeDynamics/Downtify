@@ -235,6 +235,25 @@ function getArtistImageScanStatus() {
   return API.get('/api/metadata/artist-images/status')
 }
 
+function scanAlbumImages(limit = 50, scanAll = false, reset = false) {
+  return API.post('/api/metadata/album-images/scan', {
+    limit,
+    all: scanAll,
+    reset,
+  })
+}
+
+function getAlbumImageScanStatus() {
+  return API.get('/api/metadata/album-images/status')
+}
+
+function applyAlbumImage(file, candidate = null) {
+  return API.post('/api/metadata/album-images/apply', {
+    file,
+    candidate: candidate && typeof candidate === 'object' ? candidate : null,
+  })
+}
+
 function scanArtistTags(limit = 100, scanAll = false, reset = false) {
   return API.post('/api/metadata/artist-tags/scan', {
     limit,
@@ -917,6 +936,9 @@ export default {
   applyMetadata,
   scanArtistImages,
   getArtistImageScanStatus,
+  scanAlbumImages,
+  getAlbumImageScanStatus,
+  applyAlbumImage,
   scanArtistTags,
   getArtistTagScanStatus,
   applyArtistTags,

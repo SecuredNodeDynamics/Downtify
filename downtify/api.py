@@ -430,6 +430,22 @@ class AppState:
         'complete': False,
     }
     artist_image_scan_task: Optional[asyncio.Task] = None
+    album_image_scan: dict[str, Any] = {
+        'status': 'idle',
+        'limit': 50,
+        'scanned': 0,
+        'batch_scanned': 0,
+        'total': 0,
+        'matched': 0,
+        'items': [],
+        'clean': [],
+        'completed': [],
+        'error': '',
+        'errors': [],
+        'next_offset': 0,
+        'complete': False,
+    }
+    album_image_scan_task: Optional[asyncio.Task] = None
     artist_tag_scan: dict[str, Any] = {
         'status': 'idle',
         'limit': 100,
@@ -2179,6 +2195,29 @@ def _exclude_completed_metadata_items(
     ]
 
 
+def _album_image_scan_status() -> dict[str, Any]:
+    return dict(state.album_image_scan)
+
+
+def _completed_album_image_files() -> set[str]:
+    return {
+        str(item.get('file') or '')
+        for item in state.album_image_scan.get('completed') or []
+        if item.get('file')
+    }
+
+
+def _exclude_completed_album_image_items(
+    items: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    completed = _completed_album_image_files()
+    if not completed:
+        return items
+    return [
+        item for item in items if str(item.get('file') or '') not in completed
+    ]
+
+
 def _artist_tag_scan_status() -> dict[str, Any]:
     return dict(state.artist_tag_scan)
 
@@ -2388,6 +2427,126 @@ async def start_metadata_scan(request: Request) -> dict[str, Any]:
 @router.get('/api/metadata/scan/status')
 def metadata_scan_status() -> dict[str, Any]:
     return _metadata_scan_status()
+
+
+async def _run_album_image_scan(
+    limit: int, start: int, scan_all: bool = False
+) -> None:
+    def progress(update: dict[str, Any]) -> None:
+        items = _merge_items_by(
+            list(state.album_image_scan.get('items') or []),
+            list(update.get('items') or []),
+            'file',
+        )
+        items = _exclude_completed_album_image_items(items)
+        clean = _merge_items_by(
+            list(state.album_image_scan.get('clean') or []),
+            list(update.get('clean') or []),
+            'file',
+        )
+        state.album_image_scan = {
+            **state.album_image_scan,
+            **update,
+            'items': items,
+            'clean': clean,
+            'matched': len(items),
+            'status': 'scanning',
+            'limit': limit,
+        }
+
+    try:
+        download_dir = _active_download_dir()
+        result = await asyncio.to_thread(
+            metadata_repair.scan_album_images,
+            download_dir,
+            1_000_000 if scan_all else limit,
+            start,
+            progress,
+        )
+        items = _merge_items_by(
+            list(state.album_image_scan.get('items') or []),
+            list(result.get('items') or []),
+            'file',
+        )
+        items = _exclude_completed_album_image_items(items)
+        clean = _merge_items_by(
+            list(state.album_image_scan.get('clean') or []),
+            list(result.get('clean') or []),
+            'file',
+        )
+        state.album_image_scan = {
+            **state.album_image_scan,
+            **result,
+            'items': items,
+            'clean': clean,
+            'matched': len(items),
+            'limit': limit,
+            'status': 'done',
+            'error': '',
+            'finished_at': datetime.now(timezone.utc).isoformat(),
+        }
+    except Exception as exc:
+        logger.exception('Album image scan failed')
+        state.album_image_scan = {
+            **state.album_image_scan,
+            'status': 'error',
+            'error': str(exc),
+            'finished_at': datetime.now(timezone.utc).isoformat(),
+        }
+
+
+@router.post('/api/metadata/album-images/scan')
+async def start_album_image_scan(request: Request) -> dict[str, Any]:
+    download_dir = _active_download_dir()
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+    try:
+        limit = max(1, min(500, int(payload.get('limit', 50))))
+    except (TypeError, ValueError):
+        limit = 50
+    reset = bool(payload.get('reset', False))
+    scan_all = bool(payload.get('all', False))
+
+    task = state.album_image_scan_task
+    if task is not None and not task.done():
+        return _album_image_scan_status()
+
+    previous = state.album_image_scan
+    start, continuing = _scan_resume_start(previous, reset, download_dir)
+    previous_items = (
+        _exclude_completed_album_image_items(previous.get('items') or [])
+        if continuing
+        else []
+    )
+    previous_clean = (previous.get('clean') or []) if continuing else []
+
+    state.album_image_scan = {
+        'status': 'scanning',
+        'limit': limit,
+        'scanned': 0,
+        'batch_scanned': 0,
+        'total': 0,
+        'matched': len(previous_items),
+        'items': previous_items,
+        'clean': previous_clean,
+        'completed': previous.get('completed') or [],
+        'error': '',
+        'errors': [],
+        'root': str(download_dir.resolve()),
+        'next_offset': start,
+        'complete': False,
+    }
+    state.album_image_scan_task = asyncio.create_task(
+        _run_album_image_scan(limit, start, scan_all)
+    )
+    return _album_image_scan_status()
+
+
+@router.get('/api/metadata/album-images/status')
+def album_image_scan_status() -> dict[str, Any]:
+    return _album_image_scan_status()
 
 
 async def _run_artist_tag_scan(
@@ -3233,6 +3392,46 @@ async def apply_metadata(request: Request) -> dict[str, Any]:
     except Exception as exc:
         logger.exception('Metadata repair failed for {}', file)
         _add_repair_log('metadata', 'failed', file, str(exc))
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@router.post('/api/metadata/album-images/apply')
+async def apply_album_image(request: Request) -> dict[str, Any]:
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+    file = str(payload.get('file') or '').strip()
+    candidate = payload.get('candidate')
+    if not file:
+        raise HTTPException(status_code=400, detail='File is required')
+    try:
+        result = await asyncio.to_thread(
+            metadata_repair.repair_album_image,
+            _active_download_dir(),
+            file,
+            candidate if isinstance(candidate, dict) else None,
+        )
+        completed = list(state.album_image_scan.get('completed') or [])
+        completed.insert(0, result)
+        items = [
+            item
+            for item in state.album_image_scan.get('items') or []
+            if item.get('file') != file
+        ]
+        state.album_image_scan = {
+            **state.album_image_scan,
+            'items': items,
+            'matched': len(items),
+            'completed': completed,
+        }
+        _add_repair_log('album_image', 'success', file, result=result)
+        return result
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception('Album image repair failed for {}', file)
+        _add_repair_log('album_image', 'failed', file, str(exc))
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 

@@ -44,6 +44,11 @@ export function resolvePlayerBrowseState(libraryItems, intent, options = {}) {
       selectedGenreName: '',
       playlistFiles: albumEntry.files,
       startFile: file,
+      context: {
+        type: 'album',
+        name: albumEntry.name,
+        artist: albumEntry.artist,
+      },
     }
   }
 
@@ -69,6 +74,7 @@ export function resolvePlayerBrowseState(libraryItems, intent, options = {}) {
       selectedGenreName: '',
       playlistFiles: artistFiles,
       startFile: file,
+      context: { type: 'artist', name: artist },
     }
   }
 

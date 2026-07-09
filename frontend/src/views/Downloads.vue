@@ -1195,25 +1195,39 @@ function closeGenre() {
 function playFile(file) {
   saveBrowseScrollPosition()
   const playlist = visibleFiles.value
-  player.setPlaylist(playlist, { startIndex: playlist.indexOf(file) })
+  player.setPlaylist(playlist, {
+    startIndex: playlist.indexOf(file),
+    context: selectedGenreName.value
+      ? { type: 'genre', name: selectedGenreName.value }
+      : null,
+  })
   router.push({ name: 'Player' })
 }
 
 function playArtist(artist) {
   saveBrowseScrollPosition()
-  player.setPlaylist(artist.files, { startIndex: 0 })
+  player.setPlaylist(artist.files, {
+    startIndex: 0,
+    context: { type: 'artist', name: artist.name },
+  })
   router.push({ name: 'Player' })
 }
 
 function playAlbum(album) {
   saveBrowseScrollPosition()
-  player.setPlaylist(album.files, { startIndex: 0 })
+  player.setPlaylist(album.files, {
+    startIndex: 0,
+    context: { type: 'album', name: album.name, artist: album.artist },
+  })
   router.push({ name: 'Player' })
 }
 
 function playGenre(genre) {
   saveBrowseScrollPosition()
-  player.setPlaylist(genre.files, { startIndex: 0 })
+  player.setPlaylist(genre.files, {
+    startIndex: 0,
+    context: { type: 'genre', name: genre.name },
+  })
   router.push({ name: 'Player' })
 }
 
