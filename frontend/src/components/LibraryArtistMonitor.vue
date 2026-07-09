@@ -231,7 +231,7 @@ async function lookupSpotifyArtistsWithRetry(artistName, limit = 5) {
 
   let { res, matches } = await lookup()
   if (matches.length === 0) {
-    await new Promise((resolve) => setTimeout(resolve, 1500))
+    await new Promise((resolve) => setTimeout(resolve, 250))
     ;({ res, matches } = await lookup())
   }
   return { res, matches }
@@ -306,7 +306,7 @@ async function addMatch(match) {
     pickerMatches.value = []
     actionError.value = ''
     upsertMonitoredArtist(res.data, props.artistName)
-    await refreshMonitoredArtists({ force: true })
+    void refreshMonitoredArtists()
   } catch (err) {
     if (err?.response?.status === 409) {
       pickerOpen.value = false

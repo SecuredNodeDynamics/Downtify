@@ -16,6 +16,7 @@ import {
 import { usesEmbeddedServer } from './serverConnection.js'
 
 const VOLUME_KEY = 'downtify-player-volume'
+const SESSION_KEY = 'downtify-player-session-v1'
 
 const playlist = ref([])
 const currentIndex = ref(-1)
@@ -42,6 +43,70 @@ let recoverAttempts = 0
 let recovering = false
 let mediaSessionReady = false
 let lastMediaPositionSyncAt = 0
+let lastSessionPersistAt = 0
+let pendingSession = readPlayerSession()
+
+function readPlayerSession() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(SESSION_KEY) || 'null')
+    if (!parsed || typeof parsed.file !== 'string' || !parsed.file) return null
+    return {
+      file: parsed.file,
+      time: Math.max(0, Number(parsed.time) || 0),
+      playing: Boolean(parsed.playing),
+      repeatMode: ['off', 'all', 'one'].includes(parsed.repeatMode)
+        ? parsed.repeatMode
+        : 'off',
+      shuffle: Boolean(parsed.shuffle),
+    }
+  } catch {
+    return null
+  }
+}
+
+function persistPlayerSession(force = false) {
+  const now = Date.now()
+  if (!force && now - lastSessionPersistAt < 1000) return
+  const track = currentTrackForMediaSession()
+  if (!track?.file) return
+  lastSessionPersistAt = now
+  try {
+    localStorage.setItem(
+      SESSION_KEY,
+      JSON.stringify({
+        file: track.file,
+        time: audio?.currentTime || currentTime.value || 0,
+        playing: playbackIntent || isPlaying.value,
+        repeatMode: repeatMode.value,
+        shuffle: shuffle.value,
+      })
+    )
+  } catch {
+    // Ignore private-mode storage failures.
+  }
+}
+
+function restorePlayerSession(paths) {
+  const session = pendingSession
+  if (!session || currentIndex.value >= 0) return false
+  const index = paths.indexOf(session.file)
+  if (index < 0) {
+    pendingSession = null
+    return false
+  }
+
+  repeatMode.value = session.repeatMode
+  shuffle.value = session.shuffle
+  currentIndex.value = index
+  currentTime.value = session.time
+  void applyTrack(index, {
+    autoplay: session.playing,
+    resetTime: false,
+    restoreTime: session.time,
+  })
+  pendingSession = null
+  return true
+}
 
 function currentTrackForMediaSession() {
   return currentIndex.value >= 0 && currentIndex.value < playlist.value.length
@@ -234,6 +299,7 @@ function ensureAudio() {
       currentTime.value = audio.currentTime
     }
     syncMediaSessionNow({ position: true })
+    persistPlayerSession()
   })
   audio.addEventListener('seeking', () => {
     isSeeking = true
@@ -275,6 +341,7 @@ function ensureAudio() {
     stopProgressTicker()
     if (audio) currentTime.value = audio.currentTime
     syncMediaSessionNow({ position: true })
+    persistPlayerSession(true)
   })
   return audio
 }
@@ -322,7 +389,10 @@ function selectAt(index) {
   void applyTrack(index, { autoplay: false, resetTime: false })
 }
 
-async function applyTrack(index, { autoplay = false, resetTime = true } = {}) {
+async function applyTrack(
+  index,
+  { autoplay = false, resetTime = true, restoreTime = 0 } = {}
+) {
   if (index < 0 || index >= playlist.value.length) return
   const a = ensureAudio()
   const wasPlaying = isPlaying.value
@@ -353,6 +423,24 @@ async function applyTrack(index, { autoplay = false, resetTime = true } = {}) {
       a.currentTime = 0
       currentTime.value = 0
       duration.value = 0
+    }
+    if (restoreTime > 0) {
+      const applyRestoreTime = () => {
+        if (playingFile !== track.file) return
+        try {
+          a.currentTime = Math.min(
+            restoreTime,
+            Number.isFinite(a.duration)
+              ? Math.max(0, a.duration - 0.25)
+              : restoreTime
+          )
+          currentTime.value = a.currentTime
+        } catch {
+          // Metadata is not ready yet; loadedmetadata will retry.
+        }
+      }
+      a.addEventListener('loadedmetadata', applyRestoreTime, { once: true })
+      applyRestoreTime()
     }
     if (autoplay || wasPlaying) {
       playbackIntent = true
@@ -411,6 +499,10 @@ function setPlaylist(files, options = {}) {
     typeof f === 'string' ? trackFromFile(f) : f
   )
   playlist.value = tracks
+  if (restorePlayerSession(tracks.map((track) => track.file))) {
+    if (shuffle.value) buildShuffleOrder()
+    return
+  }
   if (currentIndex.value >= tracks.length) currentIndex.value = -1
   if (shuffle.value) buildShuffleOrder()
   if (typeof options.startIndex === 'number') {
@@ -456,6 +548,7 @@ function pause() {
   playbackIntent = false
   resetRecovery()
   if (audio) audio.pause()
+  persistPlayerSession(true)
 }
 
 function toggle() {
@@ -560,7 +653,10 @@ function onEnded() {
 }
 
 function setRepeat(mode) {
-  if (['off', 'all', 'one'].includes(mode)) repeatMode.value = mode
+  if (['off', 'all', 'one'].includes(mode)) {
+    repeatMode.value = mode
+    persistPlayerSession(true)
+  }
 }
 
 function cycleRepeat() {
@@ -572,6 +668,7 @@ function cycleRepeat() {
 function setShuffle(v) {
   shuffle.value = !!v
   if (shuffle.value) buildShuffleOrder()
+  persistPlayerSession(true)
 }
 
 function toggleShuffle() {
@@ -587,6 +684,10 @@ const currentTrack = computed(() =>
 const progressPct = computed(() =>
   duration.value > 0 ? (currentTime.value / duration.value) * 100 : 0
 )
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('pagehide', () => persistPlayerSession(true))
+}
 
 export function formatTime(seconds) {
   if (!isFinite(seconds) || seconds < 0) return '0:00'

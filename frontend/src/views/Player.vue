@@ -500,11 +500,35 @@
           class="similar-artists-card panel-glow-shell surface"
         >
           <div class="p-3 sm:p-4">
-            <h2 class="player-detail-heading">
-              {{ t('player.similarArtists') }}
-            </h2>
+            <div class="flex items-center justify-between gap-3">
+              <h2 class="player-detail-heading">
+                {{ t('player.similarMedia') }}
+              </h2>
+              <div class="tabs tabs-boxed bg-base-100/60 p-0.5">
+                <button
+                  type="button"
+                  class="tab h-7 min-h-0 px-3 text-xs"
+                  :class="{ 'tab-active': similarMediaTab === 'artists' }"
+                  @click="similarMediaTab = 'artists'"
+                >
+                  {{ t('library.artists') }}
+                </button>
+                <button
+                  type="button"
+                  class="tab h-7 min-h-0 px-3 text-xs"
+                  :class="{ 'tab-active': similarMediaTab === 'tracks' }"
+                  @click="similarMediaTab = 'tracks'"
+                >
+                  {{ t('library.tracks') }}
+                </button>
+              </div>
+            </div>
             <div
-              v-if="similarArtistsLoading"
+              v-if="
+                similarMediaTab === 'artists'
+                  ? similarArtistsLoading
+                  : similarTracksLoading
+              "
               class="similar-artists-grid mt-2.5"
               aria-hidden="true"
             >
@@ -514,7 +538,7 @@
               </div>
             </div>
             <div
-              v-else-if="similarArtists.length"
+              v-else-if="similarMediaTab === 'artists' && similarArtists.length"
               class="similar-artists-grid mt-2.5"
             >
               <button
@@ -544,14 +568,85 @@
                     icon="clarity:user-line"
                     class="absolute left-1/2 top-1/2 h-6 w-6 -translate-x-1/2 -translate-y-1/2 text-base-content/40"
                   />
+                  <span
+                    v-if="isSimilarArtistOwned(artist)"
+                    class="similar-owned-badge"
+                    :title="t('search.inLibrary')"
+                  >
+                    <Icon icon="clarity:library-solid" class="h-3.5 w-3.5" />
+                  </span>
                 </div>
                 <p class="similar-artist-name" :title="artist.name">
                   {{ artist.name }}
                 </p>
               </button>
             </div>
+            <div
+              v-else-if="similarMediaTab === 'tracks' && similarTracks.length"
+              class="similar-artists-grid mt-2.5"
+            >
+              <article
+                v-for="track in similarTracks"
+                :key="track.song_id || track.url"
+                class="similar-track-item"
+                role="button"
+                tabindex="0"
+                @click="openSimilarTrack(track)"
+                @keydown.enter.prevent="openSimilarTrack(track)"
+                @keydown.space.prevent="openSimilarTrack(track)"
+              >
+                <div class="similar-artist-cover">
+                  <CoverImage
+                    v-if="track.cover_url"
+                    :src="API.remoteCoverSources(track.cover_url, 192).src"
+                    :fallbacks="
+                      API.remoteCoverSources(track.cover_url, 192).fallbacks
+                    "
+                    :alt="track.name"
+                    img-class="absolute inset-0 h-full w-full object-cover"
+                  >
+                    <template #fallback>
+                      <Icon
+                        icon="clarity:music-note-line"
+                        class="h-6 w-6 text-base-content/40"
+                      />
+                    </template>
+                  </CoverImage>
+                </div>
+                <div class="mt-1.5 flex min-w-0 items-start gap-1">
+                  <div class="min-w-0 flex-1">
+                    <p class="similar-artist-name mt-0" :title="track.name">
+                      {{ track.name }}
+                    </p>
+                    <p class="truncate text-[10px] text-base-content/45">
+                      {{ resultArtistLabel(track) }}
+                    </p>
+                  </div>
+                  <button
+                    v-if="!similarTrackOwnership.isOwned(track)"
+                    type="button"
+                    class="similar-track-download"
+                    :title="t('common.download')"
+                    @click.stop="downloadSimilarArtistItem(track)"
+                  >
+                    <Icon icon="clarity:download-line" class="h-3.5 w-3.5" />
+                  </button>
+                  <span
+                    v-else
+                    class="similar-track-owned"
+                    :title="t('search.inLibrary')"
+                  >
+                    <Icon icon="clarity:library-solid" class="h-3.5 w-3.5" />
+                  </span>
+                </div>
+              </article>
+            </div>
             <p v-else class="player-detail-empty mt-3">
-              {{ t('player.similarArtistsEmpty') }}
+              {{
+                similarMediaTab === 'artists'
+                  ? t('player.similarArtistsEmpty')
+                  : t('player.similarTracksEmpty')
+              }}
             </p>
           </div>
         </section>
@@ -649,7 +744,10 @@
                 <div class="artist-result-cover">
                   <CoverImage
                     v-if="item.cover_url"
-                    :src="API.searchCoverUrl(item.cover_url, 160)"
+                    :src="API.remoteCoverSources(item.cover_url, 160).src"
+                    :fallbacks="
+                      API.remoteCoverSources(item.cover_url, 160).fallbacks
+                    "
                     :alt="item.name"
                     img-class="absolute inset-0 h-full w-full object-cover"
                   />
@@ -661,6 +759,7 @@
                   </p>
                 </div>
                 <button
+                  v-if="!similarTrackOwnership.isOwned(selectedSimilarTrack)"
                   type="button"
                   class="icon-btn shrink-0 text-primary"
                   :title="t('common.download')"
@@ -673,6 +772,112 @@
             <p v-else class="py-12 text-center text-sm text-base-content/50">
               {{ t('player.artistMusicEmpty') }}
             </p>
+          </div>
+        </section>
+      </div>
+    </Teleport>
+
+    <Teleport to="body">
+      <div
+        v-if="selectedSimilarTrack"
+        class="artist-modal-backdrop"
+        @click.self="closeSimilarTrack"
+      >
+        <section
+          class="track-modal surface-strong"
+          role="dialog"
+          aria-modal="true"
+          :aria-label="selectedSimilarTrack.name"
+        >
+          <header class="artist-modal-header">
+            <h2 class="truncate text-lg font-bold">
+              {{ t('player.trackDetails') }}
+            </h2>
+            <button
+              type="button"
+              class="icon-btn shrink-0"
+              :title="t('common.close')"
+              @click="closeSimilarTrack"
+            >
+              <Icon icon="clarity:close-line" class="h-5 w-5" />
+            </button>
+          </header>
+
+          <div class="track-modal-body">
+            <div class="track-modal-cover">
+              <CoverImage
+                v-if="selectedSimilarTrack.cover_url"
+                :src="
+                  API.remoteCoverSources(selectedSimilarTrack.cover_url, 480)
+                    .src
+                "
+                :fallbacks="
+                  API.remoteCoverSources(selectedSimilarTrack.cover_url, 480)
+                    .fallbacks
+                "
+                :alt="selectedSimilarTrack.name"
+                img-class="absolute inset-0 h-full w-full object-cover"
+              >
+                <template #fallback>
+                  <Icon
+                    icon="clarity:music-note-line"
+                    class="h-12 w-12 text-base-content/35"
+                  />
+                </template>
+              </CoverImage>
+            </div>
+
+            <div class="min-w-0 flex-1">
+              <h3 class="text-xl font-bold leading-tight">
+                {{ selectedSimilarTrack.name }}
+              </h3>
+              <p class="mt-1 text-sm text-base-content/65">
+                {{ resultArtistLabel(selectedSimilarTrack) }}
+              </p>
+              <dl class="track-modal-metadata">
+                <div v-if="selectedSimilarTrack.album_name">
+                  <dt>{{ t('library.albums') }}</dt>
+                  <dd>{{ selectedSimilarTrack.album_name }}</dd>
+                </div>
+                <div v-if="selectedSimilarTrack.year">
+                  <dt>{{ t('player.releaseYear') }}</dt>
+                  <dd>{{ selectedSimilarTrack.year }}</dd>
+                </div>
+                <div v-if="selectedSimilarTrack.duration">
+                  <dt>{{ t('player.durationLabel') }}</dt>
+                  <dd>{{ formatTime(selectedSimilarTrack.duration) }}</dd>
+                </div>
+              </dl>
+
+              <div class="mt-5 flex flex-wrap items-center gap-2">
+                <button
+                  v-if="!similarTrackOwnership.isOwned(selectedSimilarTrack)"
+                  type="button"
+                  class="btn btn-primary btn-sm h-10 rounded-full px-4"
+                  @click="downloadSimilarArtistItem(selectedSimilarTrack)"
+                >
+                  <Icon icon="clarity:download-line" class="h-4 w-4" />
+                  {{ t('common.download') }}
+                </button>
+                <span
+                  v-else
+                  class="btn btn-sm h-10 cursor-default rounded-full border-primary/25 bg-primary/10 px-4 text-primary"
+                >
+                  <Icon icon="clarity:library-solid" class="h-4 w-4" />
+                  {{ t('search.inLibrary') }}
+                </span>
+                <a
+                  v-if="selectedSimilarTrack.url"
+                  class="btn btn-sm h-10 rounded-full border-white/10 bg-base-100/70 px-4"
+                  :href="selectedSimilarTrack.url"
+                  target="_blank"
+                  rel="noopener"
+                >
+                  <Icon icon="clarity:pop-out-line" class="h-4 w-4" />
+                  {{ t('player.openSource') }}
+                </a>
+              </div>
+            </div>
           </div>
         </section>
       </div>
@@ -710,6 +915,7 @@ import {
 } from '/src/model/librarySession'
 import { usePlayer, formatTime, trackInfoFromFile } from '/src/model/player'
 import { useDownloadManager } from '/src/model/download'
+import { useLibraryOwnership } from '/src/model/libraryOwnership'
 import {
   consumePlayerNavigation,
   resolvePlayerBrowseState,
@@ -744,12 +950,18 @@ const lyricLineRefs = ref([])
 const lyricsOffset = ref(readLyricsOffset())
 const similarArtists = ref([])
 const similarArtistsLoading = ref(false)
+const similarMediaTab = ref('artists')
+const similarTracks = ref([])
+const similarTracksLoading = ref(false)
+const selectedSimilarTrack = ref(null)
+const similarTrackOwnership = useLibraryOwnership(similarTracks)
 const selectedSimilarArtist = ref(null)
 const similarArtistDetailsLoading = ref(false)
 const similarArtistResults = ref([])
 const similarArtistTab = ref('albums')
 let lyricsRequestSeq = 0
 let similarArtistsRequestSeq = 0
+let similarTracksRequestSeq = 0
 let seekRaf = 0
 let pendingSeekRatio = null
 
@@ -921,22 +1133,31 @@ function librarySimilarArtistFallback(artistName) {
 
 function similarArtistCoverSources(artist) {
   const remote = String(artist?.image_url || '').trim()
-  const primary = /^https?:\/\//i.test(remote)
-    ? API.searchCoverUrl(remote, 192)
-    : API.apiAssetUrl(remote)
+  const remoteSources = /^https?:\/\//i.test(remote)
+    ? API.remoteCoverSources(remote, 192)
+    : { src: API.apiAssetUrl(remote), fallbacks: [] }
   const libraryArtist = artists.value.find((entry) =>
     artistNamesMatch(entry.name, artist?.name)
   )
   const local = libraryArtist
     ? artistCoverFor(libraryArtist)
     : { src: '', fallbacks: [] }
-  const candidates = [primary, local.src, ...(local.fallbacks || [])].filter(
-    Boolean
-  )
+  const candidates = [
+    remoteSources.src,
+    ...(remoteSources.fallbacks || []),
+    local.src,
+    ...(local.fallbacks || []),
+  ].filter(Boolean)
   return {
     src: candidates[0] || '',
     fallbacks: [...new Set(candidates.slice(1))],
   }
+}
+
+function isSimilarArtistOwned(artist) {
+  return artists.value.some((entry) =>
+    artistNamesMatch(entry.name, artist?.name)
+  )
 }
 
 const similarArtistAlbums = computed(() =>
@@ -989,6 +1210,49 @@ function resultArtistLabel(item) {
 
 function downloadSimilarArtistItem(item) {
   void downloadManager.queue(item)
+}
+
+function openSimilarTrack(track) {
+  selectedSimilarTrack.value = track
+}
+
+function closeSimilarTrack() {
+  selectedSimilarTrack.value = null
+}
+
+async function loadSimilarTracks(title, artistName) {
+  similarTracksRequestSeq += 1
+  const seq = similarTracksRequestSeq
+  similarTracks.value = []
+  similarTracksLoading.value = Boolean(title || artistName)
+  if (!title && !artistName) return
+
+  try {
+    const response = await API.search(
+      [title, artistName].filter(Boolean).join(' ')
+    )
+    if (seq !== similarTracksRequestSeq) return
+    const currentTitleKey = String(title || '')
+      .trim()
+      .toLocaleLowerCase()
+    const seen = new Set()
+    similarTracks.value = (Array.isArray(response.data) ? response.data : [])
+      .filter((item) => item?.media_type !== 'album')
+      .filter((item) => {
+        const key = String(item?.song_id || item?.url || '').trim()
+        const itemTitle = String(item?.name || '')
+          .trim()
+          .toLocaleLowerCase()
+        if (!key || seen.has(key) || itemTitle === currentTitleKey) return false
+        seen.add(key)
+        return true
+      })
+      .slice(0, 8)
+  } catch {
+    if (seq === similarTracksRequestSeq) similarTracks.value = []
+  } finally {
+    if (seq === similarTracksRequestSeq) similarTracksLoading.value = false
+  }
 }
 
 const currentAlbumKey = computed(() => {
@@ -1432,6 +1696,19 @@ watch(
   { immediate: true }
 )
 
+watch(
+  () => [
+    player.currentTrack.value?.title || '',
+    currentArtistName.value,
+    player.currentTrack.value?.file || '',
+  ],
+  ([title, artistName, file]) => {
+    const resolvedTitle = title || trackInfoFromFile(file).title
+    void loadSimilarTracks(resolvedTitle, artistName)
+  },
+  { immediate: true }
+)
+
 watch(activeLyricIndex, async (index) => {
   if (!lyricsOpen.value || index < 0) return
   await nextTick()
@@ -1556,15 +1833,30 @@ onUnmounted(() => {
     overflow-x: hidden;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
-    overscroll-behavior-y: contain;
+    overscroll-behavior-y: auto;
+    scrollbar-width: none;
+    touch-action: pan-y;
+  }
+
+  .player-content::-webkit-scrollbar {
+    display: none;
   }
 
   .player-shell {
-    display: flex;
-    flex-direction: column;
-    gap: 0.875rem;
+    display: contents;
     min-height: 0;
-    flex: 0 0 auto;
+  }
+
+  .player-shell > section {
+    order: 1;
+  }
+
+  .similar-artists-card {
+    order: 2;
+  }
+
+  .player-shell > aside {
+    order: 3;
   }
 
   .player-shell > .panel-glow-shell-grow {
@@ -1595,7 +1887,13 @@ onUnmounted(() => {
     overflow-x: hidden;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
-    overscroll-behavior-y: contain;
+    overscroll-behavior-y: auto;
+    scrollbar-width: none;
+    touch-action: pan-y;
+  }
+
+  .player-details::-webkit-scrollbar {
+    display: none;
   }
 }
 
@@ -1765,6 +2063,15 @@ onUnmounted(() => {
   @apply text-xs font-semibold uppercase tracking-wide text-base-content/45;
 }
 
+.player-details {
+  scrollbar-width: none;
+  overscroll-behavior-y: auto;
+}
+
+.player-details::-webkit-scrollbar {
+  display: none;
+}
+
 .player-detail-card {
   @apply flex flex-col gap-3 rounded-2xl border border-white/10 bg-white/5 p-3 sm:gap-4 sm:p-4;
 }
@@ -1803,6 +2110,22 @@ onUnmounted(() => {
 
 .similar-artist-item {
   @apply min-w-0 cursor-pointer text-center outline-none transition-transform hover:-translate-y-0.5 focus-visible:-translate-y-0.5;
+}
+
+.similar-track-item {
+  @apply min-w-0 cursor-pointer rounded-lg p-1 text-left outline-none transition-colors hover:bg-white/5 focus-visible:bg-white/5;
+}
+
+.similar-track-download {
+  @apply flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-primary transition-colors hover:bg-primary/10 focus-visible:bg-primary/10 focus-visible:outline-none;
+}
+
+.similar-track-owned {
+  @apply flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary;
+}
+
+.similar-owned-badge {
+  @apply absolute bottom-1 right-1 flex h-6 w-6 items-center justify-center rounded-full border border-primary/30 bg-base-100/90 text-primary shadow;
 }
 
 .similar-artist-cover {
@@ -1850,6 +2173,34 @@ onUnmounted(() => {
 
 .artist-result-cover {
   @apply relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-md bg-primary/10;
+}
+
+.track-modal {
+  @apply flex max-h-[92dvh] w-full max-w-2xl flex-col overflow-hidden rounded-t-2xl border border-white/10 shadow-2xl sm:rounded-2xl;
+}
+
+.track-modal-body {
+  @apply flex flex-col gap-5 overflow-y-auto p-4 sm:flex-row sm:p-5;
+}
+
+.track-modal-cover {
+  @apply relative mx-auto aspect-square w-full max-w-56 shrink-0 overflow-hidden rounded-xl bg-primary/10 sm:mx-0 sm:w-52;
+}
+
+.track-modal-metadata {
+  @apply mt-5 space-y-2 text-sm;
+}
+
+.track-modal-metadata > div {
+  @apply grid grid-cols-[6rem_1fr] gap-3;
+}
+
+.track-modal-metadata dt {
+  @apply text-base-content/45;
+}
+
+.track-modal-metadata dd {
+  @apply min-w-0 truncate text-base-content/75;
 }
 
 .player-detail-card :deep(.library-artist-monitor) {

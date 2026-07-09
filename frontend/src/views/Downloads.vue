@@ -572,7 +572,6 @@ import {
   fetchLibraryItems,
   getInitialLibrarySnapshot,
   onLibraryChanged,
-  resetLibraryPrefetch,
 } from '/src/model/librarySession'
 import { buildApiBaseUrl, getServerConfig } from '/src/model/serverConnection'
 import { useI18n } from '/src/i18n'
@@ -1042,11 +1041,7 @@ async function refreshFromHeader() {
   libraryRefresh.setFailed(false)
   error.value = ''
   try {
-    resetLibraryPrefetch()
-    const items = await fetchLibraryItems(
-      () => API.getLibraryFiles().then((res) => res.data || []),
-      { preferPrefetch: false }
-    )
+    const items = await API.refreshLibraryInBackground(true)
     if (items.length > 0) {
       applyLibraryData(items)
       return

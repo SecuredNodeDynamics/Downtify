@@ -54,10 +54,21 @@ describe('coverSourcesForNowPlaying', () => {
 
     const sources = API.coverSourcesForGenreFile('Artist/Album/Track.m4a')
 
-    expect(sources.src).toContain(
-      '/api/metadata/artist-images/folder-preview?'
-    )
+    expect(sources.src).toContain('/api/metadata/artist-images/folder-preview?')
     expect(sources.src).toContain('folder=Artist%2FAlbum')
     expect(sources.fallbacks.at(-1)).toContain('/cover?')
+  })
+
+  it('provides proxy and direct fallbacks for remote artwork', async () => {
+    const API = (await import('../model/api.js')).default
+    const remote = 'https://yt3.googleusercontent.com/example=w600-h600-l90-rj'
+
+    const sources = API.remoteCoverSources(remote, 192)
+
+    expect(sources.src).toContain('/api/image-proxy?')
+    expect(sources.src).toContain('w192-h192')
+    expect(sources.fallbacks).toEqual([
+      'https://yt3.googleusercontent.com/example=w192-h192-l90-rj',
+    ])
   })
 })

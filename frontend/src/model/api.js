@@ -485,10 +485,10 @@ function warmLibraryCovers(items = []) {
   const native = isCapacitorNative()
   const entries = []
   const seenArtists = new Set()
-  const artistLimit = native ? 80 : 24
-  const fileSlice = native ? 40 : 48
-  const batchLimit = native ? 80 : 96
-  const concurrency = native ? 8 : 12
+  const artistLimit = native ? 20 : 24
+  const fileSlice = native ? 12 : 24
+  const batchLimit = native ? 28 : 40
+  const concurrency = native ? 2 : 4
 
   for (const item of items) {
     const artist = String(item?.artist || '').trim()
@@ -574,6 +574,27 @@ const SEARCH_THUMBNAIL_SIZE = 256
 
 function searchCoverUrl(url, size = SEARCH_THUMBNAIL_SIZE) {
   return mediaUrl(cdnThumbnailUrl(url, size))
+}
+
+function remoteCoverSources(url, size = SEARCH_THUMBNAIL_SIZE) {
+  const remote = cdnThumbnailUrl(url, size)
+  if (!remote) return EMPTY_COVER_SOURCES
+  if (!/^https?:\/\//i.test(remote)) {
+    return Object.freeze({
+      src: apiAssetUrl(remote),
+      fallbacks: Object.freeze([]),
+    })
+  }
+
+  const base = buildApiBaseUrl(getServerConfig())
+  const proxied = `${base}/api/image-proxy?${new URLSearchParams({
+    url: remote,
+  })}`
+  const urls = isCapacitorNative() ? [remote, proxied] : [proxied, remote]
+  return Object.freeze({
+    src: urls[0],
+    fallbacks: Object.freeze([...new Set(urls.slice(1))]),
+  })
 }
 
 function mediaUrl(src) {
@@ -859,6 +880,7 @@ export default {
   apiAssetUrl,
   mediaUrl,
   searchCoverUrl,
+  remoteCoverSources,
   listDownloads,
   getLibraryFiles,
   getSimilarArtists,

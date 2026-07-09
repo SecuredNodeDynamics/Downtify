@@ -3,6 +3,8 @@ import { buildApiBaseUrl, getServerConfig } from './serverConnection.js'
 
 const API = axios.create()
 const CACHE_KEY = 'downtify.monitor.playlists'
+const artistLookupCache = new Map()
+const ARTIST_LOOKUP_TTL_MS = 10 * 60 * 1000
 
 API.interceptors.request.use((config) => {
   config.baseURL = buildApiBaseUrl(getServerConfig())
@@ -84,10 +86,22 @@ function listMonitoredPlaylists({ useCache = true } = {}) {
 }
 
 function lookupSpotifyArtists(artistName, limit = 5) {
-  return API.get('/api/monitor/artists/lookup', {
+  const key = `${String(artistName || '')
+    .trim()
+    .toLocaleLowerCase()}:${limit}`
+  const cached = artistLookupCache.get(key)
+  if (cached && Date.now() - cached.createdAt < ARTIST_LOOKUP_TTL_MS) {
+    return cached.promise
+  }
+  const promise = API.get('/api/monitor/artists/lookup', {
     params: { artist: artistName, limit },
-    timeout: 60000,
+    timeout: 20000,
+  }).catch((error) => {
+    artistLookupCache.delete(key)
+    throw error
   })
+  artistLookupCache.set(key, { createdAt: Date.now(), promise })
+  return promise
 }
 
 function searchMonitorTargets(query, kind = 'artist', limit = 6) {

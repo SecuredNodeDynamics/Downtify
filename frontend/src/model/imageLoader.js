@@ -14,6 +14,9 @@ import {
 const urlCache = new Map()
 const sourceCache = new Map()
 const preloadPromises = new Map()
+const queuedPreloadKeys = new Set()
+const batchQueue = []
+let batchWorkersRunning = 0
 
 function base64ToBlob(base64, mimeType) {
   const binary = atob(base64)
@@ -116,16 +119,23 @@ export function buildCoverSourceKey(src, fallbacks = []) {
 export function getCachedCoverDisplay(sourceKey) {
   const key = String(sourceKey || '').trim()
   if (!key) return null
-  return sourceCache.get(key) || null
+  const cached = sourceCache.get(key) || null
+  if (cached?.failed && Date.now() - Number(cached.failedAt || 0) > 30_000) {
+    sourceCache.delete(key)
+    return null
+  }
+  return cached
 }
 
 export function rememberCoverDisplay(sourceKey, displaySrc, failed = false) {
   const key = String(sourceKey || '').trim()
   if (!key) return
-  sourceCache.set(key, {
+  const entry = {
     displaySrc: String(displaySrc || ''),
     failed: Boolean(failed),
-  })
+  }
+  if (failed) entry.failedAt = Date.now()
+  sourceCache.set(key, entry)
 }
 
 export function invalidateFailedCoverDisplays() {
@@ -355,26 +365,47 @@ export function preloadCoverSourcesBatch(
     .filter((entry) => entry.src || entry.fallbacks.length)
     .slice(0, Math.max(0, limit))
 
-  if (!queue.length) return
+  for (const entry of queue) {
+    const key = buildCoverSourceKey(entry.src, entry.fallbacks)
+    const cached = getCachedCoverDisplay(key)
+    if (!key || queuedPreloadKeys.has(key) || (cached && !cached.failed))
+      continue
+    queuedPreloadKeys.add(key)
+    batchQueue.push({ ...entry, key })
+  }
 
-  let cursor = 0
-  const workerCount = Math.min(Math.max(1, concurrency), queue.length)
-  const workers = Array.from({ length: workerCount }, async () => {
-    while (cursor < queue.length) {
-      const entry = queue[cursor]
-      cursor += 1
-      try {
-        await preloadCoverSources(entry)
-      } catch {
-        // Ignore individual preload failures.
+  const workerLimit = Math.max(1, Math.min(concurrency, 4))
+  while (batchWorkersRunning < workerLimit && batchQueue.length) {
+    batchWorkersRunning += 1
+    void (async () => {
+      while (batchQueue.length && document.visibilityState !== 'hidden') {
+        const entry = batchQueue.shift()
+        try {
+          await preloadCoverSources(entry)
+        } catch {
+          // Ignore individual preload failures.
+        } finally {
+          queuedPreloadKeys.delete(entry.key)
+        }
+        await new Promise((resolve) => setTimeout(resolve, 16))
       }
-    }
-  })
+      batchWorkersRunning -= 1
+      if (batchQueue.length && document.visibilityState !== 'hidden') {
+        preloadCoverSourcesBatch([], { concurrency: workerLimit })
+      }
+    })()
+  }
+}
 
-  void Promise.all(workers)
+export function cancelPendingCoverPreloads() {
+  while (batchQueue.length) {
+    const entry = batchQueue.pop()
+    if (entry?.key) queuedPreloadKeys.delete(entry.key)
+  }
 }
 
 export function clearNativeImageCache() {
+  cancelPendingCoverPreloads()
   for (const blobUrl of urlCache.values()) {
     if (blobUrl.startsWith('blob:')) {
       URL.revokeObjectURL(blobUrl)
