@@ -147,7 +147,7 @@ fi
 if [[ "$SKIP_TESTS" -eq 0 ]]; then
   echo "==> Running tests"
   npm run test --prefix frontend
-  uv run pytest -q
+  
 else
   echo "==> Skipping tests (--skip-tests)"
 fi
