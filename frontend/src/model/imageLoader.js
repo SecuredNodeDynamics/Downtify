@@ -19,7 +19,8 @@ const batchQueue = []
 let batchWorkersRunning = 0
 
 function base64ToBlob(base64, mimeType) {
-  const binary = atob(base64)
+  const encoded = String(base64 || '').replace(/^data:[^;,]+;base64,/i, '')
+  const binary = atob(encoded)
   const len = binary.length
   const bytes = new Uint8Array(len)
   for (let i = 0; i < len; i += 1) {
@@ -92,12 +93,42 @@ async function fetchImageBlob(url) {
   const response = await CapacitorHttp.get({
     url,
     responseType: 'blob',
+    connectTimeout: 15000,
+    readTimeout: 20000,
   })
   if (response.status < 200 || response.status >= 300) {
     throw new Error(`HTTP ${response.status}`)
   }
   const mime = contentTypeFromHeaders(response.headers)
+  if (response.data instanceof Blob) return response.data
+  if (response.data instanceof ArrayBuffer) {
+    return new Blob([response.data], { type: mime })
+  }
   return base64ToBlob(response.data, mime)
+}
+
+const PROXY_IMAGE_HOST_SUFFIXES = [
+  'scdn.co',
+  'spotifycdn.com',
+  'googleusercontent.com',
+  'ggpht.com',
+  'ytimg.com',
+  'mzstatic.com',
+]
+
+export function backendImageProxyUrl(url) {
+  try {
+    const target = new URL(url)
+    const host = target.hostname.toLowerCase()
+    const allowed = PROXY_IMAGE_HOST_SUFFIXES.some(
+      (suffix) => host === suffix || host.endsWith(`.${suffix}`)
+    )
+    if (!allowed) return ''
+    const base = buildApiBaseUrl(getServerConfig())
+    return `${base}/api/image-proxy?${new URLSearchParams({ url })}`
+  } catch {
+    return ''
+  }
 }
 
 async function fetchWithBrowser(url) {
@@ -300,11 +331,21 @@ export async function resolveImageSrc(url) {
         return blobUrl
       }
 
-      const blob = await fetchImageBlob(value)
-      void writePersistedImage(value, blob)
-      const blobUrl = URL.createObjectURL(blob)
-      rememberResolvedUrl(value, blobUrl)
-      return blobUrl
+      try {
+        const blob = await fetchImageBlob(value)
+        void writePersistedImage(value, blob)
+        const blobUrl = URL.createObjectURL(blob)
+        rememberResolvedUrl(value, blobUrl)
+        return blobUrl
+      } catch (directError) {
+        const proxyUrl = backendImageProxyUrl(value)
+        if (!proxyUrl) throw directError
+        const blob = await fetchImageBlob(proxyUrl)
+        void writePersistedImage(value, blob)
+        const blobUrl = URL.createObjectURL(blob)
+        rememberResolvedUrl(value, blobUrl)
+        return blobUrl
+      }
     }
 
     const blobUrl = await fetchWithBrowser(value)
@@ -312,7 +353,9 @@ export async function resolveImageSrc(url) {
     return blobUrl
   } catch (error) {
     console.warn('Failed to load image on native:', value, error)
-    rememberResolvedUrl(value, value)
+    // Do not cache a failed direct URL as resolved. A later retry may succeed
+    // through native HTTP or the backend proxy after connectivity/server
+    // startup recovers.
     return value
   }
 }

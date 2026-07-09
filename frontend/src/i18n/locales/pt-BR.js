@@ -446,6 +446,7 @@ export default {
     pause: 'Pausar monitoramento',
     resume: 'Retomar monitoramento',
     checkNow: 'Verificar agora',
+    checkAll: 'Verificar agora todos os itens monitorados',
     checkFailed: 'Falha na verificacao do monitor.',
     stop: 'Parar de monitorar',
     applyInterval: 'Aplicar',
@@ -490,6 +491,9 @@ export default {
     title: 'Configurações',
     subtitle: 'Ajuste como o Downtify baixa e marca suas músicas.',
     generalTab: 'Geral',
+    monitorArtistInitialSearch: 'Primeira busca do artista monitorado',
+    monitorArtistInitialSearchHint:
+      'Buscar automaticamente álbuns e faixas ao monitorar um artista.',
     apiTab: 'API',
     logsTab: 'Registros',
     aboutTab: 'Sobre',

@@ -443,6 +443,19 @@ async def check_monitored(
                 )
                 if history_changed is not None:
                     await history_changed(history_id)
+            try:
+                # Both YouTube Music and plain YouTube have been exhausted by
+                # Downloader.download. Record a terminal attempt so scheduled
+                # monitor sweeps do not create the same failure indefinitely.
+                # A user-triggered history retry still remains available.
+                await asyncio.to_thread(
+                    db.mark_track_downloaded, item.id, track_id, None
+                )
+            except sqlite3.IntegrityError:
+                logger.warning(
+                    'Monitor item {} removed while recording failure',
+                    item.id,
+                )
             logger.exception('Failed to auto-download track {}', track_id)
 
     await asyncio.to_thread(

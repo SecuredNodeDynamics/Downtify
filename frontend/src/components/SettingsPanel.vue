@@ -92,6 +92,26 @@
         </p>
       </div>
 
+      <div>
+        <label
+          class="block text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2"
+        >
+          {{ t('settings.monitorArtistInitialSearch') }}
+        </label>
+        <label
+          class="flex cursor-pointer items-center justify-between gap-4 rounded-xl border border-white/10 bg-base-100/70 px-3 py-3"
+        >
+          <span class="text-sm text-base-content/80">
+            {{ t('settings.monitorArtistInitialSearchHint') }}
+          </span>
+          <input
+            v-model="sm.settings.value.monitor_artist_initial_search"
+            type="checkbox"
+            class="toggle toggle-primary shrink-0"
+          />
+        </label>
+      </div>
+
       <!-- Download destination (irrelevant in on-device mode: files are
            always saved locally by the embedded backend). -->
       <div v-if="!isDeviceMode">
@@ -1032,7 +1052,9 @@
 
         <div class="grid gap-3 md:grid-cols-2">
           <div class="surface rounded-2xl p-4">
-            <p class="text-xs font-semibold uppercase tracking-wider text-base-content/45">
+            <p
+              class="text-xs font-semibold uppercase tracking-wider text-base-content/45"
+            >
               {{ t('settings.aboutWhatItDoes') }}
             </p>
             <ul class="mt-3 space-y-2">
@@ -1051,7 +1073,9 @@
           </div>
 
           <div class="surface rounded-2xl p-4">
-            <p class="text-xs font-semibold uppercase tracking-wider text-base-content/45">
+            <p
+              class="text-xs font-semibold uppercase tracking-wider text-base-content/45"
+            >
               {{ t('settings.aboutTips') }}
             </p>
             <ul class="mt-3 space-y-2">
@@ -1779,7 +1803,8 @@ const latestVersionLabel = computed(() => {
 const canRunUpdate = computed(() => {
   if (usesApkUpdateFlow()) {
     return Boolean(
-      updateStatus.value?.update_available || updateStatus.value?.needs_apk_update
+      updateStatus.value?.update_available ||
+        updateStatus.value?.needs_apk_update
     )
   }
   return Boolean(updateStatus.value?.update_available)

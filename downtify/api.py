@@ -95,6 +95,7 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     'enable_jellyfin_tools': True,
     'artist_folder_policy': 'artwork_available',
     'discogs_token': '',
+    'monitor_artist_initial_search': True,
 }
 
 AUDIO_EXTENSIONS = {'.mp3', '.m4a', '.flac', '.ogg', '.wav', '.aac', '.opus'}
@@ -3821,6 +3822,12 @@ async def delete_history_item(history_id: int) -> dict[str, Any]:
     return {'deleted': True, 'id': history_id}
 
 
+@router.post('/api/history/{history_id}/delete')
+async def delete_history_item_post(history_id: int) -> dict[str, Any]:
+    """Delete history through clients that cannot reliably send DELETE."""
+    return await delete_history_item(history_id)
+
+
 @router.post('/api/history/{history_id}/retry')
 async def retry_history_item(history_id: int) -> dict[str, Any]:
     if state.downloader is None:
@@ -5040,7 +5047,10 @@ async def add_monitor_playlist(request: Request) -> dict[str, Any]:
 
     # Kick off the first download pass immediately so the user does not have
     # to wait up to a full monitor sweep interval for the initial backfill.
-    if state.downloader is not None:
+    should_run_initial_check = kind != 'artist' or bool(
+        state.settings.get('monitor_artist_initial_search', True)
+    )
+    if state.downloader is not None and should_run_initial_check:
         loop = state.loop or asyncio.get_running_loop()
 
         async def _initial_check(pl=playlist) -> None:

@@ -182,3 +182,47 @@ async def test_check_monitored_adopts_existing_file_instead_of_redownloading(
     assert downloaded == 0
     known = db.get_track_filenames(artist.id)
     assert known.get('trk1') == f'{basename}.m4a'
+
+
+@pytest.mark.asyncio
+async def test_check_monitored_does_not_repeat_terminal_download_failure(
+    tmp_path: Path,
+) -> None:
+    db = PlaylistMonitorDB(tmp_path / 'monitor.db')
+    artist = db.add_playlist(
+        'ar789',
+        'Test Artist',
+        'https://open.spotify.com/artist/ar789',
+        kind='artist',
+    )
+    downloader = Downloader(tmp_path / 'downloads', audio_format='m4a')
+    song = {'song_id': 'trk-fail', 'name': 'Missing', 'artists': ['Artist']}
+    loop = pytest.importorskip('asyncio').get_running_loop()
+
+    with (
+        patch(
+            'downtify.monitor._fetch_monitored_tracks',
+            new=AsyncMock(return_value=[song]),
+        ),
+        patch('downtify.monitor.spotify.track_from_id', return_value={}),
+        patch.object(
+            downloader,
+            'download',
+            side_effect=RuntimeError('both providers failed'),
+        ) as download,
+    ):
+        assert (
+            await check_monitored(
+                artist, db, downloader, broadcast=AsyncMock(), loop=loop
+            )
+            == 0
+        )
+        assert (
+            await check_monitored(
+                artist, db, downloader, broadcast=AsyncMock(), loop=loop
+            )
+            == 0
+        )
+
+    download.assert_called_once()
+    assert db.get_track_filenames(artist.id) == {'trk-fail': None}

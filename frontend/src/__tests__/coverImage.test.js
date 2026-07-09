@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
-
 import {
+  backendImageProxyUrl,
   buildCoverSourceKey,
   canLoadImageDirectly,
   getCachedCoverDisplay,
@@ -100,5 +100,12 @@ describe('resolveImageSrc direct URLs', () => {
     expect(createObjectURL).toHaveBeenCalledWith(blob)
 
     createObjectURL.mockRestore()
+  })
+
+  it('builds a backend fallback for supported image CDNs only', () => {
+    expect(backendImageProxyUrl('https://i.scdn.co/image/cover')).toContain(
+      'http://downtify.local:8000/api/image-proxy?'
+    )
+    expect(backendImageProxyUrl('https://untrusted.test/cover.jpg')).toBe('')
   })
 })

@@ -551,15 +551,17 @@
 
                     <div class="min-w-0 flex-1">
                       <div class="mb-1 flex items-start justify-between gap-2">
-                        <p class="failed-card-title text-sm font-semibold leading-snug">
-                          {{ item.title || t('common.unknownTrack') }}
+                        <p
+                          class="failed-card-title text-sm font-semibold leading-snug"
+                        >
+                          {{ failedItemTitle(item) }}
                         </p>
                         <span class="badge-error-soft shrink-0">
                           {{ t('history.failed') }}
                         </span>
                       </div>
                       <p class="truncate text-xs text-base-content/60">
-                        {{ item.artists || t('common.unknownArtist') }}
+                        {{ failedItemArtists(item) }}
                       </p>
                       <p class="mt-1 text-xs text-base-content/40">
                         {{ formatDate(historyDate(item)) }}
@@ -585,7 +587,11 @@
                         v-if="retrying[item.id] === true"
                         class="loading loading-spinner loading-xs"
                       />
-                      <Icon v-else icon="clarity:refresh-line" class="h-4 w-4" />
+                      <Icon
+                        v-else
+                        icon="clarity:refresh-line"
+                        class="h-4 w-4"
+                      />
                       <span>{{ t('history.retry') }}</span>
                     </button>
                     <button
@@ -1075,16 +1081,36 @@ async function retryHistory(item) {
 }
 
 async function deleteFailedHistory(item) {
-  if (!confirm(t('failed.deletePrompt', { title: item.title }))) return
-  deletingHistory.value = { ...deletingHistory.value, [item.id]: true }
+  const historyId = Number(item?.id)
+  if (!Number.isInteger(historyId)) {
+    historyError.value = t('failed.failedDelete')
+    return
+  }
+  historyError.value = ''
+  deletingHistory.value = { ...deletingHistory.value, [historyId]: true }
   try {
-    await API.deleteHistoryItem(item.id)
-    removeHistoryItem(item.id)
+    await API.deleteHistoryItem(historyId)
+    removeHistoryItem(historyId)
   } catch {
     historyError.value = t('failed.failedDelete')
   } finally {
-    deletingHistory.value = { ...deletingHistory.value, [item.id]: false }
+    deletingHistory.value = { ...deletingHistory.value, [historyId]: false }
   }
+}
+
+function failedItemTitle(item) {
+  return (
+    item?.title ||
+    item?.song?.name ||
+    item?.song?.title ||
+    t('common.unknownTrack')
+  )
+}
+
+function failedItemArtists(item) {
+  const artists = item?.artists || item?.song?.artists || item?.song?.artist
+  if (Array.isArray(artists)) return artists.filter(Boolean).join(', ')
+  return artists || t('common.unknownArtist')
 }
 
 async function onClearHistory() {
@@ -1207,11 +1233,12 @@ onUnmounted(() => {
 }
 
 .queue-tabs {
-  @apply inline-flex min-w-0 flex-1 gap-1 overflow-x-auto rounded-full border border-white/10 bg-base-100/75 p-1;
+  @apply inline-flex min-w-0 flex-1 gap-0.5 overflow-hidden rounded-full border border-white/10 bg-base-100/75 p-1 sm:gap-1;
 }
 
 .queue-tab-btn {
-  @apply flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-3 py-2 text-center text-sm font-medium transition-colors sm:px-4;
+  @apply flex min-w-0 flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-full px-1 py-2 text-center font-medium transition-colors sm:gap-1.5 sm:px-4 sm:text-sm;
+  font-size: clamp(0.625rem, 2.75vw, 0.875rem);
 }
 
 .queue-tab-btn-active {
@@ -1223,7 +1250,7 @@ onUnmounted(() => {
 }
 
 .queue-tab-count {
-  @apply inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-primary-content/15 px-1.5 text-[11px] font-semibold;
+  @apply inline-flex h-4 min-w-[1rem] shrink items-center justify-center rounded-full bg-primary-content/15 px-1 text-[9px] font-semibold sm:h-5 sm:min-w-[1.25rem] sm:px-1.5 sm:text-[11px];
 }
 
 .queue-action-btn {
@@ -1301,7 +1328,7 @@ onUnmounted(() => {
 }
 
 .failed-card {
-  @apply rounded-2xl border border-error/15 bg-error/[0.04] p-3 shadow-lg shadow-black/10;
+  @apply min-w-0 overflow-hidden rounded-2xl border border-error/15 bg-error/[0.04] p-3 shadow-lg shadow-black/10;
 }
 
 .failed-card-title,

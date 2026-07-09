@@ -204,6 +204,19 @@ def _resolve_youtube_match(
     return video_id, match
 
 
+def _plain_youtube_search_url(song: dict[str, Any]) -> str:
+    """Build a single-result plain YouTube search for a failed YT Music match."""
+    artists = song.get('artists') or []
+    if not artists:
+        artist = str(song.get('artist') or '').strip()
+        artists = [artist] if artist else []
+    title = str(song.get('name') or song.get('title') or '').strip()
+    query = ' '.join(
+        [*(str(artist).strip() for artist in artists), title, 'audio']
+    ).strip()
+    return f'ytsearch1:{query}' if query else ''
+
+
 def _best_audio_url(info: dict[str, Any]) -> str:
     requested = info.get('requested_downloads') or []
     for item in requested:
@@ -569,11 +582,9 @@ class Downloader:
         subdir: Optional[str] = None,
     ) -> str:
         video_id, match = _resolve_youtube_match(song)
-
-        if not video_id:
-            raise RuntimeError(
-                f'Could not find a YouTube match for {song.get("name")!r}'
-            )
+        youtube_fallback_url = _plain_youtube_search_url(song)
+        if not video_id and not youtube_fallback_url:
+            raise RuntimeError(f'Could not find media for {song.get("name")!r}')
 
         song = enrich_from_match(song, match)
         if self.enhance_metadata:
@@ -607,10 +618,49 @@ class Downloader:
             except Exception:
                 logger.opt(exception=True).debug('progress hook error')
 
-        url = f'https://music.youtube.com/watch?v={video_id}'
-        final_path = self._download_and_extract(
-            url, out_template, target_dir, basename, hook
-        )
+        final_path: Path
+        if video_id:
+            url = f'https://music.youtube.com/watch?v={video_id}'
+            try:
+                final_path = self._download_and_extract(
+                    url, out_template, target_dir, basename, hook
+                )
+            except Exception as primary_exc:
+                if not youtube_fallback_url:
+                    raise
+                logger.warning(
+                    'YouTube Music download failed for {!r}; trying YouTube',
+                    song.get('name'),
+                )
+                if progress_cb:
+                    progress_cb(0.0, 'Trying YouTube fallback')
+                try:
+                    final_path = self._download_and_extract(
+                        youtube_fallback_url,
+                        out_template,
+                        target_dir,
+                        basename,
+                        hook,
+                    )
+                except Exception as fallback_exc:
+                    raise RuntimeError(
+                        'YouTube Music and YouTube both failed for '
+                        f'{song.get("name")!r}: {fallback_exc}'
+                    ) from primary_exc
+        else:
+            logger.info(
+                'No YouTube Music match for {!r}; trying YouTube',
+                song.get('name'),
+            )
+            if progress_cb:
+                progress_cb(0.0, 'Trying YouTube fallback')
+            final_path = self._download_and_extract(
+                youtube_fallback_url,
+                out_template,
+                target_dir,
+                basename,
+                hook,
+            )
 
         try:
             embed_metadata(final_path, song)

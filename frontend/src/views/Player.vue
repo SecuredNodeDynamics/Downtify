@@ -531,8 +531,13 @@
               "
               class="similar-artists-grid mt-2.5"
               aria-hidden="true"
+              @pointerdown="startSimilarMediaDrag"
+              @pointermove="moveSimilarMediaDrag"
+              @pointerup="endSimilarMediaDrag"
+              @pointercancel="endSimilarMediaDrag"
+              @click.capture="suppressSimilarMediaClick"
             >
-              <div v-for="index in 8" :key="index" class="similar-artist-item">
+              <div v-for="index in 16" :key="index" class="similar-artist-item">
                 <div class="skeleton similar-artist-cover" />
                 <div class="skeleton mx-auto mt-1.5 h-3 w-14 rounded" />
               </div>
@@ -540,6 +545,11 @@
             <div
               v-else-if="similarMediaTab === 'artists' && similarArtists.length"
               class="similar-artists-grid mt-2.5"
+              @pointerdown="startSimilarMediaDrag"
+              @pointermove="moveSimilarMediaDrag"
+              @pointerup="endSimilarMediaDrag"
+              @pointercancel="endSimilarMediaDrag"
+              @click.capture="suppressSimilarMediaClick"
             >
               <button
                 v-for="artist in similarArtists"
@@ -584,6 +594,11 @@
             <div
               v-else-if="similarMediaTab === 'tracks' && similarTracks.length"
               class="similar-artists-grid mt-2.5"
+              @pointerdown="startSimilarMediaDrag"
+              @pointermove="moveSimilarMediaDrag"
+              @pointerup="endSimilarMediaDrag"
+              @pointercancel="endSimilarMediaDrag"
+              @click.capture="suppressSimilarMediaClick"
             >
               <article
                 v-for="track in similarTracks"
@@ -962,12 +977,57 @@ const similarArtistTab = ref('albums')
 let lyricsRequestSeq = 0
 let similarArtistsRequestSeq = 0
 let similarTracksRequestSeq = 0
+let similarMediaDrag = null
+let suppressSimilarClickUntil = 0
 let seekRaf = 0
 let pendingSeekRatio = null
 
 const displayProgressPct = computed(() =>
   isScrubbing.value ? scrubPct.value : player.progressPct.value
 )
+
+function startSimilarMediaDrag(event) {
+  if (event.pointerType !== 'mouse' || event.button !== 0) return
+  const scroller = event.currentTarget
+  similarMediaDrag = {
+    scroller,
+    pointerId: event.pointerId,
+    startX: event.clientX,
+    startScrollLeft: scroller.scrollLeft,
+    moved: false,
+  }
+}
+
+function moveSimilarMediaDrag(event) {
+  const drag = similarMediaDrag
+  if (!drag || drag.pointerId !== event.pointerId) return
+  const distance = event.clientX - drag.startX
+  if (!drag.moved && Math.abs(distance) > 8) {
+    drag.moved = true
+    drag.scroller.setPointerCapture?.(event.pointerId)
+    drag.scroller.classList.add('is-dragging')
+  }
+  if (!drag.moved) return
+  drag.scroller.scrollLeft = drag.startScrollLeft - distance
+  event.preventDefault()
+}
+
+function endSimilarMediaDrag(event) {
+  const drag = similarMediaDrag
+  if (!drag || drag.pointerId !== event.pointerId) return
+  drag.scroller.classList.remove('is-dragging')
+  if (drag.moved) {
+    drag.scroller.releasePointerCapture?.(event.pointerId)
+    suppressSimilarClickUntil = performance.now() + 100
+  }
+  similarMediaDrag = null
+}
+
+function suppressSimilarMediaClick(event) {
+  if (performance.now() >= suppressSimilarClickUntil) return
+  event.preventDefault()
+  event.stopPropagation()
+}
 let genreRefreshTimers = []
 let stopLibraryListener = null
 
@@ -1247,7 +1307,7 @@ async function loadSimilarTracks(title, artistName) {
         seen.add(key)
         return true
       })
-      .slice(0, 8)
+      .slice(0, 16)
   } catch {
     if (seq === similarTracksRequestSeq) similarTracks.value = []
   } finally {
@@ -1904,10 +1964,26 @@ onUnmounted(() => {
     overflow: visible;
   }
 
-  .player-shell {
+  .player-content {
     display: grid;
     grid-template-columns: 1fr 360px;
     gap: 1.5rem;
+  }
+
+  .player-shell {
+    display: contents;
+  }
+
+  .player-shell > section {
+    grid-column: 1;
+  }
+
+  .player-shell > aside {
+    grid-column: 2;
+  }
+
+  .similar-artists-card {
+    grid-column: 1 / -1;
   }
 
   .player-details {
@@ -2105,15 +2181,31 @@ onUnmounted(() => {
 }
 
 .similar-artists-grid {
-  @apply grid grid-cols-4 gap-2 sm:grid-cols-6 lg:grid-cols-8;
+  @apply flex gap-2 overflow-x-auto pb-1;
+  cursor: grab;
+  user-select: none;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.similar-artists-grid.is-dragging {
+  cursor: grabbing;
+  scroll-behavior: auto;
+}
+
+.similar-artists-grid::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 .similar-artist-item {
-  @apply min-w-0 cursor-pointer text-center outline-none transition-transform hover:-translate-y-0.5 focus-visible:-translate-y-0.5;
+  @apply w-[4.5rem] min-w-[4.5rem] cursor-pointer text-center outline-none transition-transform hover:-translate-y-0.5 focus-visible:-translate-y-0.5;
 }
 
 .similar-track-item {
-  @apply min-w-0 cursor-pointer rounded-lg p-1 text-left outline-none transition-colors hover:bg-white/5 focus-visible:bg-white/5;
+  @apply w-[10rem] min-w-[10rem] cursor-pointer rounded-lg p-1 text-left outline-none transition-colors hover:bg-white/5 focus-visible:bg-white/5;
 }
 
 .similar-track-download {

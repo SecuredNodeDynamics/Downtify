@@ -64,6 +64,7 @@ let requestId = 0
 let candidateUrls = []
 let candidateIndex = 0
 let observer = null
+let imageLoadTimer = 0
 
 const sourceKey = computed(() =>
   buildCoverSourceKey(props.src, props.fallbacks)
@@ -126,6 +127,10 @@ async function applyCandidate(url) {
   if (current !== requestId) return true
 
   displaySrc.value = resolved || url
+  window.clearTimeout(imageLoadTimer)
+  imageLoadTimer = window.setTimeout(() => {
+    if (current === requestId) onError()
+  }, 20000)
   rememberCoverDisplay(sourceKey.value, displaySrc.value, false)
   restoredFromCache.value = true
 
@@ -141,6 +146,8 @@ async function applyCandidate(url) {
 }
 
 function onImageLoad() {
+  window.clearTimeout(imageLoadTimer)
+  imageLoadTimer = 0
   const url = candidateUrls[candidateIndex]
   if (
     url &&
@@ -161,7 +168,9 @@ async function loadCurrentCandidate() {
   await applyCandidate(url)
 }
 
-const shouldLoadNow = computed(() => isNearViewport.value || restoredFromCache.value)
+const shouldLoadNow = computed(
+  () => isNearViewport.value || restoredFromCache.value
+)
 
 function observeVisibility() {
   if (isNearViewport.value) return
@@ -186,6 +195,8 @@ function observeVisibility() {
 }
 
 function onError() {
+  window.clearTimeout(imageLoadTimer)
+  imageLoadTimer = 0
   if (candidateIndex < candidateUrls.length - 1) {
     candidateIndex += 1
     displaySrc.value = ''
@@ -242,6 +253,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  window.clearTimeout(imageLoadTimer)
   observer?.disconnect()
   window.removeEventListener(
     EMBEDDED_SERVER_READY_EVENT,

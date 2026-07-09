@@ -775,7 +775,9 @@
           </button>
         </div>
 
-        <div class="max-h-[34rem] overflow-x-hidden overflow-y-auto pr-1 sm:pr-2">
+        <div
+          class="max-h-[34rem] overflow-x-hidden overflow-y-auto pr-1 sm:pr-2"
+        >
           <div
             v-if="artistTagLoading && visibleArtistTagItems.length === 0"
             class="metadata-artist-grid"
@@ -835,7 +837,9 @@
                 </div>
               </div>
               <div class="mt-4 grid gap-2">
-                <div class="rounded-xl border border-white/10 bg-base-100/70 p-3">
+                <div
+                  class="rounded-xl border border-white/10 bg-base-100/70 p-3"
+                >
                   <p class="text-[0.65rem] uppercase text-base-content/45">
                     {{
                       activeArtistTagTab === 'needs'
@@ -867,7 +871,9 @@
                   {{ t('metadata.folderVerification') }}
                 </p>
                 <p class="mt-1">
-                  {{ artistFolderVerificationSummary(item.folder_verification) }}
+                  {{
+                    artistFolderVerificationSummary(item.folder_verification)
+                  }}
                 </p>
               </div>
               <button
@@ -875,7 +881,9 @@
                 type="button"
                 class="btn btn-sm metadata-card-btn mt-4 w-full border-white/10 bg-base-100/85 hover:bg-base-100"
                 :class="fixedArtistTags[item.file] ? 'text-primary' : ''"
-                :disabled="applyingArtistTags[item.file] || fixedArtistTags[item.file]"
+                :disabled="
+                  applyingArtistTags[item.file] || fixedArtistTags[item.file]
+                "
                 @click="applyArtistTagRepair(item)"
               >
                 <span
@@ -1256,11 +1264,7 @@
                       v-if="applying[item.file]"
                       class="loading loading-spinner loading-xs mr-2"
                     />
-                    <Icon
-                      v-else
-                      icon="clarity:tag-line"
-                      class="h-4 w-4 mr-2"
-                    />
+                    <Icon v-else icon="clarity:tag-line" class="h-4 w-4 mr-2" />
                     {{
                       fixed[item.file]
                         ? t('metadata.fixed')
@@ -1809,9 +1813,7 @@ function isJellyfinRepairableItem(item) {
 
 function isJellyfinTagRepairItem(item) {
   return (
-    item?.bucketKey === 'tag_only' &&
-    !!item?.file &&
-    !fixed.value[item.file]
+    item?.bucketKey === 'tag_only' && !!item?.file && !fixed.value[item.file]
   )
 }
 
@@ -2882,9 +2884,7 @@ async function applyJellyfinMetadataRepair(item, options = {}) {
   } catch (err) {
     if (!quiet) {
       const detail =
-        err?.response?.data?.detail ||
-        err?.message ||
-        t('metadata.failedApply')
+        err?.response?.data?.detail || err?.message || t('metadata.failedApply')
       jellyfinError.value = true
       jellyfinMessage.value = `${t('metadata.failedApply')} ${detail}`
     }
@@ -3053,21 +3053,20 @@ async function syncJellyfinAfterImageRepairs(repairedCount) {
 }
 
 .metadata-tab-shell {
-  @apply mb-5 mx-auto flex w-max max-w-full min-w-0 gap-1 overflow-x-auto rounded-full border border-white/10 bg-base-100/75 p-1 sm:mb-6;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
-}
-
-.metadata-tab-shell::-webkit-scrollbar {
-  display: none;
+  @apply mb-5 mx-auto flex w-full max-w-full min-w-0 gap-0.5 overflow-hidden rounded-full border border-white/10 bg-base-100/75 p-1 sm:mb-6 sm:w-max sm:gap-1;
 }
 
 .metadata-tab-btn {
-  @apply inline-flex max-w-full shrink-0 items-center justify-center whitespace-nowrap rounded-full px-3 py-2 text-sm font-medium transition-colors sm:px-4;
+  @apply inline-flex min-w-0 flex-1 items-center justify-center whitespace-nowrap rounded-full px-1 py-2 font-medium transition-colors sm:flex-none sm:px-4 sm:text-sm;
+  font-size: clamp(0.5rem, 2.45vw, 0.875rem);
+}
+
+.metadata-tab-btn > :deep(svg) {
+  @apply mr-1 h-3 w-3 shrink-0 sm:mr-2 sm:h-4 sm:w-4;
 }
 
 .metadata-tab-badge {
-  @apply ml-1.5 inline-flex min-w-[1.1rem] shrink-0 items-center justify-center rounded-full px-1.5 py-0.5 text-[11px] font-bold leading-none sm:ml-2 sm:min-w-0 sm:px-2 sm:text-xs;
+  @apply ml-1 inline-flex min-w-[0.9rem] shrink items-center justify-center rounded-full px-1 py-0.5 text-[9px] font-bold leading-none sm:ml-2 sm:min-w-0 sm:px-2 sm:text-xs;
   background-color: color-mix(in srgb, currentColor 10%, transparent);
 }
 

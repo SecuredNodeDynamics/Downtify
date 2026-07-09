@@ -21,6 +21,7 @@ const settings = ref({
   enable_jellyfin_tools: true,
   artist_folder_policy: 'artwork_available',
   max_parallel_downloads: 3,
+  monitor_artist_initial_search: true,
 })
 
 const settingsOptions = {

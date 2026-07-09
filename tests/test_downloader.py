@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from downtify.downloader import Downloader
+from downtify.downloader import Downloader, _plain_youtube_search_url
 
 
 def _make_downloader(tmp_path: Path) -> Downloader:
@@ -88,3 +88,9 @@ def test_existing_filename_falls_back_to_alternate_extension(tmp_path):
         {'name': 'Song', 'artists': ['Artist']}, subdir='Mix'
     )
     assert name == 'Mix/Artist - Song.opus'
+
+
+def test_plain_youtube_fallback_search_uses_artist_title_and_audio():
+    assert _plain_youtube_search_url(
+        {'name': 'Theme', 'artists': ['Michelle Williams']}
+    ) == 'ytsearch1:Michelle Williams Theme audio'

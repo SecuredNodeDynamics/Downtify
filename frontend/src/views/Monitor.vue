@@ -145,7 +145,9 @@
                     </template>
                   </CoverImage>
                   <div class="min-w-0 flex-1">
-                    <p class="truncate text-sm font-medium">{{ result.name }}</p>
+                    <p class="truncate text-sm font-medium">
+                      {{ result.name }}
+                    </p>
                     <p class="truncate text-xs text-base-content/45">
                       {{ result.subtitle || t('monitor.selectTarget') }}
                     </p>
@@ -156,10 +158,7 @@
                   />
                 </button>
               </template>
-              <p
-                v-if="targetSearchError"
-                class="px-3 py-3 text-sm text-error"
-              >
+              <p v-if="targetSearchError" class="px-3 py-3 text-sm text-error">
                 {{ targetSearchError }}
               </p>
               <p
@@ -204,9 +203,7 @@
       <section
         class="monitor-list-panel surface rounded-2xl p-3 sm:p-4 mb-6 sm:mb-8 min-w-0"
       >
-        <div
-          class="mb-3 flex items-center justify-between gap-3 px-1 sm:px-0"
-        >
+        <div class="mb-3 flex items-center justify-between gap-3 px-1 sm:px-0">
           <div class="min-w-0">
             <h2
               class="text-sm font-semibold uppercase tracking-wider text-base-content/50"
@@ -230,10 +227,15 @@
           <button
             type="button"
             class="icon-btn h-10 w-10 shrink-0"
-            :title="t('monitor.checkNow')"
-            @click="load"
+            :disabled="bulkChecking || filteredPlaylists.length === 0"
+            :title="t('monitor.checkAll')"
+            @click="onCheckAll"
           >
-            <Icon icon="clarity:refresh-line" class="h-4 w-4" />
+            <span
+              v-if="bulkChecking"
+              class="loading loading-spinner loading-sm"
+            />
+            <Icon v-else icon="clarity:refresh-line" class="h-4 w-4" />
           </button>
         </div>
 
@@ -277,10 +279,10 @@
             >
               <div class="flex gap-3 min-w-0 overflow-hidden">
                 <CoverImage
-                :src="coverForItem(pl).src"
-                :fallbacks="coverForItem(pl).fallbacks"
-                :alt="pl.name"
-                img-class="monitor-card-cover h-20 w-20 rounded-2xl object-cover border border-white/10 bg-base-100/60"
+                  :src="coverForItem(pl).src"
+                  :fallbacks="coverForItem(pl).fallbacks"
+                  :alt="pl.name"
+                  img-class="monitor-card-cover h-20 w-20 rounded-2xl object-cover border border-white/10 bg-base-100/60"
                 >
                   <template #fallback>
                     <Icon
@@ -396,12 +398,12 @@
                   :title="pl.enabled ? t('monitor.pause') : t('monitor.resume')"
                   @click="onToggle(pl)"
                 >
-                <Icon
-                  :icon="
-                    pl.enabled ? 'clarity:pause-line' : 'clarity:play-line'
-                  "
-                  class="h-4 w-4"
-                />
+                  <Icon
+                    :icon="
+                      pl.enabled ? 'clarity:pause-line' : 'clarity:play-line'
+                    "
+                    class="h-4 w-4"
+                  />
                 </button>
 
                 <button
@@ -421,7 +423,7 @@
                   class="monitor-action-btn monitor-action-btn-danger"
                   :title="t('monitor.stop')"
                   @click="onDelete(pl)"
-              >
+                >
                   <Icon icon="clarity:trash-line" class="h-4 w-4" />
                 </button>
               </div>
@@ -477,6 +479,7 @@ const targetSearchError = ref('')
 let targetSearchTimer = 0
 let targetSearchSeq = 0
 const checking = ref({})
+const bulkChecking = ref(false)
 const applyingInterval = ref({})
 const intervalDrafts = ref({})
 const intervalErrors = ref({})
@@ -575,7 +578,8 @@ watch(
 
     if (
       selectedTarget.value &&
-      (selectedTarget.value.name !== query || selectedTarget.value.kind !== kind)
+      (selectedTarget.value.name !== query ||
+        selectedTarget.value.kind !== kind)
     ) {
       selectedTarget.value = null
     }
@@ -765,6 +769,18 @@ async function onCheck(pl) {
     }
   } finally {
     checking.value = { ...checking.value, [pl.id]: false }
+  }
+}
+
+async function onCheckAll() {
+  if (bulkChecking.value) return
+  const items = filteredPlaylists.value.filter((item) => item.enabled)
+  if (!items.length) return
+  bulkChecking.value = true
+  try {
+    await Promise.allSettled(items.map((item) => onCheck(item)))
+  } finally {
+    bulkChecking.value = false
   }
 }
 

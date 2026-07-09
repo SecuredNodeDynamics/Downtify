@@ -432,6 +432,7 @@ export default {
     pause: 'Pause monitoring',
     resume: 'Resume monitoring',
     checkNow: 'Check now',
+    checkAll: 'Check all monitored items now',
     checkFailed: 'Monitor check failed.',
     stop: 'Stop monitoring',
     applyInterval: 'Apply',
@@ -476,6 +477,9 @@ export default {
     title: 'Settings',
     subtitle: 'Tweak how Downtify fetches and tags your music.',
     generalTab: 'General',
+    monitorArtistInitialSearch: 'Monitored artist first search',
+    monitorArtistInitialSearchHint:
+      'Automatically search albums and tracks as soon as an artist is monitored.',
     apiTab: 'API',
     logsTab: 'Logs',
     aboutTab: 'About',

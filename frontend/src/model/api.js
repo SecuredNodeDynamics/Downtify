@@ -755,7 +755,10 @@ function retryHistoryItem(historyId) {
 }
 
 function deleteHistoryItem(historyId) {
-  return API.delete(`/api/history/${historyId}`)
+  return API.post(`/api/history/${historyId}/delete`).catch((error) => {
+    if (![404, 405].includes(error?.response?.status)) throw error
+    return API.delete(`/api/history/${historyId}`)
+  })
 }
 
 function clearHistory() {
