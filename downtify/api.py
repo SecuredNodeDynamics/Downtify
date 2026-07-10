@@ -2549,6 +2549,87 @@ def album_image_scan_status() -> dict[str, Any]:
     return _album_image_scan_status()
 
 
+@router.get('/api/metadata/album-images/options')
+def album_image_options(file: str = Query('')) -> dict[str, Any]:
+    relative_file = str(file or '').strip()
+    if not relative_file:
+        raise HTTPException(status_code=400, detail='file is required')
+    download_dir = _active_download_dir()
+    try:
+        item = metadata_repair._album_image_scan_item(  # noqa: SLF001
+            download_dir.resolve(),
+            metadata_repair.safe_library_path(download_dir, relative_file),
+        )
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail='File not found') from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    candidate = item.get('candidate') or {}
+    cover_url = str(candidate.get('cover_url') or '').strip()
+    options = []
+    current = item.get('current') or {}
+    album = str(
+        candidate.get('album_name') or current.get('album_name') or ''
+    ).strip()
+    artists = candidate.get('artists') or current.get('artists') or []
+    artist = ', '.join(str(value) for value in artists if value) or str(
+        current.get('artist') or ''
+    )
+    seen_urls: set[str] = set()
+    if cover_url:
+        seen_urls.add(cover_url)
+        options.append({
+            'id': 'metadata-candidate',
+            'label': album or 'Album cover',
+            'subtitle': artist,
+            'source': 'Music metadata',
+            'preview_url': cover_url,
+            'image_url': cover_url,
+            'candidate': candidate,
+        })
+    if album or artist:
+        try:
+            search_results = providers.search_media(
+                f'{artist} {album}'.strip(),
+                limit=12,
+            )
+        except Exception:
+            search_results = []
+        for index, result in enumerate(search_results):
+            result_cover = str(result.get('cover_url') or '').strip()
+            if not result_cover or result_cover in seen_urls:
+                continue
+            seen_urls.add(result_cover)
+            result_album = str(result.get('album_name') or result.get('name') or album)
+            result_artists = result.get('artists') or []
+            result_artist = ', '.join(
+                str(value) for value in result_artists if value
+            ) or str(result.get('artist') or artist)
+            options.append({
+                'id': f'search-{index}',
+                'label': result_album or album or 'Album cover',
+                'subtitle': result_artist,
+                'source': result.get('source') or 'Search result',
+                'preview_url': result_cover,
+                'image_url': result_cover,
+                'candidate': {
+                    **candidate,
+                    **result,
+                    'album_name': album or result.get('album_name') or '',
+                    'cover_url': result_cover,
+                },
+            })
+            if len(options) >= 9:
+                break
+    return {
+        'file': relative_file,
+        'current': item.get('current'),
+        'candidate': candidate or None,
+        'options': options,
+    }
+
+
 async def _run_artist_tag_scan(
     limit: int, start: int, scan_all: bool = False
 ) -> None:

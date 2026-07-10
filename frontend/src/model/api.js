@@ -247,6 +247,13 @@ function getAlbumImageScanStatus() {
   return API.get('/api/metadata/album-images/status')
 }
 
+function getAlbumImageOptions(file) {
+  return API.get('/api/metadata/album-images/options', {
+    params: { file },
+    timeout: 120000,
+  })
+}
+
 function applyAlbumImage(file, candidate = null) {
   return API.post('/api/metadata/album-images/apply', {
     file,
@@ -938,6 +945,7 @@ export default {
   getArtistImageScanStatus,
   scanAlbumImages,
   getAlbumImageScanStatus,
+  getAlbumImageOptions,
   applyAlbumImage,
   scanArtistTags,
   getArtistTagScanStatus,

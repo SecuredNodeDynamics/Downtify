@@ -2,7 +2,9 @@
   <div class="min-h-0 overflow-x-hidden">
     <Navbar />
 
-    <main class="mx-auto max-w-5xl overflow-x-hidden px-3 py-4 sm:px-6 sm:py-8">
+    <main
+      class="metadata-page mx-auto max-w-5xl overflow-x-hidden px-3 py-4 sm:px-6 sm:py-8"
+    >
       <div class="mb-4 sm:mb-5 mobile-page-header">
         <div>
           <h1 class="text-2xl font-bold tracking-tight">
@@ -45,7 +47,9 @@
             :key="tab.id"
             type="button"
             class="metadata-mobile-menu-item"
-            :class="{ 'metadata-mobile-menu-item-active': activeToolTab === tab.id }"
+            :class="{
+              'metadata-mobile-menu-item-active': activeToolTab === tab.id,
+            }"
             @click="selectToolTab(tab.id)"
           >
             <Icon :icon="tab.icon" class="h-5 w-5 shrink-0" />
@@ -321,8 +325,8 @@
                     applying[item.file]
                       ? t('metadata.fixing')
                       : fixed[item.file]
-                      ? t('metadata.fixed')
-                      : t('metadata.apply')
+                        ? t('metadata.fixed')
+                        : t('metadata.apply')
                   }}
                 </button>
               </div>
@@ -353,7 +357,7 @@
                 v-if="albumImageLoading"
                 class="loading loading-spinner loading-xs mr-2"
               />
-              <Icon v-else icon="clarity:album-line" class="h-4 w-4 mr-2" />
+              <Icon v-else icon="clarity:image-line" class="h-4 w-4 mr-2" />
               {{ t('metadata.scanAlbumImages') }}
             </button>
             <button
@@ -384,6 +388,97 @@
               />
               {{ t('metadata.fixAllAlbumImages') }}
             </button>
+          </div>
+        </div>
+
+        <div
+          class="metadata-album-artist-panel surface-strong mb-5 rounded-2xl p-3 sm:p-4"
+        >
+          <div class="mb-3">
+            <label class="relative block">
+              <Icon
+                icon="clarity:search-line"
+                class="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-base-content/40"
+              />
+              <input
+                v-model.trim="albumImageArtistQuery"
+                type="search"
+                class="input-modern input-modern-plain h-11 w-full pl-10 pr-10 text-sm"
+                :placeholder="t('metadata.searchAlbumImageArtists')"
+              />
+              <button
+                v-if="albumImageArtistQuery"
+                type="button"
+                class="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-base-content/45 transition hover:bg-white/10 hover:text-base-content"
+                :title="t('metadata.clearSearch')"
+                @click="albumImageArtistQuery = ''"
+              >
+                <Icon icon="clarity:times-line" class="h-4 w-4" />
+              </button>
+            </label>
+          </div>
+
+          <div class="metadata-album-artist-scroll">
+            <div
+              v-if="filteredAlbumImageArtists.length"
+              class="metadata-artist-grid"
+            >
+              <button
+                v-for="artist in filteredAlbumImageArtists"
+                :key="artist.name"
+                type="button"
+                class="metadata-album-artist-card overflow-hidden rounded-2xl border border-primary/20 bg-base-100/90 text-left shadow-glow-sm transition hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                @click="openAlbumArtistModal(artist)"
+              >
+                <div class="relative aspect-square bg-base-100">
+                  <img
+                    v-if="albumArtistCoverUrl(artist)"
+                    :src="albumArtistCoverUrl(artist)"
+                    :alt="artist.name"
+                    class="h-full w-full object-cover"
+                    loading="lazy"
+                  />
+                  <div
+                    v-else
+                    class="flex h-full w-full items-center justify-center text-base-content/25"
+                  >
+                    <Icon icon="clarity:user-line" class="h-12 w-12" />
+                  </div>
+                </div>
+                <div class="space-y-1 p-3">
+                  <p class="truncate text-sm font-semibold">
+                    {{ artist.name }}
+                  </p>
+                  <p class="text-xs text-base-content/45">
+                    {{
+                      t('metadata.artistAlbumCount', {
+                        count: albumImageAlbumsForArtist(artist).length,
+                      })
+                    }}
+                  </p>
+                </div>
+              </button>
+            </div>
+            <div
+              v-else-if="albumImageArtists.length"
+              class="rounded-2xl border border-white/10 bg-base-100/90 p-8 text-center text-sm text-base-content/50"
+            >
+              <Icon
+                icon="clarity:search-line"
+                class="mx-auto mb-3 h-10 w-10 text-base-content/20"
+              />
+              <p>{{ t('metadata.emptyAlbumImageArtistSearch') }}</p>
+            </div>
+          </div>
+          <div
+            v-if="!albumImageArtists.length"
+            class="surface rounded-2xl p-8 text-center text-sm text-base-content/50"
+          >
+            <Icon
+              icon="clarity:image-line"
+              class="mx-auto mb-3 h-10 w-10 text-base-content/20"
+            />
+            <p>{{ t('metadata.albumImagesLibraryEmpty') }}</p>
           </div>
         </div>
 
@@ -465,7 +560,7 @@
         </div>
 
         <div
-          class="max-h-[34rem] overflow-x-hidden overflow-y-auto pr-1 sm:pr-2"
+          class="metadata-album-image-results overflow-x-hidden lg:max-h-[34rem] lg:overflow-y-auto lg:pr-2"
         >
           <div
             v-if="albumImageLoading && visibleAlbumImageItems.length === 0"
@@ -489,7 +584,7 @@
             class="surface rounded-2xl p-10 text-center"
           >
             <Icon
-              icon="clarity:album-line"
+              icon="clarity:image-line"
               class="mx-auto mb-3 h-10 w-10 text-base-content/20"
             />
             <p class="text-sm text-base-content/50">
@@ -513,18 +608,24 @@
               "
             >
               <div class="relative aspect-square bg-base-100/80">
-                <img
+                <button
                   v-if="albumImagePreviewUrl(item)"
-                  :src="albumImagePreviewUrl(item)"
-                  :alt="displaySong(item.candidate || item.current)"
-                  class="h-full w-full object-cover"
-                  loading="lazy"
-                />
+                  type="button"
+                  class="block h-full w-full"
+                  @click="openAlbumImagePicker(albumImageActionItem(item))"
+                >
+                  <img
+                    :src="albumImagePreviewUrl(item)"
+                    :alt="displaySong(item.candidate || item.current)"
+                    class="h-full w-full object-cover"
+                    loading="lazy"
+                  />
+                </button>
                 <div
                   v-else
                   class="flex h-full w-full items-center justify-center text-base-content/25"
                 >
-                  <Icon icon="clarity:album-line" class="h-12 w-12" />
+                  <Icon icon="clarity:image-line" class="h-12 w-12" />
                 </div>
                 <span
                   class="pill absolute left-2 top-2 max-w-[calc(100%-1rem)] truncate text-[0.65rem]"
@@ -567,9 +668,17 @@
                     applyingAlbumImages[item.file]
                       ? t('metadata.fixing')
                       : fixedAlbumImages[item.file]
-                      ? t('metadata.fixed')
-                      : t('metadata.apply')
+                        ? t('metadata.fixed')
+                        : t('metadata.apply')
                   }}
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-sm metadata-card-btn w-full border-white/10 bg-base-100/85 hover:bg-base-100"
+                  @click="openAlbumImagePicker(albumImageActionItem(item))"
+                >
+                  <Icon icon="clarity:image-line" class="mr-2 h-4 w-4" />
+                  {{ t('metadata.chooseCover') }}
                 </button>
               </div>
             </article>
@@ -599,11 +708,7 @@
                 v-if="artistImageLoading"
                 class="loading loading-spinner loading-xs mr-2"
               />
-              <Icon
-                v-else
-                icon="clarity:image-gallery-line"
-                class="h-4 w-4 mr-2"
-              />
+              <Icon v-else icon="clarity:image-line" class="h-4 w-4 mr-2" />
               {{ t('metadata.scanArtistImages') }}
             </button>
             <button
@@ -759,7 +864,7 @@
             class="surface rounded-2xl p-10 text-center"
           >
             <Icon
-              icon="clarity:image-gallery-line"
+              icon="clarity:image-line"
               class="mx-auto mb-3 h-10 w-10 text-base-content/20"
             />
             <p class="text-sm text-base-content/50">
@@ -798,7 +903,7 @@
                     :icon="
                       activeArtistImageTab === 'needs'
                         ? 'clarity:user-line'
-                        : 'clarity:image-gallery-line'
+                        : 'clarity:image-line'
                     "
                     class="h-12 w-12"
                   />
@@ -840,8 +945,8 @@
                     isArtistImageUpdateTab
                       ? ''
                       : fixedArtistImages[itemKey(item)]
-                      ? 'text-primary'
-                      : ''
+                        ? 'text-primary'
+                        : ''
                   "
                   :disabled="applyingArtistImages[itemKey(item)]"
                   @click="
@@ -858,7 +963,7 @@
                     v-else
                     :icon="
                       isArtistImageUpdateTab
-                        ? 'clarity:image-gallery-line'
+                        ? 'clarity:image-line'
                         : 'clarity:check-line'
                     "
                     class="mr-2 h-4 w-4"
@@ -1129,8 +1234,8 @@
                   applyingArtistTags[item.file]
                     ? t('metadata.fixing')
                     : fixedArtistTags[item.file]
-                    ? t('metadata.fixed')
-                    : t('metadata.fixArtists')
+                      ? t('metadata.fixed')
+                      : t('metadata.fixArtists')
                 }}
               </button>
             </article>
@@ -1184,11 +1289,7 @@
                 v-if="repairingAllJellyfin"
                 class="loading loading-spinner loading-xs mr-2"
               />
-              <Icon
-                v-else
-                icon="clarity:image-gallery-line"
-                class="h-4 w-4 mr-2"
-              />
+              <Icon v-else icon="clarity:image-line" class="h-4 w-4 mr-2" />
               {{ t('metadata.fixAllArtistImages') }}
             </button>
           </div>
@@ -1437,7 +1538,7 @@
                     class="flex h-full w-full items-center justify-center bg-primary/5"
                   >
                     <Icon
-                      icon="clarity:image-gallery-line"
+                      icon="clarity:image-line"
                       class="h-10 w-10 text-base-content/25"
                     />
                   </div>
@@ -1503,8 +1604,8 @@
                       fixed[item.file]
                         ? t('metadata.fixed')
                         : applying[item.file]
-                        ? t('metadata.fixing')
-                        : t('metadata.fixTags')
+                          ? t('metadata.fixing')
+                          : t('metadata.fixTags')
                     }}
                   </button>
                   <button
@@ -1524,15 +1625,15 @@
                     />
                     <Icon
                       v-else
-                      icon="clarity:image-gallery-line"
+                      icon="clarity:image-line"
                       class="h-4 w-4 mr-2"
                     />
                     {{
                       fixedArtistImages[jellyfinRepairKey(item)]
                         ? t('metadata.fixed')
                         : failedArtistRepairKeys[jellyfinRepairKey(item)]
-                        ? t('metadata.fixFailed')
-                        : t('metadata.chooseCover')
+                          ? t('metadata.fixFailed')
+                          : t('metadata.chooseCover')
                     }}
                   </button>
                   <button
@@ -1597,6 +1698,99 @@
     </main>
 
     <div
+      v-if="albumArtistModalOpen"
+      class="fixed inset-0 z-40 flex items-end justify-center bg-black/60 p-4 sm:items-center"
+      @click.self="closeAlbumArtistModal"
+    >
+      <div
+        class="surface-strong flex max-h-[88dvh] w-full max-w-4xl flex-col overflow-hidden rounded-3xl border border-white/10 shadow-glow-md"
+        role="dialog"
+        aria-modal="true"
+      >
+        <div
+          class="flex items-center justify-between gap-4 border-b border-white/10 px-5 py-4"
+        >
+          <div class="min-w-0">
+            <h3 class="truncate text-lg font-semibold">
+              {{ selectedAlbumArtist?.name }}
+            </h3>
+            <p class="mt-1 text-sm text-base-content/55">
+              {{
+                t('metadata.artistAlbumCount', {
+                  count: selectedAlbumArtistAlbums.length,
+                })
+              }}
+            </p>
+          </div>
+          <button
+            type="button"
+            class="icon-btn shrink-0"
+            @click="closeAlbumArtistModal"
+          >
+            <Icon icon="clarity:times-line" class="h-5 w-5" />
+          </button>
+        </div>
+
+        <div class="min-h-0 overflow-y-auto p-4 sm:p-5">
+          <div class="grid gap-3 sm:grid-cols-2">
+            <article
+              v-for="album in selectedAlbumArtistAlbums"
+              :key="album.key"
+              class="rounded-2xl border border-white/10 bg-base-100/70 p-3"
+            >
+              <button
+                type="button"
+                class="group flex w-full min-w-0 items-center gap-3 text-left"
+                @click="openAlbumImagePicker(albumImageActionItem(album))"
+              >
+                <div
+                  class="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-primary/10"
+                >
+                  <img
+                    v-if="albumCoverUrl(album)"
+                    :src="albumCoverUrl(album)"
+                    :alt="album.name"
+                    class="h-full w-full object-cover"
+                    loading="lazy"
+                  />
+                  <div
+                    v-else
+                    class="flex h-full w-full items-center justify-center text-base-content/30"
+                  >
+                    <Icon icon="clarity:image-line" class="h-8 w-8" />
+                  </div>
+                </div>
+                <div class="min-w-0 flex-1">
+                  <p
+                    class="truncate text-sm font-semibold group-hover:text-primary"
+                  >
+                    {{ album.name }}
+                  </p>
+                  <p class="mt-1 text-xs text-base-content/45">
+                    {{ t('player.countMany', { count: album.files.length }) }}
+                  </p>
+                </div>
+              </button>
+              <button
+                type="button"
+                class="btn btn-primary btn-sm metadata-card-btn mt-3 w-full"
+                :disabled="applyingAlbumImages[album.coverFile]"
+                @click="openAlbumImagePicker(albumImageActionItem(album))"
+              >
+                <span
+                  v-if="applyingAlbumImages[album.coverFile]"
+                  class="loading loading-spinner loading-xs mr-2"
+                />
+                <Icon v-else icon="clarity:image-line" class="mr-2 h-4 w-4" />
+                {{ t('metadata.updateCover') }}
+              </button>
+            </article>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div
       v-if="artistImagePickerOpen"
       class="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-4 sm:items-center"
       @click.self="closeArtistImagePicker"
@@ -1608,10 +1802,18 @@
       >
         <div class="border-b border-white/10 px-5 py-4">
           <h3 class="text-lg font-semibold">
-            {{ t('metadata.chooseCoverTitle') }}
+            {{
+              artistImagePickerContext === 'album'
+                ? t('metadata.chooseAlbumCoverTitle')
+                : t('metadata.chooseCoverTitle')
+            }}
           </h3>
           <p class="mt-1 text-sm text-base-content/60">
-            {{ artistImagePickerItem?.name || artistImagePickerItem?.artist }}
+            {{
+              artistImagePickerItem?.name ||
+              artistImagePickerItem?.album_name ||
+              artistImagePickerItem?.artist
+            }}
           </p>
           <p class="mt-1 text-xs text-base-content/45">
             {{ t('metadata.chooseCoverHint') }}
@@ -1731,6 +1933,7 @@ import { Icon } from '@iconify/vue'
 
 import Navbar from '/src/components/Navbar.vue'
 import API from '/src/model/api'
+import { groupAlbums, groupArtists } from '/src/model/library'
 import { useSettingsManager } from '/src/model/settings'
 import { useI18n } from '/src/i18n'
 
@@ -1791,6 +1994,10 @@ const applyingAlbumImages = ref({})
 const fixedAlbumImages = ref({})
 const repairingAllAlbumImages = ref(false)
 const albumImageSummary = ref({ scanned: 0, matched: 0, total: 0 })
+const albumImageLibraryItems = ref([])
+const albumImageArtistQuery = ref('')
+const albumArtistModalOpen = ref(false)
+const selectedAlbumArtist = ref(null)
 const artistTagLoading = ref(false)
 const artistTagError = ref('')
 const artistTagLimit = ref(50)
@@ -1820,8 +2027,8 @@ const visibleItems = computed(() =>
   activeTab.value === 'completed'
     ? completedItems.value
     : activeTab.value === 'clean'
-    ? cleanItems.value
-    : items.value
+      ? cleanItems.value
+      : items.value
 )
 
 const metadataToolTabs = computed(() => {
@@ -1834,12 +2041,12 @@ const metadataToolTabs = computed(() => {
     {
       id: 'album-images',
       label: t('metadata.albumImagesTab'),
-      icon: 'clarity:album-line',
+      icon: 'clarity:library-line',
     },
     {
       id: 'images',
       label: t('metadata.artistImagesTab'),
-      icon: 'clarity:image-gallery-line',
+      icon: 'clarity:image-line',
     },
     {
       id: 'artist-tags',
@@ -1863,26 +2070,74 @@ const visibleArtistImageItems = computed(() =>
   activeArtistImageTab.value === 'completed'
     ? completedArtistImages.value
     : activeArtistImageTab.value === 'clean'
-    ? cleanArtistImageItems.value
-    : activeArtistImageTab.value === 'failed'
-    ? failedArtistImages.value
-    : artistImageItems.value
+      ? cleanArtistImageItems.value
+      : activeArtistImageTab.value === 'failed'
+        ? failedArtistImages.value
+        : artistImageItems.value
 )
 
 const visibleAlbumImageItems = computed(() =>
   activeAlbumImageTab.value === 'completed'
     ? completedAlbumImages.value
     : activeAlbumImageTab.value === 'clean'
-    ? cleanAlbumImageItems.value
-    : albumImageItems.value
+      ? cleanAlbumImageItems.value
+      : albumImageItems.value
+)
+
+const libraryGroupOptions = computed(() => ({
+  unknownArtist: t('common.unknownArtist'),
+}))
+
+const albumImageArtists = computed(() =>
+  groupArtists(albumImageBrowserItems.value, libraryGroupOptions.value).filter(
+    (artist) => albumImageAlbumsForArtist(artist).length > 0
+  )
+)
+
+const filteredAlbumImageArtists = computed(() => {
+  const query = albumImageArtistQuery.value.trim().toLowerCase()
+  if (!query) return albumImageArtists.value
+  return albumImageArtists.value.filter((artist) => {
+    const artistName = String(artist?.name || '').toLowerCase()
+    if (artistName.includes(query)) return true
+    return albumImageAlbumsForArtist(artist).some((album) =>
+      String(album?.name || '').toLowerCase().includes(query)
+    )
+  })
+})
+
+const albumImageAlbums = computed(() =>
+  groupAlbums(albumImageBrowserItems.value, libraryGroupOptions.value)
+)
+
+const albumImageBrowserItems = computed(() => {
+  const byFile = new Map()
+  for (const item of albumImageLibraryItems.value) {
+    if (item?.file) byFile.set(item.file, item)
+  }
+  for (const item of [
+    ...albumImageItems.value,
+    ...cleanAlbumImageItems.value,
+    ...completedAlbumImages.value,
+  ]) {
+    const converted = albumImageScanItemToLibraryItem(item)
+    if (converted?.file) byFile.set(converted.file, converted)
+  }
+  return Array.from(byFile.values())
+})
+
+const selectedAlbumArtistAlbums = computed(() =>
+  selectedAlbumArtist.value
+    ? albumImageAlbumsForArtist(selectedAlbumArtist.value)
+    : []
 )
 
 const visibleArtistTagItems = computed(() =>
   activeArtistTagTab.value === 'completed'
     ? completedArtistTags.value
     : activeArtistTagTab.value === 'clean'
-    ? cleanArtistTagItems.value
-    : artistTagItems.value
+      ? cleanArtistTagItems.value
+      : artistTagItems.value
 )
 
 const emptyArtistTagMessage = computed(() => {
@@ -1930,7 +2185,7 @@ const reconciliationBuckets = computed(() => {
       label: t('metadata.missingLocalImages'),
       items: data.missing_images || [],
       count: data.counts?.missing_local_images || 0,
-      icon: 'clarity:image-gallery-line',
+      icon: 'clarity:image-line',
     },
     {
       key: 'jellyfin_only',
@@ -2036,12 +2291,9 @@ watch(
   { immediate: true }
 )
 
-watch(
-  activeToolTab,
-  () => {
-    metadataToolMenuOpen.value = false
-  }
-)
+watch(activeToolTab, () => {
+  metadataToolMenuOpen.value = false
+})
 
 function selectToolTab(tabId) {
   activeToolTab.value = tabId
@@ -2146,6 +2398,67 @@ function albumImagePreviewUrl(item) {
   }
   const file = String(item?.file || '').trim()
   return file ? apiPreviewSrc(API.coverFileURL(file, 320)) : ''
+}
+
+function albumCoverUrl(album) {
+  const file = String(album?.coverFile || album?.file || '').trim()
+  return file ? apiPreviewSrc(API.coverFileURL(file, 320)) : ''
+}
+
+function albumArtistCoverUrl(artist) {
+  const file = String(artist?.previewFiles?.[0] || artist?.files?.[0] || '')
+  return file ? apiPreviewSrc(API.coverFileURL(file, 320)) : ''
+}
+
+function albumImageAlbumsForArtist(artist) {
+  const name = String(artist?.name || '').trim()
+  return albumImageAlbums.value.filter((album) => album.artist === name)
+}
+
+function albumImageScanItemToLibraryItem(item) {
+  const current = item?.current || {}
+  const candidate = item?.candidate || {}
+  const file = String(item?.file || '').trim()
+  if (!file) return null
+  const artists =
+    current.artists ||
+    candidate.artists ||
+    [current.artist || candidate.artist].filter(Boolean)
+  return {
+    file,
+    title: current.name || candidate.name || '',
+    artist: artists?.[0] || current.artist || candidate.artist || '',
+    artists,
+    album: current.album_name || candidate.album_name || '',
+    genre: current.genre || candidate.genre || '',
+    browse_genre: current.browse_genre || candidate.browse_genre || '',
+  }
+}
+
+function openAlbumArtistModal(artist) {
+  selectedAlbumArtist.value = artist
+  albumArtistModalOpen.value = true
+}
+
+function closeAlbumArtistModal() {
+  albumArtistModalOpen.value = false
+  selectedAlbumArtist.value = null
+}
+
+function albumImageActionItem(item) {
+  const file = String(item?.coverFile || item?.file || item?.files?.[0] || '')
+  const current = item?.current || {
+    name: item?.name || '',
+    album_name: item?.name || '',
+    artists: item?.artists || [item?.artist].filter(Boolean),
+  }
+  return {
+    ...item,
+    file,
+    current,
+    name: item?.name || current.album_name || current.name || '',
+    artist: item?.artist || current.artist || current.artists?.[0] || '',
+  }
 }
 
 function albumImageStatusBadge(item) {
@@ -2842,6 +3155,7 @@ async function refreshJellyfin() {
 
 onMounted(async () => {
   syncMetadataMobileAction()
+  await loadAlbumImageLibrary()
   try {
     const res = await API.getMetadataScanStatus()
     applyScanStatus(res.data)
@@ -3057,6 +3371,19 @@ async function scanAllArtistImages() {
   }
 }
 
+async function loadAlbumImageLibrary() {
+  try {
+    const res = await API.getLibraryFiles()
+    albumImageLibraryItems.value = Array.isArray(res.data)
+      ? res.data
+      : Array.isArray(res.data?.items)
+        ? res.data.items
+        : []
+  } catch {
+    albumImageLibraryItems.value = []
+  }
+}
+
 async function scanAlbumImages() {
   albumImageLoading.value = true
   albumImageError.value = ''
@@ -3089,32 +3416,72 @@ async function scanAllAlbumImages() {
   }
 }
 
+async function openAlbumImagePicker(item) {
+  if (!item?.file) return
+  artistImagePickerContext.value = 'album'
+  artistImagePickerItem.value = item
+  artistImagePickerOpen.value = true
+  artistImagePickerOptions.value = []
+  artistImagePickerSelected.value = null
+  artistImagePickerError.value = ''
+  artistImagePickerPreviewFailed.value = {}
+  artistImagePickerLoading.value = true
+  artistImagePickerSlowHint.value = false
+  try {
+    const res = await API.getAlbumImageOptions(item.file)
+    artistImagePickerOptions.value = res.data?.options || []
+    if (artistImagePickerOptions.value.length === 1) {
+      artistImagePickerSelected.value = artistImagePickerOptions.value[0]
+    }
+  } catch (err) {
+    artistImagePickerError.value =
+      err?.response?.data?.detail || t('metadata.chooseCoverFailed')
+  } finally {
+    artistImagePickerLoading.value = false
+  }
+}
+
 async function applyAlbumImage(item, options = {}) {
-  const { quiet = false } = options
+  const { quiet = false, selection = null } = options
+  const targetFiles =
+    Array.isArray(item.files) && item.files.length ? item.files : [item.file]
+  const applyKey = item.file
   applyingAlbumImages.value = {
     ...applyingAlbumImages.value,
-    [item.file]: true,
+    [applyKey]: true,
   }
   if (!quiet) albumImageError.value = ''
   try {
-    const res = await API.applyAlbumImage(item.file, item.candidate)
-    if (!res.data?.has_cover) {
-      if (!quiet) albumImageError.value = t('metadata.failedVerify')
-      return false
+    const selectedCoverUrl =
+      selection?.image_url || selection?.candidate?.cover_url || ''
+    const candidate = selectedCoverUrl
+      ? { cover_url: selectedCoverUrl }
+      : item.candidate
+    const results = []
+    for (const file of targetFiles) {
+      // eslint-disable-next-line no-await-in-loop
+      const res = await API.applyAlbumImage(file, candidate)
+      if (!res.data?.has_cover) {
+        if (!quiet) albumImageError.value = t('metadata.failedVerify')
+        return false
+      }
+      results.push(res.data)
     }
+    const primaryResult = results[0]
     fixedAlbumImages.value = {
       ...fixedAlbumImages.value,
-      [item.file]: true,
+      [applyKey]: true,
     }
-    completedAlbumImages.value = [res.data, ...completedAlbumImages.value]
+    completedAlbumImages.value = [primaryResult, ...completedAlbumImages.value]
     albumImageItems.value = albumImageItems.value.filter(
-      (existing) => existing.file !== item.file
+      (existing) => !targetFiles.includes(existing.file)
     )
     albumImageSummary.value = {
       ...albumImageSummary.value,
       matched: albumImageItems.value.length,
     }
     API.clearCoverSourcesCache()
+    await loadAlbumImageLibrary()
     return true
   } catch (err) {
     if (!quiet) {
@@ -3127,7 +3494,7 @@ async function applyAlbumImage(item, options = {}) {
   } finally {
     applyingAlbumImages.value = {
       ...applyingAlbumImages.value,
-      [item.file]: false,
+      [applyKey]: false,
     }
   }
 }
@@ -3221,7 +3588,11 @@ async function confirmArtistImageSelection() {
   let ok = false
   artistImagePickerApplying.value = true
   try {
-    if (artistImagePickerContext.value === 'jellyfin') {
+    if (artistImagePickerContext.value === 'album') {
+      ok = await applyAlbumImage(item, {
+        selection,
+      })
+    } else if (artistImagePickerContext.value === 'jellyfin') {
       ok = await applyJellyfinArtistImage(item, {
         quiet: false,
         selection,
@@ -3602,7 +3973,13 @@ async function syncJellyfinAfterImageRepairs(repairedCount) {
 }
 
 .metadata-tab-shell {
-  @apply mb-5 mx-auto flex w-full max-w-full min-w-0 gap-0.5 overflow-hidden rounded-full border border-white/10 bg-base-100/75 p-1 sm:mb-6 sm:w-max sm:gap-1;
+  @apply mb-5 mx-auto flex w-full max-w-full min-w-0 gap-0.5 overflow-hidden rounded-full border border-white/10 bg-base-100/95 p-1 sm:mb-6 sm:w-max sm:gap-1;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+[data-theme='downtify-light'] .metadata-tab-shell {
+  @apply bg-white/95;
 }
 
 @media (max-width: 1023px) {
@@ -3623,6 +4000,46 @@ async function syncJellyfinAfterImageRepairs(repairedCount) {
 .metadata-tab-badge {
   @apply ml-1 inline-flex min-w-[0.9rem] shrink items-center justify-center rounded-full px-1 py-0.5 text-[9px] font-bold leading-none sm:ml-2 sm:min-w-0 sm:px-2 sm:text-xs;
   background-color: color-mix(in srgb, currentColor 10%, transparent);
+}
+
+.metadata-album-image-results {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.metadata-album-image-results::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.metadata-album-artist-panel {
+  @apply min-w-0 max-w-full overflow-hidden bg-base-100/95;
+}
+
+[data-theme='downtify-light'] .metadata-album-artist-panel {
+  @apply bg-white/95;
+}
+
+.metadata-album-artist-scroll {
+  @apply max-h-[34rem] min-h-0 overflow-x-hidden overflow-y-auto pr-1;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+@media (max-width: 639px) {
+  .metadata-album-artist-scroll {
+    max-height: min(31rem, calc(100dvh - 17rem));
+  }
+}
+
+.metadata-album-artist-card {
+  background-color: color-mix(in srgb, hsl(var(--b1)) 94%, transparent);
+}
+
+[data-theme='downtify-light'] .metadata-album-artist-card {
+  @apply bg-white/95;
 }
 
 .metadata-mobile-menu-backdrop {

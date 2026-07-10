@@ -2386,15 +2386,11 @@ const playerContextLabel = computed(() => {
   const context = player.playlistContext.value
   if (!context?.type || !context?.name) return ''
   const count = player.playlist.value.length
-  const countLabel = t('player.countMany', { count })
-  if (context.type === 'genre') {
-    return `${t('player.playingGenre')}: ${context.name} - ${countLabel}`
-  }
-  if (context.type === 'artist') {
-    return `${t('player.playingArtist')}: ${context.name} - ${countLabel}`
-  }
-  if (context.type === 'album') {
-    return `${t('player.playingAlbum')}: ${context.name} - ${countLabel}`
+  const countLabel = t(count === 1 ? 'player.countOne' : 'player.countMany', {
+    count,
+  })
+  if (['genre', 'artist', 'album'].includes(context.type)) {
+    return `${context.name} - ${countLabel}`
   }
   return ''
 })
@@ -2778,12 +2774,16 @@ onUnmounted(() => {
 
   .player-shell > section {
     grid-column: 1;
+    align-self: start;
+    height: clamp(32rem, calc(100dvh - 14rem), 46rem);
     min-width: 0;
+    overflow: hidden;
   }
 
   .player-shell > aside {
     grid-column: 2;
     align-self: start;
+    display: flex;
     height: clamp(32rem, calc(100dvh - 14rem), 46rem);
     min-width: 0;
     overflow: hidden;
@@ -2795,6 +2795,7 @@ onUnmounted(() => {
   }
 
   .player-details {
+    flex: 1 1 auto;
     height: 100%;
     overflow-y: auto;
   }
