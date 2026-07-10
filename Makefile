@@ -25,6 +25,9 @@ down:
 run:
 	uv run python main.py web
 
+dev:
+	bash scripts/dev.sh
+
 format:
 	uv run ruff format .; uv run ruff check . --fix
 	./frontend/node_modules/.bin/prettier --write frontend/src/.
@@ -66,4 +69,4 @@ doc:
 %:
 	@:
 
-.PHONY: all build latest clean up down run format lint export changelog version doc android-apk publish
+.PHONY: all build latest clean up down run dev format lint export changelog version doc android-apk publish

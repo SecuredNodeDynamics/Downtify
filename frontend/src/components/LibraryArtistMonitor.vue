@@ -1,5 +1,5 @@
 <template>
-  <div class="library-artist-monitor flex shrink-0 flex-col items-end">
+  <div class="library-artist-monitor">
     <button
       v-if="monitoredEntry"
       type="button"
@@ -35,11 +35,8 @@
       </span>
     </button>
 
-    <p
-      v-if="actionError"
-      class="mt-1 max-w-[14rem] text-right text-xs text-error"
-      role="alert"
-    >
+    <p v-if="actionError" class="monitor-alert" role="alert">
+      <Icon icon="clarity:warning-line" class="h-3.5 w-3.5 shrink-0" />
       {{ actionError }}
     </p>
 
@@ -363,3 +360,13 @@ onUnmounted(() => {
   }
 })
 </script>
+
+<style scoped>
+.library-artist-monitor {
+  @apply flex min-w-0 max-w-full shrink-0 flex-col items-end gap-1;
+}
+
+.monitor-alert {
+  @apply flex max-w-full items-start gap-1.5 rounded-lg border border-error/25 bg-error/10 px-2.5 py-1.5 text-left text-xs leading-snug text-error;
+}
+</style>

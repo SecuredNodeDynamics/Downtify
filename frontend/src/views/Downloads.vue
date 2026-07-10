@@ -1369,7 +1369,7 @@ onUnmounted(() => {
 }
 
 .library-drill-actions {
-  @apply flex shrink-0 flex-nowrap items-center justify-end gap-2;
+  @apply flex shrink-0 flex-wrap items-start justify-end gap-2;
 }
 
 .library-drill-header :deep(.library-artist-monitor .btn) {

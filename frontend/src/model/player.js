@@ -45,6 +45,7 @@ let recovering = false
 let mediaSessionReady = false
 let lastMediaPositionSyncAt = 0
 let lastSessionPersistAt = 0
+let applyTrackSeq = 0
 let pendingSession = readPlayerSession()
 
 function readPlayerSession() {
@@ -151,7 +152,18 @@ function syncMediaSessionNow({ position = false } = {}) {
 function resumePlaybackIfNeeded() {
   const a = audio
   if (!a || !playbackIntent || !a.paused) return
-  a.play().catch(() => {})
+  playAudioWithRecovery(a)
+}
+
+function playAudioWithRecovery(el = audio) {
+  if (!el) return Promise.resolve(false)
+  return el
+    .play()
+    .then(() => true)
+    .catch(() => {
+      if (el === audio && playbackIntent) scheduleRecovery()
+      return false
+    })
 }
 
 async function ensureMediaSession() {
@@ -242,8 +254,9 @@ function attemptRecovery() {
     } catch {
       // Seeking can throw if the element isn't ready yet; play anyway.
     }
-    el.play()
-      .then(() => {
+    playAudioWithRecovery(el)
+      .then((played) => {
+        if (!played) return
         // Success is finalized by the 'playing' listener (resetRecovery).
       })
       .catch(finishFailure)
@@ -401,8 +414,9 @@ async function applyTrack(
   { autoplay = false, resetTime = true, restoreTime = 0 } = {}
 ) {
   if (index < 0 || index >= playlist.value.length) return
+  const seq = ++applyTrackSeq
   const a = ensureAudio()
-  const wasPlaying = isPlaying.value
+  const wasPlaying = isPlaying.value || playbackIntent
   const track = playlist.value[index]
   currentIndex.value = index
   if (shuffle.value) {
@@ -413,6 +427,7 @@ async function applyTrack(
   syncMediaSessionNow({ position: true })
 
   const nextUrl = await resolvePlaybackUrl(track.file)
+  if (seq !== applyTrackSeq || currentIndex.value !== index) return
   track.url = nextUrl
 
   const sameSource =
@@ -426,6 +441,7 @@ async function applyTrack(
     resetRecovery()
     playingFile = track.file
     a.src = nextUrl
+    a.load()
     if (resetTime) {
       a.currentTime = 0
       currentTime.value = 0
@@ -451,14 +467,14 @@ async function applyTrack(
     }
     if (autoplay || wasPlaying) {
       playbackIntent = true
-      await a.play().catch(() => {})
+      await playAudioWithRecovery(a)
     }
     return
   }
 
   if ((autoplay || wasPlaying) && a.paused) {
     playbackIntent = true
-    await a.play().catch(() => {})
+    await playAudioWithRecovery(a)
   }
 }
 
@@ -497,7 +513,8 @@ export function syncPlaylistFromFiles(files, options = {}) {
       return
     }
     if (wasPlaying && a.paused) {
-      a.play().catch(() => {})
+      playbackIntent = true
+      playAudioWithRecovery(a)
     }
     return
   }
@@ -558,7 +575,7 @@ function play() {
     return
   }
   playbackIntent = true
-  a.play().catch(() => {})
+  playAudioWithRecovery(a)
 }
 
 function pause() {
@@ -662,7 +679,7 @@ function onEnded() {
     seek(0)
     if (audio) {
       playbackIntent = true
-      audio.play().catch(() => {})
+      playAudioWithRecovery(audio)
     }
     return
   }
@@ -702,6 +719,47 @@ const progressPct = computed(() =>
   duration.value > 0 ? (currentTime.value / duration.value) * 100 : 0
 )
 
+const upNext = computed(() => {
+  const list = playlist.value
+  const index = currentIndex.value
+  if (index < 0 || list.length <= 1) return []
+  const limit = Math.min(12, list.length - 1)
+  const result = []
+
+  if (shuffle.value) {
+    if (shuffleOrder.length !== list.length) buildShuffleOrder()
+    const startPos = shuffleOrder.indexOf(index)
+    if (startPos < 0) return []
+    for (let step = 1; step <= limit; step += 1) {
+      const pos = startPos + step
+      if (pos >= shuffleOrder.length && repeatMode.value !== 'all') break
+      const nextIndex = shuffleOrder[pos % shuffleOrder.length]
+      if (nextIndex === index) break
+      result.push({
+        track: list[nextIndex],
+        index: nextIndex,
+        offset: result.length + 1,
+      })
+    }
+    return result
+  }
+
+  for (let step = 1; step <= limit; step += 1) {
+    let nextIndex = index + step
+    if (nextIndex >= list.length) {
+      if (repeatMode.value !== 'all') break
+      nextIndex %= list.length
+    }
+    if (nextIndex === index) break
+    result.push({
+      track: list[nextIndex],
+      index: nextIndex,
+      offset: result.length + 1,
+    })
+  }
+  return result
+})
+
 if (typeof window !== 'undefined') {
   window.addEventListener('pagehide', () => persistPlayerSession(true))
 }
@@ -724,6 +782,7 @@ export function usePlayer() {
     playlistContext,
     currentIndex,
     currentTrack,
+    upNext,
     isPlaying,
     currentTime,
     duration,

@@ -103,14 +103,14 @@
                     {{ t('player.nothingPlayingHint') }}
                   </span>
                 </p>
-                <div
-                  v-if="playerContextLabel"
-                  class="mt-2 flex justify-center"
-                >
+                <div v-if="playerContextLabel" class="mt-2 flex justify-center">
                   <span
                     class="inline-flex max-w-full items-center gap-1.5 rounded-full border border-primary/25 bg-primary/10 px-3 py-1 text-xs font-medium text-primary"
                   >
-                    <Icon :icon="playerContextIcon" class="h-3.5 w-3.5 shrink-0" />
+                    <Icon
+                      :icon="playerContextIcon"
+                      class="h-3.5 w-3.5 shrink-0"
+                    />
                     <span class="truncate">{{ playerContextLabel }}</span>
                   </span>
                 </div>
@@ -352,6 +352,75 @@
                   :title="t('player.volume')"
                 />
               </div>
+
+              <section
+                v-if="queueDisplayTracks.length"
+                class="player-queue mt-5 w-full text-left"
+              >
+                <div class="mb-2 flex items-center justify-between gap-3">
+                  <h2 class="player-detail-heading">
+                    {{ t('player.upNext') }}
+                  </h2>
+                  <span class="text-xs text-base-content/45">
+                    {{
+                      t('player.countMany', {
+                        count: queueDisplayTracks.length,
+                      })
+                    }}
+                  </span>
+                </div>
+                <div class="player-queue-list">
+                  <button
+                    v-for="item in visibleQueueTracks"
+                    :key="item.track.file"
+                    type="button"
+                    class="player-queue-item"
+                    :title="item.track.title"
+                    @click="openQueueTrack(item)"
+                  >
+                    <div class="player-queue-cover">
+                      <CoverImage
+                        :src="coverSourcesFor(item.track.file).src"
+                        :fallbacks="coverSourcesFor(item.track.file).fallbacks"
+                        :alt="item.track.title"
+                        img-class="absolute inset-0 h-full w-full object-cover"
+                      >
+                        <template #fallback>
+                          <Icon
+                            icon="clarity:music-note-line"
+                            class="h-5 w-5 text-base-content/40"
+                          />
+                        </template>
+                      </CoverImage>
+                    </div>
+                    <div class="min-w-0 flex-1">
+                      <p class="truncate text-sm font-semibold">
+                        {{ item.track.title }}
+                      </p>
+                      <p class="truncate text-xs text-base-content/45">
+                        {{ queueTrackArtist(item.track) }}
+                      </p>
+                    </div>
+                    <Icon
+                      icon="clarity:info-standard-line"
+                      class="h-4 w-4 shrink-0 text-base-content/35"
+                    />
+                  </button>
+                </div>
+              </section>
+              <section
+                v-else-if="hasActiveTrack"
+                class="player-queue mt-5 w-full text-left"
+              >
+                <div class="mb-2 flex items-center justify-between gap-3">
+                  <h2 class="player-detail-heading">
+                    {{ t('player.upNext') }}
+                  </h2>
+                </div>
+                <p class="text-sm text-base-content/45">
+                  {{ t('player.queueEmpty') }}
+                </p>
+              </section>
             </div>
           </section>
 
@@ -663,10 +732,14 @@
                     v-if="!similarTrackOwnership.isOwned(track)"
                     type="button"
                     class="similar-track-download"
+                    :class="downloadButtonClass(track)"
                     :title="t('common.download')"
                     @click.stop="downloadSimilarArtistItem(track)"
                   >
-                    <Icon icon="clarity:download-line" class="h-3.5 w-3.5" />
+                    <Icon
+                      :icon="downloadButtonIcon(track)"
+                      class="h-3.5 w-3.5"
+                    />
                   </button>
                   <span
                     v-else
@@ -799,16 +872,326 @@
                   v-if="!similarTrackOwnership.isOwned(selectedSimilarTrack)"
                   type="button"
                   class="icon-btn shrink-0 text-primary"
+                  :class="downloadButtonClass(item)"
                   :title="t('common.download')"
                   @click="downloadSimilarArtistItem(item)"
                 >
-                  <Icon icon="clarity:download-line" class="h-5 w-5" />
+                  <Icon :icon="downloadButtonIcon(item)" class="h-5 w-5" />
                 </button>
               </article>
             </div>
             <p v-else class="py-12 text-center text-sm text-base-content/50">
               {{ t('player.artistMusicEmpty') }}
             </p>
+          </div>
+        </section>
+      </div>
+    </Teleport>
+
+    <Teleport to="body">
+      <div
+        v-if="selectedQueueTrack"
+        class="artist-modal-backdrop"
+        @click.self="closeQueueTrack"
+      >
+        <section
+          class="track-modal surface-strong"
+          role="dialog"
+          aria-modal="true"
+          :aria-label="selectedQueueTrack.track.title"
+        >
+          <header class="artist-modal-header">
+            <div class="min-w-0">
+              <h2 class="truncate text-lg font-bold">
+                {{ selectedQueueTrack.track.title }}
+              </h2>
+              <p class="truncate text-xs text-base-content/50">
+                {{ queueTrackArtist(selectedQueueTrack.track) }}
+              </p>
+            </div>
+            <button
+              type="button"
+              class="icon-btn shrink-0"
+              :title="t('common.close')"
+              @click="closeQueueTrack"
+            >
+              <Icon icon="clarity:close-line" class="h-5 w-5" />
+            </button>
+          </header>
+
+          <div class="track-modal-body">
+            <div class="track-modal-cover">
+              <CoverImage
+                :src="coverSourcesFor(selectedQueueTrack.track.file).src"
+                :fallbacks="
+                  coverSourcesFor(selectedQueueTrack.track.file).fallbacks
+                "
+                :alt="selectedQueueTrack.track.title"
+                img-class="absolute inset-0 h-full w-full object-cover"
+              >
+                <template #fallback>
+                  <Icon
+                    icon="clarity:music-note-line"
+                    class="h-12 w-12 text-base-content/35"
+                  />
+                </template>
+              </CoverImage>
+            </div>
+
+            <div class="min-w-0 flex-1">
+              <dl class="track-modal-metadata mt-0">
+                <div>
+                  <dt>{{ t('library.artists') }}</dt>
+                  <dd>{{ queueTrackArtist(selectedQueueTrack.track) }}</dd>
+                </div>
+                <div v-if="selectedQueueTrackLibraryItem?.album">
+                  <dt>{{ t('library.albums') }}</dt>
+                  <dd>{{ selectedQueueTrackLibraryItem.album }}</dd>
+                </div>
+                <div>
+                  <dt>{{ t('player.queuePosition') }}</dt>
+                  <dd>{{ selectedQueueTrack.offset }}</dd>
+                </div>
+              </dl>
+
+              <div
+                v-if="selectedQueueAlbum"
+                class="mt-4 rounded-xl border border-white/10 bg-white/5 p-3"
+              >
+                <div class="flex items-center justify-between gap-3">
+                  <div class="min-w-0">
+                    <p class="truncate text-sm font-semibold">
+                      {{ selectedQueueAlbum.name }}
+                    </p>
+                    <p class="text-xs text-base-content/50">
+                      {{
+                        selectedQueueAlbumExpectedCount
+                          ? t('player.albumCompleteness', {
+                              have: selectedQueueAlbum.files.length,
+                              total: selectedQueueAlbumExpectedCount,
+                            })
+                          : t('library.albumMeta', {
+                              tracks: selectedQueueAlbum.files.length,
+                            })
+                      }}
+                    </p>
+                  </div>
+                  <span
+                    class="inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold"
+                    :class="
+                      selectedQueueAlbumMissingCount > 0
+                        ? 'bg-amber-300/15 text-amber-200'
+                        : 'bg-primary/10 text-primary'
+                    "
+                  >
+                    <Icon
+                      :icon="
+                        selectedQueueAlbumMissingCount > 0
+                          ? 'clarity:warning-line'
+                          : 'clarity:check-line'
+                      "
+                      class="h-3.5 w-3.5"
+                    />
+                    {{
+                      selectedQueueAlbumMissingCount > 0
+                        ? t('player.albumMissingShort', {
+                            count: selectedQueueAlbumMissingCount,
+                          })
+                        : t('player.albumComplete')
+                    }}
+                  </span>
+                </div>
+              </div>
+
+              <div class="mt-4">
+                <div class="mb-2 flex items-center justify-between gap-3">
+                  <h3 class="player-detail-heading">
+                    {{ t('player.matchingAlbums') }}
+                  </h3>
+                  <span
+                    v-if="queueAlbumLookupLoading"
+                    class="loading loading-spinner loading-xs text-primary"
+                  />
+                </div>
+                <div v-if="queueAlbumCandidates.length" class="space-y-2">
+                  <article
+                    v-for="album in queueAlbumCandidates"
+                    :key="album.browse_id || album.url || album.name"
+                    class="queue-album-card"
+                  >
+                    <div class="artist-result">
+                      <div class="artist-result-cover">
+                        <CoverImage
+                          v-if="album.cover_url"
+                          :src="
+                            API.remoteCoverSources(album.cover_url, 160).src
+                          "
+                          :fallbacks="
+                            API.remoteCoverSources(album.cover_url, 160)
+                              .fallbacks
+                          "
+                          :alt="album.name"
+                          img-class="absolute inset-0 h-full w-full object-cover"
+                        />
+                      </div>
+                      <div class="min-w-0 flex-1">
+                        <p class="truncate text-sm font-semibold">
+                          {{ album.name }}
+                        </p>
+                        <p class="truncate text-xs text-base-content/50">
+                          {{ queueAlbumCandidateMeta(album) }}
+                        </p>
+                        <p
+                          class="mt-1 text-xs"
+                          :class="queueAlbumStatusClass(album)"
+                        >
+                          {{ queueAlbumStatusLabel(album) }}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        class="btn btn-xs h-8 rounded-full border-white/10 bg-base-100/70 px-3"
+                        :disabled="!album.browse_id"
+                        @click="toggleQueueAlbumTracks(album)"
+                      >
+                        <span
+                          v-if="queueAlbumTracksLoading[queueAlbumKey(album)]"
+                          class="loading loading-spinner loading-xs"
+                        />
+                        <Icon
+                          v-else
+                          :icon="
+                            expandedQueueAlbumKey === queueAlbumKey(album)
+                              ? 'clarity:angle-line'
+                              : 'clarity:angle-line'
+                          "
+                          class="h-3.5 w-3.5"
+                          :class="{
+                            'rotate-90':
+                              expandedQueueAlbumKey !== queueAlbumKey(album),
+                            '-rotate-90':
+                              expandedQueueAlbumKey === queueAlbumKey(album),
+                          }"
+                        />
+                        {{ t('player.viewAlbumTracks') }}
+                      </button>
+                      <button
+                        type="button"
+                        class="btn btn-xs h-8 shrink-0 rounded-full px-3 text-primary"
+                        :class="downloadButtonClass(album)"
+                        :title="t('player.downloadMissingAlbum')"
+                        @click="downloadQueueAlbumMissing(album)"
+                      >
+                        <Icon
+                          :icon="downloadButtonIcon(album)"
+                          class="h-4 w-4"
+                        />
+                        {{ queueAlbumDownloadLabel(album) }}
+                      </button>
+                    </div>
+
+                    <div
+                      v-if="expandedQueueAlbumKey === queueAlbumKey(album)"
+                      class="queue-album-tracks"
+                    >
+                      <div
+                        v-if="queueAlbumTracksLoading[queueAlbumKey(album)]"
+                        class="space-y-2"
+                      >
+                        <div
+                          v-for="index in 4"
+                          :key="index"
+                          class="skeleton h-10 rounded-lg"
+                        />
+                      </div>
+                      <div
+                        v-else-if="queueAlbumTracks(album).length"
+                        class="space-y-1.5"
+                      >
+                        <div class="queue-album-track-summary">
+                          <span>
+                            {{
+                              t('player.albumTracksOwnedSummary', {
+                                have: queueAlbumStatus(album).have,
+                                total: queueAlbumStatus(album).total,
+                              })
+                            }}
+                          </span>
+                          <span
+                            v-if="queueAlbumStatus(album).missing > 0"
+                            class="text-amber-200"
+                          >
+                            {{
+                              t('player.albumTracksMissingSummary', {
+                                count: queueAlbumStatus(album).missing,
+                              })
+                            }}
+                          </span>
+                        </div>
+                        <article
+                          v-for="track in queueAlbumTracks(album)"
+                          :key="track.song_id || track.url || track.name"
+                          class="queue-album-track"
+                        >
+                          <div class="min-w-0 flex-1">
+                            <p class="truncate text-sm font-medium">
+                              {{ track.name }}
+                            </p>
+                            <p class="truncate text-xs text-base-content/45">
+                              {{ resultArtistLabel(track) }}
+                            </p>
+                          </div>
+                          <span
+                            v-if="queueAlbumTrackOwned(track)"
+                            class="queue-track-owned"
+                          >
+                            <Icon
+                              icon="clarity:library-solid"
+                              class="h-3.5 w-3.5"
+                            />
+                            {{ t('search.inLibrary') }}
+                          </span>
+                          <button
+                            v-else
+                            type="button"
+                            class="queue-track-download"
+                            :class="downloadButtonClass(track)"
+                            :title="t('common.download')"
+                            @click="downloadSimilarArtistItem(track)"
+                          >
+                            <Icon
+                              :icon="downloadButtonIcon(track)"
+                              class="h-3.5 w-3.5"
+                            />
+                            {{ t('player.missingTrack') }}
+                          </button>
+                        </article>
+                      </div>
+                      <p v-else class="player-detail-empty">
+                        {{ t('player.albumTracksUnavailable') }}
+                      </p>
+                    </div>
+                  </article>
+                </div>
+                <p
+                  v-else-if="!queueAlbumLookupLoading"
+                  class="player-detail-empty"
+                >
+                  {{ t('player.noMatchingAlbums') }}
+                </p>
+              </div>
+
+              <div class="mt-5 flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  class="btn btn-primary btn-sm h-10 rounded-full px-4"
+                  @click="player.playAt(selectedQueueTrack.index)"
+                >
+                  <Icon icon="clarity:play-line" class="h-4 w-4" />
+                  {{ t('player.play') }}
+                </button>
+              </div>
+            </div>
           </div>
         </section>
       </div>
@@ -891,10 +1274,20 @@
                   v-if="!similarTrackOwnership.isOwned(selectedSimilarTrack)"
                   type="button"
                   class="btn btn-primary btn-sm h-10 rounded-full px-4"
+                  :class="downloadButtonClass(selectedSimilarTrack)"
                   @click="downloadSimilarArtistItem(selectedSimilarTrack)"
                 >
-                  <Icon icon="clarity:download-line" class="h-4 w-4" />
-                  {{ t('common.download') }}
+                  <Icon
+                    :icon="downloadButtonIcon(selectedSimilarTrack)"
+                    class="h-4 w-4"
+                  />
+                  {{
+                    downloadButtonState(selectedSimilarTrack) === 'loading'
+                      ? t('common.downloading')
+                      : downloadButtonState(selectedSimilarTrack) === 'done'
+                      ? t('common.done')
+                      : t('common.download')
+                  }}
                 </button>
                 <span
                   v-else
@@ -952,7 +1345,12 @@ import {
 } from '/src/model/librarySession'
 import { usePlayer, formatTime, trackInfoFromFile } from '/src/model/player'
 import { useDownloadManager } from '/src/model/download'
-import { useLibraryOwnership } from '/src/model/libraryOwnership'
+import {
+  findOwnedAlbum,
+  findOwnedTrack,
+  useLibraryOwnership,
+} from '/src/model/libraryOwnership'
+import { useAlbumTrackCounts } from '/src/model/albumTrackCounts'
 import {
   consumePlayerNavigation,
   resolvePlayerBrowseState,
@@ -996,9 +1394,18 @@ const selectedSimilarArtist = ref(null)
 const similarArtistDetailsLoading = ref(false)
 const similarArtistResults = ref([])
 const similarArtistTab = ref('albums')
+const selectedQueueTrack = ref(null)
+const queueAlbumCandidates = ref([])
+const queueAlbumLookupLoading = ref(false)
+const queueAlbumCounts = useAlbumTrackCounts(queueAlbumCandidates)
+const downloadButtonStates = ref({})
+const expandedQueueAlbumKey = ref('')
+const queueAlbumTracksByKey = ref({})
+const queueAlbumTracksLoading = ref({})
 let lyricsRequestSeq = 0
 let similarArtistsRequestSeq = 0
 let similarTracksRequestSeq = 0
+let queueAlbumLookupSeq = 0
 let similarMediaDrag = null
 let suppressSimilarClickUntil = 0
 let seekRaf = 0
@@ -1099,6 +1506,64 @@ const currentLibraryItem = computed(() => {
   const file = player.currentTrack.value?.file
   if (!file) return null
   return libraryItems.value.find((item) => item.file === file) || null
+})
+
+const upNextTracks = computed(() => {
+  return player.upNext.value || []
+})
+
+const queueDisplayTracks = computed(() => {
+  if (upNextTracks.value.length) return upNextTracks.value
+  const current = player.currentIndex.value
+  if (current < 0 || player.playlist.value.length <= 1) return []
+  return player.playlist.value
+    .map((track, index) => ({ track, index, offset: index + 1 }))
+    .filter((item) => item.index !== current)
+})
+
+const visibleQueueTracks = computed(() => queueDisplayTracks.value.slice(0, 6))
+
+const selectedQueueTrackLibraryItem = computed(() => {
+  const file = selectedQueueTrack.value?.track?.file
+  if (!file) return null
+  return libraryItems.value.find((item) => item.file === file) || null
+})
+
+const selectedQueueAlbum = computed(() => {
+  const item = selectedQueueTrackLibraryItem.value
+  if (!item?.album) return null
+  const key = albumKey(item.artist, item.album)
+  return albums.value.find((album) => album.key === key) || null
+})
+
+const bestQueueAlbumCandidate = computed(() => {
+  const local = selectedQueueAlbum.value
+  if (!local) return null
+  const localName = normalizedArtistKey(local.name)
+  const localArtist = normalizedArtistKey(local.artist)
+  return (
+    queueAlbumCandidates.value.find((album) => {
+      const name = normalizedArtistKey(album?.name)
+      const artist = normalizedArtistKey(resultArtistLabel(album))
+      return (
+        name === localName && (!localArtist || artist.includes(localArtist))
+      )
+    }) ||
+    queueAlbumCandidates.value[0] ||
+    null
+  )
+})
+
+const selectedQueueAlbumExpectedCount = computed(() => {
+  const count = queueAlbumCounts.trackCountFor(bestQueueAlbumCandidate.value)
+  return count || Number(bestQueueAlbumCandidate.value?.track_count) || 0
+})
+
+const selectedQueueAlbumMissingCount = computed(() => {
+  const local = selectedQueueAlbum.value
+  const expected = selectedQueueAlbumExpectedCount.value
+  if (!local || !expected) return 0
+  return Math.max(0, expected - local.files.length)
 })
 
 function artistNamesMatch(a, b) {
@@ -1290,8 +1755,261 @@ function resultArtistLabel(item) {
   return String(item?.artist || item?.album_name || '')
 }
 
-function downloadSimilarArtistItem(item) {
-  void downloadManager.queue(item)
+function queueTrackArtist(track) {
+  const item = libraryItems.value.find((entry) => entry.file === track?.file)
+  return item?.artist || track?.artist || t('common.unknownArtist')
+}
+
+function queueAlbumCandidateMeta(album) {
+  const count = queueAlbumCounts.trackCountFor(album)
+  const artist = resultArtistLabel(album)
+  const countLabel = count ? t('player.countMany', { count }) : ''
+  return [artist, countLabel].filter(Boolean).join(' - ')
+}
+
+function queueAlbumKey(album) {
+  return String(album?.browse_id || album?.url || album?.name || '').trim()
+}
+
+function queueAlbumTracks(album) {
+  return queueAlbumTracksByKey.value[queueAlbumKey(album)] || []
+}
+
+function queueAlbumOwnedAlbum(album) {
+  return findOwnedAlbum(album, libraryItems.value)
+}
+
+function queueAlbumTrackOwned(track) {
+  return Boolean(findOwnedTrack(track, libraryItems.value))
+}
+
+function queueAlbumMissingTracks(album) {
+  return queueAlbumTracks(album).filter((track) => !queueAlbumTrackOwned(track))
+}
+
+function queueAlbumStatus(album) {
+  const tracks = queueAlbumTracks(album)
+  const expected = queueAlbumCounts.trackCountFor(album)
+  const ownedAlbum = queueAlbumOwnedAlbum(album)
+  if (tracks.length) {
+    const missing = queueAlbumMissingTracks(album).length
+    return {
+      owned: missing === 0,
+      missing,
+      have: tracks.length - missing,
+      total: tracks.length,
+    }
+  }
+  if (ownedAlbum && expected) {
+    const missing = Math.max(0, expected - ownedAlbum.files.length)
+    return {
+      owned: missing === 0,
+      missing,
+      have: ownedAlbum.files.length,
+      total: expected,
+    }
+  }
+  if (ownedAlbum) {
+    return {
+      owned: true,
+      missing: 0,
+      have: ownedAlbum.files.length,
+      total: ownedAlbum.files.length,
+    }
+  }
+  return { owned: false, missing: 0, have: 0, total: expected || 0 }
+}
+
+function queueAlbumStatusLabel(album) {
+  const status = queueAlbumStatus(album)
+  if (status.owned) return t('player.albumDownloaded')
+  if (status.total) {
+    return t('player.albumCompleteness', {
+      have: status.have,
+      total: status.total,
+    })
+  }
+  return t('player.albumNotDownloaded')
+}
+
+function queueAlbumDownloadLabel(album) {
+  const status = queueAlbumStatus(album)
+  if (status.have > 0 && status.missing > 0) {
+    return t('player.downloadMissing')
+  }
+  return t('player.downloadAlbum')
+}
+
+function queueAlbumStatusClass(album) {
+  const status = queueAlbumStatus(album)
+  if (status.owned) return 'text-primary'
+  if (status.have > 0) return 'text-amber-200'
+  return 'text-base-content/45'
+}
+
+async function loadQueueAlbumTracks(album) {
+  const key = queueAlbumKey(album)
+  if (!key || queueAlbumTracksByKey.value[key]?.length) return
+  if (!album?.browse_id) return
+  queueAlbumTracksLoading.value = {
+    ...queueAlbumTracksLoading.value,
+    [key]: true,
+  }
+  try {
+    const response = await API.openYoutubeAlbum(album.browse_id)
+    queueAlbumTracksByKey.value = {
+      ...queueAlbumTracksByKey.value,
+      [key]: Array.isArray(response.data) ? response.data : [],
+    }
+  } catch {
+    queueAlbumTracksByKey.value = {
+      ...queueAlbumTracksByKey.value,
+      [key]: [],
+    }
+  } finally {
+    queueAlbumTracksLoading.value = {
+      ...queueAlbumTracksLoading.value,
+      [key]: false,
+    }
+  }
+}
+
+function toggleQueueAlbumTracks(album) {
+  const key = queueAlbumKey(album)
+  if (!key) return
+  expandedQueueAlbumKey.value = expandedQueueAlbumKey.value === key ? '' : key
+  if (expandedQueueAlbumKey.value) {
+    void loadQueueAlbumTracks(album)
+  }
+}
+
+async function downloadQueueAlbumMissing(album) {
+  await loadQueueAlbumTracks(album)
+  const missing = queueAlbumMissingTracks(album)
+  if (!missing.length) {
+    await downloadSimilarArtistItem(album)
+    return
+  }
+  setDownloadButtonState(album, 'loading')
+  try {
+    for (const track of missing) {
+      await downloadManager.queue(track)
+    }
+    setDownloadButtonState(album, 'done')
+    setTimeout(() => clearDownloadButtonState(album), 1400)
+  } catch {
+    clearDownloadButtonState(album)
+  }
+}
+
+async function loadQueueAlbumCandidates(trackItem) {
+  queueAlbumLookupSeq += 1
+  const seq = queueAlbumLookupSeq
+  queueAlbumCandidates.value = []
+  expandedQueueAlbumKey.value = ''
+  queueAlbumTracksByKey.value = {}
+  queueAlbumTracksLoading.value = {}
+  const libraryItem =
+    libraryItems.value.find((item) => item.file === trackItem?.track?.file) ||
+    null
+  const query = [
+    libraryItem?.artist || queueTrackArtist(trackItem?.track),
+    libraryItem?.album,
+  ]
+    .filter(Boolean)
+    .join(' ')
+  queueAlbumLookupLoading.value = Boolean(query)
+  if (!query) return
+
+  try {
+    const response = await API.search(query)
+    if (seq !== queueAlbumLookupSeq) return
+    queueAlbumCandidates.value = (
+      Array.isArray(response.data) ? response.data : []
+    )
+      .filter((item) => item?.media_type === 'album')
+      .slice(0, 5)
+  } catch {
+    if (seq === queueAlbumLookupSeq) queueAlbumCandidates.value = []
+  } finally {
+    if (seq === queueAlbumLookupSeq) queueAlbumLookupLoading.value = false
+  }
+}
+
+function openQueueTrack(item) {
+  selectedQueueTrack.value = item
+  void loadQueueAlbumCandidates(item)
+}
+
+function closeQueueTrack() {
+  selectedQueueTrack.value = null
+  queueAlbumCandidates.value = []
+  queueAlbumLookupLoading.value = false
+  expandedQueueAlbumKey.value = ''
+  queueAlbumTracksByKey.value = {}
+  queueAlbumTracksLoading.value = {}
+}
+
+function downloadButtonKey(item) {
+  return [
+    item?.media_type || 'track',
+    item?.browse_id,
+    item?.song_id,
+    item?.url,
+    item?.name,
+    resultArtistLabel(item),
+  ]
+    .filter(Boolean)
+    .join(':')
+}
+
+function setDownloadButtonState(item, state) {
+  const key = downloadButtonKey(item)
+  if (!key) return
+  downloadButtonStates.value = {
+    ...downloadButtonStates.value,
+    [key]: state,
+  }
+}
+
+function clearDownloadButtonState(item) {
+  const key = downloadButtonKey(item)
+  if (!key || !downloadButtonStates.value[key]) return
+  const next = { ...downloadButtonStates.value }
+  delete next[key]
+  downloadButtonStates.value = next
+}
+
+function downloadButtonState(item) {
+  const key = downloadButtonKey(item)
+  return key ? downloadButtonStates.value[key] || '' : ''
+}
+
+function downloadButtonClass(item) {
+  const state = downloadButtonState(item)
+  return {
+    'download-button-loading': state === 'loading',
+    'download-button-done': state === 'done',
+  }
+}
+
+function downloadButtonIcon(item) {
+  const state = downloadButtonState(item)
+  if (state === 'loading') return 'clarity:sync-line'
+  if (state === 'done') return 'clarity:check-line'
+  return 'clarity:download-line'
+}
+
+async function downloadSimilarArtistItem(item) {
+  if (!item || downloadButtonState(item) === 'loading') return
+  setDownloadButtonState(item, 'loading')
+  try {
+    await downloadManager.queue(item)
+    setDownloadButtonState(item, 'done')
+    setTimeout(() => clearDownloadButtonState(item), 1400)
+  } catch {
+    clearDownloadButtonState(item)
+  }
 }
 
 function openSimilarTrack(track) {
@@ -1933,6 +2651,24 @@ onUnmounted(() => {
   -webkit-overflow-scrolling: touch;
 }
 
+.player-queue {
+  @apply rounded-2xl border border-white/10 bg-base-100/45 p-3;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04);
+}
+
+.player-queue-list {
+  @apply grid gap-2;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+}
+
+.player-queue-item {
+  @apply flex min-w-0 items-center gap-2 rounded-xl border border-white/10 bg-white/5 p-2 text-left transition-colors hover:bg-white/10 focus-visible:bg-white/10 focus-visible:outline-none;
+}
+
+.player-queue-cover {
+  @apply relative h-11 w-11 shrink-0 overflow-hidden rounded-lg bg-primary/10;
+}
+
 @media (max-width: 1023px) {
   .player-view {
     height: calc(
@@ -1994,6 +2730,10 @@ onUnmounted(() => {
   .player-cover {
     width: min(28vw, 6.5rem);
     aspect-ratio: 1;
+  }
+
+  .player-queue-list {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .player-play-btn {
@@ -2062,6 +2802,16 @@ onUnmounted(() => {
   .player-cover {
     height: 16rem;
     width: 16rem;
+  }
+
+  .player-queue {
+    max-height: 17rem;
+    overflow-y: auto;
+    scrollbar-width: none;
+  }
+
+  .player-queue::-webkit-scrollbar {
+    display: none;
   }
 
   .player-play-btn {
@@ -2204,6 +2954,46 @@ onUnmounted(() => {
   }
 }
 
+@keyframes download-press {
+  0% {
+    transform: scale(1);
+  }
+  55% {
+    transform: scale(0.9);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes download-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes download-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 1px rgb(26 208 92 / 0.16), 0 0 0 rgb(26 208 92 / 0);
+  }
+  50% {
+    box-shadow: 0 0 0 1px rgb(26 208 92 / 0.34), 0 0 18px rgb(26 208 92 / 0.32);
+  }
+}
+
+@keyframes download-pop {
+  0% {
+    transform: scale(0.92);
+  }
+  55% {
+    transform: scale(1.08);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
 .player-detail-heading {
   @apply text-xs font-semibold uppercase tracking-wide text-base-content/45;
 }
@@ -2230,7 +3020,7 @@ onUnmounted(() => {
 }
 
 .player-detail-actions {
-  @apply flex w-full flex-nowrap items-center justify-end gap-2;
+  @apply flex w-full flex-wrap items-start justify-end gap-2;
 }
 
 .player-detail-cover {
@@ -2279,6 +3069,21 @@ onUnmounted(() => {
 
 .similar-track-download {
   @apply flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-primary transition-colors hover:bg-primary/10 focus-visible:bg-primary/10 focus-visible:outline-none;
+}
+
+.download-button-loading {
+  @apply pointer-events-none;
+  animation: download-press 220ms ease-out,
+    download-pulse 1.1s ease-in-out infinite;
+}
+
+.download-button-loading svg {
+  animation: download-spin 900ms linear infinite;
+}
+
+.download-button-done {
+  animation: download-pop 420ms cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 0 0 1px rgb(26 208 92 / 0.26), 0 0 22px rgb(26 208 92 / 0.32);
 }
 
 .similar-track-owned {
@@ -2332,6 +3137,34 @@ onUnmounted(() => {
   @apply flex min-w-0 items-center gap-3 rounded-lg border border-white/10 bg-base-100/50 p-2.5;
 }
 
+.queue-album-card {
+  @apply overflow-hidden rounded-lg border border-white/10 bg-base-100/35;
+}
+
+.queue-album-card > .artist-result {
+  @apply rounded-none border-0 bg-transparent;
+}
+
+.queue-album-tracks {
+  @apply border-t border-white/10 bg-black/10 p-2.5;
+}
+
+.queue-album-track {
+  @apply flex min-w-0 items-center gap-2 rounded-lg bg-white/5 px-2.5 py-2;
+}
+
+.queue-album-track-summary {
+  @apply mb-2 flex flex-wrap items-center justify-between gap-2 rounded-lg bg-base-100/45 px-2.5 py-2 text-xs font-medium text-base-content/55;
+}
+
+.queue-track-owned {
+  @apply inline-flex shrink-0 items-center gap-1 rounded-full bg-primary/10 px-2 py-1 text-xs font-semibold text-primary;
+}
+
+.queue-track-download {
+  @apply inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-300/25 bg-amber-300/10 px-2 py-1 text-xs font-semibold text-amber-200 transition-colors hover:bg-amber-300/15 focus-visible:outline-none;
+}
+
 .artist-result-cover {
   @apply relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-md bg-primary/10;
 }
@@ -2341,11 +3174,11 @@ onUnmounted(() => {
 }
 
 .track-modal-body {
-  @apply flex flex-col gap-5 overflow-y-auto p-4 sm:flex-row sm:p-5;
+  @apply flex flex-col items-start gap-5 overflow-y-auto p-4 sm:flex-row sm:p-5;
 }
 
 .track-modal-cover {
-  @apply relative mx-auto aspect-square w-full max-w-56 shrink-0 overflow-hidden rounded-xl bg-primary/10 sm:mx-0 sm:w-52;
+  @apply relative mx-auto aspect-square w-full max-w-56 shrink-0 overflow-hidden rounded-xl bg-primary/10 sm:mx-0 sm:h-52 sm:w-52 sm:max-w-none;
 }
 
 .track-modal-metadata {
@@ -2365,10 +3198,14 @@ onUnmounted(() => {
 }
 
 .player-detail-card :deep(.library-artist-monitor) {
-  @apply shrink-0;
+  @apply min-w-0 shrink-0;
 }
 
 .player-detail-card :deep(.library-artist-monitor .btn) {
   @apply h-9 whitespace-nowrap;
+}
+
+.player-detail-card :deep(.library-artist-monitor .monitor-alert) {
+  @apply max-w-[16rem];
 }
 </style>
