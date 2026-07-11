@@ -297,6 +297,8 @@ export default {
     artistImages: 'Imagens locais de artistas',
     albumImageLimit: 'Album images to show',
     scanAlbumImages: 'Scan album images',
+    albumImagesLibraryEmpty: 'Nenhum album baixado encontrado.',
+    artistAlbumCount: '{count} albuns',
     searchAlbumImageArtists: 'Buscar artistas ou albuns',
     emptyAlbumImageArtistSearch: 'Nenhum artista ou album correspondente.',
     clearSearch: 'Limpar busca',
@@ -398,6 +400,7 @@ export default {
     chooseCover: 'Escolher capa',
     updateCover: 'Atualizar capa',
     chooseCoverTitle: 'Escolher capa do artista',
+    chooseAlbumCoverTitle: 'Escolher capa do album',
     chooseCoverHint:
       'Escolha uma imagem do YouTube Music, Deezer, Spotify, Discogs, MusicBrainz ou Jellyfin.',
     chooseCoverLoading: 'Carregando opções de capa…',
@@ -405,6 +408,8 @@ export default {
       'Ainda buscando no YouTube Music, Discogs e MusicBrainz — pode levar até um minuto.',
     chooseCoverPreviewUnavailable: 'Prévia indisponível',
     chooseCoverEmpty: 'Nenhuma opção de capa foi encontrada para este artista.',
+    chooseAlbumCoverEmpty:
+      'Nenhuma opção de capa foi encontrada para este album.',
     chooseCoverFailed: 'Falha ao carregar opções de capa.',
     applySelectedCover: 'Aplicar capa selecionada',
     fixFailed: 'Correção falhou',

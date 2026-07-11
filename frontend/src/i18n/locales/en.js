@@ -397,6 +397,7 @@ export default {
       'Still searching Spotify, Discogs, and MusicBrainz — this can take up to a minute.',
     chooseCoverPreviewUnavailable: 'Preview unavailable',
     chooseCoverEmpty: 'No cover options were found for this artist.',
+    chooseAlbumCoverEmpty: 'No cover options were found for this album.',
     chooseCoverFailed: 'Failed to load cover options.',
     applySelectedCover: 'Apply selected cover',
     fixFailed: 'Fix failed',

@@ -3,6 +3,7 @@ import axios from 'axios' // used to connect to server backend in ./server folde
 import {
   buildApiBaseUrl,
   buildWsUrl,
+  getCurrentPageServerUrl,
   getServerConfig,
   isCapacitorNative,
   needsServerConnection,
@@ -36,6 +37,26 @@ API.interceptors.request.use((config) => {
   config.baseURL = buildApiBaseUrl(getServerConfig())
   return config
 })
+
+API.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const config = error?.config
+    const canRetryCurrentPage =
+      config &&
+      !config.__downtifyRetriedCurrentPage &&
+      !error?.response &&
+      !isCapacitorNative() &&
+      usesCustomServerUrl()
+    const currentPageUrl = canRetryCurrentPage ? getCurrentPageServerUrl() : ''
+    if (currentPageUrl) {
+      config.__downtifyRetriedCurrentPage = true
+      config.baseURL = currentPageUrl
+      return API.request(config)
+    }
+    return Promise.reject(error)
+  }
+)
 
 const sessionID = uuidv4()
 
@@ -247,9 +268,12 @@ function getAlbumImageScanStatus() {
   return API.get('/api/metadata/album-images/status')
 }
 
-function getAlbumImageOptions(file) {
+function getAlbumImageOptions(file, options = {}) {
+  const params = { file }
+  if (options.album) params.album = options.album
+  if (options.artist) params.artist = options.artist
   return API.get('/api/metadata/album-images/options', {
-    params: { file },
+    params,
     timeout: 120000,
   })
 }

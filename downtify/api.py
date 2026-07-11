@@ -2550,7 +2550,11 @@ def album_image_scan_status() -> dict[str, Any]:
 
 
 @router.get('/api/metadata/album-images/options')
-def album_image_options(file: str = Query('')) -> dict[str, Any]:
+def album_image_options(
+    file: str = Query(''),
+    album: str = Query(''),
+    artist: str = Query(''),
+) -> dict[str, Any]:
     relative_file = str(file or '').strip()
     if not relative_file:
         raise HTTPException(status_code=400, detail='file is required')
@@ -2569,11 +2573,18 @@ def album_image_options(file: str = Query('')) -> dict[str, Any]:
     cover_url = str(candidate.get('cover_url') or '').strip()
     options = []
     current = item.get('current') or {}
+    album_override = str(album or '').strip()
+    artist_override = str(artist or '').strip()
     album = str(
-        candidate.get('album_name') or current.get('album_name') or ''
+        album_override
+        or candidate.get('album_name')
+        or current.get('album_name')
+        or ''
     ).strip()
     artists = candidate.get('artists') or current.get('artists') or []
-    artist = ', '.join(str(value) for value in artists if value) or str(
+    artist = artist_override or ', '.join(
+        str(value) for value in artists if value
+    ) or str(
         current.get('artist') or ''
     )
     seen_urls: set[str] = set()
@@ -2589,13 +2600,22 @@ def album_image_options(file: str = Query('')) -> dict[str, Any]:
             'candidate': candidate,
         })
     if album or artist:
-        try:
-            search_results = providers.search_media(
-                f'{artist} {album}'.strip(),
-                limit=12,
-            )
-        except Exception:
-            search_results = []
+        search_results: list[dict[str, Any]] = []
+        search_queries = [
+            f'{artist} {album}'.strip(),
+            album,
+            f'{album} {artist}'.strip(),
+        ]
+        seen_queries: set[str] = set()
+        for query in search_queries:
+            query_key = query.casefold()
+            if not query or query_key in seen_queries:
+                continue
+            seen_queries.add(query_key)
+            try:
+                search_results.extend(providers.search_media(query, limit=12))
+            except Exception:
+                continue
         for index, result in enumerate(search_results):
             result_cover = str(result.get('cover_url') or '').strip()
             if not result_cover or result_cover in seen_urls:

@@ -392,6 +392,83 @@
         </div>
 
         <div
+          v-if="albumImageError"
+          class="surface mb-4 flex items-start gap-3 rounded-2xl p-4 text-sm"
+          :class="
+            repairingAllAlbumImages ? 'text-base-content/60' : 'text-error'
+          "
+        >
+          <Icon
+            icon="clarity:exclamation-circle-line"
+            class="h-5 w-5 shrink-0"
+          />
+          <span class="min-w-0 break-words">{{ albumImageError }}</span>
+        </div>
+
+        <section class="metadata-stat-grid">
+          <div class="metadata-stat-card surface rounded-2xl">
+            <p class="metadata-stat-label">{{ t('metadata.scanned') }}</p>
+            <p class="metadata-stat-value">{{ albumImageSummary.scanned }}</p>
+          </div>
+          <div class="metadata-stat-card surface rounded-2xl">
+            <p class="metadata-stat-label">{{ t('metadata.needsFix') }}</p>
+            <p class="metadata-stat-value text-primary">
+              {{ albumImageItems.length }}
+            </p>
+          </div>
+          <div class="metadata-stat-card surface rounded-2xl">
+            <p class="metadata-stat-label">{{ t('metadata.completed') }}</p>
+            <p class="metadata-stat-value">
+              {{ completedAlbumImages.length }}
+            </p>
+          </div>
+        </section>
+
+        <div class="metadata-tab-shell tab-glow-shell">
+          <button
+            class="metadata-tab-btn"
+            :class="
+              activeAlbumImageTab === 'needs'
+                ? 'bg-primary text-primary-content shadow-glow-sm'
+                : 'text-base-content/60 hover:text-base-content'
+            "
+            @click="activeAlbumImageTab = 'needs'"
+          >
+            {{ t('metadata.needsFix') }}
+            <span class="metadata-tab-badge">{{ albumImageItems.length }}</span>
+          </button>
+          <button
+            class="metadata-tab-btn"
+            :class="
+              activeAlbumImageTab === 'completed'
+                ? 'bg-primary text-primary-content shadow-glow-sm'
+                : 'text-base-content/60 hover:text-base-content'
+            "
+            @click="activeAlbumImageTab = 'completed'"
+          >
+            {{ t('metadata.completed') }}
+            <span class="metadata-tab-badge">
+              {{ completedAlbumImages.length }}
+            </span>
+          </button>
+          <button
+            class="metadata-tab-btn"
+            :class="
+              activeAlbumImageTab === 'clean'
+                ? 'bg-primary text-primary-content shadow-glow-sm'
+                : 'text-base-content/60 hover:text-base-content'
+            "
+            @click="activeAlbumImageTab = 'clean'"
+          >
+            <span class="sm:hidden">{{ t('metadata.cleanShort') }}</span>
+            <span class="hidden sm:inline">{{ t('metadata.clean') }}</span>
+            <span class="metadata-tab-badge">
+              {{ cleanAlbumImageItems.length }}
+            </span>
+          </button>
+        </div>
+
+        <div
           class="metadata-album-artist-panel surface-strong mb-5 rounded-2xl p-3 sm:p-4"
         >
           <div class="mb-3">
@@ -478,212 +555,16 @@
               icon="clarity:image-line"
               class="mx-auto mb-3 h-10 w-10 text-base-content/20"
             />
-            <p>{{ t('metadata.albumImagesLibraryEmpty') }}</p>
-          </div>
-        </div>
-
-        <div
-          v-if="albumImageError"
-          class="surface mb-4 flex items-start gap-3 rounded-2xl p-4 text-sm"
-          :class="
-            repairingAllAlbumImages ? 'text-base-content/60' : 'text-error'
-          "
-        >
-          <Icon
-            icon="clarity:exclamation-circle-line"
-            class="h-5 w-5 shrink-0"
-          />
-          <span class="min-w-0 break-words">{{ albumImageError }}</span>
-        </div>
-
-        <section class="metadata-stat-grid">
-          <div class="metadata-stat-card surface rounded-2xl">
-            <p class="metadata-stat-label">{{ t('metadata.scanned') }}</p>
-            <p class="metadata-stat-value">{{ albumImageSummary.scanned }}</p>
-          </div>
-          <div class="metadata-stat-card surface rounded-2xl">
-            <p class="metadata-stat-label">{{ t('metadata.needsFix') }}</p>
-            <p class="metadata-stat-value text-primary">
-              {{ albumImageItems.length }}
-            </p>
-          </div>
-          <div class="metadata-stat-card surface rounded-2xl">
-            <p class="metadata-stat-label">{{ t('metadata.completed') }}</p>
-            <p class="metadata-stat-value">
-              {{ completedAlbumImages.length }}
-            </p>
-          </div>
-        </section>
-
-        <div class="metadata-tab-shell tab-glow-shell">
-          <button
-            class="metadata-tab-btn"
-            :class="
-              activeAlbumImageTab === 'needs'
-                ? 'bg-primary text-primary-content shadow-glow-sm'
-                : 'text-base-content/60 hover:text-base-content'
-            "
-            @click="activeAlbumImageTab = 'needs'"
-          >
-            {{ t('metadata.needsFix') }}
-            <span class="metadata-tab-badge">{{ albumImageItems.length }}</span>
-          </button>
-          <button
-            class="metadata-tab-btn"
-            :class="
-              activeAlbumImageTab === 'completed'
-                ? 'bg-primary text-primary-content shadow-glow-sm'
-                : 'text-base-content/60 hover:text-base-content'
-            "
-            @click="activeAlbumImageTab = 'completed'"
-          >
-            {{ t('metadata.completed') }}
-            <span class="metadata-tab-badge">
-              {{ completedAlbumImages.length }}
-            </span>
-          </button>
-          <button
-            class="metadata-tab-btn"
-            :class="
-              activeAlbumImageTab === 'clean'
-                ? 'bg-primary text-primary-content shadow-glow-sm'
-                : 'text-base-content/60 hover:text-base-content'
-            "
-            @click="activeAlbumImageTab = 'clean'"
-          >
-            <span class="sm:hidden">{{ t('metadata.cleanShort') }}</span>
-            <span class="hidden sm:inline">{{ t('metadata.clean') }}</span>
-            <span class="metadata-tab-badge">
-              {{ cleanAlbumImageItems.length }}
-            </span>
-          </button>
-        </div>
-
-        <div
-          class="metadata-album-image-results overflow-x-hidden lg:max-h-[34rem] lg:overflow-y-auto lg:pr-2"
-        >
-          <div
-            v-if="albumImageLoading && visibleAlbumImageItems.length === 0"
-            class="metadata-artist-grid"
-          >
-            <div
-              v-for="n in 8"
-              :key="n"
-              class="overflow-hidden rounded-2xl border border-white/10 bg-base-100/60"
-            >
-              <div class="skeleton scan-skeleton-glow aspect-square w-full" />
-              <div class="space-y-2 p-3">
-                <div class="skeleton h-4 w-2/3 rounded-full" />
-                <div class="skeleton h-3 w-full rounded-full" />
-              </div>
-            </div>
-          </div>
-
-          <div
-            v-else-if="visibleAlbumImageItems.length === 0"
-            class="surface rounded-2xl p-10 text-center"
-          >
-            <Icon
-              icon="clarity:image-line"
-              class="mx-auto mb-3 h-10 w-10 text-base-content/20"
-            />
-            <p class="text-sm text-base-content/50">
+            <p>
               {{
-                albumImageLoading
-                  ? t('metadata.scanning')
-                  : emptyAlbumImageMessage
+                hasAlbumImageScanData
+                  ? emptyAlbumImageMessage
+                  : t('metadata.albumImagesLibraryEmpty')
               }}
             </p>
           </div>
-
-          <div v-else class="metadata-artist-grid">
-            <article
-              v-for="item in visibleAlbumImageItems"
-              :key="item.file"
-              class="overflow-hidden rounded-2xl border border-primary/20 bg-base-100/75 shadow-glow-sm"
-              :class="
-                applyingAlbumImages[item.file]
-                  ? 'border-primary/40 ring-2 ring-primary/30'
-                  : ''
-              "
-            >
-              <div class="relative aspect-square bg-base-100/80">
-                <button
-                  v-if="albumImagePreviewUrl(item)"
-                  type="button"
-                  class="block h-full w-full"
-                  @click="openAlbumImagePicker(albumImageActionItem(item))"
-                >
-                  <img
-                    :src="albumImagePreviewUrl(item)"
-                    :alt="displaySong(item.candidate || item.current)"
-                    class="h-full w-full object-cover"
-                    loading="lazy"
-                  />
-                </button>
-                <div
-                  v-else
-                  class="flex h-full w-full items-center justify-center text-base-content/25"
-                >
-                  <Icon icon="clarity:image-line" class="h-12 w-12" />
-                </div>
-                <span
-                  class="pill absolute left-2 top-2 max-w-[calc(100%-1rem)] truncate text-[0.65rem]"
-                  :class="albumImageStatusBadgeClass(item)"
-                >
-                  {{ albumImageStatusBadge(item) }}
-                </span>
-              </div>
-              <div class="space-y-2 p-3">
-                <p class="line-clamp-2 text-sm font-semibold leading-snug">
-                  {{ displaySong(item.current) }}
-                </p>
-                <p class="truncate text-xs text-base-content/45">
-                  {{ item.file }}
-                </p>
-                <p class="truncate text-xs text-primary">
-                  {{
-                    item.has_cover
-                      ? t('metadata.existingAlbumCover')
-                      : t('metadata.missingAlbumCover')
-                  }}
-                </p>
-                <button
-                  v-if="activeAlbumImageTab === 'needs'"
-                  type="button"
-                  class="btn btn-sm metadata-card-btn w-full border-white/10 bg-base-100/85 hover:bg-base-100"
-                  :class="fixedAlbumImages[item.file] ? 'text-primary' : ''"
-                  :disabled="
-                    applyingAlbumImages[item.file] ||
-                    fixedAlbumImages[item.file]
-                  "
-                  @click="applyAlbumImage(item)"
-                >
-                  <span
-                    v-if="applyingAlbumImages[item.file]"
-                    class="loading loading-spinner loading-xs mr-2"
-                  />
-                  <Icon v-else icon="clarity:check-line" class="mr-2 h-4 w-4" />
-                  {{
-                    applyingAlbumImages[item.file]
-                      ? t('metadata.fixing')
-                      : fixedAlbumImages[item.file]
-                        ? t('metadata.fixed')
-                        : t('metadata.apply')
-                  }}
-                </button>
-                <button
-                  type="button"
-                  class="btn btn-sm metadata-card-btn w-full border-white/10 bg-base-100/85 hover:bg-base-100"
-                  @click="openAlbumImagePicker(albumImageActionItem(item))"
-                >
-                  <Icon icon="clarity:image-line" class="mr-2 h-4 w-4" />
-                  {{ t('metadata.chooseCover') }}
-                </button>
-              </div>
-            </article>
-          </div>
         </div>
+
       </section>
 
       <section v-if="activeToolTab === 'images'" class="metadata-section">
@@ -1844,7 +1725,11 @@
             v-else-if="artistImagePickerOptions.length === 0"
             class="rounded-2xl border border-white/10 bg-base-100/60 px-4 py-8 text-center text-sm text-base-content/55"
           >
-            {{ t('metadata.chooseCoverEmpty') }}
+            {{
+              artistImagePickerContext === 'album'
+                ? t('metadata.chooseAlbumCoverEmpty')
+                : t('metadata.chooseCoverEmpty')
+            }}
           </p>
           <div v-else class="grid grid-cols-2 gap-3 sm:grid-cols-3">
             <button
@@ -2084,6 +1969,14 @@ const visibleAlbumImageItems = computed(() =>
       : albumImageItems.value
 )
 
+const hasAlbumImageScanData = computed(
+  () =>
+    albumImageItems.value.length > 0 ||
+    cleanAlbumImageItems.value.length > 0 ||
+    completedAlbumImages.value.length > 0 ||
+    albumImageSummary.value.scanned > 0
+)
+
 const libraryGroupOptions = computed(() => ({
   unknownArtist: t('common.unknownArtist'),
 }))
@@ -2112,16 +2005,21 @@ const albumImageAlbums = computed(() =>
 
 const albumImageBrowserItems = computed(() => {
   const byFile = new Map()
-  for (const item of albumImageLibraryItems.value) {
-    if (item?.file) byFile.set(item.file, item)
+  if (!hasAlbumImageScanData.value) {
+    for (const item of albumImageLibraryItems.value) {
+      if (item?.file) byFile.set(item.file, item)
+    }
   }
-  for (const item of [
-    ...albumImageItems.value,
-    ...cleanAlbumImageItems.value,
-    ...completedAlbumImages.value,
-  ]) {
+  for (const item of visibleAlbumImageItems.value) {
     const converted = albumImageScanItemToLibraryItem(item)
-    if (converted?.file) byFile.set(converted.file, converted)
+    if (converted?.file) {
+      byFile.set(converted.file, {
+        ...(albumImageLibraryItems.value.find(
+          (libraryItem) => libraryItem?.file === converted.file
+        ) || {}),
+        ...converted,
+      })
+    }
   }
   return Array.from(byFile.values())
 })
@@ -2291,8 +2189,12 @@ watch(
   { immediate: true }
 )
 
-watch(activeToolTab, () => {
+watch(activeToolTab, (tabId) => {
   metadataToolMenuOpen.value = false
+  if (tabId === 'album-images') {
+    refreshAlbumImageStatus()
+    loadAlbumImageLibrary()
+  }
 })
 
 function selectToolTab(tabId) {
@@ -2458,6 +2360,8 @@ function albumImageActionItem(item) {
     current,
     name: item?.name || current.album_name || current.name || '',
     artist: item?.artist || current.artist || current.artists?.[0] || '',
+    album_name: item?.name || current.album_name || '',
+    artists: item?.artists || current.artists || [item?.artist].filter(Boolean),
   }
 }
 
@@ -2925,7 +2829,29 @@ function applyAlbumImageStatus(data) {
   completedAlbumImages.value = data.completed || completedAlbumImages.value
   if (data.status === 'error') {
     albumImageError.value = data.error || t('metadata.failedAlbumImageScan')
+  } else if (!repairingAllAlbumImages.value) {
+    albumImageError.value = ''
   }
+}
+
+function albumImageRequestErrorMessage(err) {
+  const detail = err?.response?.data?.detail
+  if (detail) return detail
+  const status = err?.response?.status
+  const method = String(err?.config?.method || 'request').toUpperCase()
+  const url = `${err?.config?.baseURL || ''}${err?.config?.url || ''}`
+  if (status && url) {
+    return `${t('metadata.failedAlbumImageScan')} ${method} ${url} returned ${status}.`
+  }
+  if (url) {
+    return `${t('metadata.failedAlbumImageScan')} ${method} ${url}: ${
+      err?.message || 'Network Error'
+    }`
+  }
+  if (err?.message) {
+    return `${t('metadata.failedAlbumImageScan')} ${err.message}`
+  }
+  return t('metadata.failedAlbumImageScan')
 }
 
 function applyArtistTagStatus(data) {
@@ -3026,11 +2952,12 @@ async function refreshAlbumImageStatus() {
     applyAlbumImageStatus(res.data)
     if (res.data.status !== 'scanning') {
       stopAlbumImagePolling()
+      await loadAlbumImageLibrary()
     }
-  } catch {
+  } catch (err) {
     stopAlbumImagePolling()
     albumImageLoading.value = false
-    albumImageError.value = t('metadata.failedAlbumImageScan')
+    albumImageError.value = albumImageRequestErrorMessage(err)
   }
 }
 
@@ -3393,9 +3320,11 @@ async function scanAlbumImages() {
     applyAlbumImageStatus(res.data)
     if (res.data.status === 'scanning') {
       startAlbumImagePolling()
+    } else {
+      await loadAlbumImageLibrary()
     }
-  } catch {
-    albumImageError.value = t('metadata.failedAlbumImageScan')
+  } catch (err) {
+    albumImageError.value = albumImageRequestErrorMessage(err)
     albumImageLoading.value = false
   }
 }
@@ -3409,9 +3338,11 @@ async function scanAllAlbumImages() {
     applyAlbumImageStatus(res.data)
     if (res.data.status === 'scanning') {
       startAlbumImagePolling()
+    } else {
+      await loadAlbumImageLibrary()
     }
-  } catch {
-    albumImageError.value = t('metadata.failedAlbumImageScan')
+  } catch (err) {
+    albumImageError.value = albumImageRequestErrorMessage(err)
     albumImageLoading.value = false
   }
 }
@@ -3427,8 +3358,20 @@ async function openAlbumImagePicker(item) {
   artistImagePickerPreviewFailed.value = {}
   artistImagePickerLoading.value = true
   artistImagePickerSlowHint.value = false
+  if (artistImagePickerSlowTimer !== null) {
+    clearTimeout(artistImagePickerSlowTimer)
+  }
+  artistImagePickerSlowTimer = setTimeout(() => {
+    artistImagePickerSlowHint.value = true
+  }, 4000)
   try {
-    const res = await API.getAlbumImageOptions(item.file)
+    const res = await API.getAlbumImageOptions(item.file, {
+      album: item.album_name || item.name || item.current?.album_name || '',
+      artist:
+        item.artist ||
+        item.current?.artist ||
+        (item.artists || item.current?.artists || []).join(', '),
+    })
     artistImagePickerOptions.value = res.data?.options || []
     if (artistImagePickerOptions.value.length === 1) {
       artistImagePickerSelected.value = artistImagePickerOptions.value[0]
