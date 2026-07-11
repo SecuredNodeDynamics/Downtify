@@ -338,8 +338,8 @@
                       player.isMuted.value || player.volume.value === 0
                         ? 'clarity:volume-mute-line'
                         : player.volume.value < 0.5
-                          ? 'clarity:volume-down-line'
-                          : 'clarity:volume-up-line'
+                        ? 'clarity:volume-down-line'
+                        : 'clarity:volume-up-line'
                     "
                     class="h-5 w-5"
                   />
@@ -487,7 +487,7 @@
                         </p>
                       </div>
                     </div>
-                    <div class="player-detail-actions">
+                    <div class="player-detail-actions player-artist-actions">
                       <button
                         type="button"
                         class="btn btn-primary btn-sm inline-flex h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3 sm:px-4"
@@ -1290,8 +1290,8 @@
                     downloadButtonState(selectedSimilarTrack) === 'loading'
                       ? t('common.downloading')
                       : downloadButtonState(selectedSimilarTrack) === 'done'
-                        ? t('common.done')
-                        : t('common.download')
+                      ? t('common.done')
+                      : t('common.download')
                   }}
                 </button>
                 <span
@@ -1897,9 +1897,7 @@ async function downloadQueueAlbumMissing(album) {
   }
   setDownloadButtonState(album, 'loading')
   try {
-    for (const track of missing) {
-      await downloadManager.queue(track)
-    }
+    await downloadManager.queueBatch(missing)
     setDownloadButtonState(album, 'done')
     setTimeout(() => clearDownloadButtonState(album), 1400)
   } catch {
@@ -2596,20 +2594,63 @@ onUnmounted(() => {
 }
 
 .player-cover {
-  width: min(18rem, 58vw);
-  height: min(18rem, 58vw);
+  width: auto;
+  height: auto;
   max-width: 100%;
   aspect-ratio: 1 / 1;
   background: transparent;
   box-shadow: none;
+  overflow: visible;
 }
 
 .player-cover-active {
   filter: drop-shadow(0 0 24px rgb(26 208 92 / 0.18));
 }
 
+.player-cover-active::before {
+  content: '';
+  position: absolute;
+  inset: -18%;
+  z-index: 0;
+  border-radius: inherit;
+  background: radial-gradient(
+    circle,
+    rgb(26 208 92 / 0.62) 0%,
+    rgb(26 208 92 / 0.24) 36%,
+    transparent 72%
+  );
+  filter: blur(24px);
+  opacity: 0.55;
+  transform: scale(1);
+  animation: cover-glow-pulse 1.16s ease-in-out infinite;
+}
+
 .player-cover-frame {
-  @apply relative flex h-full w-full items-center justify-center overflow-hidden rounded-2xl bg-primary/10 sm:rounded-3xl;
+  @apply relative flex items-center justify-center overflow-hidden rounded-2xl bg-primary/10 sm:rounded-3xl;
+  z-index: 1;
+  width: min(18rem, 58vw);
+  height: min(18rem, 58vw);
+  aspect-ratio: 1 / 1;
+}
+
+@keyframes cover-glow-pulse {
+  0%,
+  100% {
+    opacity: 0.42;
+    filter: blur(18px);
+    transform: scale(0.96);
+  }
+  42% {
+    opacity: 0.9;
+    filter: blur(30px);
+    transform: scale(1.18);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .player-cover-active::before {
+    animation: none;
+  }
 }
 
 .player-shell > section,
@@ -2671,6 +2712,7 @@ onUnmounted(() => {
 
 .player-queue {
   @apply rounded-2xl border border-white/10 bg-base-100/45 p-3;
+  min-height: 10rem;
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04);
 }
 
@@ -2746,9 +2788,14 @@ onUnmounted(() => {
   }
 
   .player-cover {
+    width: auto;
+    height: auto;
+    aspect-ratio: 1 / 1;
+  }
+
+  .player-cover-frame {
     width: min(28vw, 6.5rem);
     height: min(28vw, 6.5rem);
-    aspect-ratio: 1 / 1;
   }
 
   .player-queue-list {
@@ -2779,6 +2826,10 @@ onUnmounted(() => {
 }
 
 @media (min-width: 1024px) {
+  .player-page {
+    --player-panel-height: clamp(42rem, calc(100dvh - 7rem), 56rem);
+  }
+
   .player-view {
     height: auto;
     max-height: none;
@@ -2798,7 +2849,7 @@ onUnmounted(() => {
   .player-shell > section {
     grid-column: 1;
     align-self: start;
-    height: clamp(32rem, calc(100dvh - 14rem), 46rem);
+    height: var(--player-panel-height);
     min-width: 0;
     overflow: hidden;
   }
@@ -2807,7 +2858,7 @@ onUnmounted(() => {
     grid-column: 2;
     align-self: start;
     display: flex;
-    height: clamp(32rem, calc(100dvh - 14rem), 46rem);
+    height: var(--player-panel-height);
     min-width: 0;
     overflow: hidden;
   }
@@ -2824,13 +2875,19 @@ onUnmounted(() => {
   }
 
   .player-cover {
-    width: 16rem;
-    height: 16rem;
+    width: auto;
+    height: auto;
     aspect-ratio: 1 / 1;
   }
 
+  .player-cover-frame {
+    width: 16rem;
+    height: 16rem;
+  }
+
   .player-queue {
-    max-height: 17rem;
+    max-height: 20rem;
+    min-height: 12rem;
     overflow-y: auto;
     scrollbar-width: none;
   }
@@ -2897,12 +2954,8 @@ onUnmounted(() => {
   box-shadow: 0 0 12px rgba(26, 208, 92, 0.45);
   transform: translate(-50%, -50%) scale(0.9);
   opacity: 0;
-  transition:
-    left 100ms linear,
-    opacity 160ms ease,
-    transform 160ms ease,
-    width 160ms ease,
-    height 160ms ease;
+  transition: left 100ms linear, opacity 160ms ease, transform 160ms ease,
+    width 160ms ease, height 160ms ease;
   will-change: left, transform;
 }
 
@@ -3004,14 +3057,10 @@ onUnmounted(() => {
 @keyframes download-pulse {
   0%,
   100% {
-    box-shadow:
-      0 0 0 1px rgb(26 208 92 / 0.16),
-      0 0 0 rgb(26 208 92 / 0);
+    box-shadow: 0 0 0 1px rgb(26 208 92 / 0.16), 0 0 0 rgb(26 208 92 / 0);
   }
   50% {
-    box-shadow:
-      0 0 0 1px rgb(26 208 92 / 0.34),
-      0 0 18px rgb(26 208 92 / 0.32);
+    box-shadow: 0 0 0 1px rgb(26 208 92 / 0.34), 0 0 18px rgb(26 208 92 / 0.32);
   }
 }
 
@@ -3054,6 +3103,14 @@ onUnmounted(() => {
 
 .player-detail-actions {
   @apply flex w-full flex-wrap items-start justify-end gap-2;
+}
+
+.player-artist-actions {
+  @apply flex-nowrap items-center justify-start;
+}
+
+.player-artist-actions :deep(.library-artist-monitor) {
+  @apply flex-row items-center;
 }
 
 .player-detail-cover {
@@ -3106,8 +3163,7 @@ onUnmounted(() => {
 
 .download-button-loading {
   @apply pointer-events-none;
-  animation:
-    download-press 220ms ease-out,
+  animation: download-press 220ms ease-out,
     download-pulse 1.1s ease-in-out infinite;
 }
 
@@ -3117,9 +3173,7 @@ onUnmounted(() => {
 
 .download-button-done {
   animation: download-pop 420ms cubic-bezier(0.16, 1, 0.3, 1);
-  box-shadow:
-    0 0 0 1px rgb(26 208 92 / 0.26),
-    0 0 22px rgb(26 208 92 / 0.32);
+  box-shadow: 0 0 0 1px rgb(26 208 92 / 0.26), 0 0 22px rgb(26 208 92 / 0.32);
 }
 
 .similar-track-owned {

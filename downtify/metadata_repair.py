@@ -729,6 +729,7 @@ def scan_album_images(
     start: int = 0,
     progress_cb: ProgressCallback | None = None,
 ) -> dict[str, Any]:
+    clean_status_limit = 200
     root = root.resolve()
     files = [
         path
@@ -758,14 +759,17 @@ def scan_album_images(
             items.append(item)
         elif item is not None:
             clean_items.append(item)
-        if progress_cb is not None:
+        is_last_selected = batch_scanned == len(selected)
+        if progress_cb is not None and (
+            batch_scanned % 10 == 0 or is_last_selected
+        ):
             progress_cb({
                 'scanned': current_offset,
                 'batch_scanned': batch_scanned,
                 'total': total,
                 'matched': len(items),
                 'items': list(items),
-                'clean': list(clean_items),
+                'clean': list(clean_items[-clean_status_limit:]),
                 'start': start,
                 'next_offset': current_offset,
             })
@@ -777,7 +781,7 @@ def scan_album_images(
         'total': total,
         'matched': len(items),
         'items': items,
-        'clean': clean_items,
+        'clean': clean_items[-clean_status_limit:],
         'errors': errors,
         'start': start,
         'next_offset': next_offset,

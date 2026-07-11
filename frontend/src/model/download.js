@@ -424,6 +424,7 @@ export function useDownloadManager() {
     fromURL,
     download,
     queue,
+    queueBatch,
     retryWithAudio,
     remove,
     clearAll,

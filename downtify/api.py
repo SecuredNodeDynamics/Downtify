@@ -2196,7 +2196,10 @@ def _exclude_completed_metadata_items(
 
 
 def _album_image_scan_status() -> dict[str, Any]:
-    return dict(state.album_image_scan)
+    status = dict(state.album_image_scan)
+    status['items'] = list(status.get('items') or [])[:500]
+    status['clean'] = list(status.get('clean') or [])[:200]
+    return status
 
 
 def _completed_album_image_files() -> set[str]:
@@ -2432,6 +2435,8 @@ def metadata_scan_status() -> dict[str, Any]:
 async def _run_album_image_scan(
     limit: int, start: int, scan_all: bool = False
 ) -> None:
+    clean_status_limit = 200
+
     def progress(update: dict[str, Any]) -> None:
         items = _merge_items_by(
             list(state.album_image_scan.get('items') or []),
@@ -2443,7 +2448,7 @@ async def _run_album_image_scan(
             list(state.album_image_scan.get('clean') or []),
             list(update.get('clean') or []),
             'file',
-        )
+        )[-clean_status_limit:]
         state.album_image_scan = {
             **state.album_image_scan,
             **update,
@@ -2473,7 +2478,7 @@ async def _run_album_image_scan(
             list(state.album_image_scan.get('clean') or []),
             list(result.get('clean') or []),
             'file',
-        )
+        )[-clean_status_limit:]
         state.album_image_scan = {
             **state.album_image_scan,
             **result,

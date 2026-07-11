@@ -25,13 +25,24 @@
       v-else
       type="button"
       class="btn btn-sm inline-flex h-10 items-center gap-1.5 rounded-full border-white/10 bg-base-100/85 px-3 hover:bg-base-100 sm:px-4"
+      :class="{
+        'monitor-not-found-btn': artistNotFound,
+      }"
       :disabled="busy"
       @click="startMonitor"
     >
       <span v-if="busy" class="loading loading-spinner loading-xs" />
-      <Icon v-else icon="clarity:eye-line" class="h-4 w-4 shrink-0" />
+      <Icon
+        v-else
+        :icon="artistNotFound ? 'clarity:warning-line' : 'clarity:eye-line'"
+        class="h-4 w-4 shrink-0"
+      />
       <span class="text-xs sm:text-sm">
-        {{ t('library.monitorArtist') }}
+        {{
+          artistNotFound
+            ? t('library.monitorArtistNotFoundShort')
+            : t('library.monitorArtist')
+        }}
       </span>
     </button>
 
@@ -152,6 +163,7 @@ const router = useRouter()
 
 const busy = ref(false)
 const actionError = ref('')
+const artistNotFound = ref(false)
 const pickerError = ref('')
 const pickerOpen = ref(false)
 const pickerMatches = ref([])
@@ -238,6 +250,7 @@ async function startMonitor() {
   if (!props.artistName || busy.value) return
   busy.value = true
   actionError.value = ''
+  artistNotFound.value = false
   pickerError.value = ''
   try {
     if (!(await ensureBackendReady())) {
@@ -250,7 +263,7 @@ async function startMonitor() {
     )
     const matches = dedupeArtistMatches(rawMatches)
     if (matches.length === 0) {
-      actionError.value = t('library.monitorArtistNotFound')
+      artistNotFound.value = true
       return
     }
 
@@ -292,6 +305,7 @@ async function addMatch(match) {
     pickerOpen.value = false
     pickerMatches.value = []
     actionError.value = ''
+    artistNotFound.value = false
     return
   }
 
@@ -302,6 +316,7 @@ async function addMatch(match) {
     pickerOpen.value = false
     pickerMatches.value = []
     actionError.value = ''
+    artistNotFound.value = false
     upsertMonitoredArtist(res.data, props.artistName)
     void refreshMonitoredArtists()
   } catch (err) {
@@ -341,6 +356,14 @@ function handleEmbeddedServerReady() {
   if (actionError.value) actionError.value = ''
 }
 
+watch(
+  () => props.artistName,
+  () => {
+    actionError.value = ''
+    artistNotFound.value = false
+  }
+)
+
 onMounted(() => {
   void refreshMonitoredArtists()
   if (usesEmbeddedServer()) {
@@ -368,5 +391,9 @@ onUnmounted(() => {
 
 .monitor-alert {
   @apply flex max-w-full items-start gap-1.5 rounded-lg border border-error/25 bg-error/10 px-2.5 py-1.5 text-left text-xs leading-snug text-error;
+}
+
+.monitor-not-found-btn {
+  @apply border-error/50 bg-error/10 text-error hover:border-error/70 hover:bg-error/15;
 }
 </style>

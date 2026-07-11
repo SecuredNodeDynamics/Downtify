@@ -252,7 +252,7 @@ export default {
       'Elige el artista de Spotify para vigilar nuevas pistas y álbumes.',
     monitorArtistMatchScore: '{score}% coincidencia de nombre',
     monitorArtistNotFound: 'No se encontró un artista coincidente en Spotify.',
-    monitorArtistNotFoundShort: 'No encontrado',
+    monitorArtistNotFoundShort: 'No se encontró artista',
     monitorArtistLookupFailed: 'No se pudo buscar este artista en Spotify.',
     monitorArtistAddFailed: 'No se pudo agregar el artista al monitor.',
   },

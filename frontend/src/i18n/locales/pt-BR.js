@@ -251,7 +251,7 @@ export default {
     monitorArtistMatchScore: '{score}% de correspondência de nome',
     monitorArtistNotFound:
       'Nenhum artista correspondente encontrado no Spotify.',
-    monitorArtistNotFoundShort: 'Não encontrado',
+    monitorArtistNotFoundShort: 'Nenhum artista encontrado',
     monitorArtistLookupFailed:
       'Não foi possível buscar este artista no Spotify.',
     monitorArtistAddFailed: 'Falha ao adicionar artista ao monitor.',
