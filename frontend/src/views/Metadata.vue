@@ -3526,14 +3526,16 @@ async function confirmArtistImageSelection() {
   const selection = artistImagePickerSelected.value
   if (!item || !selection) return
 
+  if (artistImagePickerContext.value === 'album') {
+    closeArtistImagePicker()
+    void applyAlbumImage(item, { selection })
+    return
+  }
+
   let ok = false
   artistImagePickerApplying.value = true
   try {
-    if (artistImagePickerContext.value === 'album') {
-      ok = await applyAlbumImage(item, {
-        selection,
-      })
-    } else if (artistImagePickerContext.value === 'jellyfin') {
+    if (artistImagePickerContext.value === 'jellyfin') {
       ok = await applyJellyfinArtistImage(item, {
         quiet: false,
         selection,

@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 from downtify.downloader import Downloader
-from downtify.library_index import album_in_library, media_in_library, media_item_key
+from downtify.library_index import (
+    album_in_library,
+    media_in_library,
+    media_item_key,
+)
 
 
 def test_media_item_key_prefers_song_and_browse_ids():
