@@ -2597,9 +2597,9 @@ onUnmounted(() => {
 
 .player-cover {
   width: min(18rem, 58vw);
-  height: min(18rem, 58vw);
   max-width: 100%;
   aspect-ratio: 1 / 1;
+  height: auto;
   background: transparent;
   box-shadow: none;
 }
@@ -2747,7 +2747,7 @@ onUnmounted(() => {
 
   .player-cover {
     width: min(28vw, 6.5rem);
-    height: min(28vw, 6.5rem);
+    height: auto;
     aspect-ratio: 1 / 1;
   }
 
@@ -2825,7 +2825,7 @@ onUnmounted(() => {
 
   .player-cover {
     width: 16rem;
-    height: 16rem;
+    height: auto;
     aspect-ratio: 1 / 1;
   }
 
