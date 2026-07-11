@@ -3508,25 +3508,39 @@ async def apply_album_image(request: Request) -> dict[str, Any]:
     except Exception:
         payload = {}
     file = str(payload.get('file') or '').strip()
+    files = [
+        str(item).strip()
+        for item in (payload.get('files') or [])
+        if str(item).strip()
+    ]
     candidate = payload.get('candidate')
     if not file:
         raise HTTPException(status_code=400, detail='File is required')
+    target_files = list(dict.fromkeys([file, *files]))
+
+    def repair_targets() -> list[dict[str, Any]]:
+        return [
+            metadata_repair.repair_album_image(
+                _active_download_dir(),
+                target_file,
+                candidate if isinstance(candidate, dict) else None,
+            )
+            for target_file in target_files
+        ]
+
     try:
-        result = await asyncio.to_thread(
-            metadata_repair.repair_album_image,
-            _active_download_dir(),
-            file,
-            candidate if isinstance(candidate, dict) else None,
-        )
+        results = await asyncio.to_thread(repair_targets)
+        result = results[0]
         clear_cover_cache()
         invalidate_library_files_cache()
         notify_library_changed()
         completed = list(state.album_image_scan.get('completed') or [])
-        completed.insert(0, result)
+        completed = [*results, *completed]
+        target_set = set(target_files)
         items = [
             item
             for item in state.album_image_scan.get('items') or []
-            if item.get('file') != file
+            if item.get('file') not in target_set
         ]
         state.album_image_scan = {
             **state.album_image_scan,

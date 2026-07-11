@@ -278,9 +278,10 @@ function getAlbumImageOptions(file, options = {}) {
   })
 }
 
-function applyAlbumImage(file, candidate = null) {
+function applyAlbumImage(file, candidate = null, files = []) {
   return API.post('/api/metadata/album-images/apply', {
     file,
+    files: Array.isArray(files) ? files : [],
     candidate: candidate && typeof candidate === 'object' ? candidate : null,
   })
 }

@@ -325,8 +325,8 @@
                     applying[item.file]
                       ? t('metadata.fixing')
                       : fixed[item.file]
-                        ? t('metadata.fixed')
-                        : t('metadata.apply')
+                      ? t('metadata.fixed')
+                      : t('metadata.apply')
                   }}
                 </button>
               </div>
@@ -564,7 +564,6 @@
             </p>
           </div>
         </div>
-
       </section>
 
       <section v-if="activeToolTab === 'images'" class="metadata-section">
@@ -826,8 +825,8 @@
                     isArtistImageUpdateTab
                       ? ''
                       : fixedArtistImages[itemKey(item)]
-                        ? 'text-primary'
-                        : ''
+                      ? 'text-primary'
+                      : ''
                   "
                   :disabled="applyingArtistImages[itemKey(item)]"
                   @click="
@@ -1115,8 +1114,8 @@
                   applyingArtistTags[item.file]
                     ? t('metadata.fixing')
                     : fixedArtistTags[item.file]
-                      ? t('metadata.fixed')
-                      : t('metadata.fixArtists')
+                    ? t('metadata.fixed')
+                    : t('metadata.fixArtists')
                 }}
               </button>
             </article>
@@ -1485,8 +1484,8 @@
                       fixed[item.file]
                         ? t('metadata.fixed')
                         : applying[item.file]
-                          ? t('metadata.fixing')
-                          : t('metadata.fixTags')
+                        ? t('metadata.fixing')
+                        : t('metadata.fixTags')
                     }}
                   </button>
                   <button
@@ -1513,8 +1512,8 @@
                       fixedArtistImages[jellyfinRepairKey(item)]
                         ? t('metadata.fixed')
                         : failedArtistRepairKeys[jellyfinRepairKey(item)]
-                          ? t('metadata.fixFailed')
-                          : t('metadata.chooseCover')
+                        ? t('metadata.fixFailed')
+                        : t('metadata.chooseCover')
                     }}
                   </button>
                   <button
@@ -1912,8 +1911,8 @@ const visibleItems = computed(() =>
   activeTab.value === 'completed'
     ? completedItems.value
     : activeTab.value === 'clean'
-      ? cleanItems.value
-      : items.value
+    ? cleanItems.value
+    : items.value
 )
 
 const metadataToolTabs = computed(() => {
@@ -1955,18 +1954,18 @@ const visibleArtistImageItems = computed(() =>
   activeArtistImageTab.value === 'completed'
     ? completedArtistImages.value
     : activeArtistImageTab.value === 'clean'
-      ? cleanArtistImageItems.value
-      : activeArtistImageTab.value === 'failed'
-        ? failedArtistImages.value
-        : artistImageItems.value
+    ? cleanArtistImageItems.value
+    : activeArtistImageTab.value === 'failed'
+    ? failedArtistImages.value
+    : artistImageItems.value
 )
 
 const visibleAlbumImageItems = computed(() =>
   activeAlbumImageTab.value === 'completed'
     ? completedAlbumImages.value
     : activeAlbumImageTab.value === 'clean'
-      ? cleanAlbumImageItems.value
-      : albumImageItems.value
+    ? cleanAlbumImageItems.value
+    : albumImageItems.value
 )
 
 const hasAlbumImageScanData = computed(
@@ -1994,7 +1993,9 @@ const filteredAlbumImageArtists = computed(() => {
     const artistName = String(artist?.name || '').toLowerCase()
     if (artistName.includes(query)) return true
     return albumImageAlbumsForArtist(artist).some((album) =>
-      String(album?.name || '').toLowerCase().includes(query)
+      String(album?.name || '')
+        .toLowerCase()
+        .includes(query)
     )
   })
 })
@@ -2034,8 +2035,8 @@ const visibleArtistTagItems = computed(() =>
   activeArtistTagTab.value === 'completed'
     ? completedArtistTags.value
     : activeArtistTagTab.value === 'clean'
-      ? cleanArtistTagItems.value
-      : artistTagItems.value
+    ? cleanArtistTagItems.value
+    : artistTagItems.value
 )
 
 const emptyArtistTagMessage = computed(() => {
@@ -2841,7 +2842,9 @@ function albumImageRequestErrorMessage(err) {
   const method = String(err?.config?.method || 'request').toUpperCase()
   const url = `${err?.config?.baseURL || ''}${err?.config?.url || ''}`
   if (status && url) {
-    return `${t('metadata.failedAlbumImageScan')} ${method} ${url} returned ${status}.`
+    return `${t(
+      'metadata.failedAlbumImageScan'
+    )} ${method} ${url} returned ${status}.`
   }
   if (url) {
     return `${t('metadata.failedAlbumImageScan')} ${method} ${url}: ${
@@ -3304,8 +3307,8 @@ async function loadAlbumImageLibrary() {
     albumImageLibraryItems.value = Array.isArray(res.data)
       ? res.data
       : Array.isArray(res.data?.items)
-        ? res.data.items
-        : []
+      ? res.data.items
+      : []
   } catch {
     albumImageLibraryItems.value = []
   }
@@ -3400,17 +3403,12 @@ async function applyAlbumImage(item, options = {}) {
     const candidate = selectedCoverUrl
       ? { cover_url: selectedCoverUrl }
       : item.candidate
-    const results = []
-    for (const file of targetFiles) {
-      // eslint-disable-next-line no-await-in-loop
-      const res = await API.applyAlbumImage(file, candidate)
-      if (!res.data?.has_cover) {
-        if (!quiet) albumImageError.value = t('metadata.failedVerify')
-        return false
-      }
-      results.push(res.data)
+    const res = await API.applyAlbumImage(item.file, candidate, targetFiles)
+    if (!res.data?.has_cover) {
+      if (!quiet) albumImageError.value = t('metadata.failedVerify')
+      return false
     }
-    const primaryResult = results[0]
+    const primaryResult = res.data
     fixedAlbumImages.value = {
       ...fixedAlbumImages.value,
       [applyKey]: true,
