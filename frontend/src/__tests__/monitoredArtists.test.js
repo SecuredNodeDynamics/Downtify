@@ -42,7 +42,9 @@ describe('monitoredArtists', () => {
     ])
 
     expect(normalizeMonitoredArtistName('  Taylor Swift ')).toBe('taylor swift')
-    expect(findMonitoredArtist('taylor swift')).toEqual(monitoredArtists.value[0])
+    expect(findMonitoredArtist('taylor swift')).toEqual(
+      monitoredArtists.value[0]
+    )
     expect(findMonitoredArtist('Daily Mix')).toBeNull()
   })
 

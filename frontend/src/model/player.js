@@ -108,7 +108,7 @@ function restorePlayerSession(paths) {
   currentIndex.value = index
   currentTime.value = session.time
   void applyTrack(index, {
-    autoplay: session.playing,
+    autoplay: false,
     resetTime: false,
     restoreTime: session.time,
   })

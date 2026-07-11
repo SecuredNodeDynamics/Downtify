@@ -58,7 +58,6 @@ const placeholder = computed(() =>
     : t('search.placeholder')
 )
 
-
 const canSubmit = computed(() => {
   const value = query.value.trim()
   if (!value) return false

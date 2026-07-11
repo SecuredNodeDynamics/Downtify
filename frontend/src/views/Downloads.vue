@@ -921,7 +921,9 @@ watch(
       : '',
   () => {
     if (viewMode.value !== 'artists' || selectedArtist.value) return
-    scheduleVisibleCoverWarm(() => warmVisibleArtistCovers(filteredArtists.value))
+    scheduleVisibleCoverWarm(() =>
+      warmVisibleArtistCovers(filteredArtists.value)
+    )
   },
   { immediate: true }
 )

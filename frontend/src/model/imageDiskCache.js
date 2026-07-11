@@ -65,7 +65,10 @@ export async function readPersistedImage(url) {
 
 async function trimCache(db) {
   const count = await new Promise((resolve) => {
-    const request = db.transaction(STORE_NAME, 'readonly').objectStore(STORE_NAME).count()
+    const request = db
+      .transaction(STORE_NAME, 'readonly')
+      .objectStore(STORE_NAME)
+      .count()
     request.onsuccess = () => resolve(request.result || 0)
     request.onerror = () => resolve(0)
   })

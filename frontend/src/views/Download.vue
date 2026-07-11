@@ -25,5 +25,4 @@ onMounted(() => window.scroll(0, 0))
       var(--app-bottom-nav-height) - var(--app-safe-bottom)
   );
 }
-
 </style>

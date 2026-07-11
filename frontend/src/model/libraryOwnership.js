@@ -6,10 +6,7 @@ import {
   groupAlbums,
   libraryItemArtists,
 } from './library'
-import {
-  getCachedLibraryItems,
-  onLibraryChanged,
-} from './librarySession'
+import { getCachedLibraryItems, onLibraryChanged } from './librarySession'
 
 export function mediaItemKey(item) {
   return String(item?.song_id || item?.browse_id || item?.url || '')
@@ -54,7 +51,9 @@ export function isMediaOwnedLocally(item, libraryItems) {
   if (!item || !Array.isArray(libraryItems) || !libraryItems.length) {
     return false
   }
-  return Boolean(findOwnedAlbum(item, libraryItems) || findOwnedTrack(item, libraryItems))
+  return Boolean(
+    findOwnedAlbum(item, libraryItems) || findOwnedTrack(item, libraryItems)
+  )
 }
 
 export function findOwnedAlbum(item, libraryItems) {

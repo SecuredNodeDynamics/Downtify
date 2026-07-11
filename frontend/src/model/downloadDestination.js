@@ -29,7 +29,10 @@ function readNativeTreeUri() {
 }
 
 function guessMimeType(name) {
-  const ext = String(name || '').split('.').pop().toLowerCase()
+  const ext = String(name || '')
+    .split('.')
+    .pop()
+    .toLowerCase()
   switch (ext) {
     case 'mp3':
       return 'audio/mpeg'

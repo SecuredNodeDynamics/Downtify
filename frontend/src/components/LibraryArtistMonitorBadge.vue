@@ -20,7 +20,10 @@ import { computed } from 'vue'
 import { Icon } from '@iconify/vue'
 
 import { useI18n } from '../i18n'
-import { findMonitoredArtist, monitoredArtistMap } from '../model/monitoredArtists'
+import {
+  findMonitoredArtist,
+  monitoredArtistMap,
+} from '../model/monitoredArtists'
 
 const props = defineProps({
   artistName: {
