@@ -50,36 +50,39 @@
             >
               <!-- Cover -->
               <div
-                class="player-cover relative flex items-center justify-center overflow-hidden rounded-2xl bg-primary/10 text-primary shadow-glow sm:rounded-3xl"
+                class="player-cover relative flex items-center justify-center overflow-hidden rounded-2xl text-primary sm:rounded-3xl"
                 :class="{
-                  'pulse-glow': hasActiveTrack && player.isPlaying.value,
+                  'player-cover-active': hasActiveTrack,
                   'opacity-80': !hasActiveTrack,
                 }"
               >
-                <CoverImage
-                  v-if="
-                    hasActiveTrack &&
-                    (currentCoverSources.src ||
-                      currentCoverSources.fallbacks.length)
-                  "
-                  :key="player.currentTrack.value?.file || 'player-cover'"
-                  :src="currentCoverSources.src"
-                  :fallbacks="currentCoverSources.fallbacks"
-                  :alt="trackTitle"
-                  img-class="absolute inset-0 h-full w-full object-cover"
-                >
-                  <template #fallback>
-                    <Icon
-                      icon="clarity:music-note-line"
-                      class="h-16 w-16 sm:h-24 sm:w-24"
-                    />
-                  </template>
-                </CoverImage>
-                <Icon
-                  v-else
-                  icon="clarity:music-note-line"
-                  class="h-16 w-16 sm:h-24 sm:w-24"
-                />
+                <div class="player-cover-frame">
+                  <CoverImage
+                    v-if="
+                      hasActiveTrack &&
+                      (currentCoverSources.src ||
+                        currentCoverSources.fallbacks.length)
+                    "
+                    :key="player.currentTrack.value?.file || 'player-cover'"
+                    :src="currentCoverSources.src"
+                    :fallbacks="currentCoverSources.fallbacks"
+                    :alt="trackTitle"
+                    img-class="absolute inset-0 h-full w-full object-cover"
+                    eager
+                  >
+                    <template #fallback>
+                      <Icon
+                        icon="clarity:music-note-line"
+                        class="h-16 w-16 sm:h-24 sm:w-24"
+                      />
+                    </template>
+                  </CoverImage>
+                  <Icon
+                    v-else
+                    icon="clarity:music-note-line"
+                    class="h-16 w-16 sm:h-24 sm:w-24"
+                  />
+                </div>
                 <div
                   v-if="player.isPlaying.value"
                   class="absolute bottom-2 right-2 equalizer h-5 sm:bottom-3 sm:right-3"
@@ -335,8 +338,8 @@
                       player.isMuted.value || player.volume.value === 0
                         ? 'clarity:volume-mute-line'
                         : player.volume.value < 0.5
-                        ? 'clarity:volume-down-line'
-                        : 'clarity:volume-up-line'
+                          ? 'clarity:volume-down-line'
+                          : 'clarity:volume-up-line'
                     "
                     class="h-5 w-5"
                   />
@@ -901,7 +904,7 @@
           :aria-label="selectedQueueTrack.track.title"
         >
           <header class="artist-modal-header">
-            <div class="min-w-0">
+            <div class="min-w-0 flex-1">
               <h2 class="truncate text-lg font-bold">
                 {{ selectedQueueTrack.track.title }}
               </h2>
@@ -909,117 +912,126 @@
                 {{ queueTrackArtist(selectedQueueTrack.track) }}
               </p>
             </div>
-            <button
-              type="button"
-              class="icon-btn shrink-0"
-              :title="t('common.close')"
-              @click="closeQueueTrack"
-            >
-              <Icon icon="clarity:close-line" class="h-5 w-5" />
-            </button>
+            <div class="flex shrink-0 items-center gap-2">
+              <button
+                type="button"
+                class="btn btn-primary btn-sm h-10 rounded-full px-4"
+                @click="player.playAt(selectedQueueTrack.index)"
+              >
+                <Icon icon="clarity:play-line" class="h-4 w-4" />
+                {{ t('player.play') }}
+              </button>
+              <button
+                type="button"
+                class="icon-btn shrink-0"
+                :title="t('common.close')"
+                @click="closeQueueTrack"
+              >
+                <Icon icon="clarity:close-line" class="h-5 w-5" />
+              </button>
+            </div>
           </header>
 
           <div class="track-modal-body">
-            <div class="track-modal-cover">
-              <CoverImage
-                :src="coverSourcesFor(selectedQueueTrack.track.file).src"
-                :fallbacks="
-                  coverSourcesFor(selectedQueueTrack.track.file).fallbacks
-                "
-                :alt="selectedQueueTrack.track.title"
-                img-class="absolute inset-0 h-full w-full object-cover"
-              >
-                <template #fallback>
-                  <Icon
-                    icon="clarity:music-note-line"
-                    class="h-12 w-12 text-base-content/35"
-                  />
-                </template>
-              </CoverImage>
-            </div>
-
-            <div class="min-w-0 flex-1">
-              <dl class="track-modal-metadata mt-0">
-                <div>
-                  <dt>{{ t('library.artists') }}</dt>
-                  <dd>{{ queueTrackArtist(selectedQueueTrack.track) }}</dd>
-                </div>
-                <div v-if="selectedQueueTrackLibraryItem?.album">
-                  <dt>{{ t('library.albums') }}</dt>
-                  <dd>{{ selectedQueueTrackLibraryItem.album }}</dd>
-                </div>
-                <div>
-                  <dt>{{ t('player.queuePosition') }}</dt>
-                  <dd>{{ selectedQueueTrack.offset }}</dd>
-                </div>
-              </dl>
-
-              <div
-                v-if="selectedQueueAlbum"
-                class="mt-4 rounded-xl border border-white/10 bg-white/5 p-3"
-              >
-                <div class="flex items-center justify-between gap-3">
-                  <div class="min-w-0">
-                    <p class="truncate text-sm font-semibold">
-                      {{ selectedQueueAlbum.name }}
-                    </p>
-                    <p class="text-xs text-base-content/50">
-                      {{
-                        selectedQueueAlbumExpectedCount
-                          ? t('player.albumCompleteness', {
-                              have: selectedQueueAlbum.files.length,
-                              total: selectedQueueAlbumExpectedCount,
-                            })
-                          : t('library.albumMeta', {
-                              tracks: selectedQueueAlbum.files.length,
-                            })
-                      }}
-                    </p>
-                  </div>
-                  <span
-                    class="inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold"
-                    :class="
-                      selectedQueueAlbumMissingCount > 0
-                        ? 'bg-amber-300/15 text-amber-200'
-                        : 'bg-primary/10 text-primary'
-                    "
-                  >
+            <div class="track-modal-summary">
+              <div class="track-modal-cover">
+                <CoverImage
+                  :src="coverSourcesFor(selectedQueueTrack.track.file).src"
+                  :fallbacks="
+                    coverSourcesFor(selectedQueueTrack.track.file).fallbacks
+                  "
+                  :alt="selectedQueueTrack.track.title"
+                  img-class="absolute inset-0 h-full w-full object-cover"
+                >
+                  <template #fallback>
                     <Icon
-                      :icon="
-                        selectedQueueAlbumMissingCount > 0
-                          ? 'clarity:warning-line'
-                          : 'clarity:check-line'
-                      "
-                      class="h-3.5 w-3.5"
+                      icon="clarity:music-note-line"
+                      class="h-12 w-12 text-base-content/35"
                     />
-                    {{
-                      selectedQueueAlbumMissingCount > 0
-                        ? t('player.albumMissingShort', {
-                            count: selectedQueueAlbumMissingCount,
-                          })
-                        : t('player.albumComplete')
-                    }}
-                  </span>
-                </div>
+                  </template>
+                </CoverImage>
               </div>
 
-              <div class="mt-4">
-                <div class="mb-2 flex items-center justify-between gap-3">
-                  <h3 class="player-detail-heading">
-                    {{ t('player.matchingAlbums') }}
-                  </h3>
-                  <span
-                    v-if="queueAlbumLookupLoading"
-                    class="loading loading-spinner loading-xs text-primary"
-                  />
-                </div>
-                <div v-if="queueAlbumCandidates.length" class="space-y-2">
-                  <article
-                    v-for="album in queueAlbumCandidates"
-                    :key="album.browse_id || album.url || album.name"
-                    class="queue-album-card"
-                  >
-                    <div class="artist-result">
+              <div class="min-w-0 flex-1">
+                <dl class="track-modal-metadata mt-0">
+                  <div>
+                    <dt>{{ t('library.artists') }}</dt>
+                    <dd>{{ queueTrackArtist(selectedQueueTrack.track) }}</dd>
+                  </div>
+                  <div v-if="selectedQueueTrackLibraryItem?.album">
+                    <dt>{{ t('library.albums') }}</dt>
+                    <dd>{{ selectedQueueTrackLibraryItem.album }}</dd>
+                  </div>
+                  <div>
+                    <dt>{{ t('player.queuePosition') }}</dt>
+                    <dd>{{ selectedQueueTrack.offset }}</dd>
+                  </div>
+                </dl>
+              </div>
+            </div>
+
+            <div v-if="selectedQueueAlbum" class="track-modal-current-album">
+              <div class="min-w-0">
+                <p class="truncate text-sm font-semibold">
+                  {{ selectedQueueAlbum.name }}
+                </p>
+                <p class="text-xs text-base-content/50">
+                  {{
+                    selectedQueueAlbumExpectedCount
+                      ? t('player.albumCompleteness', {
+                          have: selectedQueueAlbum.files.length,
+                          total: selectedQueueAlbumExpectedCount,
+                        })
+                      : t('library.albumMeta', {
+                          tracks: selectedQueueAlbum.files.length,
+                        })
+                  }}
+                </p>
+              </div>
+              <span
+                class="inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold"
+                :class="
+                  selectedQueueAlbumMissingCount > 0
+                    ? 'bg-amber-300/15 text-amber-200'
+                    : 'bg-primary/10 text-primary'
+                "
+              >
+                <Icon
+                  :icon="
+                    selectedQueueAlbumMissingCount > 0
+                      ? 'clarity:warning-line'
+                      : 'clarity:check-line'
+                  "
+                  class="h-3.5 w-3.5"
+                />
+                {{
+                  selectedQueueAlbumMissingCount > 0
+                    ? t('player.albumMissingShort', {
+                        count: selectedQueueAlbumMissingCount,
+                      })
+                    : t('player.albumComplete')
+                }}
+              </span>
+            </div>
+
+            <div class="track-modal-albums">
+              <div class="mb-2 flex items-center justify-between gap-3">
+                <h3 class="player-detail-heading">
+                  {{ t('player.matchingAlbums') }}
+                </h3>
+                <span
+                  v-if="queueAlbumLookupLoading"
+                  class="loading loading-spinner loading-xs text-primary"
+                />
+              </div>
+              <div v-if="queueAlbumCandidates.length" class="space-y-2">
+                <article
+                  v-for="album in queueAlbumCandidates"
+                  :key="album.browse_id || album.url || album.name"
+                  class="queue-album-card"
+                >
+                  <div class="queue-album-main">
+                    <div class="queue-album-summary">
                       <div class="artist-result-cover">
                         <CoverImage
                           v-if="album.cover_url"
@@ -1041,156 +1053,149 @@
                         <p class="truncate text-xs text-base-content/50">
                           {{ queueAlbumCandidateMeta(album) }}
                         </p>
-                        <p
-                          class="mt-1 text-xs"
-                          :class="queueAlbumStatusClass(album)"
-                        >
-                          {{ queueAlbumStatusLabel(album) }}
-                        </p>
                       </div>
-                      <button
-                        type="button"
-                        class="btn btn-xs h-8 rounded-full border-white/10 bg-base-100/70 px-3"
-                        :disabled="!album.browse_id"
-                        @click="toggleQueueAlbumTracks(album)"
-                      >
-                        <span
-                          v-if="queueAlbumTracksLoading[queueAlbumKey(album)]"
-                          class="loading loading-spinner loading-xs"
-                        />
-                        <Icon
-                          v-else
-                          :icon="
-                            expandedQueueAlbumKey === queueAlbumKey(album)
-                              ? 'clarity:angle-line'
-                              : 'clarity:angle-line'
-                          "
-                          class="h-3.5 w-3.5"
-                          :class="{
-                            'rotate-90':
-                              expandedQueueAlbumKey !== queueAlbumKey(album),
-                            '-rotate-90':
-                              expandedQueueAlbumKey === queueAlbumKey(album),
-                          }"
-                        />
-                        {{ t('player.viewAlbumTracks') }}
-                      </button>
-                      <button
-                        type="button"
-                        class="btn btn-xs h-8 shrink-0 rounded-full px-3 text-primary"
-                        :class="downloadButtonClass(album)"
-                        :title="t('player.downloadMissingAlbum')"
-                        @click="downloadQueueAlbumMissing(album)"
-                      >
-                        <Icon
-                          :icon="downloadButtonIcon(album)"
-                          class="h-4 w-4"
-                        />
-                        {{ queueAlbumDownloadLabel(album) }}
-                      </button>
                     </div>
+                    <div class="queue-album-footer">
+                      <p
+                        class="queue-album-status"
+                        :class="queueAlbumStatusClass(album)"
+                      >
+                        {{ queueAlbumStatusLabel(album) }}
+                      </p>
+                      <div class="queue-album-actions">
+                        <button
+                          type="button"
+                          class="queue-album-action-btn"
+                          :disabled="!album.browse_id"
+                          @click="toggleQueueAlbumTracks(album)"
+                        >
+                          <span
+                            v-if="queueAlbumTracksLoading[queueAlbumKey(album)]"
+                            class="loading loading-spinner loading-xs"
+                          />
+                          <Icon
+                            v-else
+                            :icon="
+                              expandedQueueAlbumKey === queueAlbumKey(album)
+                                ? 'clarity:angle-line'
+                                : 'clarity:angle-line'
+                            "
+                            class="h-3.5 w-3.5"
+                            :class="{
+                              'rotate-90':
+                                expandedQueueAlbumKey !== queueAlbumKey(album),
+                              '-rotate-90':
+                                expandedQueueAlbumKey === queueAlbumKey(album),
+                            }"
+                          />
+                          {{ t('player.viewAlbumTracks') }}
+                        </button>
+                        <button
+                          type="button"
+                          class="queue-album-action-btn queue-album-download-btn"
+                          :class="downloadButtonClass(album)"
+                          :title="t('player.downloadMissingAlbum')"
+                          @click="downloadQueueAlbumMissing(album)"
+                        >
+                          <Icon
+                            :icon="downloadButtonIcon(album)"
+                            class="h-4 w-4"
+                          />
+                          {{ queueAlbumDownloadLabel(album) }}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
 
+                  <div
+                    v-if="expandedQueueAlbumKey === queueAlbumKey(album)"
+                    class="queue-album-tracks"
+                  >
                     <div
-                      v-if="expandedQueueAlbumKey === queueAlbumKey(album)"
-                      class="queue-album-tracks"
+                      v-if="queueAlbumTracksLoading[queueAlbumKey(album)]"
+                      class="space-y-2"
                     >
                       <div
-                        v-if="queueAlbumTracksLoading[queueAlbumKey(album)]"
-                        class="space-y-2"
-                      >
-                        <div
-                          v-for="index in 4"
-                          :key="index"
-                          class="skeleton h-10 rounded-lg"
-                        />
-                      </div>
-                      <div
-                        v-else-if="queueAlbumTracks(album).length"
-                        class="space-y-1.5"
-                      >
-                        <div class="queue-album-track-summary">
-                          <span>
-                            {{
-                              t('player.albumTracksOwnedSummary', {
-                                have: queueAlbumStatus(album).have,
-                                total: queueAlbumStatus(album).total,
-                              })
-                            }}
-                          </span>
-                          <span
-                            v-if="queueAlbumStatus(album).missing > 0"
-                            class="text-amber-200"
-                          >
-                            {{
-                              t('player.albumTracksMissingSummary', {
-                                count: queueAlbumStatus(album).missing,
-                              })
-                            }}
-                          </span>
-                        </div>
-                        <article
-                          v-for="track in queueAlbumTracks(album)"
-                          :key="track.song_id || track.url || track.name"
-                          class="queue-album-track"
-                        >
-                          <div class="min-w-0 flex-1">
-                            <p class="truncate text-sm font-medium">
-                              {{ track.name }}
-                            </p>
-                            <p class="truncate text-xs text-base-content/45">
-                              {{ resultArtistLabel(track) }}
-                            </p>
-                          </div>
-                          <span
-                            v-if="queueAlbumTrackOwned(track)"
-                            class="queue-track-owned"
-                          >
-                            <Icon
-                              icon="clarity:library-solid"
-                              class="h-3.5 w-3.5"
-                            />
-                            {{ t('search.inLibrary') }}
-                          </span>
-                          <button
-                            v-else
-                            type="button"
-                            class="queue-track-download"
-                            :class="downloadButtonClass(track)"
-                            :title="t('common.download')"
-                            @click="downloadSimilarArtistItem(track)"
-                          >
-                            <Icon
-                              :icon="downloadButtonIcon(track)"
-                              class="h-3.5 w-3.5"
-                            />
-                            {{ t('player.missingTrack') }}
-                          </button>
-                        </article>
-                      </div>
-                      <p v-else class="player-detail-empty">
-                        {{ t('player.albumTracksUnavailable') }}
-                      </p>
+                        v-for="index in 4"
+                        :key="index"
+                        class="skeleton h-10 rounded-lg"
+                      />
                     </div>
-                  </article>
-                </div>
-                <p
-                  v-else-if="!queueAlbumLookupLoading"
-                  class="player-detail-empty"
-                >
-                  {{ t('player.noMatchingAlbums') }}
-                </p>
+                    <div
+                      v-else-if="queueAlbumTracks(album).length"
+                      class="space-y-1.5"
+                    >
+                      <div class="queue-album-track-summary">
+                        <span>
+                          {{
+                            t('player.albumTracksOwnedSummary', {
+                              have: queueAlbumStatus(album).have,
+                              total: queueAlbumStatus(album).total,
+                            })
+                          }}
+                        </span>
+                        <span
+                          v-if="queueAlbumStatus(album).missing > 0"
+                          class="text-amber-200"
+                        >
+                          {{
+                            t('player.albumTracksMissingSummary', {
+                              count: queueAlbumStatus(album).missing,
+                            })
+                          }}
+                        </span>
+                      </div>
+                      <article
+                        v-for="track in queueAlbumTracks(album)"
+                        :key="track.song_id || track.url || track.name"
+                        class="queue-album-track"
+                      >
+                        <div class="min-w-0 flex-1">
+                          <p class="truncate text-sm font-medium">
+                            {{ track.name }}
+                          </p>
+                          <p class="truncate text-xs text-base-content/45">
+                            {{ resultArtistLabel(track) }}
+                          </p>
+                        </div>
+                        <span
+                          v-if="queueAlbumTrackOwned(track)"
+                          class="queue-track-owned"
+                        >
+                          <Icon
+                            icon="clarity:library-solid"
+                            class="h-3.5 w-3.5"
+                          />
+                          {{ t('search.inLibrary') }}
+                        </span>
+                        <button
+                          v-else
+                          type="button"
+                          class="queue-track-download"
+                          :class="downloadButtonClass(track)"
+                          :title="t('common.download')"
+                          @click="downloadSimilarArtistItem(track)"
+                        >
+                          <Icon
+                            :icon="downloadButtonIcon(track)"
+                            class="h-3.5 w-3.5"
+                          />
+                          {{ t('player.missingTrack') }}
+                        </button>
+                      </article>
+                    </div>
+                    <p v-else class="player-detail-empty">
+                      {{ t('player.albumTracksUnavailable') }}
+                    </p>
+                  </div>
+                </article>
               </div>
-
-              <div class="mt-5 flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  class="btn btn-primary btn-sm h-10 rounded-full px-4"
-                  @click="player.playAt(selectedQueueTrack.index)"
-                >
-                  <Icon icon="clarity:play-line" class="h-4 w-4" />
-                  {{ t('player.play') }}
-                </button>
-              </div>
+              <p
+                v-else-if="!queueAlbumLookupLoading"
+                class="player-detail-empty"
+              >
+                {{ t('player.noMatchingAlbums') }}
+              </p>
             </div>
           </div>
         </section>
@@ -1285,8 +1290,8 @@
                     downloadButtonState(selectedSimilarTrack) === 'loading'
                       ? t('common.downloading')
                       : downloadButtonState(selectedSimilarTrack) === 'done'
-                      ? t('common.done')
-                      : t('common.download')
+                        ? t('common.done')
+                        : t('common.download')
                   }}
                 </button>
                 <span
@@ -2590,6 +2595,23 @@ onUnmounted(() => {
   max-width: 100%;
 }
 
+.player-cover {
+  width: min(18rem, 58vw);
+  height: min(18rem, 58vw);
+  max-width: 100%;
+  aspect-ratio: 1 / 1;
+  background: transparent;
+  box-shadow: none;
+}
+
+.player-cover-active {
+  filter: drop-shadow(0 0 24px rgb(26 208 92 / 0.18));
+}
+
+.player-cover-frame {
+  @apply relative flex h-full w-full items-center justify-center overflow-hidden rounded-2xl bg-primary/10 sm:rounded-3xl;
+}
+
 .player-shell > section,
 .player-now {
   overflow-x: hidden;
@@ -2725,7 +2747,8 @@ onUnmounted(() => {
 
   .player-cover {
     width: min(28vw, 6.5rem);
-    aspect-ratio: 1;
+    height: min(28vw, 6.5rem);
+    aspect-ratio: 1 / 1;
   }
 
   .player-queue-list {
@@ -2801,8 +2824,9 @@ onUnmounted(() => {
   }
 
   .player-cover {
-    height: 16rem;
     width: 16rem;
+    height: 16rem;
+    aspect-ratio: 1 / 1;
   }
 
   .player-queue {
@@ -2873,8 +2897,12 @@ onUnmounted(() => {
   box-shadow: 0 0 12px rgba(26, 208, 92, 0.45);
   transform: translate(-50%, -50%) scale(0.9);
   opacity: 0;
-  transition: left 100ms linear, opacity 160ms ease, transform 160ms ease,
-    width 160ms ease, height 160ms ease;
+  transition:
+    left 100ms linear,
+    opacity 160ms ease,
+    transform 160ms ease,
+    width 160ms ease,
+    height 160ms ease;
   will-change: left, transform;
 }
 
@@ -2976,10 +3004,14 @@ onUnmounted(() => {
 @keyframes download-pulse {
   0%,
   100% {
-    box-shadow: 0 0 0 1px rgb(26 208 92 / 0.16), 0 0 0 rgb(26 208 92 / 0);
+    box-shadow:
+      0 0 0 1px rgb(26 208 92 / 0.16),
+      0 0 0 rgb(26 208 92 / 0);
   }
   50% {
-    box-shadow: 0 0 0 1px rgb(26 208 92 / 0.34), 0 0 18px rgb(26 208 92 / 0.32);
+    box-shadow:
+      0 0 0 1px rgb(26 208 92 / 0.34),
+      0 0 18px rgb(26 208 92 / 0.32);
   }
 }
 
@@ -3074,7 +3106,8 @@ onUnmounted(() => {
 
 .download-button-loading {
   @apply pointer-events-none;
-  animation: download-press 220ms ease-out,
+  animation:
+    download-press 220ms ease-out,
     download-pulse 1.1s ease-in-out infinite;
 }
 
@@ -3084,7 +3117,9 @@ onUnmounted(() => {
 
 .download-button-done {
   animation: download-pop 420ms cubic-bezier(0.16, 1, 0.3, 1);
-  box-shadow: 0 0 0 1px rgb(26 208 92 / 0.26), 0 0 22px rgb(26 208 92 / 0.32);
+  box-shadow:
+    0 0 0 1px rgb(26 208 92 / 0.26),
+    0 0 22px rgb(26 208 92 / 0.32);
 }
 
 .similar-track-owned {
@@ -3139,11 +3174,39 @@ onUnmounted(() => {
 }
 
 .queue-album-card {
-  @apply overflow-hidden rounded-lg border border-white/10 bg-base-100/35;
+  @apply w-full min-w-0 max-w-full overflow-hidden rounded-lg border border-white/10 bg-base-100/35;
 }
 
-.queue-album-card > .artist-result {
-  @apply rounded-none border-0 bg-transparent;
+.queue-album-main {
+  @apply grid min-w-0 gap-3 p-2.5;
+}
+
+.queue-album-summary {
+  @apply flex w-full min-w-0 items-center gap-3;
+}
+
+.queue-album-footer {
+  @apply grid w-full min-w-0 gap-2;
+}
+
+.queue-album-status {
+  @apply min-w-0 text-xs leading-snug;
+}
+
+.queue-album-actions {
+  @apply grid w-full min-w-0 grid-cols-2 gap-2;
+}
+
+.queue-album-action-btn {
+  @apply inline-flex h-8 min-w-0 max-w-full items-center justify-center gap-1.5 overflow-hidden rounded-full border border-white/10 bg-base-100/70 px-2.5 text-xs font-semibold whitespace-nowrap transition-colors hover:bg-base-100/90 disabled:opacity-50 sm:px-3;
+}
+
+.queue-album-action-btn svg {
+  @apply shrink-0;
+}
+
+.queue-album-download-btn {
+  @apply text-primary;
 }
 
 .queue-album-tracks {
@@ -3171,11 +3234,39 @@ onUnmounted(() => {
 }
 
 .track-modal {
-  @apply flex max-h-[92dvh] w-full max-w-2xl flex-col overflow-hidden rounded-t-2xl border border-white/10 shadow-2xl sm:rounded-2xl;
+  @apply flex max-h-[92dvh] w-[calc(100vw-0.75rem)] max-w-2xl flex-col overflow-hidden rounded-t-2xl border border-white/10 shadow-2xl sm:w-full sm:rounded-2xl;
 }
 
 .track-modal-body {
-  @apply flex flex-col items-start gap-5 overflow-y-auto p-4 sm:flex-row sm:p-5;
+  @apply flex min-h-0 flex-1 flex-col gap-5 overflow-x-hidden overflow-y-auto p-3 sm:p-5;
+  -webkit-overflow-scrolling: touch;
+  -ms-overflow-style: none;
+  overscroll-behavior-y: contain;
+  scrollbar-width: none;
+}
+
+.track-modal-body::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+.track-modal-summary {
+  @apply flex w-full min-w-0 flex-col items-start gap-5 sm:flex-row;
+}
+
+.track-modal-albums {
+  @apply w-full min-w-0 max-w-full self-stretch overflow-x-hidden;
+}
+
+.track-modal-current-album {
+  @apply flex w-full min-w-0 max-w-full items-center justify-between gap-3 rounded-lg border border-white/10 bg-white/5 p-2.5;
+}
+
+@media (max-width: 480px) {
+  .queue-album-actions {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .track-modal-cover {

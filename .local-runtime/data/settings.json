@@ -1,0 +1,26 @@
+{
+  "audio_providers": [
+    "youtube-music"
+  ],
+  "lyrics_providers": [
+    "lrclib"
+  ],
+  "download_lyrics": true,
+  "format": "mp3",
+  "bitrate": "320",
+  "output": "{artists} - {title}.{output-ext}",
+  "generate_m3u": true,
+  "max_parallel_downloads": 12,
+  "organize_by_artist": true,
+  "organize_by_album": true,
+  "enhance_metadata": true,
+  "download_artist_images": true,
+  "server_media_location": "",
+  "jellyfin_url": "",
+  "jellyfin_api_key": "",
+  "jellyfin_music_library": "",
+  "enable_jellyfin_tools": true,
+  "artist_folder_policy": "artwork_available",
+  "discogs_token": "",
+  "monitor_artist_initial_search": true
+}

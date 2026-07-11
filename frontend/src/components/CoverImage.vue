@@ -53,6 +53,10 @@ const props = defineProps({
     type: String,
     default: '',
   },
+  eager: {
+    type: Boolean,
+    default: false,
+  },
 })
 
 const displaySrc = ref('')
@@ -71,7 +75,10 @@ const sourceKey = computed(() =>
 )
 
 const imageLoading = computed(() =>
-  usesEmbeddedServer() || restoredFromCache.value || displaySrc.value
+  props.eager ||
+  usesEmbeddedServer() ||
+  restoredFromCache.value ||
+  displaySrc.value
     ? 'eager'
     : 'lazy'
 )
@@ -169,7 +176,7 @@ async function loadCurrentCandidate() {
 }
 
 const shouldLoadNow = computed(
-  () => isNearViewport.value || restoredFromCache.value
+  () => props.eager || isNearViewport.value || restoredFromCache.value
 )
 
 function observeVisibility() {
