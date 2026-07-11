@@ -485,7 +485,7 @@ function coverSourcesForArtist(
   return entry
 }
 
-const NOW_PLAYING_COVER_SIZE_WEB = DEFAULT_COVER_SIZE
+const NOW_PLAYING_COVER_SIZE_WEB = 640
 
 function mergeCoverSources(primary, secondary) {
   const urls = [

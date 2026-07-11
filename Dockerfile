@@ -23,12 +23,12 @@ RUN npm run build
 FROM python:3.13-alpine
 
 LABEL maintainer="SecuredNodeDynamics"
-LABEL version="2.11.29"
+LABEL version="2.11.30"
 LABEL description="Self-hosted Spotify downloader"
 
 LABEL org.opencontainers.image.title="Downtify" \
       org.opencontainers.image.description="Download your Spotify playlists and songs along with album art and metadata in a self-hosted way via Docker." \
-      org.opencontainers.image.version="2.11.29" \
+      org.opencontainers.image.version="2.11.30" \
       org.opencontainers.image.authors="SecuredNodeDynamics" \
       org.opencontainers.image.url="https://github.com/SecuredNodeDynamics/Downtify" \
       org.opencontainers.image.source="https://github.com/SecuredNodeDynamics/Downtify" \
