@@ -839,39 +839,51 @@ function artistCoverProps(artist) {
   }
 }
 
+let visibleCoverWarmTimer = null
+
+function scheduleVisibleCoverWarm(callback) {
+  if (visibleCoverWarmTimer !== null) {
+    clearTimeout(visibleCoverWarmTimer)
+  }
+  visibleCoverWarmTimer = setTimeout(() => {
+    visibleCoverWarmTimer = null
+    callback()
+  }, 180)
+}
+
 function warmVisibleArtistCovers(artistList = []) {
   const entries = artistList
-    .slice(0, 100)
+    .slice(0, 32)
     .map((artist) => artistCoverFor(artist))
     .filter((entry) => entry.src || entry.fallbacks?.length)
-  preloadCoverSourcesBatch(entries, { limit: 100, concurrency: 8 })
+  preloadCoverSourcesBatch(entries, { limit: 32, concurrency: 2 })
 }
 
 function warmVisibleAlbumCovers(albumList = []) {
   const entries = albumList
-    .slice(0, 100)
+    .slice(0, 32)
     .map((album) => coverSourcesFor(album.coverFile))
     .filter((entry) => entry.src || entry.fallbacks?.length)
-  preloadCoverSourcesBatch(entries, { limit: 100, concurrency: 8 })
+  preloadCoverSourcesBatch(entries, { limit: 32, concurrency: 2 })
 }
 
 function warmVisibleTrackCovers(trackList = []) {
   const entries = trackList
-    .slice(0, 100)
+    .slice(0, 32)
     .map((file) => coverSourcesFor(file))
     .filter((entry) => entry.src || entry.fallbacks?.length)
-  preloadCoverSourcesBatch(entries, { limit: 100, concurrency: 8 })
+  preloadCoverSourcesBatch(entries, { limit: 32, concurrency: 2 })
 }
 
 function warmVisibleGenreCovers(genreList = []) {
   const entries = []
-  for (const genre of genreList.slice(0, 48)) {
+  for (const genre of genreList.slice(0, 20)) {
     for (const file of genre.coverFiles || []) {
       const entry = API.coverSourcesForGenreFile(file)
       if (entry.src || entry.fallbacks?.length) entries.push(entry)
     }
   }
-  preloadCoverSourcesBatch(entries, { limit: 96, concurrency: 12 })
+  preloadCoverSourcesBatch(entries, { limit: 32, concurrency: 2 })
 }
 
 function warmVisibleCoversForCurrentView() {
@@ -909,7 +921,7 @@ watch(
       : '',
   () => {
     if (viewMode.value !== 'artists' || selectedArtist.value) return
-    warmVisibleArtistCovers(filteredArtists.value)
+    scheduleVisibleCoverWarm(() => warmVisibleArtistCovers(filteredArtists.value))
   },
   { immediate: true }
 )
@@ -930,7 +942,9 @@ watch(
       viewMode.value === 'albums' ||
       (viewMode.value === 'artists' && selectedArtist.value)
     if (!inAlbumBrowse) return
-    warmVisibleAlbumCovers(filteredVisibleAlbums.value)
+    scheduleVisibleCoverWarm(() =>
+      warmVisibleAlbumCovers(filteredVisibleAlbums.value)
+    )
   },
   { immediate: true }
 )
@@ -944,7 +958,7 @@ watch(
       : '',
   () => {
     if (viewMode.value !== 'genres' || selectedGenreName.value) return
-    warmVisibleGenreCovers(filteredGenres.value)
+    scheduleVisibleCoverWarm(() => warmVisibleGenreCovers(filteredGenres.value))
   },
   { immediate: true }
 )
@@ -964,7 +978,9 @@ watch(
     ) {
       return
     }
-    warmVisibleTrackCovers(filteredVisibleFiles.value)
+    scheduleVisibleCoverWarm(() =>
+      warmVisibleTrackCovers(filteredVisibleFiles.value)
+    )
   },
   { immediate: true }
 )
@@ -1286,6 +1302,10 @@ onDeactivated(() => {
 
 onUnmounted(() => {
   stopLibraryListener?.()
+  if (visibleCoverWarmTimer !== null) {
+    clearTimeout(visibleCoverWarmTimer)
+    visibleCoverWarmTimer = null
+  }
   clearGenreRefreshTimers()
   libraryRefresh.unregister()
 })

@@ -10,6 +10,8 @@ const libraryChangeListeners = new Set()
 const PERSIST_KEY = 'downtify-library-cache-v2'
 const PERSIST_MAX_AGE_MS = 24 * 60 * 60 * 1000
 export const LIBRARY_BACKGROUND_REFRESH_MS = 30_000
+let persistTimer = null
+let pendingPersistPayload = null
 
 export function getLibraryRevision() {
   return libraryRevision
@@ -69,6 +71,11 @@ export function clearLibrarySessionCache() {
   cachedPaths = null
   cachedLibraryItems = null
   cachedServerKey = ''
+  pendingPersistPayload = null
+  if (persistTimer !== null) {
+    clearTimeout(persistTimer)
+    persistTimer = null
+  }
 }
 
 export function resetLibraryPrefetch() {
@@ -103,6 +110,24 @@ function normalizeLibraryPayload(items) {
 }
 
 export function loadPersistedLibrary(serverKey = '') {
+  if (
+    pendingPersistPayload &&
+    (!serverKey ||
+      !pendingPersistPayload.serverKey ||
+      pendingPersistPayload.serverKey === serverKey)
+  ) {
+    const items = normalizeLibraryPayload(pendingPersistPayload.items)
+    if (items.length) {
+      return {
+        paths: Array.isArray(pendingPersistPayload.paths)
+          ? pendingPersistPayload.paths
+          : items.map((item) => item.file),
+        items,
+        serverKey: pendingPersistPayload.serverKey || serverKey,
+      }
+    }
+  }
+
   if (typeof localStorage === 'undefined') return null
 
   try {
@@ -139,20 +164,34 @@ export function persistLibraryCache(paths, items, serverKey = '') {
   const normalized = normalizeLibraryPayload(items)
   if (!normalized.length) return
 
-  try {
-    localStorage.setItem(
-      PERSIST_KEY,
-      JSON.stringify({
-        savedAt: Date.now(),
-        serverKey: serverKey || cachedServerKey,
-        paths: Array.isArray(paths)
-          ? paths
-          : normalized.map((item) => item.file),
-        items: normalized,
-      })
-    )
-  } catch {
-    // Ignore quota errors; in-memory cache still helps during the session.
+  const payload = {
+    savedAt: Date.now(),
+    serverKey: serverKey || cachedServerKey,
+    paths: Array.isArray(paths) ? paths : normalized.map((item) => item.file),
+    items: normalized,
+  }
+  pendingPersistPayload = payload
+
+  if (persistTimer !== null) {
+    clearTimeout(persistTimer)
+  }
+
+  const persist = () => {
+    persistTimer = null
+    try {
+      localStorage.setItem(PERSIST_KEY, JSON.stringify(payload))
+      if (pendingPersistPayload === payload) {
+        pendingPersistPayload = null
+      }
+    } catch {
+      // Ignore quota errors; in-memory cache still helps during the session.
+    }
+  }
+
+  if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+    window.requestIdleCallback(persist, { timeout: 5000 })
+  } else {
+    persistTimer = setTimeout(persist, 500)
   }
 }
 

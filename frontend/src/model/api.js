@@ -361,11 +361,15 @@ function downloadFileURL(fileName) {
 // (often 1000x1000+) made the library feel slow. The full-screen player asks
 // for a larger size, and metadata editing uses the original (size 0).
 const DEFAULT_COVER_SIZE = 320
+let coverCacheVersion = 0
 
 function withCoverSize(params, size) {
   const value = Number(size)
   if (Number.isFinite(value) && value > 0) {
     params.size = String(Math.round(value))
+  }
+  if (coverCacheVersion > 0) {
+    params.v = String(coverCacheVersion)
   }
   return params
 }
@@ -520,6 +524,7 @@ function coverSourcesForNowPlaying(fileName, { artistName = '' } = {}) {
 }
 
 function clearCoverSourcesCache() {
+  coverCacheVersion += 1
   coverSourcesCache.clear()
 }
 

@@ -45,7 +45,15 @@ export function canLoadImageDirectly(url) {
 }
 
 function persistImageInBackground(url) {
-  void persistLoadedImage(url)
+  if (!isCapacitorNative()) return
+  const run = () => {
+    void persistLoadedImage(url)
+  }
+  if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+    window.requestIdleCallback(run, { timeout: 5000 })
+  } else {
+    setTimeout(run, 1000)
+  }
 }
 
 async function fetchDirectImageBlob(url) {
@@ -430,7 +438,7 @@ export function preloadCoverSourcesBatch(
         } finally {
           queuedPreloadKeys.delete(entry.key)
         }
-        await new Promise((resolve) => setTimeout(resolve, 16))
+        await new Promise((resolve) => setTimeout(resolve, 80))
       }
       batchWorkersRunning -= 1
       if (batchQueue.length && document.visibilityState !== 'hidden') {

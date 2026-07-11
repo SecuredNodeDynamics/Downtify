@@ -59,7 +59,7 @@ from . import (
     providers,
     spotify,
 )
-from .cover_art import cover_response_for_file
+from .cover_art import clear_cover_cache, cover_response_for_file
 from .cover_art import resize_image_bytes as cover_art_resize
 from .downloader import Downloader, preview_audio_for_song
 from .history import DownloadHistoryDB
@@ -3513,6 +3513,9 @@ async def apply_album_image(request: Request) -> dict[str, Any]:
             file,
             candidate if isinstance(candidate, dict) else None,
         )
+        clear_cover_cache()
+        invalidate_library_files_cache()
+        notify_library_changed()
         completed = list(state.album_image_scan.get('completed') or [])
         completed.insert(0, result)
         items = [
