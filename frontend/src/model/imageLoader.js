@@ -306,7 +306,7 @@ export async function resolveImageSrc(url) {
       return urlCache.get(value) || value
     } catch (error) {
       console.warn('Failed to preload image:', value, error)
-      return value
+      return ''
     }
   }
 
@@ -364,7 +364,7 @@ export async function resolveImageSrc(url) {
     // Do not cache a failed direct URL as resolved. A later retry may succeed
     // through native HTTP or the backend proxy after connectivity/server
     // startup recovers.
-    return value
+    return ''
   }
 }
 

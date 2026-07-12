@@ -366,8 +366,10 @@
                     <div class="library-browse-card-cover">
                       <CoverImage
                         :key="album.coverFile"
-                        :src="coverSourcesFor(album.coverFile).src"
-                        :fallbacks="coverSourcesFor(album.coverFile).fallbacks"
+                        :src="albumCoverSourcesFor(album.coverFile).src"
+                        :fallbacks="
+                          albumCoverSourcesFor(album.coverFile).fallbacks
+                        "
                         :alt="album.name"
                         img-class="absolute inset-0 h-full w-full object-cover"
                       >
@@ -922,6 +924,10 @@ function coverSourcesFor(file) {
   return API.coverSourcesForFile(file)
 }
 
+function albumCoverSourcesFor(file) {
+  return API.coverSourcesForAlbumFile(file)
+}
+
 function artistCoverFor(artist) {
   return artistCoverMap.value.get(artist?.name) || API.coverSourcesForArtist('')
 }
@@ -957,7 +963,7 @@ function warmVisibleArtistCovers(artistList = []) {
 function warmVisibleAlbumCovers(albumList = []) {
   const entries = albumList
     .slice(0, 32)
-    .map((album) => coverSourcesFor(album.coverFile))
+    .map((album) => albumCoverSourcesFor(album.coverFile))
     .filter((entry) => entry.src || entry.fallbacks?.length)
   preloadCoverSourcesBatch(entries, { limit: 32, concurrency: 2 })
 }
@@ -1408,8 +1414,18 @@ function downloadFromLibrarySearchUrl() {
   router.push({ name: 'Download' })
 }
 
-function queueOnlineDownload(song) {
+function queueOnlineDownload(song, feedback) {
   dm.queue(song)
+    .then((result) => {
+      if (result?.skipped) {
+        feedback?.added?.()
+        return
+      }
+      feedback?.queued?.()
+    })
+    .catch(() => {
+      feedback?.failed?.()
+    })
 }
 
 let stopLibraryListener = null

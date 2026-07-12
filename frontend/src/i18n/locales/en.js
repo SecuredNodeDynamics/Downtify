@@ -220,6 +220,8 @@ export default {
       'Download any match below and it will appear here when finished.',
     downloadTrack: 'Download',
     downloadAlbum: 'Download album',
+    downloadStarting: 'Starting...',
+    downloadAdded: 'Added',
     downloadFromLink: 'Download from link',
     downloadFromLinkHint:
       'This link is not in your library yet. Start the download now.',

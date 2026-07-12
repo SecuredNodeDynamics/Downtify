@@ -455,6 +455,23 @@ function coverSourcesForGenreFile(fileName, size = DEFAULT_COVER_SIZE) {
   return entry
 }
 
+function coverSourcesForAlbumFile(fileName, size = DEFAULT_COVER_SIZE) {
+  const file = String(fileName || '').trim()
+  if (!file) return EMPTY_COVER_SOURCES
+
+  const cacheKey = `album:${size}\0${file}`
+  const cached = coverSourcesCache.get(cacheKey)
+  if (cached) return cached
+
+  const urls = coverUrlsForGenreFile(file, size)
+  const entry = Object.freeze({
+    src: urls[0] || '',
+    fallbacks: Object.freeze(urls.slice(1)),
+  })
+  coverSourcesCache.set(cacheKey, entry)
+  return entry
+}
+
 function coverSourcesForArtist(
   artistName,
   previewFiles = [],
@@ -928,6 +945,7 @@ export default {
   coverUrlsForGenreFile,
   coverFallbackUrls,
   coverSourcesForFile,
+  coverSourcesForAlbumFile,
   coverSourcesForGenreFile,
   coverSourcesForArtist,
   coverSourcesForNowPlaying,

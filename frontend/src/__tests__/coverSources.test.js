@@ -59,6 +59,16 @@ describe('coverSourcesForNowPlaying', () => {
     expect(sources.fallbacks.at(-1)).toContain('/cover?')
   })
 
+  it('uses folder previews before embedded track covers for album tiles', async () => {
+    const API = (await import('../model/api.js')).default
+
+    const sources = API.coverSourcesForAlbumFile('Artist/Album/Track.m4a')
+
+    expect(sources.src).toContain('/api/metadata/artist-images/folder-preview?')
+    expect(sources.src).toContain('folder=Artist%2FAlbum')
+    expect(sources.fallbacks.at(-1)).toContain('/cover?')
+  })
+
   it('provides proxy and direct fallbacks for remote artwork', async () => {
     const API = (await import('../model/api.js')).default
     const remote = 'https://yt3.googleusercontent.com/example=w600-h600-l90-rj'

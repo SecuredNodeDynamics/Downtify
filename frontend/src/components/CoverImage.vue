@@ -1,7 +1,7 @@
 <template>
   <div class="contents">
     <img
-      v-show="displaySrc && !failed"
+      v-show="imageReady && displaySrc && !failed"
       :src="displaySrc"
       :alt="alt"
       :class="imgClass"
@@ -13,7 +13,7 @@
     />
     <div
       ref="rootRef"
-      v-show="!displaySrc || failed"
+      v-show="!imageReady || !displaySrc || failed"
       :class="imgClass"
       class="flex items-center justify-center"
     >
@@ -61,6 +61,7 @@ const props = defineProps({
 
 const displaySrc = ref('')
 const failed = ref(false)
+const imageReady = ref(false)
 const restoredFromCache = ref(false)
 const rootRef = ref(null)
 const isNearViewport = ref(false)
@@ -104,6 +105,7 @@ function restoreFromCache(key) {
 
   displaySrc.value = cached.displaySrc
   failed.value = cached.failed
+  imageReady.value = Boolean(cached.displaySrc && !cached.failed)
   restoredFromCache.value = Boolean(cached.displaySrc && !cached.failed)
   return restoredFromCache.value
 }
@@ -111,6 +113,7 @@ function restoreFromCache(key) {
 function retryLoad() {
   if (!sourceKey.value) return
   failed.value = false
+  imageReady.value = false
   restoredFromCache.value = false
   resetCandidates(props.src, props.fallbacks)
   if (shouldLoadNow.value) void loadCurrentCandidate()
@@ -129,18 +132,20 @@ async function applyCandidate(url) {
   if (!url) return false
   const current = ++requestId
   failed.value = false
+  imageReady.value = false
 
   const resolved = await resolveImageSrc(url)
   if (current !== requestId) return true
+  if (!resolved) {
+    onError()
+    return false
+  }
 
-  displaySrc.value = resolved || url
+  displaySrc.value = resolved
   window.clearTimeout(imageLoadTimer)
   imageLoadTimer = window.setTimeout(() => {
     if (current === requestId) onError()
   }, 20000)
-  rememberCoverDisplay(sourceKey.value, displaySrc.value, false)
-  restoredFromCache.value = true
-
   if (canLoadImageDirectly(url) && !displaySrc.value.startsWith('blob:')) {
     void persistLoadedImage(url).then((upgraded) => {
       if (!upgraded?.startsWith('blob:') || current !== requestId) return
@@ -155,6 +160,9 @@ async function applyCandidate(url) {
 function onImageLoad() {
   window.clearTimeout(imageLoadTimer)
   imageLoadTimer = 0
+  imageReady.value = true
+  rememberCoverDisplay(sourceKey.value, displaySrc.value, false)
+  restoredFromCache.value = true
   const url = candidateUrls[candidateIndex]
   if (
     url &&
@@ -169,6 +177,7 @@ async function loadCurrentCandidate() {
   const url = candidateUrls[candidateIndex]
   if (!url) {
     failed.value = true
+    imageReady.value = false
     rememberCoverDisplay(sourceKey.value, '', true)
     return
   }
@@ -207,11 +216,13 @@ function onError() {
   if (candidateIndex < candidateUrls.length - 1) {
     candidateIndex += 1
     displaySrc.value = ''
+    imageReady.value = false
     void applyCandidate(candidateUrls[candidateIndex])
     return
   }
   failed.value = true
   displaySrc.value = ''
+  imageReady.value = false
   rememberCoverDisplay(sourceKey.value, '', true)
 }
 
@@ -221,6 +232,7 @@ watch(
     if (!key) {
       failed.value = true
       displaySrc.value = ''
+      imageReady.value = false
       restoredFromCache.value = false
       candidateUrls = []
       candidateIndex = 0
@@ -236,6 +248,7 @@ watch(
     if (previousKey && previousKey !== key) {
       displaySrc.value = ''
       failed.value = false
+      imageReady.value = false
       restoredFromCache.value = false
     }
 

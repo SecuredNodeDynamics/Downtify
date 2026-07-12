@@ -28,7 +28,7 @@
     </div>
 
     <div
-      v-else-if="!items.length"
+      v-else-if="!downloadableItems.length"
       class="rounded-2xl border border-white/10 bg-white/5 px-4 py-6 text-center"
     >
       <p class="text-sm text-base-content/50">
@@ -38,7 +38,7 @@
 
     <ul v-else class="library-download-offers-list">
       <li
-        v-for="(item, index) in visibleItems"
+        v-for="(item, index) in downloadableItems"
         :key="itemKey(item, index)"
         class="library-download-offer"
       >
@@ -69,7 +69,13 @@
             {{ artistsLabel(item) }}
           </p>
           <p
-            v-if="item.album_name"
+            v-if="item.media_type === 'album'"
+            class="truncate text-[11px] text-base-content/45"
+          >
+            {{ albumTrackCountLabel(item) }}
+          </p>
+          <p
+            v-else-if="item.album_name"
             class="truncate text-[11px] text-base-content/40"
           >
             {{ item.album_name }}
@@ -86,25 +92,16 @@
           </span>
           <button
             type="button"
-            class="btn btn-primary btn-sm h-9 rounded-full px-3"
-            :disabled="isQueued(item)"
-            @click="emit('download', item)"
+            class="library-download-offer-button btn btn-primary btn-sm h-9 rounded-full px-3"
+            :class="downloadButtonClass(item, index)"
+            :disabled="isDownloadLocked(item, index)"
+            @click="handleDownload(item, index)"
           >
             <Icon
-              :icon="
-                isQueued(item)
-                  ? 'clarity:check-circle-line'
-                  : 'clarity:download-line'
-              "
+              :icon="downloadButtonIcon(item, index)"
               class="h-4 w-4"
             />
-            <span class="sm:inline">{{
-              isQueued(item)
-                ? t('search.inQueue')
-                : item.media_type === 'album'
-                ? t('library.downloadAlbum')
-                : t('library.downloadTrack')
-            }}</span>
+            <span class="sm:inline">{{ downloadButtonLabel(item, index) }}</span>
           </button>
         </div>
       </li>
@@ -129,7 +126,14 @@ import { Icon } from '@iconify/vue'
 
 import CoverImage from './CoverImage.vue'
 import API from '../model/api'
+import { useAlbumTrackCounts } from '../model/albumTrackCounts'
+import {
+  getLibraryDownloadOfferState,
+  libraryDownloadOfferKey,
+  setLibraryDownloadOfferState,
+} from '../model/libraryDownloadOfferState'
 import { onlineArtistsLabel } from '../model/libraryOnlineSearch'
+import { useLibraryOwnership } from '../model/libraryOwnership'
 import { useProgressTracker } from '../model/download'
 import { useI18n } from '../i18n'
 
@@ -144,10 +148,20 @@ const emit = defineEmits(['download'])
 
 const { t } = useI18n()
 const pt = useProgressTracker()
+const MIN_STARTING_MS = 900
 
 const visibleItems = computed(() =>
   (props.items || []).slice(0, Math.max(1, props.limit))
 )
+const { isOwned } = useLibraryOwnership(visibleItems)
+const downloadableItems = computed(() =>
+  visibleItems.value.filter((item, index) => {
+    if (!isOwned(item)) return true
+    setLibraryDownloadOfferState(item, '', `offer-${index}`)
+    return false
+  })
+)
+const { trackCountFor } = useAlbumTrackCounts(visibleItems)
 
 function coverSrc(url) {
   return API.mediaUrl(url)
@@ -158,12 +172,91 @@ function artistsLabel(item) {
   return label || t('common.unknownArtist')
 }
 
+function trackCountLabel(count) {
+  const n = Number(count)
+  if (!Number.isFinite(n) || n < 1) return ''
+  return n === 1
+    ? t('search.trackCountOne', { count: n })
+    : t('search.trackCountMany', { count: n })
+}
+
+function albumTrackCountLabel(item) {
+  const count = trackCountFor(item)
+  return trackCountLabel(count) || `${t('search.tracksTag')} ...`
+}
+
 function itemKey(item, index) {
-  return item?.browse_id || item?.song_id || item?.url || `offer-${index}`
+  return libraryDownloadOfferKey(item, `offer-${index}`)
+}
+
+function itemStateKey(item, index = 0) {
+  return libraryDownloadOfferKey(item, `offer-${index}`)
 }
 
 function isQueued(item) {
   return Boolean(pt.getBySong(item))
+}
+
+function downloadState(item, index = 0) {
+  if (isQueued(item)) return 'queued'
+  return getLibraryDownloadOfferState(item, `offer-${index}`)
+}
+
+function isDownloadLocked(item, index) {
+  return ['starting', 'queued', 'added'].includes(downloadState(item, index))
+}
+
+function downloadButtonIcon(item, index) {
+  const state = downloadState(item, index)
+  if (state === 'starting') return 'clarity:sync-line'
+  if (state === 'queued' || state === 'added') return 'clarity:check-circle-line'
+  return 'clarity:download-line'
+}
+
+function downloadButtonLabel(item, index) {
+  const state = downloadState(item, index)
+  if (state === 'starting') return t('library.downloadStarting')
+  if (state === 'queued') return t('search.inQueue')
+  if (state === 'added') return t('library.downloadAdded')
+  return item.media_type === 'album'
+    ? t('library.downloadAlbum')
+    : t('library.downloadTrack')
+}
+
+function downloadButtonClass(item, index) {
+  const state = downloadState(item, index)
+  return {
+    'library-download-offer-button-starting': state === 'starting',
+    'library-download-offer-button-confirmed':
+      state === 'queued' || state === 'added',
+  }
+}
+
+function setDownloadStateAfterPress(key, state, pressedAt) {
+  const elapsed = Date.now() - pressedAt
+  window.setTimeout(
+    () => {
+      setLibraryDownloadOfferState(null, state, key)
+    },
+    Math.max(0, MIN_STARTING_MS - elapsed)
+  )
+}
+
+function handleDownload(item, index) {
+  const key = itemStateKey(item, index)
+  const pressedAt = Date.now()
+  setLibraryDownloadOfferState(item, 'starting', key)
+  emit('download', item, {
+    queued: () => {
+      setDownloadStateAfterPress(key, 'queued', pressedAt)
+    },
+    added: () => {
+      setDownloadStateAfterPress(key, 'added', pressedAt)
+    },
+    failed: () => {
+      setLibraryDownloadOfferState(item, '', key)
+    },
+  })
 }
 </script>
 
@@ -190,5 +283,73 @@ function isQueued(item) {
 
 .library-download-offer-type {
   @apply rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-base-content/55;
+}
+
+.library-download-offer-button {
+  @apply relative min-w-32 overflow-hidden transition-all duration-200 active:scale-95;
+}
+
+.library-download-offer-button-starting {
+  @apply scale-[1.03] ring-2 ring-primary/60 ring-offset-2 ring-offset-base-100;
+  animation: library-download-button-pulse 0.8s ease-in-out infinite;
+}
+
+.library-download-offer-button-starting::after {
+  content: '';
+  position: absolute;
+  inset: -40% -60%;
+  background: linear-gradient(
+    100deg,
+    transparent 35%,
+    rgba(255, 255, 255, 0.42) 50%,
+    transparent 65%
+  );
+  animation: library-download-sheen 0.95s linear infinite;
+}
+
+.library-download-offer-button-starting :deep(svg) {
+  animation: library-download-spin 0.9s linear infinite;
+}
+
+.library-download-offer-button-confirmed {
+  @apply bg-emerald-400 text-black shadow-glow-sm ring-2 ring-emerald-200/70;
+  animation: library-download-confirm-pop 0.36s ease-out both;
+}
+
+@keyframes library-download-button-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.48);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(34, 197, 94, 0);
+  }
+}
+
+@keyframes library-download-sheen {
+  from {
+    transform: translateX(-55%);
+  }
+  to {
+    transform: translateX(55%);
+  }
+}
+
+@keyframes library-download-confirm-pop {
+  0% {
+    transform: scale(0.96);
+  }
+  70% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes library-download-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 </style>

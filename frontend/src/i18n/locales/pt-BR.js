@@ -222,6 +222,8 @@ export default {
       'Baixe qualquer resultado abaixo e ele aparecerá aqui ao terminar.',
     downloadTrack: 'Baixar',
     downloadAlbum: 'Baixar álbum',
+    downloadStarting: 'Iniciando...',
+    downloadAdded: 'Adicionado',
     downloadFromLink: 'Baixar pelo link',
     downloadFromLinkHint:
       'Este link ainda não está na sua biblioteca. Inicie o download agora.',
