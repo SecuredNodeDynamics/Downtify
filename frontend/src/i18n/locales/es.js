@@ -253,6 +253,13 @@ export default {
     monitorArtistMatchScore: '{score}% coincidencia de nombre',
     monitorArtistNotFound: 'No se encontró un artista coincidente en Spotify.',
     monitorArtistNotFoundShort: 'No se encontró artista',
+    monitorArtistManualHint:
+      'Pega la URL del artista de Spotify si la búsqueda automática no encuentra el artista correcto.',
+    monitorArtistSpotifyUrlLabel: 'URL del artista de Spotify',
+    monitorArtistSpotifyUrlPlaceholder: 'https://open.spotify.com/artist/...',
+    monitorArtistUseUrl: 'Usar URL',
+    monitorArtistInvalidSpotifyUrl:
+      'Ingresa una URL válida de artista de Spotify.',
     monitorArtistLookupFailed: 'No se pudo buscar este artista en Spotify.',
     monitorArtistAddFailed: 'No se pudo agregar el artista al monitor.',
   },

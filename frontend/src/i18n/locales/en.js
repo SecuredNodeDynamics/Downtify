@@ -248,6 +248,12 @@ export default {
     monitorArtistMatchScore: '{score}% name match',
     monitorArtistNotFound: 'No matching Spotify artist found.',
     monitorArtistNotFoundShort: 'No Artist Found',
+    monitorArtistManualHint:
+      'Paste the Spotify artist URL if automatic lookup cannot find the right artist.',
+    monitorArtistSpotifyUrlLabel: 'Spotify artist URL',
+    monitorArtistSpotifyUrlPlaceholder: 'https://open.spotify.com/artist/...',
+    monitorArtistUseUrl: 'Use URL',
+    monitorArtistInvalidSpotifyUrl: 'Enter a valid Spotify artist URL.',
     monitorArtistLookupFailed: 'Could not look up this artist on Spotify.',
     monitorArtistAddFailed: 'Failed to add artist to monitor.',
   },

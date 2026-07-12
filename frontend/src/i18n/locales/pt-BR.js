@@ -252,6 +252,13 @@ export default {
     monitorArtistNotFound:
       'Nenhum artista correspondente encontrado no Spotify.',
     monitorArtistNotFoundShort: 'Nenhum artista encontrado',
+    monitorArtistManualHint:
+      'Cole a URL do artista no Spotify se a busca automatica nao encontrar o artista correto.',
+    monitorArtistSpotifyUrlLabel: 'URL do artista no Spotify',
+    monitorArtistSpotifyUrlPlaceholder: 'https://open.spotify.com/artist/...',
+    monitorArtistUseUrl: 'Usar URL',
+    monitorArtistInvalidSpotifyUrl:
+      'Digite uma URL valida de artista do Spotify.',
     monitorArtistLookupFailed:
       'Não foi possível buscar este artista no Spotify.',
     monitorArtistAddFailed: 'Falha ao adicionar artista ao monitor.',

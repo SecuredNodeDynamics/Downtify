@@ -71,6 +71,12 @@
         </div>
 
         <div class="max-h-[24rem] space-y-2 overflow-y-auto p-4">
+          <p
+            v-if="pickerMatches.length === 0"
+            class="rounded-2xl border border-warning/20 bg-warning/10 px-4 py-3 text-sm text-warning"
+          >
+            {{ t('library.monitorArtistManualHint') }}
+          </p>
           <button
             v-for="match in pickerMatches"
             :key="match.spotify_id"
@@ -113,6 +119,31 @@
         </div>
 
         <div class="border-t border-white/10 px-5 py-4 space-y-2">
+          <form class="space-y-2" @submit.prevent="addManualArtistUrl">
+            <label
+              class="block text-xs font-semibold uppercase tracking-wide text-base-content/45"
+            >
+              {{ t('library.monitorArtistSpotifyUrlLabel') }}
+            </label>
+            <div class="flex flex-col gap-2 sm:flex-row">
+              <input
+                v-model.trim="manualSpotifyUrl"
+                type="url"
+                inputmode="url"
+                autocomplete="off"
+                class="input input-sm min-h-10 flex-1 rounded-full border-white/10 bg-base-100/85"
+                :placeholder="t('library.monitorArtistSpotifyUrlPlaceholder')"
+                :disabled="busy"
+              />
+              <button
+                type="submit"
+                class="btn btn-primary btn-sm h-10 rounded-full px-4"
+                :disabled="busy || !manualSpotifyUrl"
+              >
+                {{ t('library.monitorArtistUseUrl') }}
+              </button>
+            </div>
+          </form>
           <p v-if="pickerError" class="text-center text-sm text-error">
             {{ pickerError }}
           </p>
@@ -167,7 +198,7 @@ const artistNotFound = ref(false)
 const pickerError = ref('')
 const pickerOpen = ref(false)
 const pickerMatches = ref([])
-
+const manualSpotifyUrl = ref('')
 async function ensureBackendReady() {
   if (!usesEmbeddedServer()) return true
   const baseUrl = buildApiBaseUrl(getServerConfig())
@@ -248,6 +279,10 @@ async function lookupSpotifyArtistsWithRetry(artistName, limit = 5) {
 
 async function startMonitor() {
   if (!props.artistName || busy.value) return
+  if (artistNotFound.value) {
+    openManualArtistPicker()
+    return
+  }
   busy.value = true
   actionError.value = ''
   artistNotFound.value = false
@@ -264,6 +299,7 @@ async function startMonitor() {
     const matches = dedupeArtistMatches(rawMatches)
     if (matches.length === 0) {
       artistNotFound.value = true
+      openManualArtistPicker()
       return
     }
 
@@ -278,12 +314,21 @@ async function startMonitor() {
     }
 
     pickerMatches.value = matches
+    manualSpotifyUrl.value = ''
     pickerOpen.value = true
   } catch {
-    actionError.value = t('library.monitorArtistLookupFailed')
+    artistNotFound.value = true
+    pickerError.value = t('library.monitorArtistLookupFailed')
+    openManualArtistPicker()
   } finally {
     busy.value = false
   }
+}
+
+function openManualArtistPicker() {
+  pickerMatches.value = []
+  manualSpotifyUrl.value = ''
+  pickerOpen.value = true
 }
 
 function monitorUrlForMatch(match) {
@@ -292,6 +337,14 @@ function monitorUrlForMatch(match) {
   const spotifyId = String(match?.spotify_id || '').trim()
   if (!spotifyId) return ''
   return `https://open.spotify.com/artist/${spotifyId}`
+}
+
+function spotifyArtistIdFromUrl(url) {
+  const value = String(url || '').trim()
+  const match = value.match(
+    /^(?:https?:\/\/open\.spotify\.com\/artist\/|spotify:artist:)([A-Za-z0-9]+)(?:[/?#].*)?$/i
+  )
+  return match?.[1] || ''
 }
 
 async function addMatch(match) {
@@ -333,10 +386,25 @@ async function addMatch(match) {
   }
 }
 
+async function addManualArtistUrl() {
+  const spotifyId = spotifyArtistIdFromUrl(manualSpotifyUrl.value)
+  if (!spotifyId) {
+    pickerError.value = t('library.monitorArtistInvalidSpotifyUrl')
+    return
+  }
+  await addMatch({
+    spotify_id: spotifyId,
+    name: props.artistName,
+    url: `https://open.spotify.com/artist/${spotifyId}`,
+    match_score: 1,
+  })
+}
+
 function closePicker() {
   if (busy.value) return
   pickerOpen.value = false
   pickerMatches.value = []
+  manualSpotifyUrl.value = ''
 }
 
 function goToMonitor() {
