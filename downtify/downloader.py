@@ -92,6 +92,36 @@ def _normalize_duplicate_key(text: str) -> str:
     return re.sub(r'[^a-z0-9]+', '', text.lower())
 
 
+def _audio_album_key(path: Path) -> str:
+    try:
+        suffix = path.suffix.lower()
+        if suffix == '.mp3':
+            tags = ID3(str(path))
+            frame = tags.get('TALB')
+            text = getattr(frame, 'text', None) if frame is not None else None
+            value = str(text[0]) if text else (str(frame) if frame else '')
+            return _normalize_duplicate_key(value)
+        if suffix in {'.m4a', '.mp4'}:
+            tags = MP4(str(path)).tags or {}
+            values = tags.get('\xa9alb') or []
+            return _normalize_duplicate_key(str(values[0]) if values else '')
+        if suffix == '.flac':
+            tags = FLAC(str(path))
+            values = tags.get('album') or []
+            return _normalize_duplicate_key(str(values[0]) if values else '')
+        if suffix == '.ogg':
+            tags = OggVorbis(str(path))
+            values = tags.get('album') or []
+            return _normalize_duplicate_key(str(values[0]) if values else '')
+        if suffix == '.opus':
+            tags = OggOpus(str(path))
+            values = tags.get('album') or []
+            return _normalize_duplicate_key(str(values[0]) if values else '')
+    except Exception:
+        return ''
+    return ''
+
+
 _DEFAULT_YT_PLAYER_CLIENTS = (
     'ios',
     'android',
@@ -400,6 +430,7 @@ class Downloader:
         basename_key = _normalize_duplicate_key(self._format_basename(song))
         if not basename_key:
             return None
+        album_key = _normalize_duplicate_key(str(song.get('album_name') or ''))
 
         for candidate in self.download_dir.rglob('*'):
             if not candidate.is_file():
@@ -407,6 +438,8 @@ class Downloader:
             if candidate.suffix.lower().lstrip('.') not in _AUDIO_EXTENSIONS:
                 continue
             if _normalize_duplicate_key(candidate.stem) == basename_key:
+                if album_key and _audio_album_key(candidate) != album_key:
+                    continue
                 return candidate.relative_to(self.download_dir).as_posix()
         return None
 

@@ -83,4 +83,28 @@ describe('libraryOwnership', () => {
       )
     ).toBe(true)
   })
+
+  it('does not mark partial albums as locally owned when track count is known', async () => {
+    const { isMediaOwnedLocally } = await import('../model/libraryOwnership.js')
+
+    expect(
+      isMediaOwnedLocally(
+        {
+          media_type: 'album',
+          name: 'Live in Israel',
+          artists: ['Uriel Vega'],
+          browse_id: 'album:1',
+          track_count: 3,
+        },
+        [
+          {
+            file: 'Uriel Vega/Live in Israel/01.flac',
+            artist: 'Uriel Vega',
+            album: 'Live in Israel',
+            title: 'Intro',
+          },
+        ]
+      )
+    ).toBe(false)
+  })
 })

@@ -574,14 +574,36 @@ def album_in_library(
     if not album_key:
         return False
 
+    expected_tracks = _expected_album_track_count(album)
+    matched = 0
     artist_keys = _artist_keys(album)
     for item in items:
         if _normalize_duplicate_key(str(item.get('album') or '')) != album_key:
             continue
         for lib_artist in _library_item_artist_names(item):
             if _artist_keys_match(artist_keys, lib_artist):
-                return True
-    return False
+                matched += 1
+                break
+    if expected_tracks > 0:
+        return matched >= expected_tracks
+    return matched > 0
+
+
+def _expected_album_track_count(album: dict[str, Any]) -> int:
+    for field in (
+        'track_count',
+        'album_track_total',
+        'tracks_count',
+        'total_tracks',
+    ):
+        try:
+            count = int(album.get(field) or 0)
+        except (TypeError, ValueError):
+            count = 0
+        if count > 0:
+            return count
+    tracks = album.get('tracks')
+    return len(tracks) if isinstance(tracks, list) else 0
 
 
 def media_in_library(

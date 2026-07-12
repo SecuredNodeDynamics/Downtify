@@ -73,9 +73,33 @@ export function findOwnedAlbum(item, libraryItems) {
     matches.push(album)
   }
   for (const album of matches) {
-    if (artistKeysMatch(searchArtists, album.artist)) return album
+    if (!artistKeysMatch(searchArtists, album.artist)) continue
+    if (albumHasExpectedTrackCount(item, album)) return album
   }
-  return matches[0] || null
+  const fallback = matches.find((album) =>
+    albumHasExpectedTrackCount(item, album)
+  )
+  return fallback || null
+}
+
+function expectedAlbumTrackCount(item) {
+  for (const field of [
+    'track_count',
+    'album_track_total',
+    'tracks_count',
+    'total_tracks',
+  ]) {
+    const count = Number(item?.[field])
+    if (Number.isFinite(count) && count > 0) return count
+  }
+  return Array.isArray(item?.tracks) ? item.tracks.length : 0
+}
+
+function albumHasExpectedTrackCount(item, album) {
+  const expected = expectedAlbumTrackCount(item)
+  if (!expected) return true
+  const have = Array.isArray(album?.files) ? album.files.length : 0
+  return have >= expected
 }
 
 export function findOwnedTrack(item, libraryItems) {
@@ -144,6 +168,7 @@ export function useLibraryOwnership(itemsSource) {
       const next = new Set(ownedKeys.value)
       for (const [key, owned] of Object.entries(map)) {
         if (owned) next.add(key)
+        else next.delete(key)
       }
       ownedKeys.value = next
     } catch {

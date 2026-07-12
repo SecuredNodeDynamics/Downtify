@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from downtify.downloader import Downloader
+from mutagen.id3 import ID3, TALB
 
 
 def test_duplicate_detection_finds_exact_output_target(tmp_path):
@@ -43,3 +44,19 @@ def test_duplicate_detection_matches_when_only_first_artist_was_saved(tmp_path):
     (tmp_path / 'Connor Price - Swing.mp3').write_text('audio', encoding='utf-8')
 
     assert downloader.duplicate_filename_for(song) == 'Connor Price - Swing.mp3'
+
+
+def test_duplicate_detection_does_not_skip_different_album_track(tmp_path):
+    downloader = Downloader(tmp_path, output_template='{artists} - {title}')
+    existing = tmp_path / 'Uriel Vega - Intro.mp3'
+    tags = ID3()
+    tags.add(TALB(encoding=3, text='Already Owned Album'))
+    tags.save(existing)
+
+    song = {
+        'name': 'Intro',
+        'artists': ['Uriel Vega'],
+        'album_name': 'Live in Israel',
+    }
+
+    assert downloader.duplicate_filename_for(song) is None

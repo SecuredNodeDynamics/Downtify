@@ -60,6 +60,42 @@ def test_album_in_library_matches_any_listed_artist():
     assert album_in_library(album, library_items) is True
 
 
+def test_album_in_library_requires_expected_track_count_when_known():
+    album = {
+        'media_type': 'album',
+        'name': 'Live in Israel',
+        'artists': ['Uriel Vega'],
+        'track_count': 3,
+        'browse_id': 'album:1',
+    }
+    partial_library = [
+        {
+            'file': 'Uriel Vega/Live in Israel/01.flac',
+            'artist': 'Uriel Vega',
+            'album': 'Live in Israel',
+            'title': 'Intro',
+        }
+    ]
+    complete_library = [
+        *partial_library,
+        {
+            'file': 'Uriel Vega/Live in Israel/02.flac',
+            'artist': 'Uriel Vega',
+            'album': 'Live in Israel',
+            'title': 'Second',
+        },
+        {
+            'file': 'Uriel Vega/Live in Israel/03.flac',
+            'artist': 'Uriel Vega',
+            'album': 'Live in Israel',
+            'title': 'Third',
+        },
+    ]
+
+    assert album_in_library(album, partial_library) is False
+    assert album_in_library(album, complete_library) is True
+
+
 def test_track_in_library_from_metadata_matches_title_and_artist():
     from downtify.library_index import track_in_library_from_metadata
 
