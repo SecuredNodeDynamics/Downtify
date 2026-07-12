@@ -41,6 +41,7 @@ public class DowntifyAutoService extends MediaLibraryService {
     private static final String ARTIST_PREFIX = "downtify:auto:artist:";
     private static final String ALBUM_PREFIX = "downtify:auto:album:";
     private static final String TRACK_PREFIX = "downtify:auto:track:";
+    private static final long LIBRARY_CACHE_MS = 5 * 60 * 1000L;
 
     private static final String[] AUDIO_EXTENSIONS = {
         ".mp3",
@@ -99,7 +100,7 @@ public class DowntifyAutoService extends MediaLibraryService {
 
     private synchronized LibrarySnapshot library() {
         long now = System.currentTimeMillis();
-        if (now - snapshot.createdAtMs > 15_000L) {
+        if (now - snapshot.createdAtMs > LIBRARY_CACHE_MS) {
             snapshot = LibrarySnapshot.scan(
                 new File(EmbeddedServerPlugin.defaultDownloadDir(this))
             );
@@ -202,6 +203,10 @@ public class DowntifyAutoService extends MediaLibraryService {
                 Track track = current.byId.get(item.mediaId);
                 if (track != null) {
                     playable.add(track.toPlayableItem());
+                } else if (item.mediaId.startsWith(ARTIST_PREFIX)) {
+                    playable.addAll(playableTracks(current.byArtist.get(item.mediaId)));
+                } else if (item.mediaId.startsWith(ALBUM_PREFIX)) {
+                    playable.addAll(playableTracks(current.byAlbum.get(item.mediaId)));
                 } else if (item.localConfiguration != null) {
                     playable.add(item);
                 }
@@ -212,14 +217,14 @@ public class DowntifyAutoService extends MediaLibraryService {
     }
 
     private MediaItem rootItem() {
-        return browsable(ROOT_ID, getString(getApplicationInfo().labelRes), null);
+        return browsable(ROOT_ID, getString(getApplicationInfo().labelRes), null, false);
     }
 
     private MediaItem itemFor(String mediaId) {
         if (ROOT_ID.equals(mediaId)) return rootItem();
-        if (ARTISTS_ID.equals(mediaId)) return browsable(ARTISTS_ID, "Artists", null);
-        if (ALBUMS_ID.equals(mediaId)) return browsable(ALBUMS_ID, "Albums", null);
-        if (TRACKS_ID.equals(mediaId)) return browsable(TRACKS_ID, "Tracks", null);
+        if (ARTISTS_ID.equals(mediaId)) return browsable(ARTISTS_ID, "Artists", null, false);
+        if (ALBUMS_ID.equals(mediaId)) return browsable(ALBUMS_ID, "Albums", null, false);
+        if (TRACKS_ID.equals(mediaId)) return browsable(TRACKS_ID, "Tracks", null, false);
 
         LibrarySnapshot current = library();
         Track track = current.byId.get(mediaId);
@@ -227,11 +232,11 @@ public class DowntifyAutoService extends MediaLibraryService {
 
         if (mediaId.startsWith(ARTIST_PREFIX)) {
             String artist = current.artistNames.get(mediaId);
-            if (artist != null) return browsable(mediaId, artist, null);
+            if (artist != null) return browsable(mediaId, artist, null, true);
         }
         if (mediaId.startsWith(ALBUM_PREFIX)) {
             String album = current.albumNames.get(mediaId);
-            if (album != null) return browsable(mediaId, album, null);
+            if (album != null) return browsable(mediaId, album, null, true);
         }
         return null;
     }
@@ -240,9 +245,9 @@ public class DowntifyAutoService extends MediaLibraryService {
         LibrarySnapshot current = library();
         if (ROOT_ID.equals(parentId)) {
             List<MediaItem> roots = new ArrayList<>();
-            roots.add(browsable(ARTISTS_ID, "Artists", "Browse by artist"));
-            roots.add(browsable(ALBUMS_ID, "Albums", "Browse by album"));
-            roots.add(browsable(TRACKS_ID, "Tracks", "All downloaded tracks"));
+            roots.add(browsable(ARTISTS_ID, "Artists", "Browse by artist", false));
+            roots.add(browsable(ALBUMS_ID, "Albums", "Browse by album", false));
+            roots.add(browsable(TRACKS_ID, "Tracks", "All downloaded tracks", false));
             return roots;
         }
         if (ARTISTS_ID.equals(parentId)) {
@@ -291,12 +296,13 @@ public class DowntifyAutoService extends MediaLibraryService {
     private static MediaItem browsable(
         String mediaId,
         String title,
-        @Nullable String subtitle
+        @Nullable String subtitle,
+        boolean playable
     ) {
         MediaMetadata.Builder metadata = new MediaMetadata.Builder()
             .setTitle(title)
             .setIsBrowsable(true)
-            .setIsPlayable(false)
+            .setIsPlayable(playable)
             .setMediaType(MediaMetadata.MEDIA_TYPE_FOLDER_MIXED);
         if (subtitle != null) metadata.setSubtitle(subtitle);
         return new MediaItem.Builder()
@@ -346,7 +352,6 @@ public class DowntifyAutoService extends MediaLibraryService {
         final String artist;
         final String album;
         final long durationMs;
-        final byte[] artwork;
 
         Track(File file) {
             this.file = file;
@@ -355,7 +360,6 @@ public class DowntifyAutoService extends MediaLibraryService {
             String foundArtist = "Unknown artist";
             String foundAlbum = "Unknown album";
             long foundDurationMs = C.TIME_UNSET;
-            byte[] foundArtwork = null;
 
             MediaMetadataRetriever retriever = new MediaMetadataRetriever();
             try {
@@ -388,7 +392,6 @@ public class DowntifyAutoService extends MediaLibraryService {
                 if (duration != null) {
                     foundDurationMs = Long.parseLong(duration);
                 }
-                foundArtwork = retriever.getEmbeddedPicture();
             } catch (Exception ignored) {
                 // Metadata is helpful but not required for Android Auto playback.
             } finally {
@@ -401,7 +404,6 @@ public class DowntifyAutoService extends MediaLibraryService {
             artist = foundArtist;
             album = foundAlbum;
             durationMs = foundDurationMs;
-            artwork = foundArtwork;
             mediaId = TRACK_PREFIX + Uri.encode(file.getAbsolutePath());
         }
 
@@ -414,9 +416,6 @@ public class DowntifyAutoService extends MediaLibraryService {
                 .setIsPlayable(true)
                 .setMediaType(MediaMetadata.MEDIA_TYPE_MUSIC);
             if (durationMs > 0) metadata.setDurationMs(durationMs);
-            if (artwork != null && artwork.length > 0) {
-                metadata.setArtworkData(artwork, MediaMetadata.PICTURE_TYPE_FRONT_COVER);
-            }
             return new MediaItem.Builder()
                 .setMediaId(mediaId)
                 .setUri(Uri.fromFile(file))
@@ -518,7 +517,7 @@ public class DowntifyAutoService extends MediaLibraryService {
                     artistTracks == null || artistTracks.size() == 1
                         ? "1 track"
                         : artistTracks.size() + " tracks";
-                artistItems.put(id, browsable(id, artistNames.get(id), subtitle));
+                artistItems.put(id, browsable(id, artistNames.get(id), subtitle, true));
                 sortTracks(artistTracks);
             }
 
@@ -529,7 +528,7 @@ public class DowntifyAutoService extends MediaLibraryService {
                 String artist = albumTracks == null || albumTracks.isEmpty()
                     ? null
                     : albumTracks.get(0).artist;
-                albumItems.put(id, browsable(id, albumNames.get(id), artist));
+                albumItems.put(id, browsable(id, albumNames.get(id), artist, true));
                 sortTracks(albumTracks);
             }
 
