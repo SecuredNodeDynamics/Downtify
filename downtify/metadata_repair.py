@@ -398,6 +398,39 @@ def _album_image_scan_item(root: Path, path: Path) -> dict[str, Any]:
     }
 
 
+def _album_image_scan_files(root: Path) -> list[Path]:
+    files = [
+        path
+        for path in root.rglob('*')
+        if path.is_file() and path.suffix.lower() in AUDIO_EXTENSIONS
+    ]
+    files.sort(key=lambda path: path.relative_to(root).as_posix().casefold())
+
+    selected: list[Path] = []
+    seen_albums: set[str] = set()
+    for path in files:
+        try:
+            current = _song_from_file(path)
+        except Exception:
+            current = {}
+        album = str(current.get('album_name') or '').strip()
+        artists = ', '.join(
+            str(artist).strip()
+            for artist in current.get('artists') or []
+            if str(artist).strip()
+        )
+        if album:
+            key = f'{artists.casefold()}::{album.casefold()}'
+        else:
+            parent = path.parent.relative_to(root).as_posix().casefold()
+            key = f'{parent}::{path.stem.casefold()}'
+        if key in seen_albums:
+            continue
+        seen_albums.add(key)
+        selected.append(path)
+    return selected
+
+
 def _expanded_artist_repair(current: dict[str, Any]) -> dict[str, Any]:
     artists = [
         str(artist).strip()
@@ -731,12 +764,7 @@ def scan_album_images(
 ) -> dict[str, Any]:
     clean_status_limit = 200
     root = root.resolve()
-    files = [
-        path
-        for path in root.rglob('*')
-        if path.is_file() and path.suffix.lower() in AUDIO_EXTENSIONS
-    ]
-    files.sort(key=lambda path: path.relative_to(root).as_posix().casefold())
+    files = _album_image_scan_files(root)
     total = len(files)
     start = max(0, min(start, total))
     selected = files[start : start + max(1, limit)]
@@ -747,6 +775,17 @@ def scan_album_images(
     for path in selected:
         batch_scanned += 1
         current_offset = start + batch_scanned
+        if progress_cb is not None:
+            progress_cb({
+                'scanned': current_offset,
+                'batch_scanned': batch_scanned,
+                'total': total,
+                'matched': len(items),
+                'items': list(items),
+                'clean': list(clean_items[-clean_status_limit:]),
+                'start': start,
+                'next_offset': current_offset,
+            })
         try:
             item = _album_image_scan_item(root, path)
         except Exception as exc:
@@ -760,9 +799,7 @@ def scan_album_images(
         elif item is not None:
             clean_items.append(item)
         is_last_selected = batch_scanned == len(selected)
-        if progress_cb is not None and (
-            batch_scanned % 10 == 0 or is_last_selected
-        ):
+        if progress_cb is not None and is_last_selected:
             progress_cb({
                 'scanned': current_offset,
                 'batch_scanned': batch_scanned,

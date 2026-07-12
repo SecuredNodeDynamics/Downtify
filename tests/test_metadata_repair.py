@@ -750,6 +750,63 @@ def test_scan_library_reports_progress(tmp_path, monkeypatch):
     assert updates[-1]['clean'] == []
 
 
+def test_scan_album_images_scans_one_representative_per_album(tmp_path, monkeypatch):
+    for name in ('01.mp3', '02.mp3'):
+        path = tmp_path / 'Artist' / 'Album' / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b'not really audio')
+
+    monkeypatch.setattr(
+        metadata_repair,
+        '_song_from_file',
+        lambda _path: {
+            'name': 'Song',
+            'artists': ['Artist'],
+            'album_name': 'Album',
+        },
+    )
+    monkeypatch.setattr(
+        metadata_repair,
+        'enrich_song_metadata',
+        lambda song: {**song, 'cover_url': 'https://example.test/cover.jpg'},
+    )
+    monkeypatch.setattr(metadata_repair, 'embedded_cover_bytes', lambda _path: b'')
+
+    result = metadata_repair.scan_album_images(tmp_path)
+
+    assert result['total'] == 1
+    assert result['scanned'] == 1
+    assert result['matched'] == 1
+
+
+def test_scan_album_images_reports_progress_before_slow_lookup(tmp_path, monkeypatch):
+    track = tmp_path / 'Artist - Song.mp3'
+    track.write_bytes(b'not really audio')
+    updates = []
+
+    monkeypatch.setattr(
+        metadata_repair,
+        '_song_from_file',
+        lambda _path: {
+            'name': 'Song',
+            'artists': ['Artist'],
+            'album_name': 'Album',
+        },
+    )
+
+    def enrich(song):
+        assert updates
+        return {**song, 'cover_url': 'https://example.test/cover.jpg'}
+
+    monkeypatch.setattr(metadata_repair, 'enrich_song_metadata', enrich)
+    monkeypatch.setattr(metadata_repair, 'embedded_cover_bytes', lambda _path: b'')
+
+    metadata_repair.scan_album_images(tmp_path, progress_cb=updates.append)
+
+    assert updates[0]['scanned'] == 1
+    assert updates[0]['total'] == 1
+
+
 def test_scan_library_treats_year_derived_from_release_date_as_fixed(
     tmp_path,
     monkeypatch,
