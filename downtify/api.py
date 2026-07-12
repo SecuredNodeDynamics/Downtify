@@ -781,6 +781,10 @@ def _command_version(command: str, args: list[str]) -> dict[str, Any]:
     path = shutil.which(command)
     if not path:
         return {'available': False, 'path': None, 'version': None}
+    return _tool_version(path, args)
+
+
+def _tool_version(path: str, args: list[str]) -> dict[str, Any]:
     try:
         result = subprocess.run(
             [path, *args],
@@ -794,6 +798,13 @@ def _command_version(command: str, args: list[str]) -> dict[str, Any]:
     except Exception:
         version = None
     return {'available': True, 'path': path, 'version': version}
+
+
+def _ffmpeg_tool_info() -> dict[str, Any]:
+    path = audio_caps.ffmpeg_binary()
+    if not path:
+        return {'available': False, 'path': None, 'version': None}
+    return _tool_version(path, ['-version'])
 
 
 def _clean_version(value: Any) -> Optional[str]:
@@ -1630,7 +1641,7 @@ def get_health() -> dict[str, Any]:
         'version': state.version,
         'python': sys.version.split()[0],
         'tools': {
-            'ffmpeg': _command_version('ffmpeg', ['-version']),
+            'ffmpeg': _ffmpeg_tool_info(),
             'yt_dlp': _yt_dlp_tool_info(),
         },
         'downloads': _download_directory_summary(download_dir),
