@@ -62,7 +62,8 @@ if [[ "$PKG_VERSION" != "$VERSION" ]]; then
   exit 1
 fi
 
-cp "$ROOT/assets/icon-without-backgroud.svg" "$FRONTEND/assets/logo.svg"
+mkdir -p "$FRONTEND/assets"
+cp "$FRONTEND/src/assets/downtify.svg" "$FRONTEND/assets/logo.svg"
 npm run android:icons
 
 npm run build:android

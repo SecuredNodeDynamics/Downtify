@@ -23,8 +23,8 @@ BRAND_GREEN = '#1AD35D'
 TARGET_FILL = 0.42
 DENSITIES = ('ldpi', 'mdpi', 'hdpi', 'xhdpi', 'xxhdpi', 'xxxhdpi')
 
-# Solid download arrow (the Downtify mark) with no circle/background, taken from
-# assets/icon-without-backgroud.svg so foregrounds render crisply at any size.
+# Solid download arrow (the Downtify mark) with no circle/background, matched to
+# frontend/src/assets/downtify.svg so foregrounds render crisply at any size.
 ARROW_SVG = """<?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <svg width="1024" height="1024" viewBox="0 0 67.733332 67.733333"
      version="1.1" xmlns="http://www.w3.org/2000/svg">
