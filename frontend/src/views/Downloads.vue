@@ -102,6 +102,36 @@
               }}
             </p>
           </div>
+          <div class="artist-detail-tabs" role="tablist">
+            <button
+              type="button"
+              class="artist-detail-tab-btn"
+              :class="
+                selectedArtistDetailTab === 'albums'
+                  ? 'library-tab-btn-active'
+                  : 'library-tab-btn-inactive'
+              "
+              role="tab"
+              :aria-selected="selectedArtistDetailTab === 'albums'"
+              @click="showArtistAlbumsTab"
+            >
+              {{ t('library.artistAlbumsTab') }}
+            </button>
+            <button
+              type="button"
+              class="artist-detail-tab-btn"
+              :class="
+                selectedArtistDetailTab === 'download'
+                  ? 'library-tab-btn-active'
+                  : 'library-tab-btn-inactive'
+              "
+              role="tab"
+              :aria-selected="selectedArtistDetailTab === 'download'"
+              @click="showArtistDownloadTab"
+            >
+              {{ t('library.artistDownloadTab') }}
+            </button>
+          </div>
         </div>
 
         <div
@@ -313,7 +343,9 @@
               <ul
                 v-else-if="
                   (viewMode === 'albums' ||
-                    (viewMode === 'artists' && selectedArtist)) &&
+                    (viewMode === 'artists' &&
+                      selectedArtist &&
+                      selectedArtistDetailTab === 'albums')) &&
                   !selectedAlbum
                 "
                 class="library-browse-grid"
@@ -369,6 +401,20 @@
                   </article>
                 </li>
               </ul>
+
+              <LibraryDownloadOffers
+                v-else-if="
+                  viewMode === 'artists' &&
+                  selectedArtist &&
+                  selectedArtistDetailTab === 'download' &&
+                  !selectedAlbum
+                "
+                :items="filteredArtistDownloadAlbums"
+                :loading="artistDownloadLoading"
+                :error="artistDownloadError"
+                :limit="20"
+                @download="queueOnlineDownload"
+              />
 
               <ul
                 v-else-if="viewMode === 'genres' && !selectedGenreName"
@@ -578,7 +624,10 @@ import { useI18n } from '/src/i18n'
 import { usePlayer } from '/src/model/player'
 import { consumeLibraryNavigation } from '/src/model/libraryNavigation'
 import { useLibraryRefresh } from '/src/model/libraryRefresh'
-import { useLibraryOnlineSearch } from '/src/model/libraryOnlineSearch'
+import {
+  onlineArtistsLabel,
+  useLibraryOnlineSearch,
+} from '/src/model/libraryOnlineSearch'
 import { useSearchManager } from '/src/model/search'
 import { needsServerConnection } from '/src/model/serverConnection'
 import { refreshMonitoredArtists } from '/src/model/monitoredArtists'
@@ -605,9 +654,14 @@ const viewMode = ref('artists')
 const selectedArtistName = ref('')
 const selectedAlbumKey = ref('')
 const selectedGenreName = ref('')
+const selectedArtistDetailTab = ref('albums')
 const librarySearchQuery = ref('')
 const browseBodyRef = ref(null)
 const browseScrollPositions = new Map()
+const artistDownloadAlbums = ref([])
+const artistDownloadLoading = ref(false)
+const artistDownloadError = ref('')
+let artistDownloadRequestSeq = 0
 
 function currentBrowseScrollKey() {
   if (selectedAlbumKey.value) {
@@ -617,7 +671,7 @@ function currentBrowseScrollKey() {
     return `genre:${selectedGenreName.value}`
   }
   if (selectedArtistName.value) {
-    return `artist:${selectedArtistName.value}`
+    return `artist:${selectedArtistName.value}:${selectedArtistDetailTab.value}`
   }
   return `tab:${viewMode.value}`
 }
@@ -688,6 +742,34 @@ const selectedArtistAlbums = computed(() => {
   return albums.value.filter(
     (album) => album.artist === selectedArtist.value.name
   )
+})
+
+const selectedArtistDownloadedAlbumKeys = computed(() => {
+  const keys = new Set()
+  for (const album of selectedArtistAlbums.value) {
+    const name = String(album?.name || '')
+      .trim()
+      .toLocaleLowerCase()
+    if (name) keys.add(name)
+  }
+  return keys
+})
+
+const filteredArtistDownloadAlbums = computed(() => {
+  const downloaded = selectedArtistDownloadedAlbumKeys.value
+  const artistName = String(selectedArtist.value?.name || '')
+    .trim()
+    .toLocaleLowerCase()
+  return artistDownloadAlbums.value.filter((item) => {
+    const name = String(item?.name || item?.album_name || '')
+      .trim()
+      .toLocaleLowerCase()
+    if (!name || downloaded.has(name)) return false
+
+    const artists = onlineArtistsLabel(item).toLocaleLowerCase()
+    if (!artistName || !artists) return true
+    return artists.includes(artistName) || artistName.includes(artists)
+  })
 })
 
 const visibleAlbums = computed(() =>
@@ -767,7 +849,9 @@ const showLibraryNoSearchResults = computed(() => {
   }
   if (
     (viewMode.value === 'albums' ||
-      (viewMode.value === 'artists' && selectedArtist.value)) &&
+      (viewMode.value === 'artists' &&
+        selectedArtist.value &&
+        selectedArtistDetailTab.value === 'albums')) &&
     !selectedAlbum.value
   ) {
     return filteredVisibleAlbums.value.length === 0
@@ -816,6 +900,17 @@ watch(selectedArtist, (artist) => {
     selectedArtistName.value = ''
   }
 })
+
+watch(
+  () => selectedArtist.value?.name || '',
+  () => {
+    selectedArtistDetailTab.value = 'albums'
+    artistDownloadAlbums.value = []
+    artistDownloadError.value = ''
+    artistDownloadLoading.value = false
+    artistDownloadRequestSeq += 1
+  }
+)
 
 watch(selectedAlbum, (album) => {
   if (selectedAlbumKey.value && !album) {
@@ -894,7 +989,9 @@ function warmVisibleCoversForCurrentView() {
 
   const inAlbumBrowse =
     viewMode.value === 'albums' ||
-    (viewMode.value === 'artists' && selectedArtist.value)
+    (viewMode.value === 'artists' &&
+      selectedArtist.value &&
+      selectedArtistDetailTab.value === 'albums')
   if (inAlbumBrowse && !selectedAlbum.value) {
     warmVisibleAlbumCovers(filteredVisibleAlbums.value)
     return
@@ -912,6 +1009,44 @@ function warmVisibleCoversForCurrentView() {
   ) {
     warmVisibleTrackCovers(filteredVisibleFiles.value)
   }
+}
+
+async function loadArtistDownloadAlbums() {
+  const artist = selectedArtist.value
+  if (!artist?.name || artistDownloadLoading.value) return
+  if (artistDownloadAlbums.value.length || artistDownloadError.value) return
+
+  const seq = ++artistDownloadRequestSeq
+  artistDownloadLoading.value = true
+  artistDownloadError.value = ''
+  try {
+    const res = await API.search(artist.name)
+    if (seq !== artistDownloadRequestSeq) return
+    const items = Array.isArray(res.data) ? res.data : []
+    artistDownloadAlbums.value = items.filter(
+      (item) => item?.media_type === 'album'
+    )
+  } catch {
+    if (seq === artistDownloadRequestSeq) {
+      artistDownloadAlbums.value = []
+      artistDownloadError.value = 'failed'
+    }
+  } finally {
+    if (seq === artistDownloadRequestSeq) {
+      artistDownloadLoading.value = false
+    }
+  }
+}
+
+function showArtistAlbumsTab() {
+  selectedArtistDetailTab.value = 'albums'
+  resetBrowseScrollPosition()
+}
+
+function showArtistDownloadTab() {
+  selectedArtistDetailTab.value = 'download'
+  resetBrowseScrollPosition()
+  void loadArtistDownloadAlbums()
 }
 
 watch(
@@ -932,7 +1067,9 @@ watch(
   () => {
     const inAlbumBrowse =
       (viewMode.value === 'albums' ||
-        (viewMode.value === 'artists' && selectedArtist.value)) &&
+        (viewMode.value === 'artists' &&
+          selectedArtist.value &&
+          selectedArtistDetailTab.value === 'albums')) &&
       !selectedAlbum.value
     return inAlbumBrowse
       ? filteredVisibleAlbums.value.map((album) => albumKey(album)).join('\0')
@@ -942,7 +1079,9 @@ watch(
     if (selectedAlbum.value) return
     const inAlbumBrowse =
       viewMode.value === 'albums' ||
-      (viewMode.value === 'artists' && selectedArtist.value)
+      (viewMode.value === 'artists' &&
+        selectedArtist.value &&
+        selectedArtistDetailTab.value === 'albums')
     if (!inAlbumBrowse) return
     scheduleVisibleCoverWarm(() =>
       warmVisibleAlbumCovers(filteredVisibleAlbums.value)
@@ -1144,6 +1283,7 @@ function switchLibraryTab(mode) {
   selectedArtistName.value = ''
   selectedAlbumKey.value = ''
   selectedGenreName.value = ''
+  selectedArtistDetailTab.value = 'albums'
   restoreBrowseScrollPosition(`tab:${mode}`)
 }
 
@@ -1168,6 +1308,7 @@ function openArtist(name) {
   selectedArtistName.value = name
   selectedAlbumKey.value = ''
   selectedGenreName.value = ''
+  selectedArtistDetailTab.value = 'albums'
   resetBrowseScrollPosition()
 }
 
@@ -1176,6 +1317,7 @@ function closeArtist() {
   saveBrowseScrollPosition()
   selectedArtistName.value = ''
   selectedAlbumKey.value = ''
+  selectedArtistDetailTab.value = 'albums'
   restoreBrowseScrollPosition(restoreKey)
 }
 
@@ -1364,6 +1506,14 @@ onUnmounted(() => {
 
 .library-tab-btn-inactive {
   @apply text-base-content/60 hover:text-base-content;
+}
+
+.artist-detail-tabs {
+  @apply flex w-full min-w-0 gap-1 rounded-full border border-white/10 bg-base-100/75 p-1 sm:max-w-xs;
+}
+
+.artist-detail-tab-btn {
+  @apply min-w-0 flex-1 truncate rounded-full px-3 py-2 text-center text-xs font-medium transition-colors sm:text-sm;
 }
 
 .library-drill-header {

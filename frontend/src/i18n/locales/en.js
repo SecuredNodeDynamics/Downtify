@@ -229,6 +229,8 @@ export default {
     onlineSearchMore: '{count} more results available on the Search page.',
     artistCount: '{artists} artists - {albums} albums - {tracks} tracks',
     artistMeta: '{tracks} tracks - {albums} albums',
+    artistAlbumsTab: 'Albums',
+    artistDownloadTab: 'Download',
     albumMeta: '{tracks} tracks',
     genreMeta: '{tracks} tracks',
     openArtist: 'Open artist',

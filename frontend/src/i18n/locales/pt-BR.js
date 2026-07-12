@@ -232,6 +232,8 @@ export default {
     onlineSearchMore: 'Mais {count} resultados na página de busca.',
     artistCount: '{artists} artistas - {albums} albuns - {tracks} faixas',
     artistMeta: '{tracks} faixas - {albums} albuns',
+    artistAlbumsTab: 'Álbuns',
+    artistDownloadTab: 'Baixar',
     albumMeta: '{tracks} faixas',
     genreMeta: '{tracks} faixas',
     openArtist: 'Abrir artista',
