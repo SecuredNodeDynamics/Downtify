@@ -285,6 +285,7 @@ export function useDownloadManager() {
       })
       .catch((err) => {
         console.log('Batch submit failed:', err.message)
+        return { failed: true, error: err.message }
       })
   }
 
@@ -314,24 +315,30 @@ export function useDownloadManager() {
       })
   }
 
-  function queueAlbum(album) {
-    if (!album.browse_id) return Promise.resolve()
-    return isMediaOwned(album).then((owned) => {
-      if (owned) return { album, skipped: true }
-      loading.value = true
-      return API.openYoutubeAlbum(album.browse_id)
-        .then((res) => {
-          if (res.status === 200 && Array.isArray(res.data)) {
-            return queueBatch(res.data)
-          }
-        })
-        .catch((err) => {
-          console.log('Album queue failed:', err.message)
-        })
-        .finally(() => {
-          loading.value = false
-        })
-    })
+  async function queueAlbum(album) {
+    if (!album.browse_id) {
+      return { album, failed: true, error: 'Missing album browse id' }
+    }
+    if (await isMediaOwned(album)) return { album, skipped: true }
+
+    loading.value = true
+    try {
+      const res = await API.openYoutubeAlbum(album.browse_id)
+      const songs = Array.isArray(res.data) ? res.data : []
+      if (res.status !== 200 || !songs.length) {
+        return { album, failed: true, error: 'No tracks found for this album' }
+      }
+      const queued = await queueBatch(songs)
+      if (queued?.failed) {
+        return { album, failed: true, error: queued.error }
+      }
+      return { album, queued: true, count: songs.length }
+    } catch (err) {
+      console.log('Album queue failed:', err.message)
+      return { album, failed: true, error: err.message }
+    } finally {
+      loading.value = false
+    }
   }
 
   function download(song) {

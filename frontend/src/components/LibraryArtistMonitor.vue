@@ -24,25 +24,17 @@
     <button
       v-else
       type="button"
-      class="btn btn-sm inline-flex h-10 items-center gap-1.5 rounded-full border-white/10 bg-base-100/85 px-3 hover:bg-base-100 sm:px-4"
-      :class="{
-        'monitor-not-found-btn': artistNotFound,
-      }"
+      class="monitor-action-btn btn btn-sm inline-flex h-10 items-center gap-1.5 rounded-full border-white/10 bg-base-100/85 px-3 hover:bg-base-100 sm:px-4"
+      :class="monitorButtonClass"
       :disabled="busy"
       @click="startMonitor"
     >
-      <span v-if="busy" class="loading loading-spinner loading-xs" />
       <Icon
-        v-else
-        :icon="artistNotFound ? 'clarity:warning-line' : 'clarity:eye-line'"
+        :icon="monitorButtonIcon"
         class="h-4 w-4 shrink-0"
       />
       <span class="text-xs sm:text-sm">
-        {{
-          artistNotFound
-            ? t('library.monitorArtistNotFoundShort')
-            : t('library.monitorArtist')
-        }}
+        {{ monitorButtonLabel }}
       </span>
     </button>
 
@@ -193,12 +185,72 @@ const { t } = useI18n()
 const router = useRouter()
 
 const busy = ref(false)
+const monitorButtonState = ref('')
 const actionError = ref('')
 const artistNotFound = ref(false)
 const pickerError = ref('')
 const pickerOpen = ref(false)
 const pickerMatches = ref([])
 const manualSpotifyUrl = ref('')
+const MIN_MONITOR_STARTING_MS = 900
+const RESET_MONITOR_STATE_MS = 2500
+
+const monitorButtonClass = computed(() => ({
+  'monitor-not-found-btn': artistNotFound.value,
+  'monitor-action-btn-starting': monitorButtonState.value === 'starting',
+  'monitor-action-btn-confirmed': monitorButtonState.value === 'confirmed',
+  'monitor-action-btn-failed': monitorButtonState.value === 'failed',
+}))
+
+const monitorButtonIcon = computed(() => {
+  if (monitorButtonState.value === 'starting') return 'clarity:sync-line'
+  if (monitorButtonState.value === 'confirmed') {
+    return 'clarity:check-circle-line'
+  }
+  if (monitorButtonState.value === 'failed' || artistNotFound.value) {
+    return 'clarity:warning-line'
+  }
+  return 'clarity:eye-line'
+})
+
+const monitorButtonLabel = computed(() => {
+  if (monitorButtonState.value === 'starting') {
+    return t('library.monitorArtistStarting')
+  }
+  if (monitorButtonState.value === 'confirmed') {
+    return t('library.monitoringArtist')
+  }
+  if (monitorButtonState.value === 'failed') return t('library.monitorFailed')
+  return artistNotFound.value
+    ? t('library.monitorArtistNotFoundShort')
+    : t('library.monitorArtist')
+})
+
+function setMonitorButtonStateAfterPress(state, pressedAt) {
+  const elapsed = Date.now() - pressedAt
+  window.setTimeout(
+    () => {
+      monitorButtonState.value = state
+    },
+    Math.max(0, MIN_MONITOR_STARTING_MS - elapsed)
+  )
+}
+
+function resetMonitorButtonState(state, delay = RESET_MONITOR_STATE_MS) {
+  window.setTimeout(() => {
+    if (monitorButtonState.value === state) monitorButtonState.value = ''
+  }, delay)
+}
+
+function confirmMonitorButton(pressedAt) {
+  setMonitorButtonStateAfterPress('confirmed', pressedAt)
+}
+
+function failMonitorButton(pressedAt) {
+  setMonitorButtonStateAfterPress('failed', pressedAt)
+  resetMonitorButtonState('failed')
+}
+
 async function ensureBackendReady() {
   if (!usesEmbeddedServer()) return true
   const baseUrl = buildApiBaseUrl(getServerConfig())
@@ -283,13 +335,16 @@ async function startMonitor() {
     openManualArtistPicker()
     return
   }
+  const pressedAt = Date.now()
   busy.value = true
+  monitorButtonState.value = 'starting'
   actionError.value = ''
   artistNotFound.value = false
   pickerError.value = ''
   try {
     if (!(await ensureBackendReady())) {
       actionError.value = t('library.monitorArtistLookupFailed')
+      failMonitorButton(pressedAt)
       return
     }
 
@@ -299,25 +354,28 @@ async function startMonitor() {
     const matches = dedupeArtistMatches(rawMatches)
     if (matches.length === 0) {
       artistNotFound.value = true
+      failMonitorButton(pressedAt)
       openManualArtistPicker()
       return
     }
 
     const strongMatches = matches.filter((match) => match.match_score >= 0.72)
     if (strongMatches.length === 1) {
-      await addMatch(strongMatches[0])
+      await addMatch(strongMatches[0], pressedAt)
       return
     }
     if (matches.length === 1) {
-      await addMatch(matches[0])
+      await addMatch(matches[0], pressedAt)
       return
     }
 
+    monitorButtonState.value = ''
     pickerMatches.value = matches
     manualSpotifyUrl.value = ''
     pickerOpen.value = true
   } catch {
     artistNotFound.value = true
+    failMonitorButton(pressedAt)
     pickerError.value = t('library.monitorArtistLookupFailed')
     openManualArtistPicker()
   } finally {
@@ -347,18 +405,21 @@ function spotifyArtistIdFromUrl(url) {
   return match?.[1] || ''
 }
 
-async function addMatch(match) {
+async function addMatch(match, pressedAt = Date.now()) {
   const url = monitorUrlForMatch(match)
   if (!url) {
     pickerError.value = t('library.monitorArtistAddFailed')
+    failMonitorButton(pressedAt)
     return
   }
 
+  monitorButtonState.value = 'starting'
   if (linkExistingMonitoredArtist(match)) {
     pickerOpen.value = false
     pickerMatches.value = []
     actionError.value = ''
     artistNotFound.value = false
+    confirmMonitorButton(pressedAt)
     return
   }
 
@@ -371,16 +432,19 @@ async function addMatch(match) {
     actionError.value = ''
     artistNotFound.value = false
     upsertMonitoredArtist(res.data, props.artistName)
+    confirmMonitorButton(pressedAt)
     void refreshMonitoredArtists()
   } catch (err) {
     if (err?.response?.status === 409) {
       pickerOpen.value = false
       await refreshMonitoredArtists({ force: true })
       linkExistingMonitoredArtist(match)
+      confirmMonitorButton(pressedAt)
       return
     }
     pickerError.value =
       err?.response?.data?.detail || t('library.monitorArtistAddFailed')
+    failMonitorButton(pressedAt)
   } finally {
     busy.value = false
   }
@@ -397,7 +461,7 @@ async function addManualArtistUrl() {
     name: props.artistName,
     url: `https://open.spotify.com/artist/${spotifyId}`,
     match_score: 1,
-  })
+  }, Date.now())
 }
 
 function closePicker() {
@@ -416,6 +480,7 @@ watch(
   () => {
     pickerError.value = ''
     actionError.value = ''
+    monitorButtonState.value = ''
   }
 )
 
@@ -429,6 +494,7 @@ watch(
   () => {
     actionError.value = ''
     artistNotFound.value = false
+    monitorButtonState.value = ''
   }
 )
 
@@ -463,5 +529,78 @@ onUnmounted(() => {
 
 .monitor-not-found-btn {
   @apply border-error/50 bg-error/10 text-error hover:border-error/70 hover:bg-error/15;
+}
+
+.monitor-action-btn {
+  @apply relative overflow-hidden transition-all duration-200 active:scale-95;
+}
+
+.monitor-action-btn-starting {
+  @apply scale-[1.03] ring-2 ring-primary/60 ring-offset-2 ring-offset-base-100;
+  animation: monitor-button-pulse 0.8s ease-in-out infinite;
+}
+
+.monitor-action-btn-starting::after {
+  content: '';
+  position: absolute;
+  inset: -40% -60%;
+  background: linear-gradient(
+    100deg,
+    transparent 35%,
+    rgba(255, 255, 255, 0.42) 50%,
+    transparent 65%
+  );
+  animation: monitor-button-sheen 0.95s linear infinite;
+}
+
+.monitor-action-btn-starting :deep(svg) {
+  animation: monitor-button-spin 0.9s linear infinite;
+}
+
+.monitor-action-btn-confirmed {
+  @apply bg-emerald-400 text-black shadow-glow-sm ring-2 ring-emerald-200/70;
+  animation: monitor-button-pop 0.36s ease-out both;
+}
+
+.monitor-action-btn-failed {
+  @apply bg-error text-error-content ring-2 ring-error/60;
+  animation: monitor-button-pop 0.28s ease-out both;
+}
+
+@keyframes monitor-button-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.48);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(34, 197, 94, 0);
+  }
+}
+
+@keyframes monitor-button-sheen {
+  from {
+    transform: translateX(-55%);
+  }
+  to {
+    transform: translateX(55%);
+  }
+}
+
+@keyframes monitor-button-pop {
+  0% {
+    transform: scale(0.96);
+  }
+  70% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes monitor-button-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 </style>

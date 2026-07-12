@@ -224,6 +224,7 @@ export default {
     downloadAlbum: 'Baixar álbum',
     downloadStarting: 'Iniciando...',
     downloadAdded: 'Adicionado',
+    downloadFailed: 'Falhou',
     downloadFromLink: 'Baixar pelo link',
     downloadFromLinkHint:
       'Este link ainda não está na sua biblioteca. Inicie o download agora.',
@@ -247,7 +248,9 @@ export default {
     backToAlbums: 'Albuns',
     backToGenres: 'Gêneros',
     monitorArtist: 'Monitorar artista',
+    monitorArtistStarting: 'Iniciando...',
     monitoringArtist: 'Monitorando',
+    monitorFailed: 'Falhou',
     monitorPaused: 'Monitor pausado',
     monitorArtistPickTitle: 'Escolher artista no Spotify',
     monitorArtistPickSubtitle:

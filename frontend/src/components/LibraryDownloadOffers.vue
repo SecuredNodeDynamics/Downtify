@@ -149,6 +149,8 @@ const emit = defineEmits(['download'])
 const { t } = useI18n()
 const pt = useProgressTracker()
 const MIN_STARTING_MS = 900
+const STARTING_TIMEOUT_MS = 30000
+const RESET_FAILED_MS = 2500
 
 const visibleItems = computed(() =>
   (props.items || []).slice(0, Math.max(1, props.limit))
@@ -210,6 +212,7 @@ function downloadButtonIcon(item, index) {
   const state = downloadState(item, index)
   if (state === 'starting') return 'clarity:sync-line'
   if (state === 'queued' || state === 'added') return 'clarity:check-circle-line'
+  if (state === 'failed') return 'clarity:error-standard-line'
   return 'clarity:download-line'
 }
 
@@ -218,6 +221,7 @@ function downloadButtonLabel(item, index) {
   if (state === 'starting') return t('library.downloadStarting')
   if (state === 'queued') return t('search.inQueue')
   if (state === 'added') return t('library.downloadAdded')
+  if (state === 'failed') return t('library.downloadFailed')
   return item.media_type === 'album'
     ? t('library.downloadAlbum')
     : t('library.downloadTrack')
@@ -229,6 +233,7 @@ function downloadButtonClass(item, index) {
     'library-download-offer-button-starting': state === 'starting',
     'library-download-offer-button-confirmed':
       state === 'queued' || state === 'added',
+    'library-download-offer-button-failed': state === 'failed',
   }
 }
 
@@ -246,15 +251,32 @@ function handleDownload(item, index) {
   const key = itemStateKey(item, index)
   const pressedAt = Date.now()
   setLibraryDownloadOfferState(item, 'starting', key)
+  const timeout = window.setTimeout(() => {
+    if (getLibraryDownloadOfferState(item, key) !== 'starting') return
+    setLibraryDownloadOfferState(item, 'failed', key)
+    window.setTimeout(() => {
+      if (getLibraryDownloadOfferState(item, key) === 'failed') {
+        setLibraryDownloadOfferState(item, '', key)
+      }
+    }, RESET_FAILED_MS)
+  }, STARTING_TIMEOUT_MS)
   emit('download', item, {
     queued: () => {
+      window.clearTimeout(timeout)
       setDownloadStateAfterPress(key, 'queued', pressedAt)
     },
     added: () => {
+      window.clearTimeout(timeout)
       setDownloadStateAfterPress(key, 'added', pressedAt)
     },
     failed: () => {
-      setLibraryDownloadOfferState(item, '', key)
+      window.clearTimeout(timeout)
+      setDownloadStateAfterPress(key, 'failed', pressedAt)
+      window.setTimeout(() => {
+        if (getLibraryDownloadOfferState(item, key) === 'failed') {
+          setLibraryDownloadOfferState(item, '', key)
+        }
+      }, RESET_FAILED_MS)
     },
   })
 }
@@ -314,6 +336,11 @@ function handleDownload(item, index) {
 .library-download-offer-button-confirmed {
   @apply bg-emerald-400 text-black shadow-glow-sm ring-2 ring-emerald-200/70;
   animation: library-download-confirm-pop 0.36s ease-out both;
+}
+
+.library-download-offer-button-failed {
+  @apply bg-error text-error-content ring-2 ring-error/60;
+  animation: library-download-confirm-pop 0.28s ease-out both;
 }
 
 @keyframes library-download-button-pulse {

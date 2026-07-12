@@ -1421,6 +1421,10 @@ function queueOnlineDownload(song, feedback) {
         feedback?.added?.()
         return
       }
+      if (result?.failed) {
+        feedback?.failed?.()
+        return
+      }
       feedback?.queued?.()
     })
     .catch(() => {
