@@ -43,113 +43,117 @@
       {{ actionError }}
     </p>
 
-    <div
-      v-if="pickerOpen"
-      class="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-4 sm:items-center"
-      @click.self="closePicker"
-    >
+    <Teleport to="body">
       <div
-        class="surface-strong w-full max-w-lg overflow-hidden rounded-3xl border border-white/10 shadow-glow-md"
-        role="dialog"
-        aria-modal="true"
+        v-if="pickerOpen"
+        class="monitor-picker-backdrop fixed inset-0 z-[90] flex items-end justify-center bg-black/60 p-4 sm:items-center sm:p-6"
+        @click.self="closePicker"
       >
-        <div class="border-b border-white/10 px-5 py-4">
-          <h3 class="text-lg font-semibold">
-            {{ t('library.monitorArtistPickTitle') }}
-          </h3>
-          <p class="mt-1 text-sm text-base-content/60">
-            {{ t('library.monitorArtistPickSubtitle', { artist: artistName }) }}
-          </p>
-        </div>
+        <div
+          class="monitor-picker-panel surface-strong flex max-h-[90dvh] w-full max-w-lg flex-col overflow-hidden rounded-t-3xl border border-white/10 shadow-glow-md sm:rounded-3xl"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div class="shrink-0 border-b border-white/10 px-5 py-4">
+            <h3 class="text-lg font-semibold">
+              {{ t('library.monitorArtistPickTitle') }}
+            </h3>
+            <p class="mt-1 text-sm text-base-content/60">
+              {{
+                t('library.monitorArtistPickSubtitle', { artist: artistName })
+              }}
+            </p>
+          </div>
 
-        <div class="max-h-[24rem] space-y-2 overflow-y-auto p-4">
-          <p
-            v-if="pickerMatches.length === 0"
-            class="rounded-2xl border border-warning/20 bg-warning/10 px-4 py-3 text-sm text-warning"
-          >
-            {{ t('library.monitorArtistManualHint') }}
-          </p>
-          <button
-            v-for="match in pickerMatches"
-            :key="match.spotify_id"
-            type="button"
-            class="flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-base-100/70 p-3 text-left transition-colors hover:border-primary/45 hover:bg-base-100/90"
-            :disabled="busy"
-            @click="addMatch(match)"
-          >
-            <div
-              class="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-primary/10"
+          <div class="min-h-0 flex-1 space-y-2 overflow-y-auto p-4">
+            <p
+              v-if="pickerMatches.length === 0"
+              class="rounded-2xl border border-warning/20 bg-warning/10 px-4 py-3 text-sm text-warning"
             >
-              <img
-                v-if="match.image_url"
-                :src="match.image_url"
-                :alt="match.name"
-                class="h-full w-full object-cover"
-                loading="lazy"
-              />
-              <Icon
-                v-else
-                icon="clarity:user-line"
-                class="h-6 w-6 text-primary/70"
-              />
-            </div>
-            <div class="min-w-0 flex-1">
-              <p class="truncate font-semibold">{{ match.name }}</p>
-              <p class="text-xs text-base-content/50">
-                {{
-                  t('library.monitorArtistMatchScore', {
-                    score: Math.round((match.match_score || 0) * 100),
-                  })
-                }}
-              </p>
-            </div>
-            <Icon
-              icon="clarity:angle-line"
-              class="h-4 w-4 shrink-0 text-base-content/35"
-            />
-          </button>
-        </div>
-
-        <div class="border-t border-white/10 px-5 py-4 space-y-2">
-          <form class="space-y-2" @submit.prevent="addManualArtistUrl">
-            <label
-              class="block text-xs font-semibold uppercase tracking-wide text-base-content/45"
+              {{ t('library.monitorArtistManualHint') }}
+            </p>
+            <button
+              v-for="match in pickerMatches"
+              :key="match.spotify_id"
+              type="button"
+              class="flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-base-100/70 p-3 text-left transition-colors hover:border-primary/45 hover:bg-base-100/90"
+              :disabled="busy"
+              @click="addMatch(match)"
             >
-              {{ t('library.monitorArtistSpotifyUrlLabel') }}
-            </label>
-            <div class="flex flex-col gap-2 sm:flex-row">
-              <input
-                v-model.trim="manualSpotifyUrl"
-                type="url"
-                inputmode="url"
-                autocomplete="off"
-                class="input input-sm min-h-10 flex-1 rounded-full border-white/10 bg-base-100/85"
-                :placeholder="t('library.monitorArtistSpotifyUrlPlaceholder')"
-                :disabled="busy"
-              />
-              <button
-                type="submit"
-                class="btn btn-primary btn-sm h-10 rounded-full px-4"
-                :disabled="busy || !manualSpotifyUrl"
+              <div
+                class="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-primary/10"
               >
-                {{ t('library.monitorArtistUseUrl') }}
-              </button>
-            </div>
-          </form>
-          <p v-if="pickerError" class="text-center text-sm text-error">
-            {{ pickerError }}
-          </p>
-          <button
-            type="button"
-            class="btn btn-sm h-10 w-full rounded-full border-white/10 bg-base-100/85 hover:bg-base-100"
-            :disabled="busy"
-            @click="closePicker"
-          >
-            {{ t('common.cancel') }}
-          </button>
+                <img
+                  v-if="match.image_url"
+                  :src="match.image_url"
+                  :alt="match.name"
+                  class="h-full w-full object-cover"
+                  loading="lazy"
+                />
+                <Icon
+                  v-else
+                  icon="clarity:user-line"
+                  class="h-6 w-6 text-primary/70"
+                />
+              </div>
+              <div class="min-w-0 flex-1">
+                <p class="truncate font-semibold">{{ match.name }}</p>
+                <p class="text-xs text-base-content/50">
+                  {{
+                    t('library.monitorArtistMatchScore', {
+                      score: Math.round((match.match_score || 0) * 100),
+                    })
+                  }}
+                </p>
+              </div>
+              <Icon
+                icon="clarity:angle-line"
+                class="h-4 w-4 shrink-0 text-base-content/35"
+              />
+            </button>
+          </div>
+
+          <div class="shrink-0 space-y-2 border-t border-white/10 px-5 py-4">
+            <form class="space-y-2" @submit.prevent="addManualArtistUrl">
+              <label
+                class="block text-xs font-semibold uppercase tracking-wide text-base-content/45"
+              >
+                {{ t('library.monitorArtistSpotifyUrlLabel') }}
+              </label>
+              <div class="grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+                <input
+                  v-model.trim="manualSpotifyUrl"
+                  type="url"
+                  inputmode="url"
+                  autocomplete="off"
+                  class="input input-sm min-h-10 min-w-0 rounded-full border-white/10 bg-base-100/85"
+                  :placeholder="t('library.monitorArtistSpotifyUrlPlaceholder')"
+                  :disabled="busy"
+                />
+                <button
+                  type="submit"
+                  class="btn btn-primary btn-sm h-10 rounded-full px-4"
+                  :disabled="busy || !manualSpotifyUrl"
+                >
+                  {{ t('library.monitorArtistUseUrl') }}
+                </button>
+              </div>
+            </form>
+            <p v-if="pickerError" class="text-center text-sm text-error">
+              {{ pickerError }}
+            </p>
+            <button
+              type="button"
+              class="btn btn-sm h-10 w-full rounded-full border-white/10 bg-base-100/85 hover:bg-base-100"
+              :disabled="busy"
+              @click="closePicker"
+            >
+              {{ t('common.cancel') }}
+            </button>
+          </div>
         </div>
       </div>
-    </div>
+    </Teleport>
   </div>
 </template>
 
