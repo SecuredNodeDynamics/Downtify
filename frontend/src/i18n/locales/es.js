@@ -286,6 +286,8 @@ export default {
     scanLimit: 'Archivos a escanear',
     resultLimit: 'Correcciones a mostrar',
     scanned: 'Escaneados',
+    scannedAlbums: 'Albumes escaneados',
+    scannedTracks: 'Pistas escaneadas',
     matches: 'Coincidencias',
     needsFix: 'Reparar',
     total: 'Archivos totales',

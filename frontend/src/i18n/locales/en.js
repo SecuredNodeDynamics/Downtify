@@ -280,6 +280,8 @@ export default {
     scanLimit: 'Files to scan',
     resultLimit: 'Fixes to show',
     scanned: 'Scanned',
+    scannedAlbums: 'Scanned albums',
+    scannedTracks: 'Scanned tracks',
     matches: 'Matches',
     needsFix: 'Repair',
     total: 'Total files',

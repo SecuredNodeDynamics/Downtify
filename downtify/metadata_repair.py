@@ -398,7 +398,7 @@ def _album_image_scan_item(root: Path, path: Path) -> dict[str, Any]:
     }
 
 
-def _album_image_scan_files(root: Path) -> list[Path]:
+def _album_image_scan_files(root: Path) -> list[tuple[Path, int]]:
     files = [
         path
         for path in root.rglob('*')
@@ -406,8 +406,7 @@ def _album_image_scan_files(root: Path) -> list[Path]:
     ]
     files.sort(key=lambda path: path.relative_to(root).as_posix().casefold())
 
-    selected: list[Path] = []
-    seen_albums: set[str] = set()
+    selected: dict[str, tuple[Path, int]] = {}
     for path in files:
         try:
             current = _song_from_file(path)
@@ -424,11 +423,9 @@ def _album_image_scan_files(root: Path) -> list[Path]:
         else:
             parent = path.parent.relative_to(root).as_posix().casefold()
             key = f'{parent}::{path.stem.casefold()}'
-        if key in seen_albums:
-            continue
-        seen_albums.add(key)
-        selected.append(path)
-    return selected
+        representative, count = selected.get(key, (path, 0))
+        selected[key] = (representative, count + 1)
+    return list(selected.values())
 
 
 def _expanded_artist_repair(current: dict[str, Any]) -> dict[str, Any]:
@@ -766,20 +763,26 @@ def scan_album_images(
     root = root.resolve()
     files = _album_image_scan_files(root)
     total = len(files)
+    track_total = sum(track_count for _path, track_count in files)
     start = max(0, min(start, total))
     selected = files[start : start + max(1, limit)]
     items: list[dict[str, Any]] = []
     clean_items: list[dict[str, Any]] = []
     errors: list[dict[str, str]] = []
     batch_scanned = 0
-    for path in selected:
+    scanned_tracks = sum(track_count for _path, track_count in files[:start])
+    for path, album_track_count in selected:
         batch_scanned += 1
+        scanned_tracks += album_track_count
         current_offset = start + batch_scanned
         if progress_cb is not None:
             progress_cb({
                 'scanned': current_offset,
+                'scanned_albums': current_offset,
+                'scanned_tracks': scanned_tracks,
                 'batch_scanned': batch_scanned,
                 'total': total,
+                'track_total': track_total,
                 'matched': len(items),
                 'items': list(items),
                 'clean': list(clean_items[-clean_status_limit:]),
@@ -802,8 +805,11 @@ def scan_album_images(
         if progress_cb is not None and is_last_selected:
             progress_cb({
                 'scanned': current_offset,
+                'scanned_albums': current_offset,
+                'scanned_tracks': scanned_tracks,
                 'batch_scanned': batch_scanned,
                 'total': total,
+                'track_total': track_total,
                 'matched': len(items),
                 'items': list(items),
                 'clean': list(clean_items[-clean_status_limit:]),
@@ -814,8 +820,11 @@ def scan_album_images(
     return {
         'root': str(root),
         'scanned': next_offset,
+        'scanned_albums': next_offset,
+        'scanned_tracks': scanned_tracks,
         'batch_scanned': batch_scanned,
         'total': total,
+        'track_total': track_total,
         'matched': len(items),
         'items': items,
         'clean': clean_items[-clean_status_limit:],

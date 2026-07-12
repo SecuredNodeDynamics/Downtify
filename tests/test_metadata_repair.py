@@ -775,7 +775,10 @@ def test_scan_album_images_scans_one_representative_per_album(tmp_path, monkeypa
     result = metadata_repair.scan_album_images(tmp_path)
 
     assert result['total'] == 1
+    assert result['track_total'] == 2
     assert result['scanned'] == 1
+    assert result['scanned_albums'] == 1
+    assert result['scanned_tracks'] == 2
     assert result['matched'] == 1
 
 
@@ -804,7 +807,10 @@ def test_scan_album_images_reports_progress_before_slow_lookup(tmp_path, monkeyp
     metadata_repair.scan_album_images(tmp_path, progress_cb=updates.append)
 
     assert updates[0]['scanned'] == 1
+    assert updates[0]['scanned_albums'] == 1
+    assert updates[0]['scanned_tracks'] == 1
     assert updates[0]['total'] == 1
+    assert updates[0]['track_total'] == 1
 
 
 def test_scan_library_treats_year_derived_from_release_date_as_fixed(

@@ -405,10 +405,22 @@
           <span class="min-w-0 break-words">{{ albumImageError }}</span>
         </div>
 
-        <section class="metadata-stat-grid">
+        <section class="metadata-stat-grid-4">
           <div class="metadata-stat-card surface rounded-2xl">
-            <p class="metadata-stat-label">{{ t('metadata.scanned') }}</p>
-            <p class="metadata-stat-value">{{ albumImageSummary.scanned }}</p>
+            <p class="metadata-stat-label">
+              {{ t('metadata.scannedAlbums') }}
+            </p>
+            <p class="metadata-stat-value">
+              {{ albumImageSummary.scannedAlbums }}
+            </p>
+          </div>
+          <div class="metadata-stat-card surface rounded-2xl">
+            <p class="metadata-stat-label">
+              {{ t('metadata.scannedTracks') }}
+            </p>
+            <p class="metadata-stat-value">
+              {{ albumImageSummary.scannedTracks }}
+            </p>
           </div>
           <div class="metadata-stat-card surface rounded-2xl">
             <p class="metadata-stat-label">{{ t('metadata.needsFix') }}</p>
@@ -1877,7 +1889,14 @@ const activeAlbumImageTab = ref('needs')
 const applyingAlbumImages = ref({})
 const fixedAlbumImages = ref({})
 const repairingAllAlbumImages = ref(false)
-const albumImageSummary = ref({ scanned: 0, matched: 0, total: 0 })
+const albumImageSummary = ref({
+  scanned: 0,
+  scannedAlbums: 0,
+  scannedTracks: 0,
+  matched: 0,
+  total: 0,
+  trackTotal: 0,
+})
 const albumImageLibraryItems = ref([])
 const albumImageArtistQuery = ref('')
 const albumArtistModalOpen = ref(false)
@@ -2822,8 +2841,11 @@ function applyAlbumImageStatus(data) {
   albumImageLimit.value = data.limit || albumImageLimit.value
   albumImageSummary.value = {
     scanned: data.scanned || 0,
+    scannedAlbums: data.scanned_albums || data.scanned || 0,
+    scannedTracks: data.scanned_tracks || 0,
     matched: data.matched || 0,
     total: data.total || 0,
+    trackTotal: data.track_total || 0,
   }
   albumImageItems.value = data.items || []
   cleanAlbumImageItems.value = data.clean || cleanAlbumImageItems.value

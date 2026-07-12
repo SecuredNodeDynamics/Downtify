@@ -286,6 +286,8 @@ export default {
     scanLimit: 'Arquivos para escanear',
     resultLimit: 'Correcoes para mostrar',
     scanned: 'Escaneados',
+    scannedAlbums: 'Albuns escaneados',
+    scannedTracks: 'Faixas escaneadas',
     matches: 'Correspondencias',
     needsFix: 'Reparar',
     total: 'Arquivos totais',
