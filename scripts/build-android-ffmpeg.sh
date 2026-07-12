@@ -154,6 +154,14 @@ build_for_abi() {
   rm -rf "$prefix"
   mkdir -p "$prefix"
 
+  local x86asm_flags=()
+  if [[ "$abi" == "x86" || "$abi" == "x86_64" ]]; then
+    if ! command -v nasm >/dev/null 2>&1 && ! command -v yasm >/dev/null 2>&1; then
+      warn "[$abi] nasm/yasm not found; building ffmpeg with --disable-x86asm."
+      x86asm_flags=(--disable-x86asm)
+    fi
+  fi
+
   # --- libmp3lame (static) ---
   log "[$abi] Building libmp3lame $LAME_VERSION"
   local lame_src="$WORK/src/$abi/lame-$LAME_VERSION"
@@ -195,6 +203,7 @@ build_for_abi() {
       --enable-pic \
       --enable-gpl \
       --enable-libmp3lame \
+      "${x86asm_flags[@]}" \
       --extra-cflags="-I$prefix/include -O2 -fPIC" \
       --extra-ldflags="-L$prefix/lib" \
       --extra-ldexeflags="-pie" \
