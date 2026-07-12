@@ -5,8 +5,9 @@
     >
       <div class="flex items-center gap-2">
         <img
-          src="../assets/downtify.svg"
-          class="h-8 w-8 drop-shadow-[0_0_8px_rgba(26,208,92,0.55)]"
+          :src="appIcon"
+          class="h-8 w-8 rounded-xl object-cover drop-shadow-[0_0_8px_rgba(26,208,92,0.55)]"
+          alt=""
         />
         <span class="text-lg font-bold tracking-tight">Downtify</span>
       </div>
@@ -104,6 +105,7 @@ import router from '../router'
 import { useBinaryThemeManager } from '../model/theme'
 import { useI18n } from '../i18n'
 import { openSettingsModal } from '../model/settingsModal'
+import appIcon from '../assets/downtify-app-icon.png'
 import DownloadCounterPill from './DownloadCounterPill.vue'
 import HeaderUpdateNotice from './HeaderUpdateNotice.vue'
 

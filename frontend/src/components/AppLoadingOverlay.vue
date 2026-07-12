@@ -9,7 +9,7 @@
     >
       <div class="app-loading-card">
         <img
-          src="../assets/downtify.svg"
+          :src="appIcon"
           alt=""
           class="app-loading-logo"
           aria-hidden="true"
@@ -25,6 +25,7 @@ import { Icon } from '@iconify/vue'
 
 import { useAppLoading } from '../model/appLoading'
 import { useI18n } from '../i18n'
+import appIcon from '../assets/downtify-app-icon.png'
 
 const { visible } = useAppLoading()
 const { t } = useI18n()

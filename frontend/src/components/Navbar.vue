@@ -9,8 +9,9 @@
         :title="t('nav.home')"
       >
         <img
-          src="../assets/downtify.svg"
-          class="h-8 w-8 drop-shadow-[0_0_8px_rgba(26,208,92,0.55)]"
+          :src="appIcon"
+          class="h-8 w-8 rounded-xl object-cover drop-shadow-[0_0_8px_rgba(26,208,92,0.55)]"
+          alt=""
         />
         <span class="hidden sm:inline text-lg font-bold tracking-tight">
           Downtify
@@ -180,6 +181,7 @@ import { useDownloadRefresh } from '../model/downloadRefresh'
 import { useHealthRefresh } from '../model/healthRefresh'
 import { useLibraryRefresh } from '../model/libraryRefresh'
 import { useI18n } from '../i18n'
+import appIcon from '../assets/downtify-app-icon.png'
 
 import SearchInput from './SearchInput.vue'
 import DownloadCounterPill from './DownloadCounterPill.vue'

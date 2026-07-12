@@ -14,9 +14,13 @@
     <div class="relative w-full max-w-2xl text-center animate-slide-up">
       <div class="mx-auto mb-6 inline-flex">
         <div
-          class="relative inline-flex h-24 w-24 items-center justify-center rounded-3xl surface-strong shadow-glow"
+          class="relative inline-flex h-24 w-24 items-center justify-center rounded-3xl bg-primary/5 shadow-[0_0_34px_rgba(26,211,93,0.34)] ring-1 ring-primary/20"
         >
-          <img src="../assets/downtify.svg" class="h-14 w-14" />
+          <img
+            :src="appIcon"
+            class="h-20 w-20 rounded-2xl object-cover shadow-glow-sm"
+            alt=""
+          />
         </div>
       </div>
 
@@ -61,6 +65,7 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import SearchInput from './SearchInput.vue'
+import appIcon from '../assets/downtify-app-icon.png'
 import { useI18n } from '../i18n'
 import {
   getBundledAppVersion,

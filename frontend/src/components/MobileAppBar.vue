@@ -8,8 +8,8 @@
         @click="router.push({ name: 'Home' })"
       >
         <img
-          src="../assets/downtify.svg"
-          class="h-7 w-7 drop-shadow-[0_0_8px_rgba(26,208,92,0.55)]"
+          :src="appIcon"
+          class="h-7 w-7 rounded-lg object-cover drop-shadow-[0_0_8px_rgba(26,208,92,0.55)]"
           alt=""
         />
       </button>
@@ -94,6 +94,7 @@ import { useLibraryRefresh } from '../model/libraryRefresh'
 import { useI18n } from '../i18n'
 import DownloadCounterPill from './DownloadCounterPill.vue'
 import HeaderUpdateNotice from './HeaderUpdateNotice.vue'
+import appIcon from '../assets/downtify-app-icon.png'
 
 const route = useRoute()
 const { t } = useI18n()
