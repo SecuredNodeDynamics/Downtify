@@ -442,6 +442,7 @@ public class DowntifyAutoService extends MediaLibraryService {
         final Map<String, List<Track>> byAlbum;
 
         LibrarySnapshot(
+            long createdAtMs,
             List<Track> tracks,
             Map<String, Track> byId,
             Map<String, MediaItem> artistItems,
@@ -451,7 +452,7 @@ public class DowntifyAutoService extends MediaLibraryService {
             Map<String, List<Track>> byArtist,
             Map<String, List<Track>> byAlbum
         ) {
-            this.createdAtMs = System.currentTimeMillis();
+            this.createdAtMs = createdAtMs;
             this.tracks = tracks;
             this.byId = byId;
             this.artistItems = artistItems;
@@ -464,6 +465,7 @@ public class DowntifyAutoService extends MediaLibraryService {
 
         static LibrarySnapshot empty() {
             return new LibrarySnapshot(
+                0L,
                 Collections.emptyList(),
                 Collections.emptyMap(),
                 Collections.emptyMap(),
@@ -534,6 +536,7 @@ public class DowntifyAutoService extends MediaLibraryService {
 
             sortTracks(tracks);
             return new LibrarySnapshot(
+                System.currentTimeMillis(),
                 tracks,
                 byId,
                 artistItems,
