@@ -20,7 +20,8 @@
 
   body {
     position: relative;
-    background-image: radial-gradient(
+    background-image:
+      radial-gradient(
         circle at 0% 0%,
         rgba(26, 208, 92, 0.15),
         transparent 45%
@@ -58,7 +59,8 @@
   }
 
   [data-theme='downtify-light'] body {
-    background-image: radial-gradient(
+    background-image:
+      radial-gradient(
         circle at 0% 0%,
         rgba(26, 208, 92, 0.18),
         transparent 35%
@@ -116,23 +118,27 @@
 @layer components {
   .surface {
     @apply bg-base-100/90 backdrop-blur-md border border-primary/20;
-    box-shadow: 0 4px 18px -5px rgba(26, 208, 92, 0.12),
+    box-shadow:
+      0 4px 18px -5px rgba(26, 208, 92, 0.12),
       0 14px 40px -10px rgba(26, 208, 92, 0.09);
   }
   [data-theme='downtify-light'] .surface {
     @apply bg-white/85 border-primary/20;
-    box-shadow: 0 4px 16px -5px rgba(26, 208, 92, 0.1),
+    box-shadow:
+      0 4px 16px -5px rgba(26, 208, 92, 0.1),
       0 12px 36px -10px rgba(26, 208, 92, 0.08);
   }
 
   .surface-strong {
     @apply bg-base-100 border border-primary/25;
-    box-shadow: 0 6px 22px -6px rgba(26, 208, 92, 0.16),
+    box-shadow:
+      0 6px 22px -6px rgba(26, 208, 92, 0.16),
       0 16px 44px -12px rgba(26, 208, 92, 0.12);
   }
   [data-theme='downtify-light'] .surface-strong {
     @apply bg-white border-primary/25;
-    box-shadow: 0 6px 20px -6px rgba(26, 208, 92, 0.12),
+    box-shadow:
+      0 6px 20px -6px rgba(26, 208, 92, 0.12),
       0 14px 40px -12px rgba(26, 208, 92, 0.1);
   }
 
@@ -258,14 +264,18 @@
 
   .themed-select-menu {
     @apply overflow-hidden rounded-xl border border-white/10 bg-base-100 p-0 shadow-glow;
-    box-shadow: 0 4px 18px -5px rgba(26, 208, 92, 0.12),
-      0 14px 40px -10px rgba(26, 208, 92, 0.09), 0 12px 32px rgba(0, 0, 0, 0.35);
+    box-shadow:
+      0 4px 18px -5px rgba(26, 208, 92, 0.12),
+      0 14px 40px -10px rgba(26, 208, 92, 0.09),
+      0 12px 32px rgba(0, 0, 0, 0.35);
   }
 
   [data-theme='downtify-light'] .themed-select-menu {
     @apply border-black/10 bg-white;
-    box-shadow: 0 4px 16px -5px rgba(26, 208, 92, 0.1),
-      0 12px 36px -10px rgba(26, 208, 92, 0.08), 0 12px 28px rgba(0, 0, 0, 0.12);
+    box-shadow:
+      0 4px 16px -5px rgba(26, 208, 92, 0.1),
+      0 12px 36px -10px rgba(26, 208, 92, 0.08),
+      0 12px 28px rgba(0, 0, 0, 0.12);
   }
 
   .themed-select-option {
@@ -354,9 +364,11 @@
 
   .scan-skeleton-glow {
     @apply border border-primary/25;
-    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite,
+    animation:
+      pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite,
       scanGlow 2s ease-in-out infinite;
-    box-shadow: 0 4px 16px -5px rgba(26, 208, 92, 0.1),
+    box-shadow:
+      0 4px 16px -5px rgba(26, 208, 92, 0.1),
       0 10px 28px -8px rgba(26, 208, 92, 0.08);
   }
 
@@ -477,7 +489,7 @@
   }
 
   .app-loading-card {
-    @apply relative flex h-24 w-24 items-center justify-center rounded-3xl border border-primary/25 bg-base-100/90 shadow-glow;
+    @apply relative flex min-h-24 w-[min(20rem,calc(100vw-2rem))] flex-col items-center justify-center rounded-3xl border border-primary/25 bg-base-100/90 px-5 py-5 text-center shadow-glow;
   }
 
   .app-loading-logo {
@@ -485,8 +497,24 @@
   }
 
   .app-loading-spinner {
-    @apply absolute -bottom-1 -right-1 h-8 w-8 rounded-full bg-primary p-1.5 text-primary-content shadow-glow-sm;
+    @apply absolute right-4 top-4 h-8 w-8 rounded-full bg-primary p-1.5 text-primary-content shadow-glow-sm;
     animation: app-loading-spin 0.9s linear infinite;
+  }
+
+  .app-loading-error-icon {
+    @apply absolute right-4 top-4 h-8 w-8 rounded-full bg-error p-1.5 text-error-content shadow-glow-sm;
+  }
+
+  .app-loading-title {
+    @apply mt-3 text-sm font-semibold text-base-content;
+  }
+
+  .app-loading-subtitle {
+    @apply mt-1 max-w-[16rem] text-xs leading-5 text-base-content/60;
+  }
+
+  .app-loading-retry {
+    @apply mt-4 inline-flex h-10 items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-4 text-sm font-semibold text-primary transition-colors hover:bg-primary hover:text-primary-content;
   }
 
   .app-loading-fade-enter-active,
@@ -631,12 +659,14 @@
   0%,
   100% {
     border-color: rgba(26, 208, 92, 0.18);
-    box-shadow: 0 4px 16px -5px rgba(26, 208, 92, 0.1),
+    box-shadow:
+      0 4px 16px -5px rgba(26, 208, 92, 0.1),
       0 10px 28px -8px rgba(26, 208, 92, 0.08);
   }
   50% {
     border-color: rgba(26, 208, 92, 0.55);
-    box-shadow: 0 6px 22px -6px rgba(26, 208, 92, 0.2),
+    box-shadow:
+      0 6px 22px -6px rgba(26, 208, 92, 0.2),
       0 16px 40px -10px rgba(26, 208, 92, 0.16);
   }
 }

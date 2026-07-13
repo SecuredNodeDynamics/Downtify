@@ -34,6 +34,11 @@ import StarField from './components/StarField.vue'
 import router from './router'
 import { beginAppLoading, endAppLoading } from './model/appLoading'
 import { bootstrapAppUpdateNotice } from './model/appUpdateNotice'
+import {
+  bootstrapEmbeddedServer,
+  EMBEDDED_SERVER_READY_EVENT,
+} from './model/embeddedServer'
+import { usesEmbeddedServer } from './model/serverConnection'
 import { useBinaryThemeManager } from './model/theme'
 
 const keepAliveViews = ['Player', 'List', 'Settings', 'Download']
@@ -68,6 +73,12 @@ router.afterEach((to) => {
 })
 
 onMounted(async () => {
+  void bootstrapEmbeddedServer().then(() => {
+    if (usesEmbeddedServer()) {
+      window.dispatchEvent(new CustomEvent(EMBEDDED_SERVER_READY_EVENT))
+    }
+  })
+
   bootstrapAppUpdateNotice()
 
   const capacitor = window.Capacitor
@@ -106,7 +117,9 @@ onMounted(async () => {
 .page-leave-active,
 .page-fast-enter-active,
 .page-fast-leave-active {
-  transition: opacity 0.2s ease, transform 0.2s ease;
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
 }
 
 .page-fast-enter-active,

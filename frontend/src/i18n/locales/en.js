@@ -17,6 +17,15 @@ export default {
     nextPage: 'Next page',
     loading: 'Loading',
   },
+  engine: {
+    startingTitle: 'Starting local engine...',
+    startingHint:
+      'Preparing the on-device backend for downloads and cover art.',
+    failedTitle: 'Local engine did not start',
+    failedHint:
+      'Check Health after retrying. The app can keep running, but local downloads need the engine.',
+    retry: 'Retry',
+  },
   nav: {
     home: 'Home',
     library: 'Library',

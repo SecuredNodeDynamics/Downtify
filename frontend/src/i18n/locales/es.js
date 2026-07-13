@@ -17,6 +17,15 @@ export default {
     nextPage: 'Página siguiente',
     loading: 'Cargando',
   },
+  engine: {
+    startingTitle: 'Iniciando motor local...',
+    startingHint:
+      'Preparando el backend del dispositivo para descargas y portadas.',
+    failedTitle: 'El motor local no inició',
+    failedHint:
+      'Revisa Salud después de reintentar. La app puede seguir funcionando, pero las descargas locales necesitan el motor.',
+    retry: 'Reintentar',
+  },
   nav: {
     home: 'Inicio',
     library: 'Biblioteca',

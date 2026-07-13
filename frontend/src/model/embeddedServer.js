@@ -1,4 +1,5 @@
 import { registerPlugin } from '@capacitor/core'
+import { computed, reactive } from 'vue'
 
 import {
   EMBEDDED_SERVER_URL,
@@ -10,6 +11,16 @@ const EmbeddedServer = registerPlugin('EmbeddedServer')
 
 const READY_FLAG = 'downtify-embedded-ready'
 export const EMBEDDED_SERVER_READY_EVENT = 'downtify-embedded-server-ready'
+
+const embeddedServerState = reactive({
+  starting: false,
+  ready: false,
+  failed: false,
+  error: '',
+  baseUrl: EMBEDDED_SERVER_URL,
+})
+
+let bootstrapPromise = null
 
 function notifyEmbeddedServerReady() {
   if (typeof window === 'undefined') return
@@ -24,6 +35,16 @@ export async function startEmbeddedServer() {
   } catch (err) {
     console.warn('Could not start embedded server:', err)
     return null
+  }
+}
+
+export function useEmbeddedServerStatus() {
+  return {
+    starting: computed(() => embeddedServerState.starting),
+    ready: computed(() => embeddedServerState.ready),
+    failed: computed(() => embeddedServerState.failed),
+    error: computed(() => embeddedServerState.error),
+    baseUrl: computed(() => embeddedServerState.baseUrl),
   }
 }
 
@@ -52,14 +73,41 @@ export async function bootstrapEmbeddedServer() {
   if (!isEmbeddedServerAvailable()) return
   // Only boot the local backend when the user is in on-device mode.
   if (!usesEmbeddedServer()) return
+  if (bootstrapPromise) return bootstrapPromise
+
+  bootstrapPromise = runEmbeddedServerBootstrap().finally(() => {
+    bootstrapPromise = null
+  })
+  return bootstrapPromise
+}
+
+export function retryEmbeddedServerBootstrap() {
+  bootstrapPromise = null
+  embeddedServerState.failed = false
+  embeddedServerState.error = ''
+  return bootstrapEmbeddedServer()
+}
+
+async function runEmbeddedServerBootstrap() {
+  embeddedServerState.starting = true
+  embeddedServerState.failed = false
+  embeddedServerState.error = ''
 
   const baseUrl = (await startEmbeddedServer()) || EMBEDDED_SERVER_URL
+  embeddedServerState.baseUrl = baseUrl
   const ready = await waitForEmbeddedServer(baseUrl)
   if (!ready) {
     console.warn('Embedded server did not become ready in time.')
+    embeddedServerState.failed = true
+    embeddedServerState.error = 'timeout'
+    embeddedServerState.starting = false
     return
   }
 
+  embeddedServerState.ready = true
+  embeddedServerState.starting = false
+  embeddedServerState.failed = false
+  embeddedServerState.error = ''
   notifyEmbeddedServerReady()
 
   let alreadyReady = false

@@ -17,6 +17,14 @@ export default {
     nextPage: 'Próxima página',
     loading: 'Carregando',
   },
+  engine: {
+    startingTitle: 'Iniciando motor local...',
+    startingHint: 'Preparando o backend do dispositivo para downloads e capas.',
+    failedTitle: 'O motor local não iniciou',
+    failedHint:
+      'Verifique a Saúde depois de tentar novamente. O app pode continuar aberto, mas downloads locais precisam do motor.',
+    retry: 'Tentar novamente',
+  },
   nav: {
     home: 'Início',
     library: 'Biblioteca',
