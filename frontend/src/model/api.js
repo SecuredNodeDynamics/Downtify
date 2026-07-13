@@ -136,22 +136,22 @@ function ensureWebSocket() {
   return wsConnection
 }
 
-function getVersion() {
-  if (needsServerConnection()) return
+function getVersion({ prefetch = true } = {}) {
+  if (needsServerConnection()) return Promise.resolve('')
 
-  API.get('/api/version')
+  return API.get('/api/version')
     .then((res) => {
       const version = String(res.data ?? '').trim()
       if (!isValidVersion(version)) {
         console.warn(
           'Ignoring invalid /api/version response (is the backend running?)'
         )
-        return
+        return ''
       }
       if (isCapacitorNative()) {
         writeCachedServerVersion(version)
-        prefetchLibrary()
-        return
+        if (prefetch) prefetchLibrary()
+        return version
       }
       writeCachedServerVersion(version)
       const prevItem = localStorage.getItem('version')
@@ -162,23 +162,18 @@ function getVersion() {
       } else if (isBrowserOnApiRoute()) {
         reloadAppShell()
       }
-      prefetchLibrary()
+      if (prefetch) prefetchLibrary()
+      return version
     })
     .catch((error) => {
       console.error(error)
       console.log('Error getting version; keeping last known version')
+      return ''
     })
 }
 
 sanitizeStoredVersion()
-if (!needsServerConnection()) {
-  if (isCapacitorNative()) {
-    resolveNativeInstalledVersion()
-  }
-  getVersion()
-  ensureWebSocket()
-  prefetchLibrary()
-}
+let backendSessionStarted = false
 
 function search(query) {
   return API.get('/api/songs/search', { params: { query } })
@@ -903,6 +898,18 @@ function prefetchLibrary() {
   return promise
 }
 
+async function startBackendSession() {
+  if (needsServerConnection() || backendSessionStarted) return ''
+  backendSessionStarted = true
+  if (isCapacitorNative()) {
+    void resolveNativeInstalledVersion()
+  }
+  const version = await getVersion({ prefetch: false })
+  ensureWebSocket()
+  window.setTimeout(prefetchLibrary, isCapacitorNative() ? 900 : 250)
+  return version
+}
+
 function refreshLibraryInBackground(force = false) {
   return refreshLibrarySession(fetchLibraryItemsFromApi, {
     serverKey: libraryServerKey(),
@@ -915,9 +922,9 @@ function refreshLibraryInBackground(force = false) {
 
 function reconnectBackend() {
   resetLibraryPrefetch()
-  getVersion()
+  backendSessionStarted = false
+  void startBackendSession()
   ensureWebSocket()
-  prefetchLibrary()
 }
 
 export function isHealthPayload(data) {
@@ -952,6 +959,7 @@ export default {
   clearCoverSourcesCache,
   invalidateArtistCoverArt,
   warmLibraryCovers,
+  startBackendSession,
   refreshLibraryInBackground,
   libraryServerKey,
   apiAssetUrl,

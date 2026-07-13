@@ -11,11 +11,13 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import inspect
 import logging
 import mimetypes
 import os
 import sys
 from pathlib import Path
+from typing import Any, Callable
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -209,10 +211,24 @@ def build_app() -> FastAPI:
                 history_changed=api._broadcast_history_changed,
             )
         )
-        asyncio.create_task(api.reconcile_history_on_startup())
-        asyncio.create_task(api.backfill_monitor_images_on_startup())
-        asyncio.create_task(api.start_genre_warmup())
-        asyncio.create_task(api.warm_library_files_cache())
+        async def _delayed_startup_task(
+            delay: float, task: Callable[[], Any]
+        ) -> None:
+            await asyncio.sleep(delay)
+            result = task()
+            if inspect.isawaitable(result):
+                await result
+
+        asyncio.create_task(
+            _delayed_startup_task(2.0, api.reconcile_history_on_startup)
+        )
+        asyncio.create_task(
+            _delayed_startup_task(4.0, api.warm_library_files_cache)
+        )
+        asyncio.create_task(
+            _delayed_startup_task(8.0, api.backfill_monitor_images_on_startup)
+        )
+        asyncio.create_task(_delayed_startup_task(12.0, api.start_genre_warmup))
 
     @app.get('/list')
     def list_downloads() -> list[str]:

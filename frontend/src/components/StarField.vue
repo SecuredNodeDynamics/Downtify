@@ -4,6 +4,7 @@
 
 <script setup>
 import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { isCapacitorNative } from '../model/serverConnection'
 
 const canvasRef = ref(null)
 
@@ -20,6 +21,8 @@ let motionQuery = null
 let isMounted = false
 let isActive = true
 let nativeAppListener = null
+let lowPowerMode = false
+let lastDrawAt = 0
 
 const pointer = {
   x: 0,
@@ -33,6 +36,9 @@ function randomBetween(min, max) {
 }
 
 function getStarCount() {
+  if (lowPowerMode) {
+    return Math.min(140, Math.max(60, Math.round((width * height) / 11000)))
+  }
   return Math.min(520, Math.max(180, Math.round((width * height) / 4200)))
 }
 
@@ -83,7 +89,7 @@ function resizeCanvas() {
   const canvas = canvasRef.value
   if (!canvas) return
 
-  dpr = Math.min(window.devicePixelRatio || 1, 2)
+  dpr = Math.min(window.devicePixelRatio || 1, lowPowerMode ? 1.25 : 2)
   width = window.innerWidth
   height = window.innerHeight
 
@@ -129,7 +135,8 @@ function getStarColor(star) {
 
 function updateStars(now) {
   const pointerRecentlyActive = now - pointer.lastSeen < 2200
-  const pointerStrength = pointer.active || pointerRecentlyActive ? 1 : 0
+  const pointerStrength =
+    !lowPowerMode && (pointer.active || pointerRecentlyActive) ? 1 : 0
 
   stars.forEach((star) => {
     if (!reduceMotion && pointerStrength) {
@@ -149,7 +156,11 @@ function updateStars(now) {
       star.driftAngle += Math.sin(now * star.wander + star.phase) * 0.0025
     }
 
-    const driftSpeed = reduceMotion ? 0 : star.driftSpeed
+    const driftSpeed = reduceMotion
+      ? 0
+      : lowPowerMode
+        ? star.driftSpeed * 0.28
+        : star.driftSpeed
     star.vx +=
       (star.baseX - star.x) * 0.006 +
       Math.cos(star.driftAngle) * driftSpeed +
@@ -172,6 +183,11 @@ function updateStars(now) {
 
 function draw(now) {
   if (!context || !isActive) return
+  if (lowPowerMode && now - lastDrawAt < 48) {
+    animationFrame = requestAnimationFrame(draw)
+    return
+  }
+  lastDrawAt = now
 
   context.clearRect(0, 0, width, height)
   updateStars(now)
@@ -185,7 +201,7 @@ function draw(now) {
     const alpha = Math.max(0.05, (star.alpha + twinkle) * themeAlpha)
     const glowAlpha = alpha * (theme === 'light' ? 0.18 : 0.28) * star.depth
 
-    if (star.depth > 0.58) {
+    if (!lowPowerMode && star.depth > 0.58) {
       context.beginPath()
       context.fillStyle = `rgba(${getStarColor(star)}, ${glowAlpha})`
       context.arc(star.x, star.y, star.size * 2.8, 0, Math.PI * 2)
@@ -232,6 +248,7 @@ function handleMotionPreferenceChange(event) {
 onMounted(() => {
   isMounted = true
   isActive = document.visibilityState !== 'hidden'
+  lowPowerMode = isCapacitorNative()
   updateTheme()
   motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)')
   reduceMotion = motionQuery.matches
@@ -246,11 +263,13 @@ onMounted(() => {
   resizeCanvas()
   if (!isActive) stopAnimation()
   window.addEventListener('resize', resizeCanvas)
-  window.addEventListener('pointermove', handlePointerMove, { passive: true })
-  window.addEventListener('pointerleave', releasePointer)
+  if (!lowPowerMode) {
+    window.addEventListener('pointermove', handlePointerMove, { passive: true })
+    window.addEventListener('pointerleave', releasePointer)
+    window.addEventListener('touchmove', handleTouchMove, { passive: true })
+    window.addEventListener('touchend', releasePointer)
+  }
   window.addEventListener('blur', releasePointer)
-  window.addEventListener('touchmove', handleTouchMove, { passive: true })
-  window.addEventListener('touchend', releasePointer)
   document.addEventListener('visibilitychange', handleVisibilityChange)
 
   import('@capacitor/app')

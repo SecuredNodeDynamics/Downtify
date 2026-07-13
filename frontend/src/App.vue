@@ -22,7 +22,7 @@
 </template>
 
 <script setup>
-import { onBeforeMount, onMounted } from 'vue'
+import { nextTick, onBeforeMount, onMounted } from 'vue'
 
 import AppLoadingOverlay from './components/AppLoadingOverlay.vue'
 import BottomNav from './components/BottomNav.vue'
@@ -32,6 +32,7 @@ import MobileMoreSheet from './components/MobileMoreSheet.vue'
 import MobileSearchSheet from './components/MobileSearchSheet.vue'
 import StarField from './components/StarField.vue'
 import router from './router'
+import API from './model/api'
 import { beginAppLoading, endAppLoading } from './model/appLoading'
 import { bootstrapAppUpdateNotice } from './model/appUpdateNotice'
 import {
@@ -77,7 +78,11 @@ onMounted(async () => {
     if (usesEmbeddedServer()) {
       window.dispatchEvent(new CustomEvent(EMBEDDED_SERVER_READY_EVENT))
     }
+    void startMountedBackendSession()
   })
+  if (!usesEmbeddedServer()) {
+    void startMountedBackendSession()
+  }
 
   bootstrapAppUpdateNotice()
 
@@ -110,6 +115,14 @@ onMounted(async () => {
     // Capacitor app plugin unavailable in web builds.
   }
 })
+
+async function startMountedBackendSession() {
+  await nextTick()
+  await new Promise((resolve) =>
+    window.requestAnimationFrame(() => window.requestAnimationFrame(resolve))
+  )
+  await API.startBackendSession()
+}
 </script>
 
 <style>
