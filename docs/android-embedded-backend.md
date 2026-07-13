@@ -1,9 +1,9 @@
 # Embedded (serverless) Android backend
 
-By default the Downtify APK is a thin client that talks to a Downtify server.
-The **embedded backend** lets the APK run the *entire* Python backend
-in-process so it can search, download, transcode and tag audio fully on-device
-— no external server required.
+By default the Downtify APK can run the *entire* Python backend in-process so it
+can search, download, transcode and tag audio fully on-device — no external
+server required. Users can still point the app at a remote Downtify server in
+Settings → API; that remote URL overrides the embedded backend.
 
 This is implemented by embedding a Python runtime in the APK with
 [Chaquopy](https://chaquo.com/chaquopy/) and serving the existing FastAPI app
@@ -27,9 +27,20 @@ WebView (Vue app)  ──HTTP──▶  127.0.0.1:8765  (FastAPI via uvicorn)
   disables the SPA mount (`DOWNTIFY_SERVE_SPA=0`), wires up the bundled ffmpeg,
   and runs uvicorn.
 - On the web app, `frontend/src/model/embeddedServer.js` is a no-op. On the
-  APK it starts the server, waits for `/api/version`, and reloads once it's
-  reachable. `serverConnection.js` defaults the native server URL to the
-  embedded one (a user-set remote URL in Settings still takes precedence).
+  APK it starts the server and waits for `/api/version`. The Vue app mounts
+  immediately and shows the "Starting local engine..." overlay while the Python
+  backend comes up. If `/api/version` does not become reachable, the overlay
+  shows an error and a retry button instead of leaving the user on a blank
+  screen. `serverConnection.js` defaults the native server URL to the embedded
+  one (a user-set remote URL in Settings still takes precedence).
+- Frontend warmups are intentionally delayed until after the UI has mounted,
+  painted, and the backend session confirms `/api/version`. Library prefetch,
+  WebSocket startup, and cover cache warming should not happen at module import
+  time on the APK.
+- Backend warmups are staggered after FastAPI startup so `/api/version` is
+  available quickly. The monitor loop starts immediately, then non-critical
+  jobs are delayed: download-history reconciliation, library-file cache warming,
+  monitor image backfill, and genre warmup.
 
 ## Key constraints (read before building)
 
@@ -71,6 +82,34 @@ WebView (Vue app)  ──HTTP──▶  127.0.0.1:8765  (FastAPI via uvicorn)
    The Gradle build stages `main.py` + `downtify/` into the Chaquopy source set
    and installs the Python dependencies. The build script warns if no ffmpeg is
    present.
+3. Before release, run the [APK smoke-test checklist](android-apk-smoke-test.md).
+
+   It includes launch, local engine startup, Health/ffmpeg detection, search,
+   M4A download, playback, monitor, update install, Android Auto, and large
+   library scrolling checks.
+
+## Startup sequence
+
+The APK startup path is optimized so the user sees UI before expensive work
+starts:
+
+1. Android launches the Capacitor WebView and the Java `EmbeddedServerPlugin`.
+2. Vue mounts immediately and renders the normal shell plus `StarField`.
+3. `bootstrapEmbeddedServer()` starts or reconnects to the embedded Python
+   backend.
+4. While `/api/version` is not ready, the app shows **Starting local engine...**.
+5. When `/api/version` responds, the app dispatches
+   `downtify-embedded-server-ready` so cover/monitor components can retry any
+   early failed local requests.
+6. After two animation frames, `API.startBackendSession()` writes the connected
+   server version, opens the WebSocket, and schedules library prefetch/cover
+   warming.
+7. FastAPI startup keeps `/api/version` responsive first, then runs heavier
+   background warmups on delays.
+
+Avoid reintroducing API calls at frontend module import time. Anything that can
+scan the library, warm images, open WebSockets, or hit the embedded backend
+should run from mounted app code after the version check.
 
 ## Switching between embedded and remote
 
@@ -88,9 +127,14 @@ still available for the web/remote flows.
 
 ## Troubleshooting
 
-- **App shows "server required" / blank data:** the Python server may still be
-  starting (first launch is slowest) or crashed. Check `adb logcat` for the
-  `EmbeddedServer` tag and Python tracebacks.
+- **App shows "Starting local engine..." for a long time:** the Python server is
+  still booting or `/api/version` is not reachable yet. First launch after
+  install can be slower than warm launches.
+- **App shows "Local engine did not start":** tap **Retry** once. If it still
+  fails, check `adb logcat` for the `EmbeddedServer` tag and Python tracebacks.
+- **App shows "server required" / blank data:** make sure Settings → API is set
+  to the intended mode. A saved remote server URL overrides the embedded
+  default; clearing the URL returns to the on-device backend.
 - **Downloads fail at "Converting":** ffmpeg isn't bundled or isn't executable.
   Verify `adb shell <nativeLibraryDir>/libffmpeg.so -version`.
 - **Build fails installing `pydantic`/`fastapi`:** a version is pulling in

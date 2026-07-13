@@ -45,10 +45,10 @@ You interact with that server in two ways:
 
 | | **Desktop / browser** | **Android app** |
 |---|---|---|
-| **What it is** | The full web UI served by your Downtify instance | A native Android client (Capacitor) for the same UI |
-| **Where downloads happen** | On the server | On the server — not on the phone |
-| **How you connect** | Open `http://your-server:8000` in any browser | Install the APK, then point the app at your server in **Settings → API** |
-| **Best for** | Home-server setup, queue management, metadata tools, Jellyfin integration | Listening on the go, searching, queuing downloads from your phone |
+| **What it is** | The full web UI served by your Downtify instance | A native Android app (Capacitor) with an optional embedded backend |
+| **Where downloads happen** | On the server | On-device by default, or on your remote server if configured |
+| **How you connect** | Open `http://your-server:8000` in any browser | Install the APK and use it locally, or set a server in **Settings → API** |
+| **Best for** | Home-server setup, queue management, metadata tools, Jellyfin integration | On-device downloads, listening on the go, Android Auto, or remote control |
 
 ### On your computer
 
@@ -61,14 +61,14 @@ The browser talks directly to the server it was loaded from. No extra configurat
 
 ### On Android
 
-1. **Install the server** somewhere reachable from your phone — a home NAS, Raspberry Pi, VPS, or any box running the Docker image.
-2. **Install the Android app** from the [latest GitHub release](https://github.com/SecuredNodeDynamics/Downtify/releases) (`downtify-x.y.z.apk`).
-3. On first launch, open **Settings → API** and enter your server address:
+1. **Install the Android app** from the [latest GitHub release](https://github.com/SecuredNodeDynamics/Downtify/releases) (`downtify-x.y.z.apk`).
+2. Open it and let the local engine start. The APK can search, download, tag and play music on-device.
+3. Optional: to use an existing Downtify server instead, open **Settings → API** and enter your server address:
    - Home network: `192.168.1.50:8000`
    - Public access: `https://downtify.example.com` (reverse proxy, Cloudflare Tunnel, Tailscale, etc.)
-4. Tap **Test connection**, then **Save address**. The app reloads and shows your live queue, library, and downloads.
+4. Tap **Test connection**, then **Save address**. The app reloads and shows that server's queue, library, and downloads.
 
-The Android app is a **remote control and player** for your server. Your music library stays on the server; the phone streams and manages it over HTTP/WebSocket. Queue, history, playlist monitor, search, and the built-in player all work the same as in the browser.
+The Android app can run standalone through its embedded backend, or act as a remote control and player for your server. Queue, history, playlist monitor, search, and the built-in player all work the same as in the browser.
 
 > **Tip:** Use a VPN or HTTPS tunnel if you connect over the internet. The app supports `http://` on your LAN and `https://` for public URLs.
 
@@ -120,10 +120,12 @@ Open [http://localhost:8000](http://localhost:8000), paste a Spotify link, and h
 
 1. Download `downtify-x.y.z.apk` from the [Releases](https://github.com/SecuredNodeDynamics/Downtify/releases) page.
 2. Install it on your phone (enable “Install unknown apps” for your browser or file manager if prompted).
-3. Open **Settings → API**, enter your Downtify server URL, test the connection, and save.
+3. Use the default on-device backend, or open **Settings → API** to connect to a remote Downtify server.
 4. Search, queue downloads, browse your library, and listen — the same UI as the browser, tuned for mobile.
 
 The app can check GitHub for newer APK versions under **Settings → Help** and install updates in place.
+
+Maintainers working on the serverless APK should read the [embedded Android backend guide](docs/android-embedded-backend.md) and run the [APK smoke-test checklist](docs/android-apk-smoke-test.md) before release.
 
 Maintainers: release APKs must be signed with a stable release keystore and registered with [Android developer verification](docs/android-apk-signing.md) so users on certified Android devices can install without extra Play Protect friction (required in select regions from September 2026, globally from 2027).
 
