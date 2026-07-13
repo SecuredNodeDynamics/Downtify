@@ -11,6 +11,30 @@ const Health = () => import('/src/views/Health.vue')
 const Metadata = () => import('/src/views/Metadata.vue')
 const Settings = () => import('/src/views/Settings.vue')
 
+const routePreloaders = [
+  Search,
+  Download,
+  List,
+  Player,
+  Monitor,
+  Health,
+  Metadata,
+  Settings,
+]
+
+export function preloadRouteComponents() {
+  const preload = () => {
+    for (const load of routePreloaders) {
+      void load()
+    }
+  }
+  if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+    window.requestIdleCallback(preload, { timeout: 4000 })
+    return
+  }
+  window.setTimeout(preload, 1200)
+}
+
 const routes = [
   {
     path: '/',

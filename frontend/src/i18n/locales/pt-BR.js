@@ -256,7 +256,7 @@ export default {
     backToAlbums: 'Albuns',
     backToGenres: 'Gêneros',
     monitorArtist: 'Monitorar artista',
-    monitorArtistStarting: 'Iniciando...',
+    monitorArtistStarting: 'Buscando...',
     monitoringArtist: 'Monitorando',
     monitorFailed: 'Falhou',
     monitorPaused: 'Monitor pausado',

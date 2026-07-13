@@ -483,26 +483,33 @@
   }
 
   .app-loading-overlay {
-    @apply fixed inset-0 z-[200] flex items-center justify-center bg-base-100/80 backdrop-blur-sm;
+    @apply fixed inset-0 z-[200] flex items-center justify-center bg-base-100/70 backdrop-blur-[3px];
     padding-top: var(--app-safe-top);
     padding-bottom: var(--app-safe-bottom);
   }
 
   .app-loading-card {
-    @apply relative flex min-h-24 w-[min(20rem,calc(100vw-2rem))] flex-col items-center justify-center rounded-3xl border border-primary/25 bg-base-100/90 px-5 py-5 text-center shadow-glow;
+    @apply relative flex h-28 w-28 flex-col items-center justify-center rounded-3xl border border-primary/25 bg-base-100/90 text-center shadow-glow;
+    animation: app-loading-card-breathe 1.8s ease-in-out infinite;
+  }
+
+  .app-loading-card-status {
+    @apply min-h-44 h-auto w-[min(18rem,calc(100vw-2rem))] px-5 py-5;
+    animation: none;
   }
 
   .app-loading-logo {
-    @apply h-14 w-14 rounded-2xl object-cover opacity-90;
+    @apply h-16 w-16 rounded-2xl object-cover opacity-95;
+    animation: app-loading-logo-pulse 1.4s ease-in-out infinite;
   }
 
   .app-loading-spinner {
-    @apply absolute right-4 top-4 h-8 w-8 rounded-full bg-primary p-1.5 text-primary-content shadow-glow-sm;
+    @apply absolute -bottom-1 -right-1 h-9 w-9 rounded-full bg-primary p-2 text-primary-content shadow-glow-sm;
     animation: app-loading-spin 0.9s linear infinite;
   }
 
   .app-loading-error-icon {
-    @apply absolute right-4 top-4 h-8 w-8 rounded-full bg-error p-1.5 text-error-content shadow-glow-sm;
+    @apply absolute -bottom-1 -right-1 h-9 w-9 rounded-full bg-error p-2 text-error-content shadow-glow-sm;
   }
 
   .app-loading-title {
@@ -533,6 +540,32 @@
     }
     to {
       transform: rotate(360deg);
+    }
+  }
+
+  @keyframes app-loading-card-breathe {
+    0%,
+    100% {
+      transform: scale(1);
+      box-shadow:
+        0 0 0 0 rgba(26, 208, 92, 0.18),
+        0 18px 48px -16px rgba(26, 208, 92, 0.45);
+    }
+    50% {
+      transform: scale(1.035);
+      box-shadow:
+        0 0 0 8px rgba(26, 208, 92, 0),
+        0 22px 60px -18px rgba(26, 208, 92, 0.55);
+    }
+  }
+
+  @keyframes app-loading-logo-pulse {
+    0%,
+    100% {
+      filter: drop-shadow(0 0 8px rgba(26, 208, 92, 0.35));
+    }
+    50% {
+      filter: drop-shadow(0 0 16px rgba(26, 208, 92, 0.7));
     }
   }
 

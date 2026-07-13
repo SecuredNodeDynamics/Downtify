@@ -387,6 +387,7 @@
                         :fallbacks="coverSourcesFor(item.track.file).fallbacks"
                         :alt="item.track.title"
                         img-class="absolute inset-0 h-full w-full object-cover"
+                        eager
                       >
                         <template #fallback>
                           <Icon
@@ -459,6 +460,7 @@
                           "
                           :alt="currentArtistEntry.name"
                           img-class="absolute inset-0 h-full w-full object-cover"
+                          eager
                         >
                           <template #fallback>
                             <Icon
@@ -534,6 +536,7 @@
                           "
                           :alt="album.name"
                           img-class="absolute inset-0 h-full w-full object-cover"
+                          eager
                         >
                           <template #fallback>
                             <Icon
@@ -659,6 +662,7 @@
                     :fallbacks="similarArtistCoverSources(artist).fallbacks"
                     :alt="artist.name"
                     img-class="absolute inset-0 h-full w-full object-cover"
+                    eager
                   >
                     <template #fallback>
                       <Icon
@@ -713,6 +717,7 @@
                     "
                     :alt="track.name"
                     img-class="absolute inset-0 h-full w-full object-cover"
+                    eager
                   >
                     <template #fallback>
                       <Icon
@@ -863,6 +868,7 @@
                     "
                     :alt="item.name"
                     img-class="absolute inset-0 h-full w-full object-cover"
+                    eager
                   />
                 </div>
                 <div class="min-w-0 flex-1">
@@ -1052,6 +1058,7 @@
                               .fallbacks
                           "
                           :alt="album.name"
+                          eager
                           img-class="absolute inset-0 h-full w-full object-cover"
                         />
                       </div>

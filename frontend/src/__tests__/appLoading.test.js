@@ -24,7 +24,10 @@ describe('appLoading', () => {
     beginAppLoading()
     expect(visible.value).toBe(false)
 
-    vi.advanceTimersByTime(180)
+    vi.advanceTimersByTime(519)
+    expect(visible.value).toBe(false)
+
+    vi.advanceTimersByTime(1)
     expect(visible.value).toBe(true)
   })
 
@@ -32,9 +35,9 @@ describe('appLoading', () => {
     const { visible } = useAppLoading()
 
     beginAppLoading()
-    vi.advanceTimersByTime(180)
+    vi.advanceTimersByTime(520)
     endAppLoading()
-    vi.advanceTimersByTime(280)
+    vi.advanceTimersByTime(220)
 
     expect(visible.value).toBe(false)
   })

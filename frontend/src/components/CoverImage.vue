@@ -123,7 +123,7 @@ function handleEmbeddedServerReady() {
   if (!usesEmbeddedServer()) return
   if (!sourceKey.value) return
   const cached = getCachedCoverDisplay(sourceKey.value)
-  if (cached?.failed || (!displaySrc.value && !failed.value)) {
+  if (failed.value || cached?.failed || (!displaySrc.value && !failed.value)) {
     retryLoad()
   }
 }

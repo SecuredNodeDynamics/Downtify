@@ -7,8 +7,8 @@ let hideTimer = null
 let pendingLoads = 0
 let shownAt = 0
 
-const SHOW_DELAY_MS = 180
-const MIN_VISIBLE_MS = 280
+const SHOW_DELAY_MS = 520
+const MIN_VISIBLE_MS = 220
 
 export function useAppLoading() {
   return { visible }

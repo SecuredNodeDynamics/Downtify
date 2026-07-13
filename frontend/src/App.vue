@@ -31,7 +31,7 @@ import MobileAppBar from './components/MobileAppBar.vue'
 import MobileMoreSheet from './components/MobileMoreSheet.vue'
 import MobileSearchSheet from './components/MobileSearchSheet.vue'
 import StarField from './components/StarField.vue'
-import router from './router'
+import router, { preloadRouteComponents } from './router'
 import API from './model/api'
 import { beginAppLoading, endAppLoading } from './model/appLoading'
 import { bootstrapAppUpdateNotice } from './model/appUpdateNotice'
@@ -83,6 +83,7 @@ onMounted(async () => {
   if (!usesEmbeddedServer()) {
     void startMountedBackendSession()
   }
+  window.setTimeout(preloadRouteComponents, 700)
 
   bootstrapAppUpdateNotice()
 

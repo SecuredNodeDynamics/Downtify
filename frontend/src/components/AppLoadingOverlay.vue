@@ -7,7 +7,10 @@
       aria-live="polite"
       :aria-label="t('common.loading')"
     >
-      <div class="app-loading-card">
+      <div
+        class="app-loading-card"
+        :class="{ 'app-loading-card-status': hasEngineStatus }"
+      >
         <img
           :src="appIcon"
           alt=""
@@ -24,12 +27,12 @@
           icon="clarity:exclamation-circle-line"
           class="app-loading-error-icon"
         />
-        <p v-if="engineStarting || engineFailed" class="app-loading-title">
+        <p v-if="hasEngineStatus" class="app-loading-title">
           {{
             engineFailed ? t('engine.failedTitle') : t('engine.startingTitle')
           }}
         </p>
-        <p v-if="engineStarting || engineFailed" class="app-loading-subtitle">
+        <p v-if="hasEngineStatus" class="app-loading-subtitle">
           {{ engineFailed ? t('engine.failedHint') : t('engine.startingHint') }}
         </p>
         <button
@@ -62,6 +65,9 @@ const { visible: appLoadingVisible } = useAppLoading()
 const { starting: engineStarting, failed: engineFailed } =
   useEmbeddedServerStatus()
 const { t } = useI18n()
+const hasEngineStatus = computed(
+  () => engineStarting.value || engineFailed.value
+)
 const visible = computed(
   () => appLoadingVisible.value || engineStarting.value || engineFailed.value
 )

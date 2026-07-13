@@ -254,7 +254,7 @@ export default {
     backToAlbums: 'Albums',
     backToGenres: 'Genres',
     monitorArtist: 'Monitor artist',
-    monitorArtistStarting: 'Starting...',
+    monitorArtistStarting: 'Searching...',
     monitoringArtist: 'Monitoring',
     monitorFailed: 'Failed',
     monitorPaused: 'Monitor paused',
