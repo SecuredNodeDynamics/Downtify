@@ -158,16 +158,6 @@ environment:
 
 ---
 
-## 🏠 One-Click Install on Home Servers
-
-| Platform | Link |
-|----------|------|
-| ☂️ Umbrel | [Install on Umbrel](https://apps.umbrel.com/app/downtify) |
-| 🏠 CasaOS | [Install on CasaOS](https://casaos.zimaspace.com/) |
-| ⚓ HomeDock OS | [Install on HomeDock](https://www.homedock.cloud/apps/downtify/) |
-
----
-
 ## ⚙️ How It Works
 
 Downtify's download pipeline has three stages:
