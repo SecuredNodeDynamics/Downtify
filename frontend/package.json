@@ -1,6 +1,6 @@
 {
   "name": "downtify-web",
-  "version": "2.11.53",
+  "version": "2.11.54",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
