@@ -1,7 +1,7 @@
 <h1 align="center">
   <a href="https://github.com/SecuredNodeDynamics/Downtify" target="_blank" rel="noopener noreferrer">
     <picture>
-      <img width="80" src="https://github.com/user-attachments/assets/628d4334-7326-446e-9f2a-4d3ab4fc95c3">
+      <img width="80" src="docs/assets/downtify-google-play-app-icon-512.png" alt="Downtify logo">
     </picture>
   </a>
   <br>
