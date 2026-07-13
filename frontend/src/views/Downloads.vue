@@ -224,7 +224,11 @@
           class="panel-glow-shell panel-glow-shell-grow surface min-h-0 rounded-3xl"
         >
           <div class="library-browse panel-glow-inner p-3 sm:p-5">
-            <div ref="browseBodyRef" class="library-browse-body">
+            <div
+              ref="browseBodyRef"
+              class="library-browse-body"
+              @scroll.passive="onBrowseScroll"
+            >
               <div v-if="showLibraryNoSearchResults">
                 <div
                   v-if="librarySearchIsUrl"
@@ -279,7 +283,7 @@
                 class="library-browse-grid"
               >
                 <li
-                  v-for="artist in filteredArtists"
+                  v-for="artist in renderedArtists"
                   :key="artist.name"
                   class="browse-tile-shell"
                 >
@@ -351,7 +355,7 @@
                 class="library-browse-grid"
               >
                 <li
-                  v-for="album in filteredVisibleAlbums"
+                  v-for="album in renderedVisibleAlbums"
                   :key="album.key"
                   class="browse-tile-shell"
                 >
@@ -423,7 +427,7 @@
                 class="library-browse-grid"
               >
                 <li
-                  v-for="genre in filteredGenres"
+                  v-for="genre in renderedGenres"
                   :key="genre.name"
                   class="browse-tile-shell"
                 >
@@ -477,7 +481,7 @@
                 class="library-track-list space-y-2"
               >
                 <li
-                  v-for="file in filteredVisibleFiles"
+                  v-for="file in renderedVisibleFiles"
                   :key="file"
                   class="browse-tile-shell"
                 >
@@ -566,6 +570,12 @@
                   </div>
                 </li>
               </ul>
+              <div
+                v-if="hasMoreRenderedItems"
+                class="flex justify-center px-4 py-4"
+              >
+                <span class="loading loading-spinner loading-sm text-primary" />
+              </div>
             </div>
           </div>
         </div>
@@ -600,7 +610,6 @@ import { beginAppLoading, endAppLoading } from '/src/model/appLoading'
 import { useDownloadManager, scanDeviceLibraryPath } from '/src/model/download'
 import {
   albumArtistsLabel,
-  albumKey,
   displayNameFromFile,
   groupAlbums,
   groupArtists,
@@ -660,10 +669,17 @@ const selectedArtistDetailTab = ref('albums')
 const librarySearchQuery = ref('')
 const browseBodyRef = ref(null)
 const browseScrollPositions = new Map()
+const browseRenderLimits = new Map()
 const artistDownloadAlbums = ref([])
 const artistDownloadLoading = ref(false)
 const artistDownloadError = ref('')
 let artistDownloadRequestSeq = 0
+
+const GRID_RENDER_INITIAL = 32
+const GRID_RENDER_STEP = 32
+const TRACK_RENDER_INITIAL = 60
+const TRACK_RENDER_STEP = 60
+const renderLimit = ref(GRID_RENDER_INITIAL)
 
 function currentBrowseScrollKey() {
   if (selectedAlbumKey.value) {
@@ -678,14 +694,41 @@ function currentBrowseScrollKey() {
   return `tab:${viewMode.value}`
 }
 
+function initialRenderLimitForCurrentView() {
+  return viewMode.value === 'tracks' ||
+    selectedAlbumKey.value ||
+    selectedGenreName.value
+    ? TRACK_RENDER_INITIAL
+    : GRID_RENDER_INITIAL
+}
+
+function renderStepForCurrentView() {
+  return viewMode.value === 'tracks' ||
+    selectedAlbumKey.value ||
+    selectedGenreName.value
+    ? TRACK_RENDER_STEP
+    : GRID_RENDER_STEP
+}
+
+function saveBrowseRenderLimit() {
+  browseRenderLimits.set(currentBrowseScrollKey(), renderLimit.value)
+}
+
+function restoreBrowseRenderLimit(key) {
+  renderLimit.value =
+    browseRenderLimits.get(key) ?? initialRenderLimitForCurrentView()
+}
+
 function saveBrowseScrollPosition() {
   const el = browseBodyRef.value
   if (!el) return
   browseScrollPositions.set(currentBrowseScrollKey(), el.scrollTop)
+  saveBrowseRenderLimit()
 }
 
 function restoreBrowseScrollPosition(key) {
   const top = browseScrollPositions.get(key) ?? 0
+  restoreBrowseRenderLimit(key)
   const apply = () => {
     const el = browseBodyRef.value
     if (el) el.scrollTop = top
@@ -697,6 +740,7 @@ function restoreBrowseScrollPosition(key) {
 }
 
 function resetBrowseScrollPosition() {
+  renderLimit.value = initialRenderLimitForCurrentView()
   nextTick(() => {
     const el = browseBodyRef.value
     if (el) el.scrollTop = 0
@@ -844,6 +888,55 @@ const filteredVisibleFiles = computed(() => {
   })
 })
 
+const currentRenderableItems = computed(() => {
+  if (viewMode.value === 'artists' && !selectedArtist.value) {
+    return filteredArtists.value
+  }
+
+  const inAlbumBrowse =
+    (viewMode.value === 'albums' ||
+      (viewMode.value === 'artists' &&
+        selectedArtist.value &&
+        selectedArtistDetailTab.value === 'albums')) &&
+    !selectedAlbum.value
+  if (inAlbumBrowse) return filteredVisibleAlbums.value
+
+  if (viewMode.value === 'genres' && !selectedGenreName.value) {
+    return filteredGenres.value
+  }
+
+  if (
+    viewMode.value === 'tracks' ||
+    selectedAlbum.value ||
+    selectedGenreName.value ||
+    (selectedArtist.value && selectedArtistAlbums.value.length === 0)
+  ) {
+    return filteredVisibleFiles.value
+  }
+
+  return []
+})
+
+const renderedArtists = computed(() =>
+  filteredArtists.value.slice(0, renderLimit.value)
+)
+
+const renderedVisibleAlbums = computed(() =>
+  filteredVisibleAlbums.value.slice(0, renderLimit.value)
+)
+
+const renderedGenres = computed(() =>
+  filteredGenres.value.slice(0, renderLimit.value)
+)
+
+const renderedVisibleFiles = computed(() =>
+  filteredVisibleFiles.value.slice(0, renderLimit.value)
+)
+
+const hasMoreRenderedItems = computed(
+  () => currentRenderableItems.value.length > renderLimit.value
+)
+
 const showLibraryNoSearchResults = computed(() => {
   if (!librarySearchActive.value) return false
   if (viewMode.value === 'artists' && !selectedArtist.value) {
@@ -989,7 +1082,7 @@ function warmVisibleGenreCovers(genreList = []) {
 
 function warmVisibleCoversForCurrentView() {
   if (viewMode.value === 'artists' && !selectedArtist.value) {
-    warmVisibleArtistCovers(filteredArtists.value)
+    warmVisibleArtistCovers(renderedArtists.value)
     return
   }
 
@@ -999,12 +1092,12 @@ function warmVisibleCoversForCurrentView() {
       selectedArtist.value &&
       selectedArtistDetailTab.value === 'albums')
   if (inAlbumBrowse && !selectedAlbum.value) {
-    warmVisibleAlbumCovers(filteredVisibleAlbums.value)
+    warmVisibleAlbumCovers(renderedVisibleAlbums.value)
     return
   }
 
   if (viewMode.value === 'genres' && !selectedGenreName.value) {
-    warmVisibleGenreCovers(filteredGenres.value)
+    warmVisibleGenreCovers(renderedGenres.value)
     return
   }
 
@@ -1013,8 +1106,25 @@ function warmVisibleCoversForCurrentView() {
     selectedAlbum.value ||
     selectedGenreName.value
   ) {
-    warmVisibleTrackCovers(filteredVisibleFiles.value)
+    warmVisibleTrackCovers(renderedVisibleFiles.value)
   }
+}
+
+function growRenderedItems() {
+  if (!hasMoreRenderedItems.value) return
+  renderLimit.value = Math.min(
+    renderLimit.value + renderStepForCurrentView(),
+    currentRenderableItems.value.length
+  )
+  saveBrowseRenderLimit()
+  scheduleVisibleCoverWarm(warmVisibleCoversForCurrentView)
+}
+
+function onBrowseScroll(event) {
+  const el = event.currentTarget
+  if (!el || !hasMoreRenderedItems.value) return
+  const remaining = el.scrollHeight - el.scrollTop - el.clientHeight
+  if (remaining < 900) growRenderedItems()
 }
 
 async function loadArtistDownloadAlbums() {
@@ -1063,7 +1173,7 @@ watch(
   () => {
     if (viewMode.value !== 'artists' || selectedArtist.value) return
     scheduleVisibleCoverWarm(() =>
-      warmVisibleArtistCovers(filteredArtists.value)
+      warmVisibleArtistCovers(renderedArtists.value)
     )
   },
   { immediate: true }
@@ -1078,7 +1188,7 @@ watch(
           selectedArtistDetailTab.value === 'albums')) &&
       !selectedAlbum.value
     return inAlbumBrowse
-      ? filteredVisibleAlbums.value.map((album) => albumKey(album)).join('\0')
+      ? filteredVisibleAlbums.value.map((album) => album.key).join('\0')
       : ''
   },
   () => {
@@ -1090,7 +1200,7 @@ watch(
         selectedArtistDetailTab.value === 'albums')
     if (!inAlbumBrowse) return
     scheduleVisibleCoverWarm(() =>
-      warmVisibleAlbumCovers(filteredVisibleAlbums.value)
+      warmVisibleAlbumCovers(renderedVisibleAlbums.value)
     )
   },
   { immediate: true }
@@ -1105,7 +1215,7 @@ watch(
       : '',
   () => {
     if (viewMode.value !== 'genres' || selectedGenreName.value) return
-    scheduleVisibleCoverWarm(() => warmVisibleGenreCovers(filteredGenres.value))
+    scheduleVisibleCoverWarm(() => warmVisibleGenreCovers(renderedGenres.value))
   },
   { immediate: true }
 )
@@ -1126,10 +1236,26 @@ watch(
       return
     }
     scheduleVisibleCoverWarm(() =>
-      warmVisibleTrackCovers(filteredVisibleFiles.value)
+      warmVisibleTrackCovers(renderedVisibleFiles.value)
     )
   },
   { immediate: true }
+)
+
+watch(
+  () => currentBrowseScrollKey(),
+  (key) => {
+    restoreBrowseRenderLimit(key)
+  }
+)
+
+watch(
+  () => currentRenderableItems.value.length,
+  (length) => {
+    if (renderLimit.value > length) {
+      renderLimit.value = Math.max(length, initialRenderLimitForCurrentView())
+    }
+  }
 )
 
 function applyLibraryData(items) {
