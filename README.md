@@ -1,7 +1,7 @@
 <h1 align="center">
   <a href="https://github.com/SecuredNodeDynamics/Downtify" target="_blank" rel="noopener noreferrer">
     <picture>
-      <img width="80" src="docs/assets/downtify-google-play-app-icon-512.png" alt="Downtify logo">
+      <img width="80" src="docs/assets/downtify-readme-logo.png" alt="Downtify logo">
     </picture>
   </a>
   <br>
@@ -14,7 +14,6 @@
 
 <div align="center">
 
-[![Test](https://github.com/SecuredNodeDynamics/Downtify/actions/workflows/test.yml/badge.svg)](https://github.com/SecuredNodeDynamics/Downtify/actions/workflows/test.yml)
 [![GitHub Release](https://img.shields.io/github/v/release/SecuredNodeDynamics/Downtify?color=blue)](https://github.com/SecuredNodeDynamics/Downtify/releases)
 [![GitHub License](https://img.shields.io/github/license/SecuredNodeDynamics/Downtify?color=blue)](/LICENSE)
 [![GHCR](https://img.shields.io/badge/GHCR-ghcr.io%2Fsecurednodedynamics%2Fdowntify-blue?logo=github)](https://github.com/SecuredNodeDynamics/Downtify/pkgs/container/downtify)
