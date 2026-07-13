@@ -338,8 +338,8 @@
                       player.isMuted.value || player.volume.value === 0
                         ? 'clarity:volume-mute-line'
                         : player.volume.value < 0.5
-                        ? 'clarity:volume-down-line'
-                        : 'clarity:volume-up-line'
+                          ? 'clarity:volume-down-line'
+                          : 'clarity:volume-up-line'
                     "
                     class="h-5 w-5"
                   />
@@ -870,6 +870,15 @@
                   <p class="truncate text-xs text-base-content/50">
                     {{ resultArtistLabel(item) }}
                   </p>
+                  <p
+                    v-if="
+                      similarArtistTab === 'albums' &&
+                      similarArtistAlbumTrackCountLabel(item)
+                    "
+                    class="truncate text-xs text-base-content/40"
+                  >
+                    {{ similarArtistAlbumTrackCountLabel(item) }}
+                  </p>
                 </div>
                 <button
                   v-if="!similarTrackOwnership.isOwned(selectedSimilarTrack)"
@@ -1290,8 +1299,8 @@
                     downloadButtonState(selectedSimilarTrack) === 'loading'
                       ? t('common.downloading')
                       : downloadButtonState(selectedSimilarTrack) === 'done'
-                      ? t('common.done')
-                      : t('common.download')
+                        ? t('common.done')
+                        : t('common.download')
                   }}
                 </button>
                 <span
@@ -1399,6 +1408,9 @@ const selectedSimilarArtist = ref(null)
 const similarArtistDetailsLoading = ref(false)
 const similarArtistResults = ref([])
 const similarArtistTab = ref('albums')
+const similarArtistAlbumCounts = useAlbumTrackCounts(
+  () => similarArtistAlbums.value
+)
 const selectedQueueTrack = ref(null)
 const queueAlbumCandidates = ref([])
 const queueAlbumLookupLoading = ref(false)
@@ -1758,6 +1770,12 @@ function closeSimilarArtist() {
 function resultArtistLabel(item) {
   if (Array.isArray(item?.artists)) return item.artists.join(', ')
   return String(item?.artist || item?.album_name || '')
+}
+
+function similarArtistAlbumTrackCountLabel(album) {
+  const count = similarArtistAlbumCounts.trackCountFor(album)
+  if (!count) return ''
+  return t(count === 1 ? 'player.countOne' : 'player.countMany', { count })
 }
 
 function queueTrackArtist(track) {
@@ -2954,8 +2972,12 @@ onUnmounted(() => {
   box-shadow: 0 0 12px rgba(26, 208, 92, 0.45);
   transform: translate(-50%, -50%) scale(0.9);
   opacity: 0;
-  transition: left 100ms linear, opacity 160ms ease, transform 160ms ease,
-    width 160ms ease, height 160ms ease;
+  transition:
+    left 100ms linear,
+    opacity 160ms ease,
+    transform 160ms ease,
+    width 160ms ease,
+    height 160ms ease;
   will-change: left, transform;
 }
 
@@ -3057,10 +3079,14 @@ onUnmounted(() => {
 @keyframes download-pulse {
   0%,
   100% {
-    box-shadow: 0 0 0 1px rgb(26 208 92 / 0.16), 0 0 0 rgb(26 208 92 / 0);
+    box-shadow:
+      0 0 0 1px rgb(26 208 92 / 0.16),
+      0 0 0 rgb(26 208 92 / 0);
   }
   50% {
-    box-shadow: 0 0 0 1px rgb(26 208 92 / 0.34), 0 0 18px rgb(26 208 92 / 0.32);
+    box-shadow:
+      0 0 0 1px rgb(26 208 92 / 0.34),
+      0 0 18px rgb(26 208 92 / 0.32);
   }
 }
 
@@ -3163,7 +3189,8 @@ onUnmounted(() => {
 
 .download-button-loading {
   @apply pointer-events-none;
-  animation: download-press 220ms ease-out,
+  animation:
+    download-press 220ms ease-out,
     download-pulse 1.1s ease-in-out infinite;
 }
 
@@ -3173,7 +3200,9 @@ onUnmounted(() => {
 
 .download-button-done {
   animation: download-pop 420ms cubic-bezier(0.16, 1, 0.3, 1);
-  box-shadow: 0 0 0 1px rgb(26 208 92 / 0.26), 0 0 22px rgb(26 208 92 / 0.32);
+  box-shadow:
+    0 0 0 1px rgb(26 208 92 / 0.26),
+    0 0 22px rgb(26 208 92 / 0.32);
 }
 
 .similar-track-owned {
