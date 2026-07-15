@@ -137,19 +137,122 @@ export function albumKey(artist, album) {
 
 export function artistBrowseKey(name) {
   return String(name || '')
+    .normalize('NFKC')
     .trim()
-    .toLocaleLowerCase()
+    .replace(/\s+/g, ' ')
+    .toLowerCase()
+}
+
+function artistLooseKey(name) {
+  return artistBrowseKey(name)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^\p{L}\p{N}\s]/gu, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function editDistanceWithinOne(left, right) {
+  const a = String(left || '')
+  const b = String(right || '')
+  if (a === b) return 0
+  if (Math.abs(a.length - b.length) > 1) return 2
+
+  let edits = 0
+  let i = 0
+  let j = 0
+  while (i < a.length && j < b.length) {
+    if (a[i] === b[j]) {
+      i += 1
+      j += 1
+      continue
+    }
+    edits += 1
+    if (edits > 1) return 2
+    if (a.length > b.length) {
+      i += 1
+    } else if (b.length > a.length) {
+      j += 1
+    } else {
+      i += 1
+      j += 1
+    }
+  }
+  return edits + (i < a.length || j < b.length ? 1 : 0)
+}
+
+function artistNamesLookEquivalent(left, right) {
+  const a = artistLooseKey(left)
+  const b = artistLooseKey(right)
+  if (!a || !b) return false
+  if (a === b) return true
+
+  const leftWords = a.split(' ')
+  const rightWords = b.split(' ')
+  if (leftWords.length !== rightWords.length) return false
+  if (leftWords.length > 4) return false
+
+  let totalEdits = 0
+  for (let index = 0; index < leftWords.length; index += 1) {
+    const leftWord = leftWords[index]
+    const rightWord = rightWords[index]
+    if (leftWord === rightWord) continue
+    if (Math.min(leftWord.length, rightWord.length) < 4) return false
+    const edits = editDistanceWithinOne(leftWord, rightWord)
+    if (edits > 1) return false
+    totalEdits += edits
+    if (totalEdits > 2) return false
+  }
+  return totalEdits > 0
+}
+
+function cleanArtistDisplayName(name) {
+  return String(name || '')
+    .normalize('NFKC')
+    .trim()
+    .replace(/\s+/g, ' ')
+}
+
+function artistDisplayScore(name) {
+  const value = cleanArtistDisplayName(name)
+  if (!value) return 0
+  return value.split(/\s+/).reduce((score, word) => {
+    const startsWell = /^[\p{Lu}\d]/u.test(word) ? 1 : 0
+    const acronymBonus = word.length > 1 && word === word.toUpperCase() ? 0.25 : 0
+    const diacriticBonus = /[^\u0000-\u007f]/.test(word) ? 0.5 : 0
+    return score + startsWell + acronymBonus + diacriticBonus
+  }, 0)
 }
 
 function chooseArtistDisplayName(current, candidate) {
-  const currentName = String(current || '').trim()
-  const candidateName = String(candidate || '').trim()
+  const currentName = cleanArtistDisplayName(current)
+  const candidateName = cleanArtistDisplayName(candidate)
   if (!currentName) return candidateName
   if (!candidateName) return currentName
-  if (artistBrowseKey(currentName) !== artistBrowseKey(candidateName)) {
+  if (
+    artistBrowseKey(currentName) !== artistBrowseKey(candidateName) &&
+    !artistNamesLookEquivalent(currentName, candidateName)
+  ) {
     return currentName
   }
+  const currentScore = artistDisplayScore(currentName)
+  const candidateScore = artistDisplayScore(candidateName)
+  if (candidateScore !== currentScore) {
+    return candidateScore > currentScore ? candidateName : currentName
+  }
   return candidateName.length > currentName.length ? candidateName : currentName
+}
+
+function artistGroupKeyForName(grouped, name) {
+  const key = artistBrowseKey(name)
+  if (!key || grouped.has(key)) return key
+
+  for (const [existingKey, artist] of grouped.entries()) {
+    if (artistNamesLookEquivalent(artist.name, name)) {
+      return existingKey
+    }
+  }
+  return key
 }
 
 export function libraryCoverFolders(file) {
@@ -170,7 +273,7 @@ export function groupArtists(items, options = {}) {
   for (const raw of items) {
     const item = normalizeLibraryItem(raw, options)
     for (const name of libraryItemArtists(item, options)) {
-      const key = artistBrowseKey(name)
+      const key = artistGroupKeyForName(grouped, name)
       if (!key) continue
 
       if (!grouped.has(key)) {
@@ -274,6 +377,24 @@ function artistsListEqual(left, right) {
   return a.every((value, index) => value === b[index])
 }
 
+function titleCaseGenreLabel(value) {
+  return String(value || '')
+    .trim()
+    .split(/\s+/)
+    .map((word) => {
+      if (word.includes('&')) return word.toUpperCase()
+      return word
+        .split('-')
+        .map((part) =>
+          part
+            ? `${part.charAt(0).toUpperCase()}${part.slice(1).toLowerCase()}`
+            : part
+        )
+        .join('-')
+    })
+    .join(' ')
+}
+
 export function libraryItemsEqual(current, next) {
   if (!Array.isArray(current) || !Array.isArray(next)) return false
   if (current.length !== next.length) return false
@@ -306,14 +427,14 @@ export function normalizeGenreDisplayName(name) {
     .trim()
   if (folded === 'r b' || folded === 'rnb') return 'R&B'
   if (folded === 'hip hop' || folded === 'hiphop') return 'Hip-Hop'
-  return raw
+  if (folded === 'edm' || folded === 'idm') return folded.toUpperCase()
+  return titleCaseGenreLabel(raw)
 }
 
 export function libraryGenreName(item, unknownLabel = 'Unknown', options = {}) {
   const normalized = normalizeLibraryItem(item, options)
-  const raw =
-    String(normalized.genre || normalized.browse_genre || '').trim() ||
-    unknownLabel
+  const raw = String(normalized.browse_genre || normalized.genre || '').trim()
+  if (!raw) return unknownLabel
   return normalizeGenreDisplayName(raw)
 }
 

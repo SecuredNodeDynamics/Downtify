@@ -38,7 +38,7 @@
           :class="{ 'mobile-app-bar-icon-error': libraryRefreshFailed }"
           :title="t('common.refresh')"
           :disabled="libraryRefreshLoading"
-          @click="refreshLibrary()"
+          @click.stop.prevent="refreshLibraryInPlace"
         >
           <Icon
             icon="clarity:refresh-line"
@@ -132,6 +132,15 @@ function clearRouteAction(event) {
   const routeName = event?.detail?.routeName
   if (!routeName || routeAction.value?.routeName === routeName) {
     routeAction.value = null
+  }
+}
+
+async function refreshLibraryInPlace() {
+  if (route.name !== 'List') return
+  const originalPath = route.fullPath
+  await refreshLibrary()
+  if (router.currentRoute.value.name === 'Home') {
+    await router.replace(originalPath || { name: 'List' })
   }
 }
 

@@ -174,9 +174,7 @@ def _title_case_genre(value: str) -> str:
         return 'Hip-Hop'
     if raw.casefold() in {'edm', 'idm'}:
         return raw.upper()
-    if raw.islower() or raw.isupper():
-        return raw.title()
-    return raw
+    return raw.title()
 
 
 def _split_genre_parts(value: str) -> list[str]:

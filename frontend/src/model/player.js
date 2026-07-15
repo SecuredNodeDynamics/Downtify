@@ -362,6 +362,7 @@ function ensureAudio() {
     if (audio) currentTime.value = audio.currentTime
     syncMediaSessionNow({ position: true })
     persistPlayerSession(true)
+    if (playbackIntent) scheduleRecovery()
   })
   return audio
 }
@@ -520,8 +521,7 @@ export function syncPlaylistFromFiles(files, options = {}) {
   }
 
   if (currentFile && !paths.includes(currentFile)) {
-    pause()
-    currentIndex.value = -1
+    return
   }
 
   setPlaylist(paths, options)

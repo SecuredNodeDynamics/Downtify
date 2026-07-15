@@ -169,8 +169,14 @@ describe('library path helpers', () => {
     ])
   })
 
-  it('merges artist names that only differ by casing', () => {
+  it('merges artist names that only differ by casing or spacing', () => {
     const items = [
+      {
+        file: 'taylor swift/Reputation/01.flac',
+        artist: 'taylor swift',
+        album: 'Reputation',
+        title: 'Track',
+      },
       {
         file: 'Taylor Swift/1989/01.flac',
         artist: 'Taylor Swift',
@@ -178,15 +184,39 @@ describe('library path helpers', () => {
         title: 'Welcome',
       },
       {
-        file: 'taylor swift/Reputation/01.flac',
-        artist: 'taylor swift',
-        album: 'Reputation',
-        title: 'Track',
+        file: 'Taylor  Swift/Folklore/01.flac',
+        artist: 'Taylor  Swift',
+        album: 'Folklore',
+        title: 'Cardigan',
       },
     ]
 
     const artists = groupArtists(items)
     expect(artists).toHaveLength(1)
+    expect(artists[0].name).toBe('Taylor Swift')
+    expect(artists[0].files).toHaveLength(3)
+    expect(artists[0].albumCount).toBe(3)
+  })
+
+  it('merges artist names with missing accents and small spelling drift', () => {
+    const items = [
+      {
+        file: 'Andr Haze/Album A/01.flac',
+        artist: 'Andr Haze',
+        album: 'Album A',
+        title: 'One',
+      },
+      {
+        file: 'André Hazes/Album B/01.flac',
+        artist: 'André Hazes',
+        album: 'Album B',
+        title: 'Two',
+      },
+    ]
+
+    const artists = groupArtists(items)
+    expect(artists).toHaveLength(1)
+    expect(artists[0].name).toBe('André Hazes')
     expect(artists[0].files).toHaveLength(2)
   })
 
@@ -227,7 +257,27 @@ describe('library path helpers', () => {
     expect(genres[0].files).toHaveLength(2)
   })
 
-  it('groups specific genres like Swing instead of collapsing to browse parents', () => {
+  it('merges genre casing variants into one display bucket', () => {
+    const items = [
+      {
+        file: 'Artist A/Album/01.flac',
+        genre: 'Progressive Rock',
+        browse_genre: 'Progressive Rock',
+      },
+      {
+        file: 'Artist B/Album/01.flac',
+        genre: 'Progressive rock',
+        browse_genre: 'Progressive rock',
+      },
+    ]
+
+    const genres = groupGenres(items)
+    expect(genres).toHaveLength(1)
+    expect(genres[0].name).toBe('Progressive Rock')
+    expect(genres[0].files).toHaveLength(2)
+  })
+
+  it('groups specific genres like Swing under their browse parents', () => {
     const items = [
       {
         file: 'Swing Sisters/Swing/01.flac',
@@ -243,9 +293,36 @@ describe('library path helpers', () => {
 
     const genres = groupGenres(items)
     expect(genres).toHaveLength(1)
-    expect(genres[0].name).toBe('Swing')
-    expect(genres[0].subgenres).toEqual(['Jazz'])
-    expect(libraryGenreName(items[0])).toBe('Swing')
+    expect(genres[0].name).toBe('Jazz')
+    expect(genres[0].subgenres).toEqual(['Swing'])
+    expect(libraryGenreName(items[0])).toBe('Jazz')
+  })
+
+  it('uses broad browse genres for cleaner library genre buckets', () => {
+    const items = [
+      {
+        file: 'Artist A/Album/01.flac',
+        genre: 'Neo Soul',
+        browse_genre: 'R&B',
+      },
+      {
+        file: 'Artist B/Album/01.flac',
+        genre: 'Contemporary R&B',
+        browse_genre: 'R&B',
+      },
+      {
+        file: 'Artist C/Album/01.flac',
+        genre: 'Country Rap',
+        browse_genre: 'Country',
+      },
+    ]
+
+    const genres = groupGenres(items)
+    expect(genres.map((genre) => genre.name)).toEqual(['Country', 'R&B'])
+    expect(genres.find((genre) => genre.name === 'R&B').subgenres).toEqual([
+      'Contemporary R&B',
+      'Neo Soul',
+    ])
   })
 
   it('groups genre cover files from distinct albums', () => {

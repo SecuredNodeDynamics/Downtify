@@ -91,7 +91,7 @@
             :class="{ 'icon-btn-error': libraryRefreshFailed }"
             :title="t('common.refresh')"
             :disabled="libraryRefreshLoading"
-            @click="refreshLibrary()"
+            @click.stop.prevent="refreshLibraryInPlace"
           >
             <Icon
               icon="clarity:refresh-line"
@@ -207,4 +207,13 @@ const {
   visible: downloadRefreshVisible,
   refresh: refreshDownload,
 } = useDownloadRefresh()
+
+async function refreshLibraryInPlace() {
+  if (route.name !== 'List') return
+  const originalPath = route.fullPath
+  await refreshLibrary()
+  if (router.currentRoute.value.name === 'Home') {
+    await router.replace(originalPath || { name: 'List' })
+  }
+}
 </script>

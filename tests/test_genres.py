@@ -13,6 +13,7 @@ def test_canonical_genre_accepts_spotify_style_tags():
     assert canonical_genre('neo soul') == 'Neo Soul'
     assert canonical_genre('smooth jazz') == 'Smooth Jazz'
     assert canonical_genre('classical crossover') == 'Classical Crossover'
+    assert canonical_genre('Progressive rock') == 'Progressive Rock'
     assert canonical_genre('hip hop') == 'Hip-Hop'
     assert canonical_genre('Hip Hop') == 'Hip-Hop'
 
