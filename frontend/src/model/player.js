@@ -17,6 +17,8 @@ import { usesEmbeddedServer } from './serverConnection.js'
 
 const VOLUME_KEY = 'downtify-player-volume'
 const SESSION_KEY = 'downtify-player-session-v1'
+const SLOW_PLAYBACK_MS = 1500
+const PLAYBACK_START_WATCHDOG_MS = 7000
 
 const playlist = ref([])
 const currentIndex = ref(-1)
@@ -40,6 +42,7 @@ let playingFile = ''
 // the stream is paused by the browser even though playback is still intended.
 let playbackIntent = false
 let recoverTimer = 0
+let playbackWatchdogTimer = 0
 let recoverAttempts = 0
 let recovering = false
 let mediaSessionReady = false
@@ -47,6 +50,35 @@ let lastMediaPositionSyncAt = 0
 let lastSessionPersistAt = 0
 let applyTrackSeq = 0
 let pendingSession = readPlayerSession()
+
+function nowMs() {
+  return typeof performance !== 'undefined' && performance.now
+    ? performance.now()
+    : Date.now()
+}
+
+function logSlowPlayback(stage, startedAt, track, extra = {}) {
+  const elapsed = Math.round(nowMs() - startedAt)
+  if (elapsed < SLOW_PLAYBACK_MS) return
+  console.warn('[Downtify player] slow playback', {
+    stage,
+    elapsedMs: elapsed,
+    file: track?.file || '',
+    ...extra,
+  })
+}
+
+function preloadPlaybackUrlAt(index) {
+  const track = playlist.value[index]
+  if (!track?.file || track.url) return
+  resolvePlaybackUrl(track.file)
+    .then((url) => {
+      if (url && playlist.value[index]?.file === track.file) {
+        playlist.value[index].url = url
+      }
+    })
+    .catch(() => {})
+}
 
 function readPlayerSession() {
   try {
@@ -157,6 +189,7 @@ function resumePlaybackIfNeeded() {
 
 function playAudioWithRecovery(el = audio) {
   if (!el) return Promise.resolve(false)
+  armPlaybackStartWatchdog(el)
   return el
     .play()
     .then(() => true)
@@ -164,6 +197,41 @@ function playAudioWithRecovery(el = audio) {
       if (el === audio && playbackIntent) scheduleRecovery()
       return false
     })
+}
+
+function clearPlaybackStartWatchdog() {
+  if (playbackWatchdogTimer) {
+    clearTimeout(playbackWatchdogTimer)
+    playbackWatchdogTimer = 0
+  }
+}
+
+function armPlaybackStartWatchdog(el = audio) {
+  clearPlaybackStartWatchdog()
+  if (!el || !playbackIntent) return
+  const file = playingFile
+  const startedAt = nowMs()
+  const startTime = Number.isFinite(el.currentTime) ? el.currentTime : 0
+  playbackWatchdogTimer = setTimeout(() => {
+    playbackWatchdogTimer = 0
+    if (el !== audio || !playbackIntent || isSeeking || playingFile !== file) {
+      return
+    }
+    const current = Number.isFinite(el.currentTime) ? el.currentTime : 0
+    const advanced = current > startTime + 0.25
+    const hasMetadata =
+      Number.isFinite(el.duration) && el.duration > 0 && el.readyState >= 1
+    const healthy = advanced || (hasMetadata && el.readyState >= 3)
+    if (healthy) return
+
+    logSlowPlayback('watchdog-recovery', startedAt, currentTrack.value, {
+      readyState: el.readyState,
+      networkState: el.networkState,
+      currentTime: current,
+      duration: Number.isFinite(el.duration) ? el.duration : 0,
+    })
+    scheduleRecovery({ force: true })
+  }, PLAYBACK_START_WATCHDOG_MS)
 }
 
 async function ensureMediaSession() {
@@ -201,12 +269,13 @@ function resetRecovery() {
   recoverAttempts = 0
   recovering = false
   clearRecoverTimer()
+  clearPlaybackStartWatchdog()
 }
 
-function recoveryContext() {
+function recoveryContext({ force = false } = {}) {
   return {
     playbackIntent,
-    streamed: isStreamedPlayback(),
+    streamed: force || isStreamedPlayback(),
     paused: audio ? audio.paused : true,
     seeking: isSeeking,
     readyState: audio ? audio.readyState : 0,
@@ -214,19 +283,19 @@ function recoveryContext() {
   }
 }
 
-function scheduleRecovery() {
+function scheduleRecovery(options = {}) {
   if (!audio || recoverTimer || recovering) return
-  if (!shouldRecoverPlayback(recoveryContext())) return
+  if (!shouldRecoverPlayback(recoveryContext(options))) return
   const delay = recoveryDelayMs(recoverAttempts)
   recoverTimer = setTimeout(() => {
     recoverTimer = 0
-    void attemptRecovery()
+    void attemptRecovery(options)
   }, delay)
 }
 
-function attemptRecovery() {
+function attemptRecovery(options = {}) {
   if (!audio || recovering) return
-  if (!shouldRecoverPlayback(recoveryContext())) return
+  if (!shouldRecoverPlayback(recoveryContext(options))) return
 
   recovering = true
   recoverAttempts += 1
@@ -235,7 +304,7 @@ function attemptRecovery() {
 
   const finishFailure = () => {
     recovering = false
-    scheduleRecovery()
+    scheduleRecovery(options)
   }
 
   const resume = () => {
@@ -427,8 +496,12 @@ async function applyTrack(
   }
   syncMediaSessionNow({ position: true })
 
+  const startedAt = nowMs()
   const nextUrl = await resolvePlaybackUrl(track.file)
   if (seq !== applyTrackSeq || currentIndex.value !== index) return
+  logSlowPlayback('resolve-url', startedAt, track, {
+    embedded: usesEmbeddedServer(),
+  })
   track.url = nextUrl
 
   const sameSource =
@@ -442,6 +515,18 @@ async function applyTrack(
     resetRecovery()
     playingFile = track.file
     a.src = nextUrl
+    const reportLoadedMetadata = () => {
+      if (seq === applyTrackSeq && playingFile === track.file) {
+        logSlowPlayback('loaded-metadata', startedAt, track)
+      }
+    }
+    const reportPlaying = () => {
+      if (seq === applyTrackSeq && playingFile === track.file) {
+        logSlowPlayback('playing', startedAt, track)
+      }
+    }
+    a.addEventListener('loadedmetadata', reportLoadedMetadata, { once: true })
+    a.addEventListener('playing', reportPlaying, { once: true })
     a.load()
     if (resetTime) {
       a.currentTime = 0
@@ -470,12 +555,20 @@ async function applyTrack(
       playbackIntent = true
       await playAudioWithRecovery(a)
     }
+    preloadPlaybackUrlAt(index + 1)
+    if (shuffle.value && shuffleOrder.length) {
+      preloadPlaybackUrlAt(shuffleOrder[shufflePos + 1])
+    }
     return
   }
 
   if ((autoplay || wasPlaying) && a.paused) {
     playbackIntent = true
     await playAudioWithRecovery(a)
+  }
+  preloadPlaybackUrlAt(index + 1)
+  if (shuffle.value && shuffleOrder.length) {
+    preloadPlaybackUrlAt(shuffleOrder[shufflePos + 1])
   }
 }
 
@@ -581,6 +674,7 @@ function play() {
 function pause() {
   playbackIntent = false
   resetRecovery()
+  clearPlaybackStartWatchdog()
   if (audio) audio.pause()
   persistPlayerSession(true)
 }

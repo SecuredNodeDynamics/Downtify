@@ -1382,6 +1382,8 @@ import { useI18n } from '/src/i18n'
 defineOptions({ name: 'Player' })
 
 const LYRICS_OFFSET_KEY = 'downtify-player-lyrics-offset'
+const GENRE_REFRESH_DELAYS_MS = [15000, 60000, 300000]
+const PLAYBACK_REFRESH_DELAY_MS = 30000
 
 const playerServerKey = buildApiBaseUrl(getServerConfig())
 const initialPlayerSnapshot = getInitialLibrarySnapshot(playerServerKey)
@@ -1482,6 +1484,7 @@ function suppressSimilarMediaClick(event) {
   event.stopPropagation()
 }
 let genreRefreshTimers = []
+let deferredLibraryRefreshTimer = 0
 let stopLibraryListener = null
 
 const unknownGenreLabel = computed(() => t('player.unknownGenre'))
@@ -2262,7 +2265,21 @@ async function applyFetchedLibrary(items) {
   syncPlayerPlaylist(items.map((item) => item.file))
 }
 
+function deferLibraryMetadataRefresh(force = false) {
+  if (deferredLibraryRefreshTimer) {
+    clearTimeout(deferredLibraryRefreshTimer)
+  }
+  deferredLibraryRefreshTimer = setTimeout(() => {
+    deferredLibraryRefreshTimer = 0
+    void refreshLibraryMetadataInBackground(force)
+  }, PLAYBACK_REFRESH_DELAY_MS)
+}
+
 async function refreshLibraryMetadataInBackground(force = false) {
+  if (player.isPlaying.value) {
+    deferLibraryMetadataRefresh(force)
+    return
+  }
   try {
     const items = await API.refreshLibraryInBackground(force)
     if (items.length > 0 && !libraryItemsUnchanged(items)) {
@@ -2314,7 +2331,7 @@ function scheduleGenreRefresh(items) {
   clearGenreRefreshTimers()
   if (countUnknownGenres(items) === 0) return
 
-  for (const delay of [3000, 10000, 30000, 90000, 300000]) {
+  for (const delay of GENRE_REFRESH_DELAYS_MS) {
     genreRefreshTimers.push(
       setTimeout(() => {
         refreshLibraryGenres()
@@ -2592,6 +2609,10 @@ onActivated(() => {
 onUnmounted(() => {
   stopLibraryListener?.()
   clearGenreRefreshTimers()
+  if (deferredLibraryRefreshTimer) {
+    clearTimeout(deferredLibraryRefreshTimer)
+    deferredLibraryRefreshTimer = 0
+  }
   onSeekEnd()
   if (seekRaf) {
     cancelAnimationFrame(seekRaf)
