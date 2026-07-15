@@ -910,12 +910,12 @@ async function startBackendSession() {
   return version
 }
 
-function refreshLibraryInBackground(force = false) {
+function refreshLibraryInBackground(force = false, options = {}) {
   return refreshLibrarySession(fetchLibraryItemsFromApi, {
     serverKey: libraryServerKey(),
     force,
   }).then((items) => {
-    if (items?.length) warmLibraryCovers(items)
+    if (items?.length && options.warmCovers !== false) warmLibraryCovers(items)
     return items
   })
 }

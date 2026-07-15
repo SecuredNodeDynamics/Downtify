@@ -1376,7 +1376,11 @@ import {
   consumePlayerNavigation,
   resolvePlayerBrowseState,
 } from '/src/model/playerNavigation'
-import { buildApiBaseUrl, getServerConfig } from '/src/model/serverConnection'
+import {
+  buildApiBaseUrl,
+  getServerConfig,
+  isCapacitorNative,
+} from '/src/model/serverConnection'
 import { useI18n } from '/src/i18n'
 
 defineOptions({ name: 'Player' })
@@ -1384,6 +1388,8 @@ defineOptions({ name: 'Player' })
 const LYRICS_OFFSET_KEY = 'downtify-player-lyrics-offset'
 const GENRE_REFRESH_DELAYS_MS = [15000, 60000, 300000]
 const PLAYBACK_REFRESH_DELAY_MS = 30000
+const NATIVE_SIMILAR_MEDIA_DELAY_MS = 5000
+const WEB_SIMILAR_MEDIA_DELAY_MS = 300
 
 const playerServerKey = buildApiBaseUrl(getServerConfig())
 const initialPlayerSnapshot = getInitialLibrarySnapshot(playerServerKey)
@@ -1485,6 +1491,8 @@ function suppressSimilarMediaClick(event) {
 }
 let genreRefreshTimers = []
 let deferredLibraryRefreshTimer = 0
+let similarArtistsTimer = 0
+let similarTracksTimer = 0
 let stopLibraryListener = null
 
 const unknownGenreLabel = computed(() => t('player.unknownGenre'))
@@ -1645,6 +1653,17 @@ async function loadSimilarArtists(artistName) {
   if (seq === similarArtistsRequestSeq) {
     similarArtistsLoading.value = false
   }
+}
+
+function scheduleSimilarArtistsLoad(artistName) {
+  if (similarArtistsTimer) clearTimeout(similarArtistsTimer)
+  const delay = isCapacitorNative()
+    ? NATIVE_SIMILAR_MEDIA_DELAY_MS
+    : WEB_SIMILAR_MEDIA_DELAY_MS
+  similarArtistsTimer = setTimeout(() => {
+    similarArtistsTimer = 0
+    void loadSimilarArtists(artistName)
+  }, delay)
 }
 
 function normalizedArtistKey(name) {
@@ -2086,6 +2105,17 @@ async function loadSimilarTracks(title, artistName) {
   }
 }
 
+function scheduleSimilarTracksLoad(title, artistName) {
+  if (similarTracksTimer) clearTimeout(similarTracksTimer)
+  const delay = isCapacitorNative()
+    ? NATIVE_SIMILAR_MEDIA_DELAY_MS
+    : WEB_SIMILAR_MEDIA_DELAY_MS
+  similarTracksTimer = setTimeout(() => {
+    similarTracksTimer = 0
+    void loadSimilarTracks(title, artistName)
+  }, delay)
+}
+
 const currentAlbumKey = computed(() => {
   const item = currentLibraryItem.value
   if (!item?.album) return ''
@@ -2160,6 +2190,21 @@ function setLyricLineRef(el, index) {
   if (el) lyricLineRefs.value[index] = el
 }
 
+function centerActiveLyric(index) {
+  const scroller = lyricsScroller.value
+  const line = lyricLineRefs.value[index]
+  if (!scroller || !line) return
+  const target =
+    line.offsetTop -
+    scroller.offsetTop -
+    scroller.clientHeight / 2 +
+    line.clientHeight / 2
+  scroller.scrollTo({
+    top: Math.max(0, target),
+    behavior: 'smooth',
+  })
+}
+
 async function loadLyricsForFile(file) {
   lyricsRequestSeq += 1
   const seq = lyricsRequestSeq
@@ -2225,7 +2270,7 @@ function applyLibraryItems(items) {
   const options = libraryGroupOptions.value
   libraryItems.value = items.map((item) => normalizeLibraryItem(item, options))
   files.value = libraryItems.value.map((item) => item.file)
-  API.warmLibraryCovers(libraryItems.value)
+  warmPlayerLibraryCovers()
 }
 
 function hydrateLibraryFromSession() {
@@ -2243,8 +2288,13 @@ function hydrateLibraryFromSession() {
     syncPlayerPlaylist(files.value)
   }
 
-  API.warmLibraryCovers(libraryItems.value)
+  warmPlayerLibraryCovers()
   return true
+}
+
+function warmPlayerLibraryCovers() {
+  if (isCapacitorNative() && player.isPlaying.value) return
+  API.warmLibraryCovers(libraryItems.value)
 }
 
 async function fetchPlayerLibraryItems(options = {}) {
@@ -2281,7 +2331,9 @@ async function refreshLibraryMetadataInBackground(force = false) {
     return
   }
   try {
-    const items = await API.refreshLibraryInBackground(force)
+    const items = await API.refreshLibraryInBackground(force, {
+      warmCovers: !(isCapacitorNative() && player.isPlaying.value),
+    })
     if (items.length > 0 && !libraryItemsUnchanged(items)) {
       applyLibraryItems(items)
       if (!libraryPathsUnchanged(items)) {
@@ -2557,7 +2609,7 @@ watch(
 watch(
   currentArtistName,
   (artistName) => {
-    void loadSimilarArtists(artistName)
+    scheduleSimilarArtistsLoad(artistName)
   },
   { immediate: true }
 )
@@ -2570,7 +2622,7 @@ watch(
   ],
   ([title, artistName, file]) => {
     const resolvedTitle = title || trackInfoFromFile(file).title
-    void loadSimilarTracks(resolvedTitle, artistName)
+    scheduleSimilarTracksLoad(resolvedTitle, artistName)
   },
   { immediate: true }
 )
@@ -2578,16 +2630,13 @@ watch(
 watch(activeLyricIndex, async (index) => {
   if (!lyricsOpen.value || index < 0) return
   await nextTick()
-  lyricLineRefs.value[index]?.scrollIntoView({
-    block: 'center',
-    behavior: 'smooth',
-  })
+  centerActiveLyric(index)
 })
 
 onMounted(() => {
   window.scroll(0, 0)
   if (libraryItems.value.length) {
-    API.warmLibraryCovers(libraryItems.value)
+    warmPlayerLibraryCovers()
     syncPlayerPlaylist(files.value)
   }
   load()
@@ -2609,6 +2658,14 @@ onActivated(() => {
 onUnmounted(() => {
   stopLibraryListener?.()
   clearGenreRefreshTimers()
+  if (similarArtistsTimer) {
+    clearTimeout(similarArtistsTimer)
+    similarArtistsTimer = 0
+  }
+  if (similarTracksTimer) {
+    clearTimeout(similarTracksTimer)
+    similarTracksTimer = 0
+  }
   if (deferredLibraryRefreshTimer) {
     clearTimeout(deferredLibraryRefreshTimer)
     deferredLibraryRefreshTimer = 0
@@ -2716,6 +2773,7 @@ onUnmounted(() => {
   max-height: clamp(7.5rem, 22dvh, 13rem);
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  contain: layout paint;
   overscroll-behavior-y: contain;
   scrollbar-width: none;
 }
