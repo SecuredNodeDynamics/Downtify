@@ -444,7 +444,7 @@
 
               <ul v-else class="queue-list">
                 <li
-                  v-for="item in pt.activeQueue.value"
+                  v-for="item in visibleActiveQueue"
                   :key="item.song.song_id || item.song.name"
                   class="queue-item"
                 >
@@ -515,6 +515,10 @@
                   </div>
                 </li>
               </ul>
+              <p v-if="hiddenActiveQueueCount > 0" class="queue-overflow-note">
+                {{ hiddenActiveQueueCount }} more queued items hidden while the
+                app catches up.
+              </p>
             </template>
 
             <template v-else-if="activeTab === 'failed'">
@@ -895,6 +899,14 @@ const manageView = ref('tracks')
 const manageDeleting = ref({})
 let manageFetchSeq = 0
 let stopManageLibraryListener = null
+const MAX_VISIBLE_QUEUE_ITEMS = 20
+
+const visibleActiveQueue = computed(() =>
+  pt.activeQueue.value.slice(0, MAX_VISIBLE_QUEUE_ITEMS)
+)
+const hiddenActiveQueueCount = computed(() =>
+  Math.max(0, pt.activeQueue.value.length - MAX_VISIBLE_QUEUE_ITEMS)
+)
 
 const filteredManageItems = computed(() => {
   const query = manageQuery.value.trim()
@@ -1467,6 +1479,10 @@ onUnmounted(() => {
 
 .queue-list {
   @apply space-y-2;
+}
+
+.queue-overflow-note {
+  @apply mt-3 rounded-xl border border-white/10 bg-base-100/45 px-3 py-2 text-center text-xs font-medium text-base-content/50;
 }
 
 .failed-tab-actions {

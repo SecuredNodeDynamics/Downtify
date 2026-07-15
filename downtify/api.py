@@ -100,6 +100,7 @@ DEFAULT_SETTINGS: dict[str, Any] = {
 
 DOWNLOAD_PROGRESS_MIN_INTERVAL = 0.25
 DOWNLOAD_PROGRESS_MIN_DELTA = 1.0
+MAX_PENDING_DOWNLOAD_JOBS = 20
 
 AUDIO_EXTENSIONS = {'.mp3', '.m4a', '.flac', '.ogg', '.wav', '.aac', '.opus'}
 GITHUB_REPO = 'SecuredNodeDynamics/Downtify'
@@ -3781,6 +3782,30 @@ def _register_job(
     return song_id
 
 
+def _pending_download_job_count() -> int:
+    return sum(
+        1
+        for job in state.download_jobs.values()
+        if job.get('status') in {'queued', 'downloading'}
+    )
+
+
+def _ensure_download_queue_capacity(additional: int) -> None:
+    count = max(0, int(additional or 0))
+    if count <= 0:
+        return
+    pending = _pending_download_job_count()
+    remaining = MAX_PENDING_DOWNLOAD_JOBS - pending
+    if count > remaining:
+        raise HTTPException(
+            status_code=429,
+            detail=(
+                f'Download queue is full. {pending} pending, '
+                f'{remaining} slots available.'
+            ),
+        )
+
+
 async def _run_download(
     song: dict[str, Any],
     song_id: str,
@@ -3941,6 +3966,7 @@ async def download_endpoint(
         song.get('year'),
         song.get('release_date'),
     )
+    _ensure_download_queue_capacity(1)
     song_id = _register_job(song, status='downloading')
     history_id = (
         state.history_db.create(song, status='downloading', source_url=url)
@@ -4055,6 +4081,8 @@ async def download_batch_endpoint(request: Request) -> dict[str, Any]:
         raise HTTPException(
             status_code=400, detail='songs must be a non-empty list'
         )
+    valid_input_count = sum(1 for song in songs if isinstance(song, dict))
+    _ensure_download_queue_capacity(valid_input_count)
     playlist_url = str(payload.get('playlist_url') or '')
     generate_m3u = bool(payload.get('generate_m3u', True))
 

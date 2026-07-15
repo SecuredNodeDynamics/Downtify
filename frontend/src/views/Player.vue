@@ -1305,7 +1305,8 @@
                   {{
                     downloadButtonState(selectedSimilarTrack) === 'loading'
                       ? t('common.downloading')
-                      : downloadButtonState(selectedSimilarTrack) === 'done'
+                      : downloadButtonState(selectedSimilarTrack) === 'done' ||
+                          downloadButtonState(selectedSimilarTrack) === 'queued'
                         ? t('common.done')
                         : t('common.download')
                   }}
@@ -2040,6 +2041,7 @@ function downloadButtonClass(item) {
   const state = downloadButtonState(item)
   return {
     'download-button-loading': state === 'loading',
+    'download-button-queued': state === 'queued',
     'download-button-done': state === 'done',
   }
 }
@@ -2047,6 +2049,7 @@ function downloadButtonClass(item) {
 function downloadButtonIcon(item) {
   const state = downloadButtonState(item)
   if (state === 'loading') return 'clarity:sync-line'
+  if (state === 'queued') return 'clarity:check-line'
   if (state === 'done') return 'clarity:check-line'
   return 'clarity:download-line'
 }
@@ -2063,8 +2066,7 @@ async function downloadSimilarArtistItem(item) {
       clearDownloadButtonState(item)
       return
     }
-    setDownloadButtonState(item, 'done')
-    setTimeout(() => clearDownloadButtonState(item), 1400)
+    setDownloadButtonState(item, 'queued')
   } catch (error) {
     console.warn('Similar artist download failed:', item, error)
     clearDownloadButtonState(item)
@@ -3311,6 +3313,19 @@ onUnmounted(() => {
   box-shadow:
     0 0 0 1px rgb(26 208 92 / 0.26),
     0 0 22px rgb(26 208 92 / 0.32);
+}
+
+.download-button-queued {
+  @apply pointer-events-none border-white/10 bg-base-300/60 text-base-content/55 shadow-none;
+}
+
+.similar-track-download.download-button-queued,
+.queue-track-download.download-button-queued {
+  @apply bg-base-300/60 text-base-content/55;
+}
+
+.queue-album-download-btn.download-button-queued {
+  @apply text-base-content/55;
 }
 
 .similar-track-owned {

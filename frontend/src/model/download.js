@@ -25,6 +25,7 @@ const STATUS = {
   DOWNLOADED: 'Done',
   ERROR: 'Error',
 }
+const MAX_PENDING_DOWNLOADS = 20
 
 const downloadQueue = ref([])
 const activeQueue = computed(() =>
@@ -268,12 +269,16 @@ export function useDownloadManager() {
   const settingsManager = useSettingsManager()
 
   function queueBatch(songs, playlistUrl = '') {
-    const generateM3u = settingsManager.settings.value.generate_m3u !== false
-    for (const song of songs) {
-      if (!progressTracker.getBySong(song)) {
-        progressTracker.appendSong(song)
-      }
+    const incoming = Array.isArray(songs) ? songs.filter(Boolean).length : 0
+    const pending = activeDownloadCount.value
+    const remaining = MAX_PENDING_DOWNLOADS - pending
+    if (incoming > remaining) {
+      return Promise.resolve({
+        failed: true,
+        error: `Download queue is full. ${pending} pending, ${Math.max(0, remaining)} slots available.`,
+      })
     }
+    const generateM3u = settingsManager.settings.value.generate_m3u !== false
     return API.downloadBatch({
       songs,
       playlist_url: playlistUrl,
@@ -284,8 +289,9 @@ export function useDownloadManager() {
         return res
       })
       .catch((err) => {
-        console.log('Batch submit failed:', err.message)
-        return { failed: true, error: err.message }
+        const message = err?.response?.data?.detail || err.message
+        console.log('Batch submit failed:', message)
+        return { failed: true, error: message }
       })
   }
 
@@ -334,8 +340,9 @@ export function useDownloadManager() {
       }
       return { album, queued: true, count: songs.length }
     } catch (err) {
-      console.log('Album queue failed:', err.message)
-      return { album, failed: true, error: err.message }
+      const message = err?.response?.data?.detail || err.message
+      console.log('Album queue failed:', message)
+      return { album, failed: true, error: message }
     } finally {
       loading.value = false
     }
@@ -373,6 +380,13 @@ export function useDownloadManager() {
 
   async function queue(song, beginDownload = true) {
     if (!song) return Promise.resolve({ song, filename: null })
+    if (activeDownloadCount.value >= MAX_PENDING_DOWNLOADS) {
+      return Promise.resolve({
+        song,
+        failed: true,
+        error: `Download queue is full. ${activeDownloadCount.value} pending, 0 slots available.`,
+      })
+    }
     if (await isMediaOwned(song)) {
       return Promise.resolve({ song, filename: null, skipped: true })
     }
