@@ -1,5 +1,5 @@
 <template>
-  <StarField v-if="!isNativeApp" />
+  <StarField v-if="showStarField" />
   <AppLoadingOverlay />
   <div
     class="app-shell flex min-h-dvh flex-col overflow-x-hidden text-base-content lg:min-h-dvh lg:overflow-visible"
@@ -7,7 +7,7 @@
     <MobileAppBar />
     <main class="mobile-main flex-1 overflow-x-hidden">
       <router-view v-slot="{ Component, route }">
-        <transition :name="routeTransitionName(route)">
+        <transition name="page-instant">
           <keep-alive :include="keepAliveViews">
             <component :is="Component" :key="route.name" />
           </keep-alive>
@@ -33,7 +33,6 @@ import MobileSearchSheet from './components/MobileSearchSheet.vue'
 import StarField from './components/StarField.vue'
 import router, { preloadRouteComponents } from './router'
 import API from './model/api'
-import { beginAppLoading, endAppLoading } from './model/appLoading'
 import { bootstrapAppUpdateNotice } from './model/appUpdateNotice'
 import {
   bootstrapEmbeddedServer,
@@ -43,10 +42,14 @@ import { isCapacitorNative, usesEmbeddedServer } from './model/serverConnection'
 import { useBinaryThemeManager } from './model/theme'
 
 const isNativeApp = isCapacitorNative()
-const keepAliveViews = computed(() =>
-  isNativeApp ? ['Player'] : ['Player', 'List', 'Settings', 'Download']
+const showStarField = computed(
+  () => !isNativeApp || router.currentRoute.value.name === 'Home'
 )
-const warmedRoutes = new Set(['Home'])
+const keepAliveViews = computed(() =>
+  isNativeApp
+    ? ['Player', 'List', 'Search', 'Download']
+    : ['Player', 'List', 'Search', 'Settings', 'Download']
+)
 
 const themeMgr = useBinaryThemeManager()
 onBeforeMount(() => {
@@ -54,26 +57,9 @@ onBeforeMount(() => {
   themeMgr.setDarkAlias('downtify-dark')
 })
 
-function routeTransitionName(route) {
-  return warmedRoutes.has(route.name) ? 'page-fast' : 'page'
-}
-
 router.beforeEach((to, from) => {
   if (to.name === from.name) return true
-
-  const instantKeepAlive =
-    keepAliveViews.value.includes(String(to.name)) && warmedRoutes.has(to.name)
-  if (!instantKeepAlive) beginAppLoading()
   return true
-})
-
-router.afterEach((to) => {
-  warmedRoutes.add(to.name)
-  window.requestAnimationFrame(() => {
-    window.requestAnimationFrame(() => {
-      endAppLoading()
-    })
-  })
 })
 
 onMounted(async () => {

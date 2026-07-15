@@ -1,26 +1,17 @@
 import { createWebHistory, createRouter } from 'vue-router'
 import config from '/src/config'
+import Home from '/src/views/Front.vue'
+import Search from '/src/views/Search.vue'
+import Download from '/src/views/Download.vue'
+import List from '/src/views/Downloads.vue'
+import Player from '/src/views/Player.vue'
 
-const Home = () => import('/src/views/Front.vue')
-const Search = () => import('/src/views/Search.vue')
-const Download = () => import('/src/views/Download.vue')
-const List = () => import('/src/views/Downloads.vue')
 const Monitor = () => import('/src/views/Monitor.vue')
-const Player = () => import('/src/views/Player.vue')
 const Health = () => import('/src/views/Health.vue')
 const Metadata = () => import('/src/views/Metadata.vue')
 const Settings = () => import('/src/views/Settings.vue')
 
-const routePreloaders = [
-  Search,
-  Download,
-  List,
-  Player,
-  Monitor,
-  Health,
-  Metadata,
-  Settings,
-]
+const routePreloaders = [Monitor, Health, Settings]
 
 export function preloadRouteComponents() {
   const preload = () => {
