@@ -115,7 +115,10 @@ const routeAction = ref(null)
 const showHealthRefresh = computed(() => route.name === 'Health')
 const showLibraryRefresh = computed(() => route.name === 'List')
 const showDownloadRefresh = computed(
-  () => route.name === 'Download' && downloadRefreshVisible.value
+  () =>
+    route.name === 'Download' &&
+    downloadRefreshVisible.value &&
+    !(routeAction.value && routeAction.value.routeName === route.name)
 )
 
 const pageTitle = computed(() => {

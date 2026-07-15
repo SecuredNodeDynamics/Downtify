@@ -136,6 +136,8 @@ export default {
     empty: 'Nenhum download com falha.',
     emptyHint:
       'Downloads com falha aparecerao aqui com acoes para tentar novamente ou excluir.',
+    retryAll: 'Tentar todos novamente',
+    failedRetryAll: 'Falha ao tentar todos os downloads novamente.',
     delete: 'Excluir',
     deletePrompt: 'Remover "{title}" dos downloads com falha?',
     failedDelete: 'Falha ao remover este download com falha.',

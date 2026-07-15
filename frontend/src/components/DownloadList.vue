@@ -79,7 +79,7 @@
         </button>
 
         <button
-          v-else-if="activeTab === 'history' && sortedHistory.length > 0"
+          v-if="activeTab === 'history' && sortedHistory.length > 0"
           type="button"
           class="queue-action-btn text-error/70 hover:text-error"
           @click="onClearHistory"
@@ -87,6 +87,25 @@
         >
           <Icon icon="clarity:trash-line" class="h-4 w-4" />
           <span class="hidden sm:inline">{{ t('history.clear') }}</span>
+        </button>
+      </div>
+
+      <div
+        v-if="activeTab === 'failed' && failedHistory.length > 0"
+        class="failed-tab-actions"
+      >
+        <button
+          type="button"
+          class="failed-bulk-retry-btn"
+          :disabled="retryAllLoading"
+          @click="retryAllFailedHistory"
+        >
+          <span
+            v-if="retryAllLoading"
+            class="loading loading-spinner loading-xs"
+          />
+          <Icon v-else icon="clarity:refresh-line" class="h-4 w-4" />
+          <span>{{ t('failed.retryAll') }}</span>
         </button>
       </div>
     </div>
@@ -521,12 +540,13 @@
                 </p>
               </div>
 
-              <ul v-else class="failed-grid">
-                <li
-                  v-for="item in failedHistory"
-                  :key="item.id"
-                  class="failed-card"
-                >
+              <template v-else>
+                <ul class="failed-grid">
+                  <li
+                    v-for="item in failedHistory"
+                    :key="item.id"
+                    class="failed-card"
+                  >
                   <div class="flex min-w-0 gap-3">
                     <div class="queue-item-cover h-14 w-14">
                       <CoverImage
@@ -608,8 +628,9 @@
                       <span>{{ t('failed.delete') }}</span>
                     </button>
                   </div>
-                </li>
-              </ul>
+                  </li>
+                </ul>
+              </template>
             </template>
 
             <template v-else>
@@ -840,6 +861,7 @@ const {
   refreshDownloadHistory,
   clearDownloadHistoryState,
   removeHistoryItem,
+  markHistoryRetrying,
   historyDate,
 } = useDownloadHistory()
 const { t } = useI18n()
@@ -847,6 +869,7 @@ const activeTab = ref('queue')
 const historyLoading = ref(false)
 const historyError = ref('')
 const retrying = ref({})
+const retryAllLoading = ref(false)
 const deletingHistory = ref({})
 let historyFetchSeq = 0
 
@@ -901,6 +924,8 @@ const manageCountLabel = computed(() => {
     ? t('manage.count', { count })
     : t('manage.countPlural', { count })
 })
+
+const retryableFailedHistory = computed(() => failedHistory.value)
 
 function coverSrc(url) {
   return API.mediaUrl(url)
@@ -1072,11 +1097,41 @@ async function retryHistory(item) {
   retrying.value = { ...retrying.value, [item.id]: true }
   try {
     await API.retryHistoryItem(item.id)
-    await refreshHistory()
+    markHistoryRetrying(item.id)
   } catch {
     historyError.value = t('history.failedRetry')
   } finally {
     retrying.value = { ...retrying.value, [item.id]: false }
+  }
+}
+
+async function retryAllFailedHistory() {
+  const items = retryableFailedHistory.value.filter(
+    (item) => item?.id !== undefined && retrying.value[item.id] !== true
+  )
+  if (!items.length || retryAllLoading.value) return
+
+  retryAllLoading.value = true
+  historyError.value = ''
+  retrying.value = {
+    ...retrying.value,
+    ...Object.fromEntries(items.map((item) => [item.id, true])),
+  }
+
+  try {
+    await Promise.all(items.map((item) => API.retryHistoryItem(item.id)))
+    for (const item of items) {
+      markHistoryRetrying(item.id)
+    }
+  } catch {
+    historyError.value = t('failed.failedRetryAll')
+  } finally {
+    const nextRetrying = { ...retrying.value }
+    for (const item of items) {
+      nextRetrying[item.id] = false
+    }
+    retrying.value = nextRetrying
+    retryAllLoading.value = false
   }
 }
 
@@ -1152,6 +1207,41 @@ function refreshActiveTab() {
   return Promise.resolve()
 }
 
+function syncMobileFailedAction() {
+  if (typeof window === 'undefined') return
+  if (
+    activeTab.value !== 'failed' ||
+    retryableFailedHistory.value.length === 0
+  ) {
+    clearMobileFailedAction()
+    return
+  }
+  window.dispatchEvent(
+    new CustomEvent('downtify:mobile-route-action', {
+      detail: {
+        routeName: 'Download',
+        icon: retryAllLoading.value
+          ? 'clarity:refresh-line'
+          : 'clarity:refresh-line',
+        label: t('failed.retryAll'),
+        title: t('failed.retryAll'),
+        onClick: () => {
+          void retryAllFailedHistory()
+        },
+      },
+    })
+  )
+}
+
+function clearMobileFailedAction() {
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(
+    new CustomEvent('downtify:clear-mobile-route-action', {
+      detail: { routeName: 'Download' },
+    })
+  )
+}
+
 function syncDownloadRefreshVisibility() {
   downloadRefresh.setVisible(
     activeTab.value === 'history' ||
@@ -1167,6 +1257,7 @@ watch(activeTab, (tab) => {
     void refreshManage({ background: manageItems.value.length > 0 })
   }
   syncDownloadRefreshVisibility()
+  syncMobileFailedAction()
 })
 
 watch(
@@ -1174,6 +1265,14 @@ watch(
   () => {
     void refreshHistory()
   }
+)
+
+watch(
+  [retryableFailedHistory, retryAllLoading],
+  () => {
+    syncMobileFailedAction()
+  },
+  { deep: true }
 )
 
 function registerManageLibraryListener() {
@@ -1191,6 +1290,7 @@ onMounted(() => {
   registerManageLibraryListener()
   downloadRefresh.register(refreshActiveTab)
   syncDownloadRefreshVisibility()
+  syncMobileFailedAction()
 })
 
 onActivated(() => {
@@ -1198,6 +1298,7 @@ onActivated(() => {
   registerManageLibraryListener()
   downloadRefresh.register(refreshActiveTab)
   syncDownloadRefreshVisibility()
+  syncMobileFailedAction()
   if (activeTab.value === 'manage') {
     void refreshManage({ background: manageItems.value.length > 0 })
   }
@@ -1209,10 +1310,12 @@ onDeactivated(() => {
     stopManageLibraryListener = null
   }
   downloadRefresh.unregister()
+  clearMobileFailedAction()
 })
 
 onUnmounted(() => {
   downloadRefresh.unregister()
+  clearMobileFailedAction()
 })
 </script>
 
@@ -1227,13 +1330,13 @@ onUnmounted(() => {
 }
 
 .queue-toolbar {
-  @apply flex items-center gap-2;
+  @apply flex flex-wrap items-center gap-2;
   background: transparent;
   box-shadow: none;
 }
 
 .queue-tabs {
-  @apply inline-flex min-w-0 flex-1 gap-0.5 overflow-hidden rounded-full border border-white/10 bg-base-100/75 p-1 sm:gap-1;
+  @apply inline-flex min-w-full flex-1 gap-0.5 overflow-hidden rounded-full border border-white/10 bg-base-100/75 p-1 sm:min-w-0 sm:gap-1;
 }
 
 .queue-tab-btn {
@@ -1321,6 +1424,14 @@ onUnmounted(() => {
 
 .queue-list {
   @apply space-y-2;
+}
+
+.failed-tab-actions {
+  @apply flex justify-end;
+}
+
+.failed-bulk-retry-btn {
+  @apply inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-primary/30 bg-primary/10 px-4 text-sm font-semibold text-primary transition-colors hover:border-primary/50 hover:bg-primary/15 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto;
 }
 
 .failed-grid {

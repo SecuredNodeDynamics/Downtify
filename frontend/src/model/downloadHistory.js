@@ -98,6 +98,22 @@ export function removeHistoryItem(historyId) {
   history.value = history.value.filter((item) => item.id !== historyId)
 }
 
+export function markHistoryRetrying(historyId) {
+  history.value = sortHistoryItems(
+    history.value.map((item) =>
+      item.id === historyId
+        ? {
+            ...item,
+            status: 'downloading',
+            error: '',
+            filename: '',
+            updated_at: new Date().toISOString(),
+          }
+        : item
+    )
+  )
+}
+
 export function useDownloadHistory() {
   const sortedHistory = computed(() =>
     sortHistoryItems(
@@ -118,6 +134,7 @@ export function useDownloadHistory() {
     upsertHistoryItem,
     clearDownloadHistoryState,
     removeHistoryItem,
+    markHistoryRetrying,
     sortHistoryItems,
     historyDate,
   }

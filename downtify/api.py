@@ -4177,6 +4177,7 @@ async def retry_history_item(history_id: int) -> dict[str, Any]:
         raise HTTPException(status_code=400, detail='History item has no song')
 
     song_id = _register_job(song, status='queued', history_id=history_id)
+    state.history_db.mark_running(history_id)
     await state.connections.broadcast({
         'song': song,
         'progress': 0,

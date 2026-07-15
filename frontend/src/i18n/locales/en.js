@@ -136,6 +136,8 @@ export default {
     empty: 'No failed downloads.',
     emptyHint:
       'Failed downloads will appear here with retry and delete actions.',
+    retryAll: 'Retry all',
+    failedRetryAll: 'Failed to retry all downloads.',
     delete: 'Delete',
     deletePrompt: 'Remove "{title}" from failed downloads?',
     failedDelete: 'Failed to remove this failed download.',

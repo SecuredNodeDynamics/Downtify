@@ -138,6 +138,8 @@ export default {
     empty: 'No hay descargas fallidas.',
     emptyHint:
       'Las descargas fallidas apareceran aqui con acciones para reintentar o eliminar.',
+    retryAll: 'Reintentar todo',
+    failedRetryAll: 'No se pudieron reintentar todas las descargas.',
     delete: 'Eliminar',
     deletePrompt: '¿Quitar "{title}" de las descargas fallidas?',
     failedDelete: 'No se pudo quitar esta descarga fallida.',
