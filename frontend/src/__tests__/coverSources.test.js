@@ -12,6 +12,7 @@ vi.mock('../model/serverConnection.js', async (importOriginal) => {
       BASEURL: '',
     }),
     isCapacitorNative: vi.fn(() => false),
+    usesEmbeddedServer: vi.fn(() => false),
     usesCustomServerUrl: vi.fn(() => false),
     needsServerConnection: vi.fn(() => false),
   }
@@ -19,8 +20,11 @@ vi.mock('../model/serverConnection.js', async (importOriginal) => {
 
 describe('coverSourcesForNowPlaying', () => {
   beforeEach(async () => {
-    const { isCapacitorNative } = await import('../model/serverConnection.js')
+    const { isCapacitorNative, usesEmbeddedServer } = await import(
+      '../model/serverConnection.js'
+    )
     isCapacitorNative.mockReturnValue(false)
+    usesEmbeddedServer.mockReturnValue(false)
     const API = (await import('../model/api.js')).default
     API.clearCoverSourcesCache()
   })
@@ -80,5 +84,39 @@ describe('coverSourcesForNowPlaying', () => {
     expect(sources.fallbacks).toEqual([
       'https://yt3.googleusercontent.com/example=w192-h192-l90-rj',
     ])
+  })
+
+  it('prefers the embedded image proxy for standalone native remote artwork', async () => {
+    const { isCapacitorNative, usesEmbeddedServer } = await import(
+      '../model/serverConnection.js'
+    )
+    isCapacitorNative.mockReturnValue(true)
+    usesEmbeddedServer.mockReturnValue(true)
+    const API = (await import('../model/api.js')).default
+    const remote = 'https://yt3.googleusercontent.com/example=w600-h600-l90-rj'
+
+    const sources = API.remoteCoverSources(remote, 192)
+
+    expect(sources.src).toContain('/api/image-proxy?')
+    expect(sources.fallbacks).toEqual([
+      'https://yt3.googleusercontent.com/example=w192-h192-l90-rj',
+    ])
+  })
+
+  it('prefers direct artwork for server-connected native remote artwork', async () => {
+    const { isCapacitorNative, usesEmbeddedServer } = await import(
+      '../model/serverConnection.js'
+    )
+    isCapacitorNative.mockReturnValue(true)
+    usesEmbeddedServer.mockReturnValue(false)
+    const API = (await import('../model/api.js')).default
+    const remote = 'https://yt3.googleusercontent.com/example=w600-h600-l90-rj'
+
+    const sources = API.remoteCoverSources(remote, 192)
+
+    expect(sources.src).toBe(
+      'https://yt3.googleusercontent.com/example=w192-h192-l90-rj'
+    )
+    expect(sources.fallbacks[0]).toContain('/api/image-proxy?')
   })
 })

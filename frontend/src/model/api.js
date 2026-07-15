@@ -7,6 +7,7 @@ import {
   getServerConfig,
   isCapacitorNative,
   needsServerConnection,
+  usesEmbeddedServer,
   usesCustomServerUrl,
 } from './serverConnection.js'
 import { libraryCoverFolders } from './library.js'
@@ -658,7 +659,10 @@ function remoteCoverSources(url, size = SEARCH_THUMBNAIL_SIZE) {
   const proxied = `${base}/api/image-proxy?${new URLSearchParams({
     url: remote,
   })}`
-  const urls = isCapacitorNative() ? [remote, proxied] : [proxied, remote]
+  const urls =
+    isCapacitorNative() && !usesEmbeddedServer()
+      ? [remote, proxied]
+      : [proxied, remote]
   return Object.freeze({
     src: urls[0],
     fallbacks: Object.freeze([...new Set(urls.slice(1))]),

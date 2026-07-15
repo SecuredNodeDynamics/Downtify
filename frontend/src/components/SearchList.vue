@@ -108,6 +108,7 @@
             <CoverImage
               v-if="song.cover_url"
               :src="coverSrc(song.cover_url)"
+              :fallbacks="coverFallbacks(song.cover_url)"
               :alt="song.name"
               img-class="h-full w-full object-cover"
             >
@@ -330,6 +331,7 @@
                     <CoverImage
                       v-if="activeDemoTrack?.cover_url"
                       :src="coverSrc(activeDemoTrack?.cover_url, 480)"
+                      :fallbacks="coverFallbacks(activeDemoTrack?.cover_url, 480)"
                       :alt="activeDemoTrack.name"
                       img-class="h-full w-full object-cover"
                     >
@@ -606,6 +608,7 @@
                   <CoverImage
                     v-if="track.cover_url"
                     :src="coverSrc(track.cover_url)"
+                    :fallbacks="coverFallbacks(track.cover_url)"
                     :alt="track.name"
                     img-class="h-10 w-10 shrink-0 rounded-lg object-cover"
                   >
@@ -692,7 +695,11 @@ const player = usePlayer()
 const { t } = useI18n()
 
 function coverSrc(url, size) {
-  return API.searchCoverUrl(url, size)
+  return API.remoteCoverSources(url, size).src
+}
+
+function coverFallbacks(url, size) {
+  return API.remoteCoverSources(url, size).fallbacks
 }
 
 function refreshSearch() {
