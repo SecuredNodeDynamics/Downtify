@@ -1435,6 +1435,7 @@ const expandedQueueAlbumKey = ref('')
 const queueAlbumTracksByKey = ref({})
 const queueAlbumTracksLoading = ref({})
 let lyricsRequestSeq = 0
+let lyricScrollRaf = 0
 let similarArtistsRequestSeq = 0
 let similarTracksRequestSeq = 0
 let queueAlbumLookupSeq = 0
@@ -2194,14 +2195,23 @@ function centerActiveLyric(index) {
   const scroller = lyricsScroller.value
   const line = lyricLineRefs.value[index]
   if (!scroller || !line) return
+  const scrollerRect = scroller.getBoundingClientRect()
+  const lineRect = line.getBoundingClientRect()
   const target =
-    line.offsetTop -
-    scroller.offsetTop -
+    scroller.scrollTop +
+    lineRect.top -
+    scrollerRect.top -
     scroller.clientHeight / 2 +
-    line.clientHeight / 2
-  scroller.scrollTo({
-    top: Math.max(0, target),
-    behavior: 'smooth',
+    lineRect.height / 2
+  const maxScroll = Math.max(0, scroller.scrollHeight - scroller.clientHeight)
+  scroller.scrollTop = Math.max(0, Math.min(maxScroll, target))
+}
+
+function scheduleActiveLyricScroll(index) {
+  if (lyricScrollRaf) cancelAnimationFrame(lyricScrollRaf)
+  lyricScrollRaf = requestAnimationFrame(() => {
+    lyricScrollRaf = 0
+    centerActiveLyric(index)
   })
 }
 
@@ -2630,7 +2640,7 @@ watch(
 watch(activeLyricIndex, async (index) => {
   if (!lyricsOpen.value || index < 0) return
   await nextTick()
-  centerActiveLyric(index)
+  scheduleActiveLyricScroll(index)
 })
 
 onMounted(() => {
@@ -2658,6 +2668,10 @@ onActivated(() => {
 onUnmounted(() => {
   stopLibraryListener?.()
   clearGenreRefreshTimers()
+  if (lyricScrollRaf) {
+    cancelAnimationFrame(lyricScrollRaf)
+    lyricScrollRaf = 0
+  }
   if (similarArtistsTimer) {
     clearTimeout(similarArtistsTimer)
     similarArtistsTimer = 0
