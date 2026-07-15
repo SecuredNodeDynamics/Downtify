@@ -887,7 +887,7 @@
                   </p>
                 </div>
                 <button
-                  v-if="!similarTrackOwnership.isOwned(selectedSimilarTrack)"
+                  v-if="!similarTrackOwnership.isOwned(item)"
                   type="button"
                   class="icon-btn shrink-0 text-primary"
                   :class="downloadButtonClass(item)"
@@ -2055,10 +2055,18 @@ async function downloadSimilarArtistItem(item) {
   if (!item || downloadButtonState(item) === 'loading') return
   setDownloadButtonState(item, 'loading')
   try {
-    await downloadManager.queue(item)
+    const result = await downloadManager.queue(item)
+    if (result?.failed) {
+      throw new Error(result.error || 'Download queue failed')
+    }
+    if (result?.skipped) {
+      clearDownloadButtonState(item)
+      return
+    }
     setDownloadButtonState(item, 'done')
     setTimeout(() => clearDownloadButtonState(item), 1400)
-  } catch {
+  } catch (error) {
+    console.warn('Similar artist download failed:', item, error)
     clearDownloadButtonState(item)
   }
 }

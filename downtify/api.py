@@ -83,7 +83,7 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     'bitrate': '320',
     'output': '{artists} - {title}.{output-ext}',
     'generate_m3u': True,
-    'max_parallel_downloads': 3,
+    'max_parallel_downloads': 2,
     'organize_by_artist': False,
     'organize_by_album': False,
     'enhance_metadata': True,
@@ -97,6 +97,9 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     'discogs_token': '',
     'monitor_artist_initial_search': True,
 }
+
+DOWNLOAD_PROGRESS_MIN_INTERVAL = 0.25
+DOWNLOAD_PROGRESS_MIN_DELTA = 1.0
 
 AUDIO_EXTENSIONS = {'.mp3', '.m4a', '.flac', '.ogg', '.wav', '.aac', '.opus'}
 GITHUB_REPO = 'SecuredNodeDynamics/Downtify'
@@ -3835,11 +3838,30 @@ async def _run_download(
         'status': 'downloading',
     })
 
+    last_progress_broadcast = {'at': 0.0, 'pct': -1.0, 'message': ''}
+
     def progress(pct: float, message: str) -> None:
         j = state.download_jobs.get(song_id)
         if j:
             j['progress'] = pct
             j['message'] = message
+        now = time.monotonic()
+        previous_pct = float(last_progress_broadcast['pct'])
+        progress_delta = abs(float(pct) - previous_pct)
+        message_changed = message != last_progress_broadcast['message']
+        enough_time = (
+            now - float(last_progress_broadcast['at'])
+            >= DOWNLOAD_PROGRESS_MIN_INTERVAL
+        )
+        important_progress = pct >= 100 or progress_delta >= 10
+        if (
+            not important_progress
+            and progress_delta < DOWNLOAD_PROGRESS_MIN_DELTA
+            and not (message_changed and enough_time)
+            and not enough_time
+        ):
+            return
+        last_progress_broadcast.update({'at': now, 'pct': pct, 'message': message})
         asyncio.run_coroutine_threadsafe(
             state.connections.broadcast({
                 'song': song,
