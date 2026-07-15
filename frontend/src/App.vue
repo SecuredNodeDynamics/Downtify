@@ -1,5 +1,5 @@
 <template>
-  <StarField />
+  <StarField v-if="!isNativeApp" />
   <AppLoadingOverlay />
   <div
     class="app-shell flex min-h-dvh flex-col overflow-x-hidden text-base-content lg:min-h-dvh lg:overflow-visible"
@@ -22,7 +22,7 @@
 </template>
 
 <script setup>
-import { nextTick, onBeforeMount, onMounted } from 'vue'
+import { computed, nextTick, onBeforeMount, onMounted } from 'vue'
 
 import AppLoadingOverlay from './components/AppLoadingOverlay.vue'
 import BottomNav from './components/BottomNav.vue'
@@ -39,10 +39,13 @@ import {
   bootstrapEmbeddedServer,
   EMBEDDED_SERVER_READY_EVENT,
 } from './model/embeddedServer'
-import { usesEmbeddedServer } from './model/serverConnection'
+import { isCapacitorNative, usesEmbeddedServer } from './model/serverConnection'
 import { useBinaryThemeManager } from './model/theme'
 
-const keepAliveViews = ['Player', 'List', 'Settings', 'Download']
+const isNativeApp = isCapacitorNative()
+const keepAliveViews = computed(() =>
+  isNativeApp ? ['Player'] : ['Player', 'List', 'Settings', 'Download']
+)
 const warmedRoutes = new Set(['Home'])
 
 const themeMgr = useBinaryThemeManager()
@@ -59,7 +62,7 @@ router.beforeEach((to, from) => {
   if (to.name === from.name) return true
 
   const instantKeepAlive =
-    keepAliveViews.includes(String(to.name)) && warmedRoutes.has(to.name)
+    keepAliveViews.value.includes(String(to.name)) && warmedRoutes.has(to.name)
   if (!instantKeepAlive) beginAppLoading()
   return true
 })

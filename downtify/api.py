@@ -83,7 +83,7 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     'bitrate': '320',
     'output': '{artists} - {title}.{output-ext}',
     'generate_m3u': True,
-    'max_parallel_downloads': 2,
+    'max_parallel_downloads': 1,
     'organize_by_artist': False,
     'organize_by_album': False,
     'enhance_metadata': True,

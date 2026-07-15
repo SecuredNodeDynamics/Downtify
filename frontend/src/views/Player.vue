@@ -593,7 +593,7 @@
         </div>
 
         <section
-          v-if="currentArtistName"
+          v-if="currentArtistName && showSimilarMedia"
           class="similar-artists-card panel-glow-shell surface"
         >
           <div class="p-3 sm:p-4">
@@ -1498,6 +1498,9 @@ let similarTracksTimer = 0
 let stopLibraryListener = null
 
 const unknownGenreLabel = computed(() => t('player.unknownGenre'))
+const showSimilarMedia = computed(
+  () => !isCapacitorNative() || !player.isPlaying.value
+)
 const libraryGroupOptions = computed(() => ({
   unknownArtist: t('common.unknownArtist'),
 }))
@@ -1659,6 +1662,10 @@ async function loadSimilarArtists(artistName) {
 
 function scheduleSimilarArtistsLoad(artistName) {
   if (similarArtistsTimer) clearTimeout(similarArtistsTimer)
+  if (isCapacitorNative() && player.isPlaying.value) {
+    similarArtistsLoading.value = false
+    return
+  }
   const delay = isCapacitorNative()
     ? NATIVE_SIMILAR_MEDIA_DELAY_MS
     : WEB_SIMILAR_MEDIA_DELAY_MS
@@ -2118,6 +2125,10 @@ async function loadSimilarTracks(title, artistName) {
 
 function scheduleSimilarTracksLoad(title, artistName) {
   if (similarTracksTimer) clearTimeout(similarTracksTimer)
+  if (isCapacitorNative() && player.isPlaying.value) {
+    similarTracksLoading.value = false
+    return
+  }
   const delay = isCapacitorNative()
     ? NATIVE_SIMILAR_MEDIA_DELAY_MS
     : WEB_SIMILAR_MEDIA_DELAY_MS
