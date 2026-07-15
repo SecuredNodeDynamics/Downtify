@@ -140,9 +140,12 @@ export default {
       'Las descargas fallidas apareceran aqui con acciones para reintentar o eliminar.',
     retryAll: 'Reintentar todo',
     failedRetryAll: 'No se pudieron reintentar todas las descargas.',
+    deleteAll: 'Eliminar todo',
+    deleteAllPrompt: '¿Quitar las {count} descargas fallidas?',
     delete: 'Eliminar',
     deletePrompt: '¿Quitar "{title}" de las descargas fallidas?',
     failedDelete: 'No se pudo quitar esta descarga fallida.',
+    failedDeleteAll: 'No se pudieron quitar todas las descargas fallidas.',
   },
   manage: {
     tab: 'Administrar',

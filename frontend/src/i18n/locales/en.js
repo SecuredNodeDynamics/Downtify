@@ -138,9 +138,12 @@ export default {
       'Failed downloads will appear here with retry and delete actions.',
     retryAll: 'Retry all',
     failedRetryAll: 'Failed to retry all downloads.',
+    deleteAll: 'Delete all',
+    deleteAllPrompt: 'Remove all {count} failed downloads?',
     delete: 'Delete',
     deletePrompt: 'Remove "{title}" from failed downloads?',
     failedDelete: 'Failed to remove this failed download.',
+    failedDeleteAll: 'Failed to remove all failed downloads.',
   },
   manage: {
     tab: 'Manage',

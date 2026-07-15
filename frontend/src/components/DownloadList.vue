@@ -96,7 +96,7 @@
       >
         <button
           type="button"
-          class="failed-bulk-retry-btn"
+          class="failed-bulk-btn failed-bulk-retry-btn"
           :disabled="retryAllLoading"
           @click="retryAllFailedHistory"
         >
@@ -106,6 +106,19 @@
           />
           <Icon v-else icon="clarity:refresh-line" class="h-4 w-4" />
           <span>{{ t('failed.retryAll') }}</span>
+        </button>
+        <button
+          type="button"
+          class="failed-bulk-btn failed-bulk-delete-btn"
+          :disabled="deleteAllLoading"
+          @click="deleteAllFailedHistory"
+        >
+          <span
+            v-if="deleteAllLoading"
+            class="loading loading-spinner loading-xs"
+          />
+          <Icon v-else icon="clarity:trash-line" class="h-4 w-4" />
+          <span>{{ t('failed.deleteAll') }}</span>
         </button>
       </div>
     </div>
@@ -870,6 +883,7 @@ const historyLoading = ref(false)
 const historyError = ref('')
 const retrying = ref({})
 const retryAllLoading = ref(false)
+const deleteAllLoading = ref(false)
 const deletingHistory = ref({})
 let historyFetchSeq = 0
 
@@ -1153,6 +1167,35 @@ async function deleteFailedHistory(item) {
   }
 }
 
+async function deleteAllFailedHistory() {
+  const items = failedHistory.value.filter((item) => item?.id !== undefined)
+  if (!items.length || deleteAllLoading.value) return
+  if (!confirm(t('failed.deleteAllPrompt', { count: items.length }))) return
+
+  deleteAllLoading.value = true
+  historyError.value = ''
+  deletingHistory.value = {
+    ...deletingHistory.value,
+    ...Object.fromEntries(items.map((item) => [item.id, true])),
+  }
+
+  try {
+    await Promise.all(items.map((item) => API.deleteHistoryItem(item.id)))
+    for (const item of items) {
+      removeHistoryItem(item.id)
+    }
+  } catch {
+    historyError.value = t('failed.failedDeleteAll')
+  } finally {
+    const nextDeleting = { ...deletingHistory.value }
+    for (const item of items) {
+      nextDeleting[item.id] = false
+    }
+    deletingHistory.value = nextDeleting
+    deleteAllLoading.value = false
+  }
+}
+
 function failedItemTitle(item) {
   return (
     item?.title ||
@@ -1427,11 +1470,19 @@ onUnmounted(() => {
 }
 
 .failed-tab-actions {
-  @apply flex justify-end;
+  @apply flex flex-wrap justify-end gap-2;
+}
+
+.failed-bulk-btn {
+  @apply inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-xl border px-4 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60 sm:flex-none;
 }
 
 .failed-bulk-retry-btn {
-  @apply inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-primary/30 bg-primary/10 px-4 text-sm font-semibold text-primary transition-colors hover:border-primary/50 hover:bg-primary/15 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto;
+  @apply border-primary/30 bg-primary/10 text-primary hover:border-primary/50 hover:bg-primary/15;
+}
+
+.failed-bulk-delete-btn {
+  @apply border-error/30 bg-error/10 text-error hover:border-error/50 hover:bg-error/15;
 }
 
 .failed-grid {

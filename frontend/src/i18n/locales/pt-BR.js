@@ -138,9 +138,12 @@ export default {
       'Downloads com falha aparecerao aqui com acoes para tentar novamente ou excluir.',
     retryAll: 'Tentar todos novamente',
     failedRetryAll: 'Falha ao tentar todos os downloads novamente.',
+    deleteAll: 'Excluir todos',
+    deleteAllPrompt: 'Remover os {count} downloads com falha?',
     delete: 'Excluir',
     deletePrompt: 'Remover "{title}" dos downloads com falha?',
     failedDelete: 'Falha ao remover este download com falha.',
+    failedDeleteAll: 'Falha ao remover todos os downloads com falha.',
   },
   manage: {
     tab: 'Gerenciar',
