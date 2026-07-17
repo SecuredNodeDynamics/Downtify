@@ -137,7 +137,7 @@ function ensureWebSocket() {
   return wsConnection
 }
 
-function getVersion({ prefetch = true } = {}) {
+function getVersion({ prefetch = false } = {}) {
   if (needsServerConnection()) return Promise.resolve('')
 
   return API.get('/api/version')
@@ -223,6 +223,10 @@ function getAppVersion() {
 
 function getHealth() {
   return API.get('/api/health')
+}
+
+function getSummary() {
+  return API.get('/api/summary')
 }
 
 function startMetadataScan(limit = 100, reset = false, scanAll = false) {
@@ -707,6 +711,10 @@ function getLibraryFiles() {
   return API.get('/api/library/files')
 }
 
+function getLibraryStats() {
+  return API.get('/api/library/stats')
+}
+
 function getSimilarArtists(artist, limit = 8) {
   return API.get('/api/library/similar-artists', {
     params: { artist, limit },
@@ -910,7 +918,6 @@ async function startBackendSession() {
   }
   const version = await getVersion({ prefetch: false })
   ensureWebSocket()
-  window.setTimeout(prefetchLibrary, isCapacitorNative() ? 900 : 250)
   return version
 }
 
@@ -972,6 +979,7 @@ export default {
   remoteCoverSources,
   listDownloads,
   getLibraryFiles,
+  getLibraryStats,
   getSimilarArtists,
   getLibraryLyrics,
   checkLibraryOwned,
@@ -998,6 +1006,7 @@ export default {
   updateApp,
   getAppVersion,
   getHealth,
+  getSummary,
   startMetadataScan,
   getMetadataScanStatus,
   applyMetadata,

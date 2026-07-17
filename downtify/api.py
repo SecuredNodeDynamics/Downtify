@@ -483,6 +483,16 @@ class AppState:
         'built_at': 0.0,
         'building': False,
     }
+    library_stats_cache: dict[str, Any] = {
+        'root': '',
+        'stats': None,
+        'built_at': 0.0,
+    }
+    health_cache: dict[str, Any] = {
+        'payload': None,
+        'built_at': 0.0,
+        'key': None,
+    }
     local_artist_inventory_cache: dict[str, Any] = {
         'root': '',
         'data': None,
@@ -809,6 +819,154 @@ def _ffmpeg_tool_info() -> dict[str, Any]:
     if not path:
         return {'available': False, 'path': None, 'version': None}
     return _tool_version(path, ['-version'])
+
+
+def _active_download_dir_or_default() -> Path:
+    return (
+        _active_download_dir()
+        if state.downloader is not None
+        else state.default_download_dir
+    )
+
+
+def _queue_summary() -> dict[str, Any]:
+    queue_counts: dict[str, int] = {}
+    for job in state.download_jobs.values():
+        status = str(job.get('status') or 'unknown')
+        queue_counts[status] = queue_counts.get(status, 0) + 1
+    active_queue_total = sum(
+        count
+        for status, count in queue_counts.items()
+        if status in {'queued', 'downloading'}
+    )
+    return {
+        'total': active_queue_total,
+        'all_total': len(state.download_jobs),
+        'counts': queue_counts,
+    }
+
+
+def _library_stats_for_items(items: list[dict[str, Any]]) -> dict[str, Any]:
+    artists: set[str] = set()
+    albums: set[tuple[str, str]] = set()
+    genres: set[str] = set()
+    for item in items:
+        for artist in item.get('artists') or [item.get('artist')]:
+            name = str(artist or '').strip()
+            if name:
+                artists.add(name.casefold())
+        album = str(item.get('album') or '').strip()
+        album_artist = str(item.get('artist') or '').strip()
+        if album:
+            albums.add((album_artist.casefold(), album.casefold()))
+        genre = str(item.get('browse_genre') or item.get('genre') or '').strip()
+        if genre:
+            genres.add(genre.casefold())
+    return {
+        'tracks': len(items),
+        'artists': len(artists),
+        'albums': len(albums),
+        'genres': len(genres),
+    }
+
+
+def _library_stats(download_dir: Path) -> dict[str, Any]:
+    root_key = str(download_dir.resolve())
+    cache = state.library_stats_cache
+    if cache.get('root') == root_key and cache.get('stats') is not None:
+        return dict(cache['stats'])
+
+    files_cache = state.library_files_cache
+    if files_cache.get('root') == root_key and files_cache.get('items'):
+        stats = _library_stats_for_items(list(files_cache['items']))
+    else:
+        stats = _library_stats_for_items(list_library_files_fast(download_dir))
+
+    state.library_stats_cache = {
+        'root': root_key,
+        'stats': stats,
+        'built_at': time.monotonic(),
+    }
+    return dict(stats)
+
+
+def _build_health_payload() -> dict[str, Any]:
+    download_dir = _active_download_dir_or_default()
+    database_dir = (
+        state.settings_path.parent
+        if state.settings_path is not None
+        else Path('/data')
+    )
+    history = state.history_db.list(limit=5) if state.history_db else []
+    completed_24h = (
+        state.history_db.count_completed_since(
+            datetime.now(timezone.utc) - timedelta(hours=24)
+        )
+        if state.history_db
+        else 0
+    )
+    queue = _queue_summary()
+
+    failed_recent = sum(1 for item in history if item.get('status') == 'error')
+
+    return {
+        'status': 'ok' if failed_recent == 0 else 'attention',
+        'version': state.version,
+        'python': sys.version.split()[0],
+        'tools': {
+            'ffmpeg': _ffmpeg_tool_info(),
+            'yt_dlp': _yt_dlp_tool_info(),
+        },
+        'downloads': _download_directory_summary(download_dir),
+        'data': _directory_summary(database_dir),
+        'settings': {
+            'format': state.settings.get('format'),
+            'bitrate': state.settings.get('bitrate'),
+            'max_parallel_downloads': state.settings.get(
+                'max_parallel_downloads'
+            ),
+            'generate_m3u': state.settings.get('generate_m3u'),
+            'download_lyrics': state.settings.get('download_lyrics'),
+            'organize_by_artist': state.settings.get('organize_by_artist'),
+            'organize_by_album': state.settings.get('organize_by_album'),
+            'enhance_metadata': state.settings.get('enhance_metadata'),
+        },
+        'queue': queue,
+        'history': {
+            'recent': history,
+            'recent_failures': failed_recent,
+            'completed_24h': completed_24h,
+        },
+    }
+
+
+def _cached_health_payload(max_age_seconds: float = 45.0) -> dict[str, Any]:
+    now = time.monotonic()
+    cache = state.health_cache
+    payload = cache.get('payload')
+    download_dir = _active_download_dir_or_default()
+    database_dir = (
+        state.settings_path.parent
+        if state.settings_path is not None
+        else Path('/data')
+    )
+    key = (
+        str(download_dir),
+        str(database_dir),
+        state.version,
+        _server_media_location(),
+        _compose_host_media_location(),
+    )
+    if (
+        payload is not None
+        and cache.get('key') == key
+        and now - float(cache.get('built_at') or 0) < max_age_seconds
+    ):
+        return dict(payload)
+
+    payload = _build_health_payload()
+    state.health_cache = {'payload': payload, 'built_at': now, 'key': key}
+    return dict(payload)
 
 
 def _clean_version(value: Any) -> Optional[str]:
@@ -1610,78 +1768,37 @@ def update_app() -> dict[str, Any]:
 
 @router.get('/api/health')
 def get_health() -> dict[str, Any]:
-    download_dir = (
-        _active_download_dir()
-        if state.downloader is not None
-        else Path('/downloads')
-    )
-    database_dir = (
-        state.settings_path.parent
-        if state.settings_path is not None
-        else Path('/data')
-    )
-    history = state.history_db.list(limit=5) if state.history_db else []
-    completed_24h = (
-        state.history_db.count_completed_since(
-            datetime.now(timezone.utc) - timedelta(hours=24)
-        )
-        if state.history_db
-        else 0
-    )
-    queue_counts: dict[str, int] = {}
-    for job in state.download_jobs.values():
-        status = str(job.get('status') or 'unknown')
-        queue_counts[status] = queue_counts.get(status, 0) + 1
-    active_queue_total = sum(
-        count
-        for status, count in queue_counts.items()
-        if status in {'queued', 'downloading'}
-    )
+    return _cached_health_payload()
 
-    failed_recent = sum(1 for item in history if item.get('status') == 'error')
 
+@router.get('/api/summary')
+def get_summary() -> dict[str, Any]:
+    download_dir = _active_download_dir_or_default()
+    health = _cached_health_payload()
     return {
-        'status': 'ok' if failed_recent == 0 else 'attention',
+        'status': health.get('status'),
         'version': state.version,
-        'python': sys.version.split()[0],
-        'tools': {
-            'ffmpeg': _ffmpeg_tool_info(),
-            'yt_dlp': _yt_dlp_tool_info(),
+        'counts': {
+            'library': _library_stats(download_dir),
+            'queue': _queue_summary(),
+            'completed_24h': health.get('history', {}).get('completed_24h', 0),
         },
-        'downloads': _download_directory_summary(download_dir),
-        'data': _directory_summary(database_dir),
-        'settings': {
-            'format': state.settings.get('format'),
-            'bitrate': state.settings.get('bitrate'),
-            'max_parallel_downloads': state.settings.get(
-                'max_parallel_downloads'
-            ),
-            'generate_m3u': state.settings.get('generate_m3u'),
-            'download_lyrics': state.settings.get('download_lyrics'),
-            'organize_by_artist': state.settings.get('organize_by_artist'),
-            'organize_by_album': state.settings.get('organize_by_album'),
-            'enhance_metadata': state.settings.get('enhance_metadata'),
+        'storage': {
+            'downloads': health.get('downloads', {}),
+            'data': health.get('data', {}),
         },
-        'queue': {
-            'total': active_queue_total,
-            'all_total': len(state.download_jobs),
-            'counts': queue_counts,
-        },
-        'history': {
-            'recent': history,
-            'recent_failures': failed_recent,
-            'completed_24h': completed_24h,
-        },
+        'tools': health.get('tools', {}),
     }
+
+
+@router.get('/api/library/stats')
+def get_library_stats() -> dict[str, Any]:
+    return _library_stats(_active_download_dir_or_default())
 
 
 @router.get('/api/library/files')
 def get_library_files() -> list[dict[str, Any]]:
-    download_dir = (
-        _active_download_dir()
-        if state.downloader is not None
-        else state.default_download_dir
-    )
+    download_dir = _active_download_dir_or_default()
     root_key = str(download_dir.resolve())
     cache = state.library_files_cache
     if cache.get('root') == root_key and cache.get('items'):
@@ -1940,6 +2057,16 @@ def invalidate_library_files_cache() -> None:
         'items': [],
         'built_at': 0.0,
         'building': False,
+    }
+    state.library_stats_cache = {
+        'root': '',
+        'stats': None,
+        'built_at': 0.0,
+    }
+    state.health_cache = {
+        'payload': None,
+        'built_at': 0.0,
+        'key': None,
     }
 
 
