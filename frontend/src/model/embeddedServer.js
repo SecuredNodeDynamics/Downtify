@@ -9,8 +9,10 @@ import {
 
 const EmbeddedServer = registerPlugin('EmbeddedServer')
 
-const READY_FLAG = 'downtify-embedded-ready'
 export const EMBEDDED_SERVER_READY_EVENT = 'downtify-embedded-server-ready'
+
+const START_PLUGIN_TIMEOUT_MS = 8000
+const VERSION_FETCH_TIMEOUT_MS = 2500
 
 const embeddedServerState = reactive({
   starting: false,
@@ -27,14 +29,51 @@ function notifyEmbeddedServerReady() {
   window.dispatchEvent(new CustomEvent(EMBEDDED_SERVER_READY_EVENT))
 }
 
+function withTimeout(promise, ms, label) {
+  let timer = 0
+  const timeout = new Promise((_, reject) => {
+    timer = window.setTimeout(
+      () => reject(new Error(`${label} timed out after ${ms}ms`)),
+      ms
+    )
+  })
+  return Promise.race([promise, timeout]).finally(() => {
+    if (timer) window.clearTimeout(timer)
+  })
+}
+
+export async function fetchEmbeddedVersion(
+  baseUrl,
+  timeoutMs = VERSION_FETCH_TIMEOUT_MS
+) {
+  const url = `${String(baseUrl || '').replace(/\/+$/, '')}/api/version`
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    const res = await fetch(url, {
+      cache: 'no-store',
+      signal: controller.signal,
+    })
+    return Boolean(res.ok)
+  } catch {
+    return false
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 export async function startEmbeddedServer() {
   if (!isEmbeddedServerAvailable()) return null
   try {
-    const info = await EmbeddedServer.start()
+    const info = await withTimeout(
+      EmbeddedServer.start(),
+      START_PLUGIN_TIMEOUT_MS,
+      'EmbeddedServer.start'
+    )
     return info?.baseUrl || EMBEDDED_SERVER_URL
   } catch (err) {
     console.warn('Could not start embedded server:', err)
-    return null
+    return EMBEDDED_SERVER_URL
   }
 }
 
@@ -50,28 +89,29 @@ export function useEmbeddedServerStatus() {
 
 export async function waitForEmbeddedServer(
   baseUrl,
-  { attempts = 90, delayMs = 1000 } = {}
+  {
+    attempts = 90,
+    delayMs = 1000,
+    fetchTimeoutMs = VERSION_FETCH_TIMEOUT_MS,
+  } = {}
 ) {
   for (let i = 0; i < attempts; i += 1) {
-    try {
-      const res = await fetch(`${baseUrl}/api/version`, { cache: 'no-store' })
-      if (res.ok) return true
-    } catch {
-      // Server not up yet; keep polling.
+    if (await fetchEmbeddedVersion(baseUrl, fetchTimeoutMs)) return true
+    if (i < attempts - 1) {
+      await new Promise((resolve) => setTimeout(resolve, delayMs))
     }
-    await new Promise((resolve) => setTimeout(resolve, delayMs))
   }
   return false
 }
 
 /**
- * Boot the on-device backend (if this is the embedded APK) and reload once it
- * is reachable so the app re-initialises against the now-live local server.
- * No-op on web and when the user has configured a remote server.
+ * Boot the on-device backend (if this is the embedded APK) and wait until
+ * ``/api/version`` answers. Do not reload the WebView afterwards — Capacitor
+ * WebViews often drop sessionStorage across ``location.reload()``, which used
+ * to restart this loop forever on the splash overlay.
  */
 export async function bootstrapEmbeddedServer() {
   if (!isEmbeddedServerAvailable()) return
-  // Only boot the local backend when the user is in on-device mode.
   if (!usesEmbeddedServer()) return
   if (bootstrapPromise) return bootstrapPromise
 
@@ -85,6 +125,7 @@ export function retryEmbeddedServerBootstrap() {
   bootstrapPromise = null
   embeddedServerState.failed = false
   embeddedServerState.error = ''
+  embeddedServerState.ready = false
   return bootstrapEmbeddedServer()
 }
 
@@ -109,16 +150,4 @@ async function runEmbeddedServerBootstrap() {
   embeddedServerState.failed = false
   embeddedServerState.error = ''
   notifyEmbeddedServerReady()
-
-  let alreadyReady = false
-  try {
-    alreadyReady = sessionStorage.getItem(READY_FLAG) === '1'
-    sessionStorage.setItem(READY_FLAG, '1')
-  } catch {
-    // sessionStorage unavailable; fall through and reload once.
-  }
-
-  if (!alreadyReady) {
-    window.location.reload()
-  }
 }

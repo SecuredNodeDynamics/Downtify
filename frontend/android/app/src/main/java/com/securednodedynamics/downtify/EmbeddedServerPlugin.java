@@ -38,8 +38,14 @@ public class EmbeddedServerPlugin extends Plugin {
 
     @PluginMethod
     public void start(PluginCall call) {
+        JSObject ret = new JSObject();
+        ret.put("baseUrl", BASE_URL);
+        ret.put("port", PORT);
+        ret.put("starting", true);
+        ret.put("crashed", crashed);
+        ret.put("downloadDir", "");
+        call.resolve(ret);
         ensureStarted(getContext().getApplicationContext());
-        call.resolve(info());
     }
 
     @PluginMethod
@@ -116,7 +122,20 @@ public class EmbeddedServerPlugin extends Plugin {
     }
 
     private static boolean isExistingDir(String path) {
-        return path != null && !path.isEmpty() && new File(path).isDirectory();
+        if (path == null || path.isEmpty()) return false;
+        if (
+            !(path.startsWith("/storage/") ||
+                path.startsWith("/sdcard") ||
+                path.startsWith("/data/"))
+        ) {
+            return false;
+        }
+        try {
+            File file = new File(path);
+            return file.isDirectory();
+        } catch (Exception ignored) {
+            return false;
+        }
     }
 
     /**
@@ -163,8 +182,7 @@ public class EmbeddedServerPlugin extends Plugin {
         final Context ctx = context.getApplicationContext();
         final String dataDir = new File(ctx.getFilesDir(), "downtify-data")
             .getAbsolutePath();
-        final String downloadDir = activeDownloadDir(ctx);
-        rememberDownloadDir(ctx, downloadDir);
+        final String downloadDir = defaultDownloadDir(ctx);
         final String nativeLibDir = ctx.getApplicationInfo().nativeLibraryDir;
 
         Thread thread = new Thread(() -> {

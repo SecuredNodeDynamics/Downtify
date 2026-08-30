@@ -153,8 +153,15 @@ def build_app() -> FastAPI:
     )
 
     api.state.version = runtime_version
-    active_download_dir = api._effective_download_dir(DOWNLOAD_DIR)
-    active_download_dir.mkdir(parents=True, exist_ok=True)
+    # On the Android APK, skip probing settings.json media paths here.
+    # Path.is_dir() on a leftover NAS/SD path can block before uvicorn binds,
+    # which leaves the WebView on the boot overlay forever.
+    if api._embedded_runtime():
+        active_download_dir = Path(DOWNLOAD_DIR)
+        active_download_dir.mkdir(parents=True, exist_ok=True)
+    else:
+        active_download_dir = api._effective_download_dir(DOWNLOAD_DIR)
+        active_download_dir.mkdir(parents=True, exist_ok=True)
     api.state.downloader = Downloader(
         active_download_dir,
         audio_format=api.state.settings['format'],
@@ -220,6 +227,9 @@ def build_app() -> FastAPI:
             if inspect.isawaitable(result):
                 await result
 
+        asyncio.create_task(
+            _delayed_startup_task(0.5, api.apply_download_dir_after_startup)
+        )
         asyncio.create_task(
             _delayed_startup_task(2.0, api.reconcile_history_on_startup)
         )

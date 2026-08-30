@@ -659,6 +659,15 @@ def _effective_download_dir(fallback: Path | str | None = None) -> Path:
     return container_root
 
 
+def apply_download_dir_after_startup() -> None:
+    try:
+        _apply_download_dir_from_settings()
+    except Exception:
+        logger.opt(exception=True).warning(
+            'Could not apply download directory after startup'
+        )
+
+
 def _apply_download_dir_from_settings() -> Path:
     target = _effective_download_dir(
         state.downloader.download_dir
