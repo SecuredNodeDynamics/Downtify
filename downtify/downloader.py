@@ -428,12 +428,36 @@ class Downloader:
                 return f'{prefix}{candidate.name}'
         return None
 
+    def _iter_library_audio_files(self):
+        root = self.download_dir
+        if not root.exists():
+            return
+        for candidate in root.rglob('*'):
+            if not candidate.is_file():
+                continue
+            if candidate.suffix.lower().lstrip('.') not in _AUDIO_EXTENSIONS:
+                continue
+            yield candidate
+
+    def build_audio_stem_index(self) -> dict[str, list[Path]]:
+        """Walk the library once so history reconcile is not O(files × jobs)."""
+        index: dict[str, list[Path]] = {}
+        for candidate in self._iter_library_audio_files():
+            key = _normalize_duplicate_key(candidate.stem)
+            if not key:
+                continue
+            index.setdefault(key, []).append(candidate)
+        return index
+
     def duplicate_filename_for(
         self,
         song: dict[str, Any],
         subdir: Optional[str] = None,
+        stem_index: Optional[dict[str, list[Path]]] = None,
     ) -> Optional[str]:
-        hit = self._duplicate_filename_for_song(song, subdir=subdir)
+        hit = self._duplicate_filename_for_song(
+            song, subdir=subdir, stem_index=stem_index
+        )
         if hit:
             return hit
 
@@ -445,7 +469,9 @@ class Downloader:
             if not name:
                 continue
             solo = {**song, 'artists': [name]}
-            hit = self._duplicate_filename_for_song(solo, subdir=subdir)
+            hit = self._duplicate_filename_for_song(
+                solo, subdir=subdir, stem_index=stem_index
+            )
             if hit:
                 return hit
         return None
@@ -454,28 +480,37 @@ class Downloader:
         self,
         song: dict[str, Any],
         subdir: Optional[str] = None,
+        stem_index: Optional[dict[str, list[Path]]] = None,
     ) -> Optional[str]:
         exact = self.existing_filename_for(song, subdir=subdir)
+        basename_key = _normalize_duplicate_key(self._format_basename(song))
+        album_key = _normalize_duplicate_key(str(song.get('album_name') or ''))
         if (
             exact
             and Path(exact).suffix.lower().lstrip('.') in _AUDIO_EXTENSIONS
         ):
-            return exact
+            exact_path = Path(exact)
+            if not exact_path.is_absolute():
+                exact_path = self.download_dir / exact
+            if not album_key or _audio_album_key(exact_path) == album_key:
+                return exact
 
-        basename_key = _normalize_duplicate_key(self._format_basename(song))
         if not basename_key:
             return None
-        album_key = _normalize_duplicate_key(str(song.get('album_name') or ''))
 
-        for candidate in self.download_dir.rglob('*'):
-            if not candidate.is_file():
+        if stem_index is not None:
+            candidates = stem_index.get(basename_key, [])
+        else:
+            candidates = [
+                candidate
+                for candidate in self._iter_library_audio_files()
+                if _normalize_duplicate_key(candidate.stem) == basename_key
+            ]
+
+        for candidate in candidates:
+            if album_key and _audio_album_key(candidate) != album_key:
                 continue
-            if candidate.suffix.lower().lstrip('.') not in _AUDIO_EXTENSIONS:
-                continue
-            if _normalize_duplicate_key(candidate.stem) == basename_key:
-                if album_key and _audio_album_key(candidate) != album_key:
-                    continue
-                return candidate.relative_to(self.download_dir).as_posix()
+            return candidate.relative_to(self.download_dir).as_posix()
         return None
 
     def _resolve_target_dir(self, subdir: Optional[str]) -> tuple[Path, str]:

@@ -20,9 +20,8 @@ export function isEmbeddedServerAvailable() {
   }
 }
 
-// 'device' = run the on-device embedded backend; 'server' = use a remote
-// Downtify server. The embedded APK defaults to 'device'; everything else is
-// always 'server'.
+// 'device' = on-phone engine at 127.0.0.1:8765 (not Docker / Cloudflare).
+// 'server' = saved LAN IP or public tunnel URL.
 export function getConnectionMode() {
   if (!isEmbeddedServerAvailable()) return 'server'
   try {
@@ -31,6 +30,9 @@ export function getConnectionMode() {
   } catch {
     // ignore storage errors
   }
+  // A saved LAN IP or Cloudflare URL means this install talks to a real
+  // Downtify server. Do not default to the on-device 127.0.0.1 engine.
+  if (getStoredServerUrl()) return 'server'
   return 'device'
 }
 

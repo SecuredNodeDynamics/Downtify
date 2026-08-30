@@ -787,9 +787,9 @@ export default {
     connectionModeDevice: 'Run on this device',
     connectionModeServer: 'Connect to a server',
     connectionModeDeviceHint:
-      'Downtify runs entirely on this device — search and downloads work without any server.',
+      'Search and downloads run on this phone (local engine at 127.0.0.1). This is not your Docker or Cloudflare server.',
     connectionModeServerHint:
-      'Use a Downtify server on your network or the internet.',
+      'Use your Downtify server — LAN IP (for example 10.128.1.63:8000) or a public URL such as a Cloudflare tunnel.',
     connectionModeServerConfigHint: 'Set the server address in Settings → API.',
     runningOnThisDevice: 'Running on this device',
     runningOnThisDeviceHint:
@@ -800,7 +800,8 @@ export default {
     serverRequiredHint:
       'The mobile app needs your server address before it can load queue, health, and other server data. Open Settings → API and enter your home IP or tunnel URL.',
     serverUrl: 'Server address',
-    serverUrlPlaceholder: 'https://downtify.example.com or 192.168.1.50:8765',
+    serverUrlPlaceholder:
+      'https://downtify.janzenmediagroup.com or http://10.128.1.63:8000',
     serverUrlCurrent: 'Connected to',
     serverUrlDefault: 'This page (same host)',
     serverTest: 'Test connection',

@@ -61,3 +61,17 @@ def test_duplicate_detection_does_not_skip_different_album_track(tmp_path):
     }
 
     assert downloader.duplicate_filename_for(song) is None
+
+
+def test_duplicate_detection_reuses_a_prebuilt_stem_index(tmp_path):
+    downloader = Downloader(tmp_path, output_template='{artists} - {title}')
+    song = {'name': 'Good Song!', 'artists': ['Good Artist']}
+    folder = tmp_path / 'Nested'
+    folder.mkdir()
+    existing = folder / 'good artist - good song.flac'
+    existing.write_text('audio', encoding='utf-8')
+
+    index = downloader.build_audio_stem_index()
+    assert downloader.duplicate_filename_for(song, stem_index=index) == (
+        'Nested/good artist - good song.flac'
+    )

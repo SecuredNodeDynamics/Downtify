@@ -2242,6 +2242,8 @@ function saveServerConnection() {
     return
   }
   setStoredServerUrl(serverUrlInput.value.trim())
+  setConnectionMode('server')
+  connectionMode.value = 'server'
   reloadAfterServerChange()
 }
 

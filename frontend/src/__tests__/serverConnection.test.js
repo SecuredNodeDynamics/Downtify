@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 vi.mock('@capacitor/core', () => ({
   Capacitor: {
     isNativePlatform: vi.fn(() => false),
+    isPluginAvailable: vi.fn(() => false),
   },
 }))
 
@@ -11,6 +12,7 @@ import {
   buildApiBaseUrl,
   canSaveServerUrlInput,
   getCurrentPageServerUrl,
+  getConnectionMode,
   isConnectedToCurrentPage,
   parseServerUrl,
   repairStoredServerUrl,
@@ -18,6 +20,18 @@ import {
 } from '../model/serverConnection.js'
 
 describe('serverConnection', () => {
+  it('parses a LAN Docker host without treating it as the phone loopback', () => {
+    const cfg = parseServerUrl('http://10.128.1.63:8000')
+    expect(cfg).toEqual({
+      PROTOCOL: 'http:',
+      WS_PROTOCOL: 'ws:',
+      BACKEND: '10.128.1.63',
+      PORT: '8000',
+      BASEURL: '',
+    })
+    expect(buildApiBaseUrl(cfg)).toBe('http://10.128.1.63:8000')
+  })
+
   it('parses https tunnel URLs without explicit port', () => {
     const cfg = parseServerUrl('https://downtify.example.com')
     expect(cfg).toEqual({
@@ -133,8 +147,48 @@ describe('serverConnection', () => {
     expect(canSaveServerUrlInput('http://127.0.0.1:8000')).toBe(true)
   })
 
+  it('defaults the APK to a saved LAN or tunnel URL instead of 127.0.0.1', () => {
+    const storage = {
+      'downtify-server-url': 'https://downtify.janzenmediagroup.com',
+    }
+    vi.stubGlobal('localStorage', {
+      getItem: (key) => storage[key] ?? null,
+      setItem: (key, value) => {
+        storage[key] = value
+      },
+      removeItem: (key) => {
+        delete storage[key]
+      },
+    })
+    Capacitor.isNativePlatform.mockReturnValue(true)
+    Capacitor.isPluginAvailable.mockReturnValue(true)
+
+    expect(getConnectionMode()).toBe('server')
+  })
+
+  it('keeps an explicit on-device mode even when a server URL is saved', () => {
+    const storage = {
+      'downtify-server-url': 'http://10.128.1.63:8000',
+      'downtify-connection-mode': 'device',
+    }
+    vi.stubGlobal('localStorage', {
+      getItem: (key) => storage[key] ?? null,
+      setItem: (key, value) => {
+        storage[key] = value
+      },
+      removeItem: (key) => {
+        delete storage[key]
+      },
+    })
+    Capacitor.isNativePlatform.mockReturnValue(true)
+    Capacitor.isPluginAvailable.mockReturnValue(true)
+
+    expect(getConnectionMode()).toBe('device')
+  })
+
   afterEach(() => {
     Capacitor.isNativePlatform.mockReturnValue(false)
+    Capacitor.isPluginAvailable.mockReturnValue(false)
     vi.unstubAllGlobals()
   })
 })

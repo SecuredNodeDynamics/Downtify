@@ -874,7 +874,6 @@ const dm = useDownloadManager()
 const {
   sortedHistory,
   failedHistory,
-  historyRevision,
   refreshDownloadHistory,
   clearDownloadHistoryState,
   removeHistoryItem,
@@ -1104,12 +1103,12 @@ function historyStatusLabel(item) {
   return t('history.queued')
 }
 
-async function refreshHistory() {
+async function refreshHistory({ reconcile = false } = {}) {
   const seq = ++historyFetchSeq
   historyLoading.value = true
   historyError.value = ''
   try {
-    const ok = await refreshDownloadHistory()
+    const ok = await refreshDownloadHistory({ reconcile })
     if (seq !== historyFetchSeq) return
     if (!ok) historyError.value = t('history.failedLoad')
   } finally {
@@ -1316,13 +1315,6 @@ watch(activeTab, (tab) => {
 })
 
 watch(
-  () => historyRevision.value,
-  () => {
-    void refreshHistory()
-  }
-)
-
-watch(
   [retryableFailedHistory, retryAllLoading],
   () => {
     syncMobileFailedAction()
@@ -1340,7 +1332,7 @@ function registerManageLibraryListener() {
 }
 
 onMounted(() => {
-  void refreshHistory()
+  void refreshHistory({ reconcile: true })
   loadManageFromCache()
   registerManageLibraryListener()
   downloadRefresh.register(refreshActiveTab)

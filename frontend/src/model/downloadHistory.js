@@ -52,15 +52,15 @@ export function upsertHistoryItem(item) {
   history.value = sortHistoryItems(next)
 }
 
-export async function refreshDownloadHistory({ reconcile = true } = {}) {
+export async function refreshDownloadHistory({ reconcile = false } = {}) {
   const seq = ++historyFetchSeq
   try {
-    if (reconcile) {
-      await API.reconcileHistory()
-    }
     const res = await API.getHistory(500, false)
     if (seq !== historyFetchSeq) return false
     history.value = sortHistoryItems(Array.isArray(res.data) ? res.data : [])
+    if (reconcile) {
+      void API.reconcileHistory().catch(() => {})
+    }
     return true
   } catch {
     return false

@@ -708,7 +708,7 @@ function listDownloads() {
 }
 
 function getLibraryFiles() {
-  return API.get('/api/library/files')
+  return API.get('/api/library/files', { timeout: 60000 })
 }
 
 function getLibraryStats() {
@@ -821,13 +821,21 @@ function clearQueue() {
 }
 
 function getHistory(limit = 500, reconcile = true) {
-  return API.get('/api/history', { params: { limit, reconcile } })
+  return API.get('/api/history', {
+    params: { limit, reconcile },
+    timeout: 30000,
+  })
 }
 
 function reconcileHistory(interruptMinutes = 15) {
-  return API.post('/api/history/reconcile', null, {
-    params: { interrupt_minutes: interruptMinutes },
-  })
+  return API.post(
+    '/api/history/reconcile',
+    {},
+    {
+      params: { interrupt_minutes: interruptMinutes },
+      timeout: 20000,
+    }
+  )
 }
 
 function retryHistoryItem(historyId) {

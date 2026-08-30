@@ -7,6 +7,7 @@ import { needsServerConnection } from '/src/model/serverConnection'
 import { notifyLibraryChanged } from '/src/model/librarySession'
 import {
   notifyDownloadHistory,
+  refreshDownloadHistory,
   upsertHistoryItem,
 } from '/src/model/downloadHistory'
 import { isMediaOwned } from '/src/model/libraryOwnership'
@@ -179,9 +180,16 @@ function maybeSaveToLocalMachine(item) {
 API.ws_onmessage((event) => {
   try {
     const data = JSON.parse(event.data)
+    if (data?.event === 'library_files_ready') {
+      notifyLibraryChanged()
+      return
+    }
     if (data?.event === 'history_changed') {
-      if (data.history_item) upsertHistoryItem(data.history_item)
-      notifyDownloadHistory({ immediate: true })
+      if (data.history_item) {
+        upsertHistoryItem(data.history_item)
+        return
+      }
+      void refreshDownloadHistory({ reconcile: false })
       return
     }
 

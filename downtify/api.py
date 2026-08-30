@@ -524,8 +524,11 @@ def _reconcile_download_history_sync(
 ) -> dict[str, int]:
     if state.downloader is None or state.history_db is None:
         return {'done': 0, 'skipped': 0, 'interrupted': 0}
+    stem_index = state.downloader.build_audio_stem_index()
     return state.history_db.reconcile_in_progress(
-        resolve_filename=state.downloader.duplicate_filename_for,
+        resolve_filename=lambda song: state.downloader.duplicate_filename_for(
+            song, stem_index=stem_index
+        ),
         interrupt_after=interrupt_after,
     )
 
@@ -913,11 +916,17 @@ def _ffmpeg_tool_info() -> dict[str, Any]:
 
 
 def _active_download_dir_or_default() -> Path:
-    return (
-        _active_download_dir()
-        if state.downloader is not None
-        else state.default_download_dir
-    )
+    try:
+        if state.downloader is not None:
+            return _active_download_dir()
+    except Exception as exc:
+        logger.warning('Using fallback download directory: {}', exc)
+        if state.downloader is not None:
+            try:
+                return Path(state.downloader.download_dir)
+            except Exception:
+                pass
+    return state.default_download_dir
 
 
 def _queue_summary() -> dict[str, Any]:
@@ -1892,10 +1901,18 @@ def get_library_files() -> list[dict[str, Any]]:
     download_dir = _active_download_dir_or_default()
     root_key = str(download_dir.resolve())
     cache = state.library_files_cache
-    if cache.get('root') == root_key and cache.get('items'):
-        return list(cache['items'])
+    cached_items = cache.get('items') or []
+    if cache.get('root') == root_key and cached_items:
+        return list(cached_items)
+    if cache.get('building'):
+        return list(cached_items)
 
-    items = list_library_files_fast(download_dir)
+    try:
+        items = list_library_files_fast(download_dir)
+    except Exception:
+        logger.opt(exception=True).warning('Library files listing failed')
+        return list(cached_items)
+
     state.library_files_cache = {
         'root': root_key,
         'items': items,
@@ -2169,11 +2186,7 @@ def invalidate_library_files_cache() -> None:
 
 
 def schedule_library_files_cache_refresh() -> None:
-    download_dir = (
-        _active_download_dir()
-        if state.downloader is not None
-        else state.default_download_dir
-    )
+    download_dir = _active_download_dir_or_default()
     root_key = str(download_dir.resolve())
     cache = state.library_files_cache
     if cache.get('root') == root_key and cache.get('items'):
@@ -2188,11 +2201,7 @@ def schedule_library_files_cache_refresh() -> None:
 
 
 async def _refresh_library_files_cache() -> None:
-    download_dir = (
-        _active_download_dir()
-        if state.downloader is not None
-        else state.default_download_dir
-    )
+    download_dir = _active_download_dir_or_default()
     root_key = str(download_dir.resolve())
     try:
         items = await asyncio.to_thread(
@@ -2206,6 +2215,10 @@ async def _refresh_library_files_cache() -> None:
             'built_at': time.monotonic(),
             'building': False,
         }
+        try:
+            await state.connections.broadcast({'event': 'library_files_ready'})
+        except Exception:
+            pass
     except Exception:
         logger.opt(exception=True).warning('Library files cache refresh failed')
         state.library_files_cache = {
@@ -2215,11 +2228,7 @@ async def _refresh_library_files_cache() -> None:
 
 
 async def _refresh_genres_and_library_cache() -> None:
-    download_dir = (
-        _active_download_dir()
-        if state.downloader is not None
-        else state.default_download_dir
-    )
+    download_dir = _active_download_dir_or_default()
     try:
         await asyncio.to_thread(warm_library_genres, download_dir)
     except Exception:
@@ -2236,11 +2245,7 @@ def schedule_library_genre_refresh() -> None:
 
 
 async def warm_library_files_cache() -> None:
-    download_dir = (
-        _active_download_dir()
-        if state.downloader is not None
-        else state.default_download_dir
-    )
+    download_dir = _active_download_dir_or_default()
     root_key = str(download_dir.resolve())
     if state.library_files_cache.get('root') == root_key and state.library_files_cache.get(
         'items'

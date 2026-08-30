@@ -802,9 +802,9 @@ export default {
     connectionModeDevice: 'Executar neste dispositivo',
     connectionModeServer: 'Conectar a um servidor',
     connectionModeDeviceHint:
-      'O Downtify roda totalmente neste dispositivo — busca e downloads funcionam sem nenhum servidor.',
+      'O Downtify roda neste telefone (motor local em 127.0.0.1). Isso nao e o servidor Docker ou o tunel Cloudflare.',
     connectionModeServerHint:
-      'Use um servidor Downtify na sua rede ou na internet.',
+      'Use seu servidor Downtify — IP da LAN (por exemplo 10.128.1.63:8000) ou uma URL publica como um tunel Cloudflare.',
     connectionModeServerConfigHint:
       'Defina o endereco do servidor em Configuracoes → API.',
     runningOnThisDevice: 'Executando neste dispositivo',
@@ -816,7 +816,8 @@ export default {
     serverRequiredHint:
       'O app movel precisa do endereco do servidor antes de carregar fila, saude e outros dados. Abra Configuracoes → API e informe seu IP local ou URL do tunel.',
     serverUrl: 'Endereco do servidor',
-    serverUrlPlaceholder: 'https://downtify.exemplo.com ou 192.168.1.50:8765',
+    serverUrlPlaceholder:
+      'https://downtify.janzenmediagroup.com ou http://10.128.1.63:8000',
     serverUrlCurrent: 'Conectado a',
     serverUrlDefault: 'Esta pagina (mesmo host)',
     serverTest: 'Testar conexao',
