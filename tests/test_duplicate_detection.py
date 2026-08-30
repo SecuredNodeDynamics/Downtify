@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from downtify.downloader import Downloader
 from mutagen.id3 import ID3, TALB
+
+from downtify.downloader import Downloader
 
 
 def test_duplicate_detection_finds_exact_output_target(tmp_path):

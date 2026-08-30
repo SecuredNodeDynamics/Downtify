@@ -211,6 +211,7 @@ def build_app() -> FastAPI:
                 history_changed=api._broadcast_history_changed,
             )
         )
+
         async def _delayed_startup_task(
             delay: float, task: Callable[[], Any]
         ) -> None:

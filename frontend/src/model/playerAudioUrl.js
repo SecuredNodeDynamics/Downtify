@@ -160,9 +160,6 @@ export async function resolvePlaybackUrl(file, options = {}) {
   }
 
   playbackUrlCache.set(cacheKey, url)
-  playbackFallbackCache.set(
-    cacheKey,
-    url && url !== httpUrl ? httpUrl : ''
-  )
+  playbackFallbackCache.set(cacheKey, url && url !== httpUrl ? httpUrl : '')
   return url
 }
