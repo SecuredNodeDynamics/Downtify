@@ -31,11 +31,26 @@ import {
 } from './appVersion.js'
 
 import { v4 as uuidv4 } from 'uuid'
+import {
+  applyAuthStatus,
+  authHeaders,
+  authStatus,
+  clearAuthToken,
+  getStoredAuthToken,
+  markAuthUnauthorized,
+  ready as authReady,
+  storeAuthToken,
+} from './authSession.js'
 
 const API = axios.create({ timeout: 20000 })
 
 API.interceptors.request.use((config) => {
   config.baseURL = buildApiBaseUrl(getServerConfig())
+  const headers = authHeaders()
+  if (headers.Authorization) {
+    config.headers = config.headers || {}
+    config.headers.Authorization = headers.Authorization
+  }
   return config
 })
 
@@ -43,6 +58,11 @@ API.interceptors.response.use(
   (response) => response,
   (error) => {
     const config = error?.config
+    const status = error?.response?.status
+    const requestUrl = String(config?.url || '')
+    if (status === 401 && !requestUrl.includes('/api/auth/')) {
+      markAuthUnauthorized()
+    }
     const canRetryCurrentPage =
       config &&
       !config.__downtifyRetriedCurrentPage &&
@@ -118,7 +138,7 @@ function ensureWebSocket() {
     return null
   }
 
-  const url = buildWsUrl(getServerConfig(), sessionID)
+  const url = buildWsUrl(getServerConfig(), sessionID, getStoredAuthToken())
   if (wsConnection && wsConnection.url === url) {
     return wsConnection
   }
@@ -932,12 +952,106 @@ function prefetchLibrary() {
   return promise
 }
 
+function persistAuthResponse(data) {
+  if (data?.token) storeAuthToken(data.token)
+  applyAuthStatus(data)
+  return data
+}
+
+async function fetchAuthStatus() {
+  const res = await API.get('/api/auth/status')
+  persistAuthResponse(res.data)
+  authReady.value = true
+  return res.data
+}
+
+async function setupAccount(payload) {
+  const res = await API.post('/api/auth/setup', payload)
+  persistAuthResponse(res.data)
+  authReady.value = true
+  backendSessionStarted = false
+  await startBackendSession()
+  return res.data
+}
+
+async function loginAccount(payload) {
+  const res = await API.post('/api/auth/login', payload)
+  persistAuthResponse(res.data)
+  authReady.value = true
+  backendSessionStarted = false
+  await startBackendSession()
+  return res.data
+}
+
+async function logoutAccount() {
+  try {
+    await API.post('/api/auth/logout')
+  } catch {
+    // still clear the local session
+  }
+  clearAuthToken()
+  applyAuthStatus({
+    auth_required: true,
+    setup_required: false,
+    authenticated: false,
+    user: null,
+    profiles: authStatus.value.profiles,
+  })
+  if (wsConnection) {
+    wsConnection.close()
+    wsConnection = null
+  }
+}
+
+async function updateAccount(payload) {
+  const res = await API.post('/api/auth/me', payload)
+  if (res.data?.user) {
+    applyAuthStatus({
+      ...authStatus.value,
+      user: res.data.user,
+      authenticated: true,
+    })
+  }
+  return res.data
+}
+
+async function createAccount(payload) {
+  const res = await API.post('/api/auth/users', payload)
+  if (Array.isArray(res.data?.profiles)) {
+    applyAuthStatus({
+      ...authStatus.value,
+      profiles: res.data.profiles,
+    })
+  }
+  return res.data
+}
+
+async function deleteAccount(userId) {
+  const res = await API.delete(`/api/auth/users/${userId}`)
+  if (Array.isArray(res.data?.profiles)) {
+    applyAuthStatus({
+      ...authStatus.value,
+      profiles: res.data.profiles,
+    })
+  }
+  return res.data
+}
+
 async function startBackendSession() {
   if (needsServerConnection() || backendSessionStarted) return ''
   backendSessionStarted = true
   if (isCapacitorNative()) {
     void resolveNativeInstalledVersion()
   }
+  try {
+    await fetchAuthStatus()
+  } catch {
+    authReady.value = true
+  }
+  const blocked =
+    authStatus.value.setup_required ||
+    (authStatus.value.auth_required && !authStatus.value.authenticated)
+  if (blocked) return ''
   const version = await getVersion({ prefetch: false })
   ensureWebSocket()
   return version
@@ -1049,5 +1163,12 @@ export default {
   ws_onerror,
   getVersion,
   reconnectBackend,
+  fetchAuthStatus,
+  setupAccount,
+  loginAccount,
+  logoutAccount,
+  updateAccount,
+  createAccount,
+  deleteAccount,
   isHealthPayload,
 }

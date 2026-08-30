@@ -25,7 +25,144 @@
       </div>
     </div>
 
-    <div v-if="activeTab === 'general'" class="px-4 pb-5 space-y-6 sm:px-6">
+    <div v-if="activeTab === 'accounts'" class="px-4 pb-5 space-y-6 sm:px-6">
+      <div v-if="authUser">
+        <label
+          class="block text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2"
+        >
+          {{ t('auth.signedInAs') }}
+        </label>
+        <p class="text-sm font-semibold">
+          {{ authUser.display_name || authUser.username }}
+        </p>
+        <p class="text-[11px] text-base-content/40">{{ authUser.username }}</p>
+      </div>
+
+      <div>
+        <label
+          class="block text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2"
+        >
+          {{ t('auth.displayName') }}
+        </label>
+        <input
+          v-model.trim="accountDisplayName"
+          class="input input-bordered w-full rounded-xl"
+        />
+        <label
+          class="mt-3 block text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2"
+        >
+          {{ t('auth.newPassword') }}
+        </label>
+        <input
+          v-model="accountPassword"
+          class="input input-bordered w-full rounded-xl"
+          type="password"
+          autocomplete="new-password"
+        />
+        <label
+          class="mt-3 block text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2"
+        >
+          {{ t('auth.pin') }}
+        </label>
+        <input
+          v-model="accountPin"
+          class="input input-bordered w-full rounded-xl"
+          inputmode="numeric"
+        />
+        <p class="text-[11px] text-base-content/40 mt-1.5">
+          {{ t('auth.credentialsHint') }}
+        </p>
+        <p v-if="accountSaveError" class="mt-2 text-sm text-error">
+          {{ accountSaveError }}
+        </p>
+        <p v-else-if="accountSaveMessage" class="mt-2 text-sm text-success">
+          {{ accountSaveMessage }}
+        </p>
+        <button
+          type="button"
+          class="btn btn-primary mt-3"
+          :disabled="accountSaving"
+          @click="saveOwnAccount"
+        >
+          {{ t('common.save') }}
+        </button>
+      </div>
+
+      <div v-if="isAdmin">
+        <label
+          class="block text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2"
+        >
+          {{ t('auth.familyAccounts') }}
+        </label>
+        <div class="space-y-2">
+          <div
+            v-for="profile in authProfiles"
+            :key="profile.id"
+            class="flex items-center justify-between gap-3 rounded-xl border border-white/10 px-3 py-2"
+          >
+            <div class="min-w-0">
+              <p class="truncate text-sm font-semibold">
+                {{ profile.display_name || profile.username }}
+              </p>
+              <p class="truncate text-[11px] text-base-content/40">
+                {{ profile.username }}
+                <span v-if="profile.is_admin"> · {{ t('auth.admin') }}</span>
+              </p>
+            </div>
+            <button
+              v-if="authUser && profile.id !== authUser.id"
+              type="button"
+              class="btn btn-ghost btn-sm text-error"
+              @click="removeAccount(profile)"
+            >
+              {{ t('common.delete') }}
+            </button>
+          </div>
+        </div>
+
+        <div class="mt-4 space-y-2 rounded-xl border border-white/10 p-3">
+          <p class="text-sm font-semibold">{{ t('auth.addAccount') }}</p>
+          <input
+            v-model.trim="newUsername"
+            class="input input-bordered w-full rounded-xl"
+            :placeholder="t('auth.username')"
+          />
+          <input
+            v-model.trim="newDisplayName"
+            class="input input-bordered w-full rounded-xl"
+            :placeholder="t('auth.displayName')"
+          />
+          <input
+            v-model="newPassword"
+            class="input input-bordered w-full rounded-xl"
+            type="password"
+            :placeholder="t('auth.password')"
+          />
+          <input
+            v-model="newPin"
+            class="input input-bordered w-full rounded-xl"
+            inputmode="numeric"
+            :placeholder="t('auth.pin')"
+          />
+          <p v-if="newAccountError" class="text-sm text-error">
+            {{ newAccountError }}
+          </p>
+          <button
+            type="button"
+            class="btn btn-primary w-full"
+            :disabled="newAccountSaving"
+            @click="addFamilyAccount"
+          >
+            {{ t('auth.addAccount') }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div
+      v-else-if="activeTab === 'general'"
+      class="px-4 pb-5 space-y-6 sm:px-6"
+    >
       <!-- App mode: on-device (serverless) vs remote server -->
       <div v-if="embeddedAvailable">
         <label
@@ -1304,8 +1441,7 @@
         <pre
           v-if="updateResult.terminal_output || updateResult.pull_output"
           class="mt-3 max-h-40 overflow-auto rounded-xl border border-white/10 bg-black/30 p-3 text-xs text-base-content/70"
-          >{{ updateResult.terminal_output || updateResult.pull_output }}</pre
-        >
+          >{{ updateResult.terminal_output || updateResult.pull_output }}</pre>
       </div>
     </div>
 
@@ -1363,6 +1499,7 @@ import {
   setStoredServerUrl,
   usesCustomServerUrl,
 } from '../model/serverConnection'
+import { useAuthSession } from '../model/authSession'
 import { useI18n } from '../i18n'
 import API from '../model/api'
 import { usesApkUpdateFlow } from '../model/appUpdate'
@@ -1389,6 +1526,19 @@ const {
   activateLocalDestination,
 } = useDownloadDestination()
 const { t, locale, setLocale, locales } = useI18n()
+const { user: authUser, profiles: authProfiles, isAdmin } = useAuthSession()
+const accountDisplayName = ref('')
+const accountPassword = ref('')
+const accountPin = ref('')
+const accountSaving = ref(false)
+const accountSaveError = ref('')
+const accountSaveMessage = ref('')
+const newUsername = ref('')
+const newDisplayName = ref('')
+const newPassword = ref('')
+const newPin = ref('')
+const newAccountSaving = ref(false)
+const newAccountError = ref('')
 const folderPickerError = ref('')
 const activeTab = ref('general')
 const tabShellRef = ref(null)
@@ -1396,6 +1546,7 @@ const activeAboutSectionId = ref('')
 
 const settingsTabs = [
   { id: 'general', labelKey: 'settings.generalTab' },
+  { id: 'accounts', labelKey: 'auth.accounts' },
   { id: 'api', labelKey: 'settings.apiTab' },
   { id: 'logs', labelKey: 'settings.logsTab' },
   { id: 'about', labelKey: 'settings.aboutTab' },
@@ -1510,6 +1661,67 @@ function applySettingsTab(tab) {
 
 function openSettingsTab(event) {
   applySettingsTab(event?.detail?.tab)
+}
+
+watch(
+  authUser,
+  (user) => {
+    accountDisplayName.value = user?.display_name || user?.username || ''
+  },
+  { immediate: true }
+)
+
+async function saveOwnAccount() {
+  accountSaveError.value = ''
+  accountSaveMessage.value = ''
+  accountSaving.value = true
+  try {
+    const payload = { display_name: accountDisplayName.value }
+    if (accountPassword.value) payload.password = accountPassword.value
+    if (accountPin.value) payload.pin = accountPin.value
+    await API.updateAccount(payload)
+    accountPassword.value = ''
+    accountSaveMessage.value = t('auth.saved')
+  } catch (err) {
+    accountSaveError.value =
+      err?.response?.data?.detail || err?.message || t('auth.failed')
+  } finally {
+    accountSaving.value = false
+  }
+}
+
+async function addFamilyAccount() {
+  newAccountError.value = ''
+  newAccountSaving.value = true
+  try {
+    await API.createAccount({
+      username: newUsername.value,
+      display_name: newDisplayName.value,
+      password: newPassword.value,
+      pin: newPin.value,
+    })
+    newUsername.value = ''
+    newDisplayName.value = ''
+    newPassword.value = ''
+    newPin.value = ''
+  } catch (err) {
+    newAccountError.value =
+      err?.response?.data?.detail || err?.message || t('auth.failed')
+  } finally {
+    newAccountSaving.value = false
+  }
+}
+
+async function removeAccount(profile) {
+  if (!window.confirm(t('auth.deleteConfirm', { name: profile.username }))) {
+    return
+  }
+  try {
+    await API.deleteAccount(profile.id)
+  } catch (err) {
+    newAccountError.value =
+      err?.response?.data?.detail || err?.message || t('auth.failed')
+  }
 }
 
 async function initDeviceStorage() {
@@ -1804,7 +2016,7 @@ const canRunUpdate = computed(() => {
   if (usesApkUpdateFlow()) {
     return Boolean(
       updateStatus.value?.update_available ||
-        updateStatus.value?.needs_apk_update
+      updateStatus.value?.needs_apk_update
     )
   }
   return Boolean(updateStatus.value?.update_available)

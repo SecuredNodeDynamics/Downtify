@@ -59,6 +59,38 @@
           </span>
         </button>
 
+        <button
+          v-if="user"
+          type="button"
+          class="mobile-more-item"
+          @click="openAccounts"
+        >
+          <Icon icon="clarity:user-line" class="h-5 w-5 shrink-0" />
+          <span class="flex-1 truncate text-left">
+            {{ user.display_name || user.username }}
+          </span>
+        </button>
+
+        <button
+          v-if="user && profiles.length > 1"
+          type="button"
+          class="mobile-more-item"
+          @click="switchProfile"
+        >
+          <Icon icon="clarity:switch-line" class="h-5 w-5 shrink-0" />
+          <span class="flex-1 text-left">{{ t('auth.switchProfile') }}</span>
+        </button>
+
+        <button
+          v-if="user"
+          type="button"
+          class="mobile-more-item"
+          @click="signOut"
+        >
+          <Icon icon="clarity:logout-line" class="h-5 w-5 shrink-0" />
+          <span class="flex-1 text-left">{{ t('auth.signOut') }}</span>
+        </button>
+
         <button type="button" class="mobile-more-item" @click="openSettings">
           <Icon icon="clarity:cog-line" class="h-5 w-5 shrink-0" />
           <span class="flex-1 text-left">{{ t('nav.settings') }}</span>
@@ -78,12 +110,16 @@ import { Icon } from '@iconify/vue'
 import { useRoute } from 'vue-router'
 
 import router from '../router'
+import API from '../model/api'
+import { useAuthSession } from '../model/authSession'
 import { useProgressTracker } from '../model/download'
+import { openSettings as openSettingsPage } from '../model/settingsModal'
 import { useBinaryThemeManager } from '../model/theme'
 import { useI18n } from '../i18n'
 
 const route = useRoute()
 const { t } = useI18n()
+const { user, profiles } = useAuthSession()
 const pt = useProgressTracker()
 const themeMgr = useBinaryThemeManager({
   newLightAlias: 'downtify-light',
@@ -112,7 +148,22 @@ function go(name) {
 
 function openSettings() {
   closeSheet()
-  router.push({ name: 'Settings' })
+  openSettingsPage()
+}
+
+function openAccounts() {
+  closeSheet()
+  openSettingsPage('accounts')
+}
+
+async function signOut() {
+  closeSheet()
+  await API.logoutAccount()
+}
+
+async function switchProfile() {
+  closeSheet()
+  await API.logoutAccount()
 }
 
 function toggleTheme() {

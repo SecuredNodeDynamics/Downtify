@@ -161,8 +161,8 @@ function envOrLocation() {
       process.env.PORT !== undefined
         ? process.env.PORT
         : hasWindow
-        ? window.location.port
-        : '',
+          ? window.location.port
+          : '',
     BASEURL: process.env.BASEURL || '',
   }
 }
@@ -181,11 +181,13 @@ export function buildApiBaseUrl(cfg = getServerConfig()) {
   return `${cfg.PROTOCOL}//${cfg.BACKEND}${port}${cfg.BASEURL || ''}`
 }
 
-export function buildWsUrl(cfg, clientId) {
+export function buildWsUrl(cfg, clientId, token = '') {
   const port = cfg.PORT ? `:${cfg.PORT}` : ''
+  const params = new URLSearchParams({ client_id: String(clientId || '') })
+  if (token) params.set('token', token)
   return `${cfg.WS_PROTOCOL}//${cfg.BACKEND}${port}${
     cfg.BASEURL || ''
-  }/api/ws?client_id=${clientId}`
+  }/api/ws?${params}`
 }
 
 export function formatServerDisplay(cfg = getServerConfig()) {

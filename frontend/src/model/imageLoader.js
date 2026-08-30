@@ -10,6 +10,7 @@ import {
   getServerConfig,
   isCapacitorNative,
 } from './serverConnection.js'
+import { authHeaders } from './authSession.js'
 
 const urlCache = new Map()
 const sourceCache = new Map()
@@ -103,6 +104,7 @@ async function fetchImageBlob(url) {
     responseType: 'blob',
     connectTimeout: 15000,
     readTimeout: 20000,
+    headers: authHeaders(),
   })
   if (response.status < 200 || response.status >= 300) {
     throw new Error(`HTTP ${response.status}`)

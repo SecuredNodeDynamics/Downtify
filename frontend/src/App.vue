@@ -1,6 +1,7 @@
 <template>
   <StarField v-if="showStarField" />
   <AppLoadingOverlay />
+  <AuthGate />
   <div
     class="app-shell flex min-h-dvh flex-col overflow-x-hidden text-base-content lg:min-h-dvh lg:overflow-visible"
   >
@@ -29,6 +30,7 @@
 import { computed, nextTick, onBeforeMount, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 
+import AuthGate from './components/AuthGate.vue'
 import AppLoadingOverlay from './components/AppLoadingOverlay.vue'
 import BottomNav from './components/BottomNav.vue'
 import Footer from './components/Footer.vue'

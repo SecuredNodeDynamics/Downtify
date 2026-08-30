@@ -134,6 +134,8 @@
 
           <HeaderUpdateNotice />
 
+          <ProfileMenu />
+
           <button
             class="icon-btn"
             @click="
@@ -186,6 +188,7 @@ import appIcon from '../assets/downtify-app-icon.png'
 import SearchInput from './SearchInput.vue'
 import DownloadCounterPill from './DownloadCounterPill.vue'
 import HeaderUpdateNotice from './HeaderUpdateNotice.vue'
+import ProfileMenu from './ProfileMenu.vue'
 import { openSettingsModal } from '../model/settingsModal'
 
 const route = useRoute()

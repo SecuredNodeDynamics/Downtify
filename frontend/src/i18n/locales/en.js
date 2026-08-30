@@ -43,6 +43,33 @@ export default {
     updateAvailable: 'Update available — open help and updates',
     downloadCounter: '{count} active downloads — open queue',
   },
+  auth: {
+    setupTitle: 'Create the first profile',
+    setupHint:
+      'This backend will ask for a login after this. Existing monitors stay on this admin profile.',
+    loginTitle: 'Choose a profile',
+    loginHint:
+      'Sign in to this Downtify backend. The music library is shared; monitors are per profile.',
+    username: 'Username',
+    displayName: 'Display name',
+    password: 'Password',
+    newPassword: 'New password',
+    pin: 'PIN',
+    createAdmin: 'Create admin profile',
+    signIn: 'Sign in',
+    signOut: 'Sign out',
+    signedInAs: 'Signed in as',
+    switchProfile: 'Switch profile',
+    accounts: 'Accounts',
+    familyAccounts: 'Family profiles',
+    addAccount: 'Add profile',
+    admin: 'Admin',
+    credentialsHint:
+      'Leave password or PIN blank to keep the current value. On-device profiles can use a PIN only.',
+    saved: 'Profile updated.',
+    failed: 'Could not update the profile.',
+    deleteConfirm: 'Delete profile "{name}"? Their monitors will be removed.',
+  },
   hero: {
     noAccount: 'no Spotify account needed',
     tagline:

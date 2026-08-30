@@ -43,6 +43,33 @@ export default {
     updateAvailable: 'Actualización disponible — abrir ayuda y actualizaciones',
     downloadCounter: '{count} descargas activas — abrir cola',
   },
+  auth: {
+    setupTitle: 'Crea el primer perfil',
+    setupHint:
+      'Este servidor pedirá inicio de sesión después. Los monitores actuales quedan en este perfil de administrador.',
+    loginTitle: 'Elige un perfil',
+    loginHint:
+      'Entra en este servidor Downtify. La biblioteca es compartida; los monitores son por perfil.',
+    username: 'Usuario',
+    displayName: 'Nombre visible',
+    password: 'Contraseña',
+    newPassword: 'Nueva contraseña',
+    pin: 'PIN',
+    createAdmin: 'Crear perfil de administrador',
+    signIn: 'Entrar',
+    signOut: 'Salir',
+    signedInAs: 'Sesión iniciada como',
+    switchProfile: 'Cambiar de perfil',
+    accounts: 'Cuentas',
+    familyAccounts: 'Perfiles familiares',
+    addAccount: 'Añadir perfil',
+    admin: 'Admin',
+    credentialsHint:
+      'Deja la contraseña o el PIN en blanco para no cambiarlos. En el dispositivo puedes usar solo PIN.',
+    saved: 'Perfil actualizado.',
+    failed: 'No se pudo actualizar el perfil.',
+    deleteConfirm: '¿Eliminar el perfil "{name}"? Se quitarán sus monitores.',
+  },
   hero: {
     noAccount: 'sin cuenta de Spotify',
     tagline:
@@ -93,7 +120,8 @@ export default {
     downloadAlbum: 'Descargar album',
     downloadRemaining: 'Descargar restantes',
     downloadTrack: 'Descargar pista',
-    queueAlbumFailed: 'No se pudo añadir este álbum a la cola. Inténtalo de nuevo.',
+    queueAlbumFailed:
+      'No se pudo añadir este álbum a la cola. Inténtalo de nuevo.',
     demo: 'Demo',
     playInEmbed: 'Reproducir vista previa',
     noPreview: 'No hay vista previa de audio para este elemento.',

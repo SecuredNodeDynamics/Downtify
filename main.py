@@ -144,6 +144,10 @@ def build_app() -> FastAPI:
             return RedirectResponse('/', status_code=303)
         return await call_next(request)
 
+    @app.middleware('http')
+    async def _enforce_auth(request, call_next):
+        return await api.enforce_auth_middleware(request, call_next)
+
     settings_path = DATABASE_DIR / 'settings.json'
     api.state.settings_path = settings_path
     api.state.settings = api._load_settings(settings_path)
@@ -188,6 +192,7 @@ def build_app() -> FastAPI:
         ),
         discogs_token=str(api.state.settings.get('discogs_token') or ''),
     )
+    api.state.auth_db = api.AuthDB(DATABASE_DIR / 'downtify_auth.db')
     app.include_router(api.router)
 
     def _on_library_changed() -> None:
@@ -238,7 +243,9 @@ def build_app() -> FastAPI:
         asyncio.create_task(
             _delayed_startup_task(8.0, api.backfill_monitor_images_on_startup)
         )
-        asyncio.create_task(_delayed_startup_task(12.0, api.start_genre_warmup))
+        asyncio.create_task(
+            _delayed_startup_task(12.0, api.start_genre_warmup)
+        )
 
     @app.get('/list')
     def list_downloads() -> list[str]:

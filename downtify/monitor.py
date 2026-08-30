@@ -50,6 +50,7 @@ class MonitoredPlaylist:
     last_track_count: int
     created_at: str
     image_url: str = ''
+    user_id: int = 0
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -110,6 +111,68 @@ class PlaylistMonitorDB:
                 )
             except Exception:
                 pass
+            self._migrate_user_id(conn)
+
+    @staticmethod
+    def _migrate_user_id(conn: sqlite3.Connection) -> None:
+        columns = {
+            row[1]
+            for row in conn.execute('PRAGMA table_info(monitored_playlists)')
+        }
+        schema_row = conn.execute(
+            "SELECT sql FROM sqlite_master WHERE type='table' "
+            "AND name='monitored_playlists'"
+        ).fetchone()
+        schema_sql = str(schema_row[0] or '') if schema_row else ''
+        unique_on_spotify_only = (
+            'spotify_id TEXT NOT NULL UNIQUE' in schema_sql
+            or 'spotify_id TEXT UNIQUE' in schema_sql
+        )
+        if 'user_id' in columns and not unique_on_spotify_only:
+            conn.execute(
+                'CREATE UNIQUE INDEX IF NOT EXISTS '
+                'idx_monitor_user_kind_spotify '
+                'ON monitored_playlists(user_id, kind, spotify_id)'
+            )
+            return
+
+        conn.execute('PRAGMA foreign_keys = OFF')
+        conn.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS monitored_playlists_v2 (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL DEFAULT 0,
+                spotify_id TEXT NOT NULL,
+                name TEXT NOT NULL,
+                url TEXT NOT NULL,
+                kind TEXT NOT NULL DEFAULT 'playlist',
+                interval_minutes INTEGER NOT NULL DEFAULT 60,
+                enabled INTEGER NOT NULL DEFAULT 1,
+                last_checked TEXT,
+                last_track_count INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL,
+                image_url TEXT NOT NULL DEFAULT '',
+                UNIQUE(user_id, kind, spotify_id)
+            );
+            """
+        )
+        select_user = 'user_id' if 'user_id' in columns else '0'
+        select_kind = 'kind' if 'kind' in columns else "'playlist'"
+        select_image = 'image_url' if 'image_url' in columns else "''"
+        conn.execute(
+            f"""INSERT INTO monitored_playlists_v2
+                (id, user_id, spotify_id, name, url, kind, interval_minutes,
+                 enabled, last_checked, last_track_count, created_at, image_url)
+                SELECT id, {select_user}, spotify_id, name, url, {select_kind},
+                       interval_minutes, enabled, last_checked,
+                       last_track_count, created_at, {select_image}
+                FROM monitored_playlists"""
+        )
+        conn.execute('DROP TABLE monitored_playlists')
+        conn.execute(
+            'ALTER TABLE monitored_playlists_v2 RENAME TO monitored_playlists'
+        )
+        conn.execute('PRAGMA foreign_keys = ON')
 
     def add_playlist(
         self,
@@ -119,14 +182,16 @@ class PlaylistMonitorDB:
         interval_minutes: int = 60,
         kind: str = 'playlist',
         image_url: str = '',
+        user_id: int = 0,
     ) -> MonitoredPlaylist:
         with self._connect() as conn:
             cur = conn.execute(
                 """INSERT INTO monitored_playlists
-                   (spotify_id, name, url, kind, interval_minutes, enabled,
-                    created_at, image_url)
-                   VALUES (?, ?, ?, ?, ?, 1, ?, ?)""",
+                   (user_id, spotify_id, name, url, kind, interval_minutes,
+                    enabled, created_at, image_url)
+                   VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)""",
                 (
+                    int(user_id or 0),
                     spotify_id,
                     name,
                     url,
@@ -142,11 +207,20 @@ class PlaylistMonitorDB:
             ).fetchone()
             return _row_to_playlist(row)
 
-    def list_playlists(self) -> list[MonitoredPlaylist]:
+    def list_playlists(
+        self, user_id: Optional[int] = None
+    ) -> list[MonitoredPlaylist]:
         with self._connect() as conn:
-            rows = conn.execute(
-                'SELECT * FROM monitored_playlists ORDER BY created_at DESC'
-            ).fetchall()
+            if user_id is None:
+                rows = conn.execute(
+                    'SELECT * FROM monitored_playlists ORDER BY created_at DESC'
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    'SELECT * FROM monitored_playlists WHERE user_id = ? '
+                    'ORDER BY created_at DESC',
+                    (int(user_id),),
+                ).fetchall()
             return [_row_to_playlist(r) for r in rows]
 
     def get_playlist(self, playlist_id: int) -> Optional[MonitoredPlaylist]:
@@ -158,20 +232,42 @@ class PlaylistMonitorDB:
             return _row_to_playlist(row) if row else None
 
     def get_by_spotify_id(
-        self, spotify_id: str, kind: Optional[str] = None
+        self,
+        spotify_id: str,
+        kind: Optional[str] = None,
+        user_id: Optional[int] = None,
     ) -> Optional[MonitoredPlaylist]:
         with self._connect() as conn:
-            if kind is None:
-                row = conn.execute(
-                    'SELECT * FROM monitored_playlists WHERE spotify_id = ?',
-                    (spotify_id,),
-                ).fetchone()
-            else:
-                row = conn.execute(
-                    'SELECT * FROM monitored_playlists WHERE spotify_id = ? AND kind = ?',
-                    (spotify_id, kind),
-                ).fetchone()
+            clauses = ['spotify_id = ?']
+            values: list[Any] = [spotify_id]
+            if kind is not None:
+                clauses.append('kind = ?')
+                values.append(kind)
+            if user_id is not None:
+                clauses.append('user_id = ?')
+                values.append(int(user_id))
+            row = conn.execute(
+                'SELECT * FROM monitored_playlists WHERE '
+                + ' AND '.join(clauses),
+                values,
+            ).fetchone()
             return _row_to_playlist(row) if row else None
+
+    def assign_unowned(self, user_id: int) -> int:
+        with self._connect() as conn:
+            cur = conn.execute(
+                'UPDATE monitored_playlists SET user_id = ? WHERE user_id = 0',
+                (int(user_id),),
+            )
+            return cur.rowcount
+
+    def delete_playlists_for_user(self, user_id: int) -> int:
+        with self._connect() as conn:
+            cur = conn.execute(
+                'DELETE FROM monitored_playlists WHERE user_id = ?',
+                (int(user_id),),
+            )
+            return cur.rowcount
 
     def delete_playlist(self, playlist_id: int) -> bool:
         with self._connect() as conn:
@@ -252,6 +348,7 @@ def _row_to_playlist(row: sqlite3.Row) -> MonitoredPlaylist:
         last_track_count=row['last_track_count'],
         created_at=row['created_at'],
         image_url=str(row['image_url'] or '') if 'image_url' in keys else '',
+        user_id=int(row['user_id']) if 'user_id' in keys else 0,
     )
 
 

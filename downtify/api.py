@@ -22,6 +22,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import contextlib
+import contextvars
 import json
 import os
 import re
@@ -47,6 +48,7 @@ from fastapi import (
     WebSocket,
     WebSocketDisconnect,
 )
+from fastapi.responses import JSONResponse
 from loguru import logger
 
 from . import (
@@ -58,6 +60,12 @@ from . import (
     metadata_repair,
     providers,
     spotify,
+)
+from .auth import (
+    COOKIE_NAME,
+    AuthDB,
+    is_public_api_path,
+    token_from_request,
 )
 from .cover_art import clear_cover_cache, cover_response_for_file
 from .cover_art import resize_image_bytes as cover_art_resize
@@ -399,6 +407,7 @@ class AppState:
     settings_path: Optional[Path] = None
     loop: Optional[asyncio.AbstractEventLoop] = None
     monitor_db: Optional[PlaylistMonitorDB] = None
+    auth_db: Optional[AuthDB] = None
     history_db: Optional[DownloadHistoryDB] = None
     history_reconcile_at: float = 0.0
     download_jobs: dict[str, dict[str, Any]] = {}
@@ -507,6 +516,129 @@ class AppState:
 
 state = AppState()
 router = APIRouter()
+_auth_user_var: contextvars.ContextVar[Optional[dict[str, Any]]] = (
+    contextvars.ContextVar('downtify_auth_user', default=None)
+)
+
+
+def _request_token(request: Request) -> str:
+    return token_from_request(dict(request.headers), request.cookies)
+
+
+def _forwarded_https(request: Request) -> bool:
+    proto = request.headers.get('x-forwarded-proto', '').split(',')[0].strip()
+    return request.url.scheme == 'https' or proto.lower() == 'https'
+
+
+def _set_session_cookie(
+    response: Response, request: Request, token: str
+) -> None:
+    response.set_cookie(
+        COOKIE_NAME,
+        token,
+        max_age=60 * 60 * 24 * 30,
+        httponly=True,
+        samesite='lax',
+        secure=_forwarded_https(request),
+        path='/',
+    )
+
+
+def _clear_session_cookie(response: Response) -> None:
+    response.delete_cookie(COOKIE_NAME, path='/')
+
+
+def _current_user(request: Optional[Request]) -> Optional[dict[str, Any]]:
+    if request is not None:
+        user = getattr(request.state, 'user', None)
+        if isinstance(user, dict):
+            return user
+    user = _auth_user_var.get()
+    return user if isinstance(user, dict) else None
+
+
+def _require_user(request: Request) -> dict[str, Any]:
+    user = _current_user(request)
+    if user is None:
+        raise HTTPException(status_code=401, detail='Not authenticated')
+    return user
+
+
+def _require_admin(request: Request) -> dict[str, Any]:
+    user = _require_user(request)
+    if not user.get('is_admin'):
+        raise HTTPException(status_code=403, detail='Admin only')
+    return user
+
+
+def _monitor_user_id(request: Optional[Request] = None) -> int:
+    user = _current_user(request)
+    if user:
+        return int(user['id'])
+    return 0
+
+
+def _auth_status_payload(
+    request: Optional[Request] = None,
+) -> dict[str, Any]:
+    db = state.auth_db
+    has_users = bool(db and db.has_users())
+    user = _current_user(request)
+    token = _request_token(request) if request is not None else ''
+    if has_users and user is None and db is not None and token:
+        user = db.user_for_token(token)
+        if request is not None:
+            request.state.user = user
+    profiles = db.list_profiles() if db is not None and has_users else []
+    return {
+        'auth_required': has_users,
+        'setup_required': not has_users,
+        'authenticated': user is not None,
+        'user': user,
+        'profiles': profiles,
+    }
+
+
+async def enforce_auth_middleware(request: Request, call_next):
+    user: Optional[dict[str, Any]] = None
+    if request.method != 'OPTIONS' and request.url.path.startswith('/api/'):
+        db = state.auth_db
+        token = _request_token(request)
+        if db is not None and token:
+            user = await asyncio.to_thread(db.user_for_token, token)
+        if (
+            not is_public_api_path(request.url.path)
+            and db is not None
+            and await asyncio.to_thread(db.has_users)
+            and user is None
+        ):
+            return JSONResponse(
+                {'detail': 'Not authenticated'}, status_code=401
+            )
+    request.state.user = user
+    user_token = _auth_user_var.set(user)
+    try:
+        return await call_next(request)
+    finally:
+        _auth_user_var.reset(user_token)
+
+
+def _issue_session(
+    response: Response, request: Request, user: dict[str, Any]
+) -> dict[str, Any]:
+    if state.auth_db is None:
+        raise HTTPException(status_code=500, detail='Auth database not ready')
+    token = state.auth_db.create_session(int(user['id']))
+    _set_session_cookie(response, request, token)
+    request.state.user = user
+    return {
+        'token': token,
+        'user': user,
+        'auth_required': True,
+        'setup_required': False,
+        'authenticated': True,
+        'profiles': state.auth_db.list_profiles(),
+    }
 
 
 def _history_item_for_ws(history_id: Optional[int]) -> dict[str, Any]:
@@ -654,7 +786,11 @@ def _persist_active_download_dir(target: Path) -> None:
 
 def _effective_download_dir(fallback: Path | str | None = None) -> Path:
     saved = _server_media_location()
-    if saved and _embedded_runtime() and not _usable_embedded_media_path(saved):
+    if (
+        saved
+        and _embedded_runtime()
+        and not _usable_embedded_media_path(saved)
+    ):
         saved = ''
     if saved:
         container_root = state.default_download_dir
@@ -822,7 +958,10 @@ def _download_directory_summary(download_dir: Path) -> dict[str, Any]:
         root_key = str(storage_dir.resolve())
     except OSError:
         root_key = ''
-    if files_cache.get('root') == root_key and files_cache.get('items') is not None:
+    if (
+        files_cache.get('root') == root_key
+        and files_cache.get('items') is not None
+    ):
         summary = _directory_summary_from_library_items(
             storage_dir,
             list(files_cache['items']),
@@ -962,7 +1101,9 @@ def _library_stats_for_items(items: list[dict[str, Any]]) -> dict[str, Any]:
         album_artist = str(item.get('artist') or '').strip()
         if album:
             albums.add((album_artist.casefold(), album.casefold()))
-        genre = str(item.get('browse_genre') or item.get('genre') or '').strip()
+        genre = str(
+            item.get('browse_genre') or item.get('genre') or ''
+        ).strip()
         if genre:
             genres.add(genre.casefold())
     return {
@@ -1086,7 +1227,10 @@ def _is_newer_version(candidate: str, current: str) -> bool:
 
 
 def _github_token() -> str:
-    return os.getenv('GITHUB_TOKEN', '').strip() or os.getenv('GH_TOKEN', '').strip()
+    return (
+        os.getenv('GITHUB_TOKEN', '').strip()
+        or os.getenv('GH_TOKEN', '').strip()
+    )
 
 
 def _github_headers() -> dict[str, str]:
@@ -1101,7 +1245,10 @@ def _github_headers() -> dict[str, str]:
 
 
 def _update_cache_path() -> Path:
-    return Path(os.getenv('DOWNTIFY_DATA_DIR', '/data')) / 'update_check_cache.json'
+    return (
+        Path(os.getenv('DOWNTIFY_DATA_DIR', '/data'))
+        / 'update_check_cache.json'
+    )
 
 
 def _update_cache_age_seconds(payload: dict[str, Any], path: Path) -> float:
@@ -1122,7 +1269,10 @@ def _load_update_cache_from_disk() -> dict[str, Any]:
         payload = json.loads(path.read_text(encoding='utf-8'))
         if not isinstance(payload, dict) or not payload.get('latest_version'):
             return {}
-        if _update_cache_age_seconds(payload, path) >= _UPDATE_CACHE_TTL_SECONDS:
+        if (
+            _update_cache_age_seconds(payload, path)
+            >= _UPDATE_CACHE_TTL_SECONDS
+        ):
             return {}
         return payload
     except Exception:
@@ -1284,7 +1434,9 @@ def _latest_tag_from_github_api(timeout: int = 8) -> dict[str, Any]:
     return {}
 
 
-def _latest_github_version(timeout: int = 8, *, refresh: bool = False) -> dict[str, Any]:
+def _latest_github_version(
+    timeout: int = 8, *, refresh: bool = False
+) -> dict[str, Any]:
     if refresh:
         _invalidate_update_cache()
     else:
@@ -1397,7 +1549,9 @@ def _docker_build_create_command(
     for bind in host_config.get('Binds') or []:
         command.extend(['-v', str(bind)])
 
-    for container_port, bindings in (host_config.get('PortBindings') or {}).items():
+    for container_port, bindings in (
+        host_config.get('PortBindings') or {}
+    ).items():
         container_port_num = str(container_port).split('/', 1)[0]
         for binding in bindings or []:
             host_port = str((binding or {}).get('HostPort') or '').strip()
@@ -1438,26 +1592,29 @@ def _docker_start_recreate_helper(
     helper_name: str,
 ) -> subprocess.CompletedProcess:
     spec = _docker_container_spec(docker, container)
-    temp_name = f'{container}-update-{int(datetime.now(timezone.utc).timestamp())}'
+    temp_name = (
+        f'{container}-update-{int(datetime.now(timezone.utc).timestamp())}'
+    )
     create_command = _docker_build_create_command(
         'docker',
         spec,
         name=temp_name,
         image=image,
     )
-    script = ' && '.join(
-        [
-            _shell_join(['docker', 'stop', '-t', '15', container]),
-            _shell_join(create_command),
-            f'{_shell_join(["docker", "rm", container])} || true',
-            _shell_join(['docker', 'rename', temp_name, container]),
-            _shell_join(['docker', 'start', container]),
-        ]
+    script = ' && '.join([
+        _shell_join(['docker', 'stop', '-t', '15', container]),
+        _shell_join(create_command),
+        f'{_shell_join(["docker", "rm", container])} || true',
+        _shell_join(['docker', 'rename', temp_name, container]),
+        _shell_join(['docker', 'start', container]),
+    ])
+    helper_image = (
+        os.getenv(
+            'DOWNTIFY_SELF_UPDATE_RECREATE_IMAGE',
+            'docker:29-cli',
+        ).strip()
+        or 'docker:29-cli'
     )
-    helper_image = os.getenv(
-        'DOWNTIFY_SELF_UPDATE_RECREATE_IMAGE',
-        'docker:29-cli',
-    ).strip() or 'docker:29-cli'
     return _run_docker_command(
         [
             docker,
@@ -1756,6 +1913,146 @@ def _start_docker_self_update(
     }
 
 
+@router.get('/api/auth/status')
+async def auth_status(request: Request) -> dict[str, Any]:
+    return _auth_status_payload(request)
+
+
+@router.post('/api/auth/setup')
+async def auth_setup(request: Request, response: Response) -> dict[str, Any]:
+    db = state.auth_db
+    if db is None:
+        raise HTTPException(status_code=500, detail='Auth database not ready')
+    if await asyncio.to_thread(db.has_users):
+        raise HTTPException(status_code=409, detail='Accounts already exist')
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+    try:
+        user = await asyncio.to_thread(
+            db.create_user,
+            str(payload.get('username') or ''),
+            password=str(payload.get('password') or ''),
+            pin=str(payload.get('pin') or ''),
+            display_name=str(payload.get('display_name') or ''),
+            is_admin=True,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if state.monitor_db is not None:
+        await asyncio.to_thread(
+            state.monitor_db.assign_unowned, int(user['id'])
+        )
+    return _issue_session(response, request, user)
+
+
+@router.post('/api/auth/login')
+async def auth_login(request: Request, response: Response) -> dict[str, Any]:
+    db = state.auth_db
+    if db is None:
+        raise HTTPException(status_code=500, detail='Auth database not ready')
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+    user = await asyncio.to_thread(
+        db.authenticate,
+        str(payload.get('username') or ''),
+        password=str(payload.get('password') or ''),
+        pin=str(payload.get('pin') or ''),
+    )
+    if user is None:
+        raise HTTPException(
+            status_code=401, detail='Invalid username, password, or PIN'
+        )
+    return _issue_session(response, request, user)
+
+
+@router.post('/api/auth/logout')
+async def auth_logout(request: Request, response: Response) -> dict[str, Any]:
+    token = _request_token(request)
+    if state.auth_db is not None and token:
+        await asyncio.to_thread(state.auth_db.delete_session, token)
+    _clear_session_cookie(response)
+    request.state.user = None
+    return {'ok': True, **_auth_status_payload(request)}
+
+
+@router.get('/api/auth/me')
+async def auth_me(request: Request) -> dict[str, Any]:
+    return {'user': _require_user(request)}
+
+
+@router.post('/api/auth/me')
+async def auth_update_me(request: Request) -> dict[str, Any]:
+    user = _require_user(request)
+    if state.auth_db is None:
+        raise HTTPException(status_code=500, detail='Auth database not ready')
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+    try:
+        updated = await asyncio.to_thread(
+            state.auth_db.set_credentials,
+            int(user['id']),
+            password=payload.get('password'),
+            pin=payload.get('pin'),
+            display_name=payload.get('display_name'),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if updated is None:
+        raise HTTPException(status_code=404, detail='User not found')
+    return {'user': updated}
+
+
+@router.post('/api/auth/users')
+async def auth_create_user(request: Request) -> dict[str, Any]:
+    _require_admin(request)
+    if state.auth_db is None:
+        raise HTTPException(status_code=500, detail='Auth database not ready')
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+    try:
+        created = await asyncio.to_thread(
+            state.auth_db.create_user,
+            str(payload.get('username') or ''),
+            password=str(payload.get('password') or ''),
+            pin=str(payload.get('pin') or ''),
+            display_name=str(payload.get('display_name') or ''),
+            is_admin=bool(payload.get('is_admin')),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {'user': created, 'profiles': state.auth_db.list_profiles()}
+
+
+@router.delete('/api/auth/users/{user_id}')
+async def auth_delete_user(user_id: int, request: Request) -> dict[str, Any]:
+    admin = _require_admin(request)
+    if int(admin['id']) == int(user_id):
+        raise HTTPException(
+            status_code=400, detail='Cannot delete your own account'
+        )
+    if state.auth_db is None:
+        raise HTTPException(status_code=500, detail='Auth database not ready')
+    try:
+        deleted = await asyncio.to_thread(state.auth_db.delete_user, user_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if not deleted:
+        raise HTTPException(status_code=404, detail='User not found')
+    if state.monitor_db is not None:
+        await asyncio.to_thread(
+            state.monitor_db.delete_playlists_for_user, user_id
+        )
+    return {'ok': True, 'profiles': state.auth_db.list_profiles()}
+
+
 @router.get('/api/version')
 def get_version() -> str:
     return state.version
@@ -1930,16 +2227,24 @@ def _best_thumbnail_url(thumbnails: Any) -> str:
     options = thumbnails if isinstance(thumbnails, list) else []
     ranked = sorted(
         (item for item in options if isinstance(item, dict)),
-        key=lambda item: int(item.get('width') or 0) * int(item.get('height') or 0),
+        key=lambda item: (
+            int(item.get('width') or 0) * int(item.get('height') or 0)
+        ),
         reverse=True,
     )
     return next(
-        (str(item.get('url') or '').strip() for item in ranked if item.get('url')),
+        (
+            str(item.get('url') or '').strip()
+            for item in ranked
+            if item.get('url')
+        ),
         '',
     )
 
 
-def _spotify_similar_artists(artist_name: str, limit: int) -> list[dict[str, str]]:
+def _spotify_similar_artists(
+    artist_name: str, limit: int
+) -> list[dict[str, str]]:
     items = artist_image_options._spotify_artist_items(
         artist_name,
         limit=min(12, limit + 2),
@@ -1951,18 +2256,18 @@ def _spotify_similar_artists(artist_name: str, limit: int) -> list[dict[str, str
         if not name or name.casefold() == target:
             continue
         image_url = artist_image_options._best_spotify_image_url(item)
-        artists.append(
-            {
-                'name': name,
-                'browse_id': str(item.get('id') or '').strip(),
-                'image_url': image_url,
-                'source': 'spotify',
-            }
-        )
+        artists.append({
+            'name': name,
+            'browse_id': str(item.get('id') or '').strip(),
+            'image_url': image_url,
+            'source': 'spotify',
+        })
     return artists[:limit]
 
 
-def _youtube_similar_artists(artist_name: str, limit: int) -> list[dict[str, str]]:
+def _youtube_similar_artists(
+    artist_name: str, limit: int
+) -> list[dict[str, str]]:
     cache_key = artist_name.casefold()
     matches = providers._ytm().search(artist_name, filter='artists', limit=5)
     exact = next(
@@ -1986,14 +2291,12 @@ def _youtube_similar_artists(artist_name: str, limit: int) -> list[dict[str, str
         if not artist or artist.casefold() == cache_key:
             continue
         image_url = _best_thumbnail_url(item.get('thumbnails'))
-        artists.append(
-            {
-                'name': artist,
-                'browse_id': str(item.get('browseId') or '').strip(),
-                'image_url': image_url,
-                'source': 'youtube_music',
-            }
-        )
+        artists.append({
+            'name': artist,
+            'browse_id': str(item.get('browseId') or '').strip(),
+            'image_url': image_url,
+            'source': 'youtube_music',
+        })
     return artists[:limit]
 
 
@@ -2028,7 +2331,10 @@ def _similar_artists_for_name(
 
     cache_key = name.casefold()
     cached = _SIMILAR_ARTISTS_CACHE.get(cache_key)
-    if cached and time.monotonic() - cached[0] < _SIMILAR_ARTISTS_CACHE_TTL_SECONDS:
+    if (
+        cached
+        and time.monotonic() - cached[0] < _SIMILAR_ARTISTS_CACHE_TTL_SECONDS
+    ):
         return cached[1][:limit]
 
     spotify_artists: list[dict[str, str]] = []
@@ -2036,11 +2342,15 @@ def _similar_artists_for_name(
     try:
         spotify_artists = _spotify_similar_artists(name, limit)
     except Exception:
-        logger.opt(exception=True).debug('Spotify similar artist lookup failed')
+        logger.opt(exception=True).debug(
+            'Spotify similar artist lookup failed'
+        )
     try:
         youtube_artists = _youtube_similar_artists(name, limit)
     except Exception:
-        logger.opt(exception=True).debug('YouTube Music similar artist lookup failed')
+        logger.opt(exception=True).debug(
+            'YouTube Music similar artist lookup failed'
+        )
 
     artists = _merge_similar_artists(
         [spotify_artists, youtube_artists],
@@ -2089,12 +2399,10 @@ def _parse_lrc_lines(text: str) -> list[dict[str, Any]]:
             seconds = int(match.group('seconds') or 0)
             fraction = match.group('fraction') or ''
             fraction_seconds = float(f'0.{fraction}') if fraction else 0.0
-            lines.append(
-                {
-                    'time': round(minutes * 60 + seconds + fraction_seconds, 3),
-                    'text': lyric,
-                }
-            )
+            lines.append({
+                'time': round(minutes * 60 + seconds + fraction_seconds, 3),
+                'text': lyric,
+            })
     lines.sort(key=lambda item: item['time'])
     return lines
 
@@ -2126,7 +2434,9 @@ def get_library_lyrics(file: str = Query('')) -> dict[str, Any]:
     except UnicodeDecodeError:
         text = lyrics_path.read_text(encoding='utf-8', errors='replace')
     except Exception as exc:
-        logger.opt(exception=True).debug('Lyrics read failed for {}', lyrics_path)
+        logger.opt(exception=True).debug(
+            'Lyrics read failed for {}', lyrics_path
+        )
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
     lines = _parse_lrc_lines(text)
@@ -2140,7 +2450,9 @@ def get_library_lyrics(file: str = Query('')) -> dict[str, Any]:
 
 @router.post('/api/library/owned')
 def check_library_owned(payload: dict[str, Any]) -> dict[str, Any]:
-    items = payload.get('items') if isinstance(payload.get('items'), list) else []
+    items = (
+        payload.get('items') if isinstance(payload.get('items'), list) else []
+    )
     download_dir = (
         _active_download_dir()
         if state.downloader is not None
@@ -2249,7 +2561,9 @@ async def _refresh_library_files_cache() -> None:
         except Exception:
             pass
     except Exception:
-        logger.opt(exception=True).warning('Library files cache refresh failed')
+        logger.opt(exception=True).warning(
+            'Library files cache refresh failed'
+        )
         state.library_files_cache = {
             **state.library_files_cache,
             'building': False,
@@ -2280,9 +2594,9 @@ def schedule_library_genre_refresh() -> None:
 async def warm_library_files_cache() -> None:
     download_dir = _active_download_dir_or_default()
     root_key = str(download_dir.resolve())
-    if state.library_files_cache.get('root') == root_key and state.library_files_cache.get(
-        'items'
-    ):
+    if state.library_files_cache.get(
+        'root'
+    ) == root_key and state.library_files_cache.get('items'):
         return
     await _refresh_library_files_cache()
 
@@ -2379,7 +2693,9 @@ def image_proxy(url: str = Query('')) -> Response:
         data, mime = fetch_remote_image(target)
     except Exception as exc:
         logger.opt(exception=True).debug('Image proxy failed for {!r}', target)
-        raise HTTPException(status_code=502, detail='Image fetch failed') from exc
+        raise HTTPException(
+            status_code=502, detail='Image fetch failed'
+        ) from exc
     return Response(
         content=data,
         media_type=mime,
@@ -2876,10 +3192,10 @@ def album_image_options(
         or ''
     ).strip()
     artists = candidate.get('artists') or current.get('artists') or []
-    artist = artist_override or ', '.join(
-        str(value) for value in artists if value
-    ) or str(
-        current.get('artist') or ''
+    artist = (
+        artist_override
+        or ', '.join(str(value) for value in artists if value)
+        or str(current.get('artist') or '')
     )
     seen_urls: set[str] = set()
     if cover_url:
@@ -2915,7 +3231,9 @@ def album_image_options(
             if not result_cover or result_cover in seen_urls:
                 continue
             seen_urls.add(result_cover)
-            result_album = str(result.get('album_name') or result.get('name') or album)
+            result_album = str(
+                result.get('album_name') or result.get('name') or album
+            )
             result_artists = result.get('artists') or []
             result_artist = ', '.join(
                 str(value) for value in result_artists if value
@@ -3259,10 +3577,9 @@ def _jellyfin_artist_preview_url(
 
 
 def _musicbrainz_artist_preview_url(mbid: str) -> str:
-    return (
-        '/api/metadata/artist-images/musicbrainz-preview?'
-        + urlencode({'mbid': mbid})
-    )
+    return '/api/metadata/artist-images/musicbrainz-preview?' + urlencode({
+        'mbid': mbid
+    })
 
 
 _ALLOWED_REMOTE_IMAGE_HOST_SUFFIXES = (
@@ -3295,7 +3612,9 @@ def _is_allowed_remote_image_url(url: str) -> bool:
 
 
 def _remote_image_preview_url(url: str) -> str:
-    return '/api/metadata/artist-images/remote-preview?' + urlencode({'url': url})
+    return '/api/metadata/artist-images/remote-preview?' + urlencode({
+        'url': url
+    })
 
 
 def _artist_image_option_preview_url(option: dict[str, Any]) -> str:
@@ -3663,7 +3982,9 @@ async def apply_artist_image(request: Request) -> dict[str, Any]:
         )
     try:
         if image_url or selected_option_id:
-            discogs_token = str(state.settings.get('discogs_token') or '').strip()
+            discogs_token = str(
+                state.settings.get('discogs_token') or ''
+            ).strip()
             image_data, _source = _resolve_manual_artist_image_bytes(
                 artist,
                 image_url=image_url,
@@ -3756,7 +4077,9 @@ async def apply_metadata(request: Request) -> dict[str, Any]:
         raise HTTPException(status_code=400, detail='file is required')
     candidate = payload.get('candidate')
     if candidate is not None and not isinstance(candidate, dict):
-        raise HTTPException(status_code=400, detail='candidate must be an object')
+        raise HTTPException(
+            status_code=400, detail='candidate must be an object'
+        )
     try:
         result = metadata_repair.repair_file(
             download_dir,
@@ -4185,7 +4508,11 @@ async def _run_download(
             and not enough_time
         ):
             return
-        last_progress_broadcast.update({'at': now, 'pct': pct, 'message': message})
+        last_progress_broadcast.update({
+            'at': now,
+            'pct': pct,
+            'message': message,
+        })
         asyncio.run_coroutine_threadsafe(
             state.connections.broadcast({
                 'song': song,
@@ -4669,9 +4996,7 @@ async def update_settings_endpoint(
                     payload['download_artist_images']
                 )
             if 'artist_folder_policy' in payload:
-                state.downloader.artist_folder_policy = (
-                    _artist_folder_policy()
-                )
+                state.downloader.artist_folder_policy = _artist_folder_policy()
             if 'discogs_token' in payload:
                 state.downloader.discogs_token = str(
                     payload.get('discogs_token') or ''
@@ -5166,7 +5491,9 @@ def _artist_image_fetchers() -> list[metadata_repair.ArtistImageFetcher]:
         fetchers.append(_jellyfin_artist_image_fetcher)
 
     discogs_token = str(state.settings.get('discogs_token') or '').strip()
-    fetchers.append(artist_image_sources.online_artist_image_fetcher(discogs_token))
+    fetchers.append(
+        artist_image_sources.online_artist_image_fetcher(discogs_token)
+    )
     return fetchers
 
 
@@ -5416,8 +5743,17 @@ def refresh_jellyfin_library() -> dict[str, Any]:
 
 @router.websocket('/api/ws')
 async def websocket_endpoint(
-    ws: WebSocket, client_id: str = Query(...)
+    ws: WebSocket,
+    client_id: str = Query(...),
+    token: str = Query(''),
 ) -> None:
+    db = state.auth_db
+    if db is not None and await asyncio.to_thread(db.has_users):
+        user = await asyncio.to_thread(db.user_for_token, token)
+        if user is None:
+            with contextlib.suppress(Exception):
+                await ws.close(code=4401)
+            return
     await state.connections.connect(client_id, ws)
     try:
         while True:
@@ -5439,6 +5775,18 @@ def _require_monitor_db() -> PlaylistMonitorDB:
             status_code=500, detail='Monitor database not ready'
         )
     return state.monitor_db
+
+
+def _owned_monitor(
+    playlist: Optional[MonitoredPlaylist],
+    request: Optional[Request],
+) -> MonitoredPlaylist:
+    if playlist is None:
+        raise HTTPException(status_code=404, detail='Monitored item not found')
+    user_id = _monitor_user_id(request)
+    if user_id > 0 and int(playlist.user_id or 0) != user_id:
+        raise HTTPException(status_code=404, detail='Monitored item not found')
+    return playlist
 
 
 _MONITOR_IMAGE_CACHE: dict[str, str] = {}
@@ -5485,8 +5833,11 @@ def _monitor_playlist_dict(
 async def _apply_monitor_playlist_update(
     playlist_id: int,
     payload: dict[str, Any],
+    request: Optional[Request] = None,
 ) -> dict[str, Any]:
     db = _require_monitor_db()
+    playlist = await asyncio.to_thread(db.get_playlist, playlist_id)
+    _owned_monitor(playlist, request)
     kwargs: dict[str, Any] = {}
     if 'interval_minutes' in payload:
         kwargs['interval_minutes'] = int(payload['interval_minutes'])
@@ -5497,18 +5848,17 @@ async def _apply_monitor_playlist_update(
         db.update_playlist, playlist_id, **kwargs
     )
     if updated is None:
-        raise HTTPException(
-            status_code=404, detail='Monitored item not found'
-        )
+        raise HTTPException(status_code=404, detail='Monitored item not found')
     return _monitor_playlist_dict(updated, fetch_image=False)
 
 
 @router.get('/api/monitor/playlists')
 async def list_monitor_playlists() -> list[dict[str, Any]]:
     db = _require_monitor_db()
+    user_id = _monitor_user_id()
     return [
         _monitor_playlist_dict(playlist, fetch_image=False)
-        for playlist in db.list_playlists()
+        for playlist in db.list_playlists(user_id)
     ]
 
 
@@ -5578,7 +5928,11 @@ def _spotify_monitor_search(
         seen_ids.add(spotify_id)
         subtitle = ''
         if kind == 'playlist':
-            owner = item.get('owner') if isinstance(item.get('owner'), dict) else {}
+            owner = (
+                item.get('owner')
+                if isinstance(item.get('owner'), dict)
+                else {}
+            )
             subtitle = str(owner.get('display_name') or '').strip()
         else:
             followers = item.get('followers')
@@ -5586,16 +5940,14 @@ def _spotify_monitor_search(
                 total = int(followers.get('total') or 0)
                 if total > 0:
                     subtitle = f'{total:,} followers'
-        results.append(
-            {
-                'spotify_id': spotify_id,
-                'name': name,
-                'kind': kind,
-                'url': f'https://open.spotify.com/{kind}/{spotify_id}',
-                'image_url': _best_spotify_search_image(item),
-                'subtitle': subtitle,
-            }
-        )
+        results.append({
+            'spotify_id': spotify_id,
+            'name': name,
+            'kind': kind,
+            'url': f'https://open.spotify.com/{kind}/{spotify_id}',
+            'image_url': _best_spotify_search_image(item),
+            'subtitle': subtitle,
+        })
     return results
 
 
@@ -5608,7 +5960,9 @@ async def search_monitor_targets(
     query = str(q or '').strip()
     target_kind = str(kind or '').strip().lower()
     if target_kind not in {'artist', 'playlist'}:
-        raise HTTPException(status_code=400, detail='kind must be artist or playlist')
+        raise HTTPException(
+            status_code=400, detail='kind must be artist or playlist'
+        )
 
     try:
         if target_kind == 'artist':
@@ -5637,7 +5991,9 @@ async def search_monitor_targets(
                 limit=limit,
             )
     except Exception as exc:
-        logger.exception('Monitor {} search failed for {!r}', target_kind, query)
+        logger.exception(
+            'Monitor {} search failed for {!r}', target_kind, query
+        )
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
     return {'query': query, 'kind': target_kind, 'results': results}
@@ -5674,7 +6030,9 @@ async def add_monitor_playlist(request: Request) -> dict[str, Any]:
             detail=f'URL is a Spotify {kind}, not a {requested_kind}',
         )
 
-    existing = await asyncio.to_thread(db.get_by_spotify_id, spotify_id, kind)
+    existing = await asyncio.to_thread(
+        db.get_by_spotify_id, spotify_id, kind, _monitor_user_id(request)
+    )
     if existing is not None:
         label = 'artist' if kind == 'artist' else 'playlist'
         raise HTTPException(
@@ -5698,7 +6056,9 @@ async def add_monitor_playlist(request: Request) -> dict[str, Any]:
     if kind == 'artist':
         target_key = re.sub(r'[^a-z0-9]+', '', str(name or '').strip().lower())
         if target_key:
-            playlists = await asyncio.to_thread(db.list_playlists)
+            playlists = await asyncio.to_thread(
+                db.list_playlists, _monitor_user_id(request)
+            )
             for playlist in playlists:
                 if playlist.kind != 'artist':
                     continue
@@ -5733,6 +6093,7 @@ async def add_monitor_playlist(request: Request) -> dict[str, Any]:
         interval_minutes,
         kind,
         image_url,
+        _monitor_user_id(request),
     )
 
     # Kick off the first download pass immediately so the user does not have
@@ -5805,7 +6166,7 @@ async def update_monitor_playlist(
         payload = await request.json()
     except Exception:
         payload = {}
-    return await _apply_monitor_playlist_update(playlist_id, payload)
+    return await _apply_monitor_playlist_update(playlist_id, payload, request)
 
 
 @router.post('/api/monitor/playlists/{playlist_id}/update')
@@ -5816,28 +6177,29 @@ async def update_monitor_playlist_post(
         payload = await request.json()
     except Exception:
         payload = {}
-    return await _apply_monitor_playlist_update(playlist_id, payload)
+    return await _apply_monitor_playlist_update(playlist_id, payload, request)
 
 
 @router.delete('/api/monitor/playlists/{playlist_id}')
-async def delete_monitor_playlist(playlist_id: int) -> dict[str, Any]:
+async def delete_monitor_playlist(
+    playlist_id: int, request: Request
+) -> dict[str, Any]:
     db = _require_monitor_db()
+    playlist = await asyncio.to_thread(db.get_playlist, playlist_id)
+    _owned_monitor(playlist, request)
     deleted = await asyncio.to_thread(db.delete_playlist, playlist_id)
     if not deleted:
-        raise HTTPException(
-            status_code=404, detail='Monitored item not found'
-        )
+        raise HTTPException(status_code=404, detail='Monitored item not found')
     return {'deleted': True, 'id': playlist_id}
 
 
 @router.post('/api/monitor/playlists/{playlist_id}/check')
-async def manual_check_playlist(playlist_id: int) -> dict[str, Any]:
+async def manual_check_playlist(
+    playlist_id: int, request: Request
+) -> dict[str, Any]:
     db = _require_monitor_db()
     playlist = await asyncio.to_thread(db.get_playlist, playlist_id)
-    if playlist is None:
-        raise HTTPException(
-            status_code=404, detail='Monitored item not found'
-        )
+    playlist = _owned_monitor(playlist, request)
     if state.downloader is None:
         raise HTTPException(status_code=500, detail='Downloader not ready')
 
@@ -5862,9 +6224,7 @@ async def manual_check_playlist(playlist_id: int) -> dict[str, Any]:
 
     updated = await asyncio.to_thread(db.get_playlist, playlist_id)
     if updated is None:
-        raise HTTPException(
-            status_code=404, detail='Monitored item not found'
-        )
+        raise HTTPException(status_code=404, detail='Monitored item not found')
 
     logger.info(
         'Manual check: downloaded {} new track(s) from "{}"',
