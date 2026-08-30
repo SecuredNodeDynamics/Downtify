@@ -312,6 +312,41 @@ def test_album_ids_from_discography_collects_unique_albums():
     ]
 
 
+def test_album_ids_from_discography_reads_artist_root():
+    data = {
+        'artist': {
+            'discography': {
+                'albums': {
+                    'items': [
+                        {
+                            'releases': {
+                                'items': [
+                                    {
+                                        'id': 'liveNights',
+                                        'uri': 'spotify:album:liveNights',
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                },
+                'singles': {
+                    'items': [
+                        {
+                            'releases': {
+                                'items': [
+                                    {'uri': 'spotify:album:singleX'}
+                                ]
+                            }
+                        }
+                    ]
+                },
+            }
+        }
+    }
+    assert _album_ids_from_discography(data) == ['liveNights', 'singleX']
+
+
 def test_embed_image_url_reads_visual_identity_image(monkeypatch):
     monkeypatch.setattr(
         'downtify.spotify._fetch_embed_json',

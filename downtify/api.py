@@ -3828,6 +3828,8 @@ def _resolve_url(url: str):
             return spotify.album_tracks_from_id(sid)
         if kind == 'playlist':
             return spotify.playlist_tracks_from_id(sid)
+        if kind == 'artist':
+            return spotify.artist_tracks_from_id(sid)
     except Exception as exc:
         logger.exception('Failed to resolve Spotify URL {}', url)
         raise HTTPException(status_code=502, detail=str(exc)) from exc
@@ -3872,6 +3874,24 @@ def _merge_client_track_hints(
     yr = hints.get('year')
     if isinstance(yr, str) and yr.strip():
         base['year'] = yr.strip()
+
+    def _fill(key: str) -> None:
+        if str(base.get(key) or '').strip():
+            return
+        value = hints.get(key)
+        if isinstance(value, str) and value.strip():
+            base[key] = value.strip()
+        elif isinstance(value, list) and value:
+            base[key] = value
+
+    for field in ('name', 'title', 'album_name', 'cover_url', 'artist'):
+        _fill(field)
+    if not (base.get('artists') or []):
+        hinted = hints.get('artists')
+        if isinstance(hinted, list) and hinted:
+            base['artists'] = hinted
+        elif isinstance(hinted, str) and hinted.strip():
+            base['artists'] = [hinted.strip()]
 
 
 def _song_for_download(url: str) -> dict[str, Any]:

@@ -64,3 +64,13 @@ describe('search result filter', () => {
     expect(sm.filteredResults.value).toEqual([items[0]])
   })
 })
+
+describe('search URL detection', () => {
+  it('treats Spotify artist links as downloadable URLs', () => {
+    const sm = useSearchManager()
+    const url = 'https://open.spotify.com/artist/1nAVKAE4ylldkFvQGo58i8'
+    expect(sm.isValidSearch(url)).toBe(false)
+    expect(sm.isValidURL(url)).toBe(true)
+    expect(sm.isValid(url)).toBe(true)
+  })
+})

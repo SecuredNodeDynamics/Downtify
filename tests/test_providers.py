@@ -402,3 +402,92 @@ def test_search_media_from_spotify_track_url(monkeypatch):
     assert len(tracks) == 1
     assert tracks[0]['name'] == 'Kaisey Jiyun'
     assert tracks[0]['artists'] == ['The Local Train']
+
+
+def test_pick_best_keeps_acoustic_cover_when_source_is_a_cover():
+    results = [
+        {
+            'videoId': 'original0001',
+            'title': "Stumblin' In",
+            'artists': [{'name': 'Chris Norman'}],
+            'duration_seconds': 239,
+        },
+        {
+            'videoId': 'audreycover01',
+            'title': "Stumblin' in (Acoustic Cover)",
+            'artists': [{'name': 'Audrey Stclair'}],
+            'duration_seconds': 208,
+        },
+    ]
+    picked = providers._pick_best(
+        results,
+        208,
+        "Stumblin' in - acoustic cover",
+        ['Audrey Stclair'],
+    )
+    assert picked is not None
+    assert picked['videoId'] == 'audreycover01'
+
+
+def test_pick_best_prefers_matching_cover_title_over_duration():
+    results = [
+        {
+            'videoId': 'someoneto001',
+            'title': 'Someone to You (Acoustic Cover)',
+            'artists': [{'name': 'Audrey Stclair'}],
+            'duration_seconds': 208,
+        },
+        {
+            'videoId': 'dropdead0001',
+            'title': 'Drop Dead (Acoustic Cover)',
+            'artists': [{'name': 'Audrey Stclair'}],
+            'duration_seconds': 209,
+        },
+    ]
+    picked = providers._pick_best(
+        results,
+        208,
+        'Drop Dead - acoustic cover',
+        ['Audrey Stclair'],
+    )
+    assert picked is not None
+    assert picked['videoId'] == 'dropdead0001'
+
+
+def test_pick_best_still_skips_covers_for_studio_originals():
+    results = [
+        {
+            'videoId': 'covervideo01',
+            'title': 'Wonderwall (Acoustic Cover)',
+            'artists': [{'name': 'Audrey Stclair'}],
+            'duration_seconds': 258,
+        },
+        {
+            'videoId': 'oasisstudio1',
+            'title': 'Wonderwall',
+            'artists': [{'name': 'Oasis'}],
+            'duration_seconds': 258,
+        },
+    ]
+    picked = providers._pick_best(
+        results, 258, 'Wonderwall', ['Oasis']
+    )
+    assert picked is not None
+    assert picked['videoId'] == 'oasisstudio1'
+
+
+def test_spotify_artist_url_builds_search_query(monkeypatch):
+    artist_url = 'https://open.spotify.com/artist/1nAVKAE4ylldkFvQGo58i8'
+    monkeypatch.setattr(
+        providers.spotify,
+        'parse_spotify_url',
+        lambda url: ('artist', '1nAVKAE4ylldkFvQGo58i8')
+        if url == artist_url
+        else None,
+    )
+    monkeypatch.setattr(
+        providers.spotify,
+        'artist_info_and_tracks',
+        lambda _artist_id: ('Audrey Stclair', []),
+    )
+    assert providers._spotify_search_query(artist_url) == 'Audrey Stclair'

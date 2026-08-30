@@ -88,6 +88,41 @@ def _sanitize(text: str) -> str:
     return safe or 'unknown'
 
 
+def _artist_names_for_filename(song: dict[str, Any]) -> list[str]:
+    names: list[str] = []
+    raw = song.get('artists')
+    if isinstance(raw, str):
+        if raw.strip():
+            names.append(raw.strip())
+    elif isinstance(raw, list):
+        for item in raw:
+            if isinstance(item, str) and item.strip():
+                names.append(item.strip())
+            elif isinstance(item, dict):
+                name = str(item.get('name') or '').strip()
+                if name:
+                    names.append(name)
+    if not names:
+        artist = str(song.get('artist') or '').strip()
+        if artist:
+            names.append(artist)
+    return names
+
+
+def _title_for_filename(song: dict[str, Any]) -> str:
+    return (
+        str(song.get('name') or song.get('title') or '').strip() or 'Unknown'
+    )
+
+
+def _normalize_output_template(template: str) -> str:
+    text = (template or '').replace('.{output-ext}', '').replace(
+        '{output-ext}', ''
+    )
+    text = text.replace('.%(ext)s', '').replace('%(ext)s', '')
+    return text.strip() or '{artists} - {title}'
+
+
 def _normalize_duplicate_key(text: str) -> str:
     return re.sub(r'[^a-z0-9]+', '', text.lower())
 
@@ -329,7 +364,7 @@ class Downloader:
         self.download_dir.mkdir(parents=True, exist_ok=True)
         self.audio_format = audio_format
         self.audio_bitrate = audio_bitrate
-        self.output_template = output_template
+        self.output_template = _normalize_output_template(output_template)
         self.lyrics_providers = list(lyrics_providers or [])
         self.organize_by_artist = organize_by_artist
         self.organize_by_album = organize_by_album
@@ -340,8 +375,8 @@ class Downloader:
 
     @staticmethod
     def _artist_subdir(song: dict[str, Any]) -> str:
-        artists = song.get('artists') or []
-        return _sanitize(artists[0] if artists else 'unknown')
+        names = _artist_names_for_filename(song)
+        return _sanitize(names[0] if names else 'unknown')
 
     @staticmethod
     def _album_subdir(song: dict[str, Any]) -> str:
@@ -361,20 +396,20 @@ class Downloader:
         return subdir
 
     def _format_basename(self, song: dict[str, Any]) -> str:
-        artists = ', '.join(song.get('artists') or []) or 'Unknown Artist'
-        # BUG FIX 1: The original `.replace('.{output-ext}', '')` used a hyphen
-        # in the placeholder, making it an invalid Python format identifier that
-        # str.format() would raise on.  Strip the yt-dlp extension token instead.
-        template = self.output_template.replace('.%(ext)s', '').replace('%(ext)s', '')
+        artists = (
+            ', '.join(_artist_names_for_filename(song)) or 'Unknown Artist'
+        )
+        title = _title_for_filename(song)
+        template = _normalize_output_template(self.output_template)
         try:
             rendered = template.format(
-                title=song.get('name', 'Unknown'),
+                title=title,
                 artists=artists,
                 artist=artists,
-                album=song.get('album_name', ''),
+                album=song.get('album_name', '') or '',
             )
-        except (KeyError, IndexError):
-            rendered = f'{artists} - {song.get("name", "Unknown")}'
+        except (KeyError, IndexError, ValueError):
+            rendered = f'{artists} - {title}'
         return _sanitize(rendered)
 
     def existing_filename_for(

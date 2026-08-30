@@ -64,6 +64,19 @@ def test_format_basename_bad_template_falls_back(tmp_path):
     assert 'Song' in result
 
 
+def test_format_basename_empty_template_uses_default(tmp_path):
+    d = _make(tmp_path, output_template='')
+    result = d._format_basename({'name': 'Song', 'artists': ['Artist']})
+    assert result == 'Artist - Song'
+
+
+def test_format_basename_empty_title_does_not_become_unknown_file(tmp_path):
+    d = _make(tmp_path)
+    result = d._format_basename({'name': '', 'artists': ['Audrey Stclair']})
+    assert result == 'Audrey Stclair - Unknown'
+    assert result != 'unknown'
+
+
 # ── _artist_subdir ────────────────────────────────────────────────────────────
 
 

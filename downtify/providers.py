@@ -184,7 +184,7 @@ def _result_to_song(result: dict[str, Any]) -> Optional[dict[str, Any]]:
     return {
         'song_id': video_id,
         'media_type': 'track',
-        'name': result.get('title', ''),
+        'name': result.get('title') or result.get('name') or '',
         'artists': artists,
         'album_name': album_name,
         'album_browse_id': album_id,
@@ -521,6 +521,9 @@ def _spotify_search_query(url: str) -> str:
             return f'{artists} {album}'.strip()
         title = first.get('name') or ''
         return f'{artists} {title}'.strip()
+    if kind == 'artist':
+        artist_name, _tracks = spotify.artist_info_and_tracks(sid)
+        return str(artist_name or '').strip()
     return ''
 
 
@@ -1094,8 +1097,7 @@ def enrich_from_match(
 _NEGATIVE_KEYWORDS = (
     'karaoke',
     'instrumental',
-    'cover ',
-    'cover)',
+    'cover',
     'tribute',
     'guitar lesson',
     'sped up',
@@ -1106,6 +1108,40 @@ _NEGATIVE_KEYWORDS = (
     '1 hour',
     'bass boosted',
 )
+
+
+def _title_has_term(title: str, term: str) -> bool:
+    """True when ``term`` appears as its own phrase in ``title``.
+
+    Substring checks like ``cover)`` miss titles such as ``acoustic cover``
+    and then skip the actual match (a cover artist's whole catalogue).
+    """
+
+    if not title or not term:
+        return False
+    pattern = r'(?<![a-z0-9])' + re.escape(term.lower()) + r'(?![a-z0-9])'
+    return re.search(pattern, title.lower()) is not None
+
+
+_PAREN_VERSION_RE = re.compile(
+    r'[\(\[][^\)\]]*(?:cover|acoustic|concert|live|official|lyrics)'
+    r'[^\)\]]*[\)\]]',
+    re.I,
+)
+_DASH_VERSION_RE = re.compile(
+    r'[-–—]\s*(?:concert\s+)?(?:acoustic\s+)?cover\b.*$',
+    re.I,
+)
+
+
+def _core_title(title: str) -> str:
+    """Strip cover/live/acoustic suffixes so originals and covers compare."""
+
+    text = str(title or '').casefold()
+    text = _PAREN_VERSION_RE.sub(' ', text)
+    text = _DASH_VERSION_RE.sub(' ', text)
+    text = re.sub(r'\s+', ' ', text).strip(' -–—')
+    return text
 
 
 def _pick_best(
@@ -1130,7 +1166,8 @@ def _pick_best(
         # which the source song does not have. Catches the most common
         # source of wrong-audio matches.
         if any(
-            kw in candidate_title and kw not in target_title_l
+            _title_has_term(candidate_title, kw)
+            and not _title_has_term(target_title_l, kw)
             for kw in _NEGATIVE_KEYWORDS
         ):
             continue
@@ -1152,7 +1189,20 @@ def _pick_best(
         if target_artist_set and not (target_artist_set & candidate_artists):
             score += 30  # heavy penalty for wrong artist
 
-        # Reward exact title matches over loosely-related ones.
+        target_core = _core_title(target_title_l)
+        candidate_core = _core_title(candidate_title)
+        if target_core and candidate_core:
+            if candidate_core == target_core:
+                score -= 20
+            else:
+                ratio = SequenceMatcher(
+                    None, candidate_core, target_core
+                ).ratio()
+                if ratio < 0.5:
+                    score += 40
+                else:
+                    score -= ratio * 15
+
         if candidate_title and target_title_l:
             if candidate_title.split('(')[0].strip() == (
                 target_title_l.split('(')[0].strip()

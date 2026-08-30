@@ -77,7 +77,8 @@ function useSearchManager() {
     return (
       str.includes('://open.spotify.com/track/') ||
       str.includes('://open.spotify.com/album/') ||
-      str.includes('://open.spotify.com/playlist/')
+      str.includes('://open.spotify.com/playlist/') ||
+      str.includes('://open.spotify.com/artist/')
     )
   }
 

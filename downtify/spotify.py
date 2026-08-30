@@ -775,7 +775,12 @@ def _album_ids_from_discography(data: dict[str, Any]) -> list[str]:
 
     ids: list[str] = []
     seen: set[str] = set()
-    root = data.get('artistUnion') or {}
+    # Web player payloads used ``artistUnion``; current partner GraphQL
+    # returns the same discography under ``artist``.
+    root = data.get('artistUnion') or data.get('artist') or {}
+    if not root and isinstance(data.get('data'), dict):
+        nested = data['data']
+        root = nested.get('artistUnion') or nested.get('artist') or {}
     discography = root.get('discography') or {}
     if not isinstance(discography, dict):
         return ids

@@ -27,6 +27,23 @@ def test_merge_applies_track_index_and_dates():
     assert 'noise' not in base
 
 
+def test_merge_fills_identity_fields_when_refetch_is_sparse():
+    base: dict = {'song_id': 'yt123', 'name': '', 'artists': []}
+    _merge_client_track_hints(
+        base,
+        {
+            'name': 'Stumblin in (Acoustic Cover)',
+            'artists': ['Audrey Stclair'],
+            'album_name': 'Euphony',
+            'cover_url': 'https://example.com/c.jpg',
+        },
+    )
+    assert base['name'] == 'Stumblin in (Acoustic Cover)'
+    assert base['artists'] == ['Audrey Stclair']
+    assert base['album_name'] == 'Euphony'
+    assert base['cover_url'] == 'https://example.com/c.jpg'
+
+
 def test_merge_ignores_invalid_track_number():
     base: dict = {'song_id': 'a'}
     _merge_client_track_hints(
