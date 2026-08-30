@@ -102,7 +102,7 @@
       </div>
     </div>
 
-    <div v-if="activeTab === 'accounts'" class="px-4 pb-5 space-y-6 sm:px-6">
+    <div v-if="activeTab === 'accounts'" class="settings-tab-body space-y-6">
       <div v-if="authUser">
         <label
           class="block text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2"
@@ -238,7 +238,7 @@
 
     <div
       v-else-if="activeTab === 'general'"
-      class="px-4 pb-5 space-y-6 sm:px-6"
+      class="settings-tab-body space-y-6"
     >
       <!-- App mode: on-device (serverless) vs remote server -->
       <div v-if="embeddedAvailable">
@@ -889,7 +889,7 @@
 
     <div
       v-else-if="activeTab === 'api' && canUseAdminPages"
-      class="px-4 pb-5 space-y-5 sm:px-6"
+      class="settings-tab-body space-y-5"
     >
       <div>
         <label
@@ -1197,7 +1197,7 @@
 
     <div
       v-else-if="activeTab === 'logs' && canUseAdminPages"
-      class="px-4 pb-5 space-y-5 sm:px-6"
+      class="settings-tab-body space-y-5"
     >
       <div class="flex items-center justify-between gap-3">
         <div>
@@ -1275,7 +1275,7 @@
       </ul>
     </div>
 
-    <div v-else-if="activeTab === 'about'" class="px-4 pb-5 space-y-5 sm:px-6">
+    <div v-else-if="activeTab === 'about'" class="settings-tab-body space-y-5">
       <template v-if="!activeAboutSection">
         <div>
           <label
@@ -1420,7 +1420,7 @@
       </template>
     </div>
 
-    <div v-else-if="activeTab === 'help'" class="px-4 pb-5 space-y-5 sm:px-6">
+    <div v-else-if="activeTab === 'help'" class="settings-tab-body space-y-5">
       <div class="flex items-start justify-between gap-3">
         <div>
           <label

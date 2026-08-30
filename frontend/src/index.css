@@ -496,6 +496,14 @@
     @apply overflow-x-clip;
   }
 
+  .settings-tab-body {
+    @apply px-4 pb-5 pt-5 sm:px-6;
+  }
+
+  .settings-panel:has(.settings-tabs-wrap) .settings-tab-body {
+    @apply pt-0;
+  }
+
   .settings-mobile-menu-backdrop {
     @apply fixed inset-0 z-50 bg-black/30 lg:hidden;
     padding-top: calc(var(--app-header-height) + var(--app-safe-top) + 0.5rem);

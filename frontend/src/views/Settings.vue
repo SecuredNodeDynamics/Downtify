@@ -2,7 +2,9 @@
   <div class="min-h-0 overflow-x-hidden pb-24 lg:pb-8">
     <Navbar />
 
-    <div class="mx-auto max-w-3xl w-full min-w-0 px-4 py-4 sm:py-8 sm:px-6">
+    <div
+      class="mx-auto max-w-3xl w-full min-w-0 px-4 pt-5 pb-4 sm:py-8 sm:px-6"
+    >
       <ServerConnectionPrompt class="mb-4" />
 
       <div class="mb-4 mobile-page-header hidden lg:block">
