@@ -5,13 +5,29 @@
     <!-- Tabs -->
     <div class="settings-tabs-wrap px-4 sm:px-6">
       <div
+        ref="tabMeasureRef"
+        class="settings-tab-measure"
+        aria-hidden="true"
+      >
+        <span
+          v-for="tab in settingsTabs"
+          :key="`measure-${tab.id}`"
+          class="settings-tab-btn"
+        >
+          {{ t(tab.labelKey) }}
+        </span>
+        <span class="settings-tab-btn settings-tab-more">
+          <Icon icon="clarity:menu-line" class="h-5 w-5" />
+        </span>
+      </div>
+      <div
         ref="tabShellRef"
         class="settings-tab-shell tab-glow-shell"
         role="tablist"
         :aria-label="t('settings.title')"
       >
         <button
-          v-for="tab in settingsTabs"
+          v-for="tab in visibleSettingsTabs"
           :key="tab.id"
           type="button"
           role="tab"
@@ -22,6 +38,47 @@
         >
           {{ t(tab.labelKey) }}
         </button>
+        <div
+          v-if="overflowSettingsTabs.length"
+          ref="tabMenuRef"
+          class="relative shrink-0"
+        >
+          <button
+            type="button"
+            class="settings-tab-btn settings-tab-more"
+            :class="{
+              'settings-tab-btn-active': overflowSettingsTabs.some(
+                (tab) => tab.id === activeTab
+              ),
+            }"
+            :aria-label="t('common.more')"
+            :aria-expanded="tabMenuOpen"
+            aria-haspopup="menu"
+            @click.stop="tabMenuOpen = !tabMenuOpen"
+          >
+            <Icon icon="clarity:menu-line" class="h-5 w-5" />
+          </button>
+          <div
+            v-if="tabMenuOpen"
+            class="absolute right-0 z-40 mt-2 min-w-[10rem] rounded-2xl border border-white/10 bg-base-100 p-1.5 shadow-xl"
+            role="menu"
+          >
+            <button
+              v-for="tab in overflowSettingsTabs"
+              :key="`menu-${tab.id}`"
+              type="button"
+              role="menuitem"
+              class="flex w-full items-center rounded-xl px-3 py-2 text-left text-sm text-base-content/70 hover:bg-white/5 hover:text-base-content"
+              :class="{
+                'bg-primary/15 font-semibold text-primary':
+                  activeTab === tab.id,
+              }"
+              @click="setActiveTab(tab.id)"
+            >
+              {{ t(tab.labelKey) }}
+            </button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -1588,6 +1645,7 @@ import {
   getDefaultMusicDir,
 } from '../model/deviceStorage'
 import { notifyLibraryChanged } from '../model/librarySession'
+import { countOverflowSettingsTabs } from '../model/settingsTabsOverflow'
 import {
   supportedAudioFormats,
   ffmpegAvailable,
@@ -1658,6 +1716,11 @@ const newAccountError = ref('')
 const folderPickerError = ref('')
 const activeTab = ref('general')
 const tabShellRef = ref(null)
+const tabMeasureRef = ref(null)
+const tabMenuRef = ref(null)
+const tabMenuOpen = ref(false)
+const overflowTabCount = ref(0)
+const tabBarObserver = ref(null)
 const activeAboutSectionId = ref('')
 
 const ALL_SETTINGS_TABS = [
@@ -1679,6 +1742,51 @@ const settingsTabs = computed(() =>
     ? ALL_SETTINGS_TABS
     : ALL_SETTINGS_TABS.filter((tab) => FAMILY_SETTINGS_TAB_IDS.has(tab.id))
 )
+const visibleSettingsTabs = computed(() => {
+  const tabs = settingsTabs.value
+  const hidden = Math.min(
+    overflowTabCount.value,
+    Math.max(0, tabs.length - 1)
+  )
+  return tabs.slice(0, tabs.length - hidden)
+})
+const overflowSettingsTabs = computed(() => {
+  const tabs = settingsTabs.value
+  const hidden = Math.min(
+    overflowTabCount.value,
+    Math.max(0, tabs.length - 1)
+  )
+  return tabs.slice(tabs.length - hidden)
+})
+
+function layoutSettingsTabs() {
+  const shell = tabShellRef.value
+  const measure = tabMeasureRef.value
+  if (!shell || !measure) return
+  const buttons = [...measure.children]
+  if (buttons.length < 2) {
+    overflowTabCount.value = 0
+    return
+  }
+  const more = buttons[buttons.length - 1]
+  const tabs = buttons.slice(0, -1)
+  const styles = getComputedStyle(shell)
+  const gap = Number.parseFloat(styles.columnGap || styles.gap) || 0
+  const padding =
+    (Number.parseFloat(styles.paddingLeft) || 0) +
+    (Number.parseFloat(styles.paddingRight) || 0)
+  overflowTabCount.value = countOverflowSettingsTabs({
+    tabWidths: tabs.map((el) => el.getBoundingClientRect().width),
+    moreWidth: more.getBoundingClientRect().width,
+    gap,
+    available: shell.clientWidth - padding,
+  })
+  if (!overflowSettingsTabs.value.length) tabMenuOpen.value = false
+}
+
+function onTabMenuDocumentClick(event) {
+  if (!tabMenuRef.value?.contains(event.target)) tabMenuOpen.value = false
+}
 
 function scrollActiveTabIntoView() {
   const shell = tabShellRef.value
@@ -1694,8 +1802,25 @@ function scrollActiveTabIntoView() {
 function setActiveTab(tab) {
   if (!settingsTabs.value.some((item) => item.id === tab)) return
   activeTab.value = tab
+  tabMenuOpen.value = false
   nextTick(scrollActiveTabIntoView)
 }
+
+watch([settingsTabs, locale], () => {
+  nextTick(layoutSettingsTabs)
+})
+
+onMounted(() => {
+  document.addEventListener('click', onTabMenuDocumentClick)
+  tabBarObserver.value = new ResizeObserver(() => layoutSettingsTabs())
+  if (tabShellRef.value) tabBarObserver.value.observe(tabShellRef.value)
+  nextTick(layoutSettingsTabs)
+})
+onBeforeUnmount(() => {
+  document.removeEventListener('click', onTabMenuDocumentClick)
+  tabBarObserver.value?.disconnect()
+  tabBarObserver.value = null
+})
 const jellyfinLibraries = ref([])
 const jellyfinLibraryLoading = ref(false)
 const jellyfinLibraryError = ref('')

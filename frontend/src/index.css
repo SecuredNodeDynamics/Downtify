@@ -455,25 +455,27 @@
   }
 
   .settings-tabs-wrap {
-    @apply mb-5 w-full min-w-0 pt-4 sm:pt-5;
+    @apply relative mb-5 w-full min-w-0 pt-4 sm:pt-5;
+  }
+
+  .settings-tab-measure {
+    @apply pointer-events-none invisible absolute left-0 top-0 flex h-0 w-max flex-nowrap items-center gap-1 overflow-hidden p-1;
   }
 
   .settings-tab-shell {
-    @apply mx-auto grid w-full min-w-0 grid-cols-5 gap-1 rounded-full border border-white/10 bg-base-100/75 p-1;
+    @apply mx-auto flex w-full min-w-0 flex-nowrap items-center gap-1 overflow-hidden rounded-full border border-white/10 bg-base-100/75 p-1;
   }
 
   .settings-tab-btn {
-    @apply min-w-0 rounded-full px-1 py-2.5 text-center text-[11px] font-medium leading-tight text-base-content/60 transition-colors hover:text-base-content sm:px-2 sm:py-2 sm:text-sm;
+    @apply shrink-0 whitespace-nowrap rounded-full px-3 py-2.5 text-center text-sm font-medium leading-tight text-base-content/60 transition-colors hover:text-base-content;
+  }
+
+  .settings-tab-more {
+    @apply flex h-[2.625rem] w-[2.625rem] items-center justify-center px-0;
   }
 
   .settings-tab-btn-active {
     @apply bg-primary text-primary-content shadow-glow-sm hover:text-primary-content;
-  }
-
-  @media (min-width: 640px) {
-    .settings-tab-btn {
-      @apply px-3;
-    }
   }
 
   /* DaisyUI puts modal-backdrop at z-index:-1, so taps miss it and hit the page. */
