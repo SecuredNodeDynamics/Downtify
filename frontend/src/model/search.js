@@ -13,7 +13,12 @@ const errorValue = ref('')
 function loadResultFilter() {
   try {
     const saved = globalThis.localStorage?.getItem(SEARCH_RESULT_FILTER_KEY)
-    if (saved === 'albums' || saved === 'tracks' || saved === 'both') {
+    if (
+      saved === 'albums' ||
+      saved === 'tracks' ||
+      saved === 'artists' ||
+      saved === 'both'
+    ) {
       return saved
     }
   } catch {
@@ -32,7 +37,13 @@ function hydrateResultFilter() {
 }
 
 function setResultFilter(mode) {
-  if (mode !== 'albums' && mode !== 'tracks' && mode !== 'both') return
+  if (
+    mode !== 'albums' &&
+    mode !== 'tracks' &&
+    mode !== 'artists' &&
+    mode !== 'both'
+  )
+    return
   hydrateResultFilter()
   resultFilter.value = mode
   try {
@@ -48,7 +59,10 @@ function filterResults(items) {
     return list.filter((item) => item?.media_type === 'album')
   }
   if (resultFilter.value === 'tracks') {
-    return list.filter((item) => item?.media_type !== 'album')
+    return list.filter((item) => item?.media_type === 'track' || !item?.media_type)
+  }
+  if (resultFilter.value === 'artists') {
+    return list.filter((item) => item?.media_type === 'artist')
   }
   return list
 }

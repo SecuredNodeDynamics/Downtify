@@ -55,6 +55,9 @@
                   'player-cover-active': hasActiveTrack,
                   'opacity-80': !hasActiveTrack,
                 }"
+                @pointerdown="onCoverPointerDown"
+                @pointerup="onCoverPointerUp"
+                @pointercancel="onCoverPointerUp"
               >
                 <div class="player-cover-frame">
                   <CoverImage
@@ -322,9 +325,9 @@
                 </p>
               </section>
 
-              <!-- Volume (desktop only — mobile uses device volume) -->
+              <!-- Volume -->
               <div
-                class="mt-6 hidden w-full max-w-xs items-center gap-3 lg:flex"
+                class="mt-4 flex w-full max-w-xs items-center gap-3 sm:mt-6"
               >
                 <button
                   class="icon-btn"
@@ -1405,6 +1408,7 @@ const loading = ref(!initialPlayerSnapshot.ready)
 const progressBar = ref(null)
 const progressTrack = ref(null)
 const isScrubbing = ref(false)
+let coverSwipeX = null
 const scrubPct = ref(0)
 const lyricsOpen = ref(false)
 const lyricsLoading = ref(false)
@@ -2565,6 +2569,21 @@ function applyScrub(e, { commitAudio = true } = {}) {
   }
 }
 
+function onCoverPointerDown(e) {
+  if (!hasActiveTrack.value) return
+  if (e.pointerType === 'mouse' && e.button !== 0) return
+  coverSwipeX = e.clientX
+}
+
+function onCoverPointerUp(e) {
+  if (coverSwipeX == null) return
+  const dx = e.clientX - coverSwipeX
+  coverSwipeX = null
+  if (Math.abs(dx) < 56) return
+  if (dx < 0) player.next()
+  else player.prev()
+}
+
 function onSeekStart(e) {
   if (!hasActiveTrack.value) return
   if (e.pointerType === 'mouse' && e.button !== 0) return
@@ -2739,6 +2758,7 @@ onUnmounted(() => {
   background: transparent;
   box-shadow: none;
   overflow: visible;
+  touch-action: pan-y;
 }
 
 .player-cover-active {

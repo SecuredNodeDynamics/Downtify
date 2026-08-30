@@ -11,6 +11,8 @@ import {
   upsertHistoryItem,
 } from '/src/model/downloadHistory'
 import { isMediaOwned } from '/src/model/libraryOwnership'
+import { missingAlbumTracks } from '/src/model/albumDownload'
+import { getCachedLibraryItems } from '/src/model/librarySession'
 import {
   supportsDeviceStorage,
   activeDownloadRoot,
@@ -343,7 +345,8 @@ export function useDownloadManager() {
     if (!progressTracker.getBySong(album)) {
       progressTracker.appendSong(album)
     }
-    if (await isMediaOwned(album)) {
+    const expected = Number(album.track_count) || 0
+    if (expected > 0 && (await isMediaOwned(album))) {
       progressTracker.removeSong(album)
       return { album, skipped: true }
     }
@@ -354,12 +357,17 @@ export function useDownloadManager() {
         progressTracker.removeSong(album)
         return { album, failed: true, error: 'No tracks found for this album' }
       }
-      const queued = await queueBatch(songs)
+      const missing = missingAlbumTracks(songs, getCachedLibraryItems() || [])
+      if (!missing.length) {
+        progressTracker.removeSong(album)
+        return { album, skipped: true, remaining: 0 }
+      }
+      const queued = await queueBatch(missing)
       if (queued?.failed) {
         progressTracker.removeSong(album)
         return { album, failed: true, error: queued.error }
       }
-      return { album, queued: true, count: songs.length }
+      return { album, queued: true, count: missing.length }
     } catch (err) {
       progressTracker.removeSong(album)
       const message = err?.response?.data?.detail || err.message

@@ -32,6 +32,7 @@ const { t } = useI18n()
 
 const options = computed(() => [
   { id: 'both', label: t('search.filterBoth') },
+  { id: 'artists', label: t('search.filterArtists') },
   { id: 'albums', label: t('search.filterAlbums') },
   { id: 'tracks', label: t('search.filterTracks') },
 ])
@@ -39,7 +40,7 @@ const options = computed(() => [
 
 <style scoped>
 .search-result-filter {
-  @apply grid w-full grid-cols-3 gap-1 rounded-full border border-white/10 bg-base-100/75 p-1;
+  @apply grid w-full grid-cols-2 gap-1 rounded-full border border-white/10 bg-base-100/75 p-1 sm:grid-cols-4;
 }
 
 .search-result-filter-btn {

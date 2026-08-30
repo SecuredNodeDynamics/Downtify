@@ -325,7 +325,9 @@ def search_songs(query: str, limit: int = 20) -> list[dict[str, Any]]:
     return songs
 
 
-def _albums_from_song_search(query: str, limit: int = 10) -> list[dict[str, Any]]:
+def _albums_from_song_search(
+    query: str, limit: int = 10
+) -> list[dict[str, Any]]:
     if not query.strip():
         return []
     try:
@@ -334,9 +336,7 @@ def _albums_from_song_search(query: str, limit: int = 10) -> list[dict[str, Any]
         logger.exception('YouTube Music album hint search failed')
         results = []
     if not results:
-        results = _ytm_region_search(
-            query, filt='songs', limit=max(limit, 20)
-        )
+        results = _ytm_region_search(query, filt='songs', limit=max(limit, 20))
 
     albums: list[dict[str, Any]] = []
     seen: set[str] = set()
@@ -354,6 +354,120 @@ def _albums_from_song_search(query: str, limit: int = 10) -> list[dict[str, Any]
         if len(albums) >= limit:
             break
     return albums
+
+
+def _result_to_artist(result: dict[str, Any]) -> Optional[dict[str, Any]]:
+    browse_id = str(result.get('browseId') or '').strip()
+    name = str(result.get('artist') or result.get('name') or '').strip()
+    if not browse_id or not name:
+        return None
+    thumbs = result.get('thumbnails') or []
+    cover = thumbs[-1].get('url', '') if thumbs else ''
+    return {
+        'song_id': f'artist:{browse_id}',
+        'media_type': 'artist',
+        'browse_id': browse_id,
+        'name': name,
+        'artists': [name],
+        'artist': name,
+        'cover_url': _upgrade_thumbnail(cover),
+        'url': f'https://music.youtube.com/channel/{browse_id}',
+        'source': 'youtube',
+    }
+
+
+def search_artists(query: str, limit: int = 5) -> list[dict[str, Any]]:
+    if not query.strip():
+        return []
+    try:
+        results = _ytm().search(query, filter='artists', limit=limit)
+    except Exception:
+        logger.exception('YouTube Music artist search failed')
+        return []
+    artists: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for row in results or []:
+        if not isinstance(row, dict):
+            continue
+        artist = _result_to_artist(row)
+        if not artist:
+            continue
+        browse_id = artist['browse_id']
+        if browse_id in seen:
+            continue
+        seen.add(browse_id)
+        artists.append(artist)
+        if len(artists) >= limit:
+            break
+    return artists
+
+
+def _albums_from_artist_section(
+    section: Any, artists: list[str]
+) -> list[dict[str, Any]]:
+    if not isinstance(section, dict):
+        return []
+    rows = section.get('results') or []
+    albums: list[dict[str, Any]] = []
+    artist_objs = [{'name': name} for name in artists if name]
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        payload = dict(row)
+        if not payload.get('artists') and artist_objs:
+            payload['artists'] = artist_objs
+        album = _result_to_album(payload)
+        if album:
+            albums.append(album)
+    return albums
+
+
+def artist_page(
+    browse_id: str = '', query: str = ''
+) -> Optional[dict[str, Any]]:
+    browse_id = str(browse_id or '').strip()
+    query = str(query or '').strip()
+    if not browse_id and query:
+        hits = search_artists(query, limit=5)
+        exact = next(
+            (
+                item
+                for item in hits
+                if str(item.get('name') or '').casefold() == query.casefold()
+            ),
+            None,
+        )
+        match = exact or (hits[0] if hits else None)
+        browse_id = str((match or {}).get('browse_id') or '').strip()
+    if not browse_id:
+        return None
+    try:
+        with _lock:
+            data = _ytm().get_artist(browse_id) or {}
+    except Exception:
+        logger.exception('YouTube Music get_artist failed for {}', browse_id)
+        return None
+    name = str(data.get('name') or query or '').strip()
+    thumbs = data.get('thumbnails') or []
+    cover = thumbs[-1].get('url', '') if thumbs else ''
+    artists = [name] if name else []
+    albums: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for key in ('albums', 'singles'):
+        for album in _albums_from_artist_section(data.get(key), artists):
+            bid = str(album.get('browse_id') or '')
+            if not bid or bid in seen:
+                continue
+            seen.add(bid)
+            albums.append(album)
+    return {
+        'name': name or browse_id,
+        'browse_id': browse_id,
+        'cover_url': _upgrade_thumbnail(cover),
+        'albums': albums,
+        'media_type': 'artist',
+        'source': 'youtube',
+    }
 
 
 def search_albums(query: str, limit: int = 10) -> list[dict[str, Any]]:
@@ -442,7 +556,9 @@ def _search_relevance(item: dict[str, Any], query: str) -> float:
         return 0
 
     title = ' '.join(_search_tokens(str(item.get('name') or '')))
-    artists = ' '.join(_search_tokens(_search_text(item, ['artists', 'artist'])))
+    artists = ' '.join(
+        _search_tokens(_search_text(item, ['artists', 'artist']))
+    )
     album = ' '.join(_search_tokens(str(item.get('album_name') or '')))
     haystack = ' '.join(part for part in [title, artists, album] if part)
     if not haystack:
@@ -475,6 +591,8 @@ def _search_relevance(item: dict[str, Any], query: str) -> float:
     elif album.startswith(q) or q in album:
         score += 18
 
+    if item.get('media_type') == 'artist':
+        score += 12
     if item.get('media_type') == 'track':
         score += 2
     return score
@@ -530,7 +648,9 @@ def _spotify_search_query(url: str) -> str:
     return ''
 
 
-def search_media_from_spotify_url(url: str, limit: int = 20) -> list[dict[str, Any]]:
+def search_media_from_spotify_url(
+    url: str, limit: int = 20
+) -> list[dict[str, Any]]:
     query = _spotify_search_query(url)
     if not query:
         return []
@@ -549,8 +669,10 @@ def search_media(query: str, limit: int = 20) -> list[dict[str, Any]]:
             return []
     song_limit = max(1, limit)
     album_limit = max(1, min(30, limit // 2))
+    artist_limit = max(1, min(5, limit // 8 or 1))
     songs = search_songs(query, limit=song_limit)
     albums = search_albums(query, limit=album_limit)
+    artists = search_artists(query, limit=artist_limit)
     seen_album_ids = {a.get('browse_id') for a in albums if a.get('browse_id')}
     for album in _albums_from_song_search(query, limit=album_limit):
         if album.get('browse_id') in seen_album_ids:
@@ -560,7 +682,7 @@ def search_media(query: str, limit: int = 20) -> list[dict[str, Any]]:
 
     combined: list[dict[str, Any]] = []
     seen: set[tuple[str, str]] = set()
-    for item in [*songs, *albums]:
+    for item in [*artists, *songs, *albums]:
         item_id = str(
             item.get('browse_id')
             or item.get('song_id')
@@ -615,6 +737,131 @@ def _get_album_data(browse_id: str) -> dict[str, Any]:
     return data
 
 
+def _album_playlist_tracks(playlist_id: str) -> list[dict[str, Any]]:
+    playlist_id = str(playlist_id or '').strip()
+    if not playlist_id:
+        return []
+    try:
+        with _lock:
+            try:
+                data = _ytm().get_playlist(playlist_id, limit=None) or {}
+            except TypeError:
+                data = _ytm().get_playlist(playlist_id, limit=500) or {}
+    except Exception:
+        logger.exception(
+            'YouTube Music get_playlist failed for {}', playlist_id
+        )
+        return []
+    return [row for row in (data.get('tracks') or []) if isinstance(row, dict)]
+
+
+def _fill_album_track_video_ids(
+    tracks: list[dict[str, Any]], extras: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    extras_by_title: dict[str, dict[str, Any]] = {}
+    for row in extras:
+        title = (
+            str(row.get('title') or row.get('name') or '').strip().casefold()
+        )
+        if title and row.get('videoId') and title not in extras_by_title:
+            extras_by_title[title] = row
+
+    filled: list[dict[str, Any]] = []
+    seen_ids: set[str] = set()
+    seen_titles: set[str] = set()
+    for index, track in enumerate(tracks):
+        row = dict(track)
+        title = (
+            str(row.get('title') or row.get('name') or '').strip().casefold()
+        )
+        if not row.get('videoId'):
+            match = extras_by_title.get(title)
+            if match is None and index < len(extras):
+                match = extras[index]
+            if match and match.get('videoId'):
+                row['videoId'] = match.get('videoId')
+                if match.get('thumbnails') and not row.get('thumbnails'):
+                    row['thumbnails'] = match.get('thumbnails')
+        vid = str(row.get('videoId') or '').strip()
+        if vid:
+            seen_ids.add(vid)
+        if title:
+            seen_titles.add(title)
+        filled.append(row)
+
+    for row in extras:
+        vid = str(row.get('videoId') or '').strip()
+        title = (
+            str(row.get('title') or row.get('name') or '').strip().casefold()
+        )
+        if vid and vid in seen_ids:
+            continue
+        if title and title in seen_titles:
+            continue
+        filled.append(row)
+        if vid:
+            seen_ids.add(vid)
+        if title:
+            seen_titles.add(title)
+    return filled
+
+
+def _song_from_album_track(
+    track: dict[str, Any],
+    *,
+    browse_id: str,
+    album_name: str,
+    album_artists: list[str],
+    year: str,
+    release_date: str,
+    cover: str,
+    thumbs: list[Any],
+    index: int,
+    total: Any,
+) -> Optional[dict[str, Any]]:
+    song = _result_to_song({
+        **track,
+        'album': {'name': album_name, 'id': browse_id},
+        'artists': track.get('artists') or album_artists,
+        'year': year,
+        'thumbnails': track.get('thumbnails') or thumbs,
+    })
+    title = str(track.get('title') or track.get('name') or '').strip()
+    if not song and title:
+        artists = _artists_from_result(track) or album_artists
+        song = {
+            'song_id': f'ytm:{browse_id}:{index}',
+            'media_type': 'track',
+            'name': title,
+            'artists': artists,
+            'artist': ', '.join(artists),
+            'album_name': album_name,
+            'album_browse_id': browse_id,
+            'cover_url': _upgrade_thumbnail(cover),
+            'duration': _parse_duration(track.get('duration'))
+            or track.get('duration_seconds')
+            or 0,
+            'url': '',
+            'explicit': bool(track.get('isExplicit')),
+            'year': year,
+            'release_date': release_date,
+            'source': 'youtube',
+        }
+    if not song:
+        return None
+    if not song.get('artists') and album_artists:
+        song['artists'] = album_artists
+        song['artist'] = ', '.join(album_artists)
+    song['album_name'] = album_name
+    song['cover_url'] = song.get('cover_url') or _upgrade_thumbnail(cover)
+    song['year'] = year
+    song['release_date'] = release_date
+    song['track_number'] = index
+    song['album_track_total'] = total
+    song['album_browse_id'] = browse_id
+    return song
+
+
 def album_tracks_from_browse_id(browse_id: str) -> list[dict[str, Any]]:
     if not browse_id.strip():
         return []
@@ -629,28 +876,44 @@ def album_tracks_from_browse_id(browse_id: str) -> list[dict[str, Any]]:
     thumbs = data.get('thumbnails') or []
     cover = thumbs[-1].get('url', '') if thumbs else ''
     tracks = [t for t in (data.get('tracks') or []) if isinstance(t, dict)]
-    total = data.get('trackCount') or len(tracks)
+    expected = _parse_track_count(data.get('trackCount')) or 0
+    playlist_id = str(data.get('audioPlaylistId') or '').strip()
+    missing_ids = any(not track.get('videoId') for track in tracks)
+    if playlist_id and (
+        not tracks or missing_ids or (expected and len(tracks) < expected)
+    ):
+        extras = _album_playlist_tracks(playlist_id)
+        if extras:
+            tracks = (
+                extras
+                if not tracks
+                else _fill_album_track_video_ids(tracks, extras)
+            )
+
+    total = expected or len(tracks)
     songs: list[dict[str, Any]] = []
     for index, track in enumerate(tracks, start=1):
-        song = _result_to_song({
-            **track,
-            'album': {'name': album_name, 'id': browse_id},
-            'artists': track.get('artists') or data.get('artists') or [],
-            'year': year,
-            'thumbnails': track.get('thumbnails') or thumbs,
-        })
-        if not song:
-            continue
-        if not song.get('artists') and album_artists:
-            song['artists'] = album_artists
-            song['artist'] = ', '.join(album_artists)
-        song['album_name'] = album_name
-        song['cover_url'] = song.get('cover_url') or _upgrade_thumbnail(cover)
-        song['year'] = year
-        song['release_date'] = release_date
-        song['track_number'] = index
-        song['album_track_total'] = total
-        songs.append(song)
+        song = _song_from_album_track(
+            track,
+            browse_id=browse_id,
+            album_name=album_name,
+            album_artists=album_artists,
+            year=year,
+            release_date=release_date,
+            cover=cover,
+            thumbs=thumbs,
+            index=index,
+            total=total,
+        )
+        if song:
+            songs.append(song)
+    if expected and len(songs) < expected:
+        logger.warning(
+            'Album {} returned {}/{} tracks after playlist fill',
+            browse_id,
+            len(songs),
+            expected,
+        )
     return songs
 
 

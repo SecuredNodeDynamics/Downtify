@@ -253,7 +253,7 @@ def _resolve_youtube_match(
     video_id = song.get('youtube_id')
     if not video_id and (song.get('source') == 'youtube'):
         song_id = str(song.get('song_id') or '').strip()
-        if song_id and not song_id.startswith('album:'):
+        if song_id and re.fullmatch(r'[A-Za-z0-9_-]{11}', song_id):
             video_id = song_id
 
     match: Optional[dict[str, Any]] = None

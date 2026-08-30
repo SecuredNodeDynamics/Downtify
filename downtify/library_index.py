@@ -35,7 +35,9 @@ _FAST_ENTRY_CACHE: dict[tuple[str, str, int, int], dict[str, Any]] = {}
 def _data_dir() -> Path:
     import os
 
-    return Path(os.getenv('DOWNTIFY_DATA_DIR', os.getenv('DATABASE_DIR', '/data')))
+    return Path(
+        os.getenv('DOWNTIFY_DATA_DIR', os.getenv('DATABASE_DIR', '/data'))
+    )
 
 
 def _album_genre_cache_path() -> Path:
@@ -95,7 +97,9 @@ def _album_genre_from_cache(album_key: str) -> str:
 
 
 def _path_parts(file: str) -> list[str]:
-    return [part.strip() for part in str(file or '').split('/') if part.strip()]
+    return [
+        part.strip() for part in str(file or '').split('/') if part.strip()
+    ]
 
 
 def _unique_artist_names(*values: Any) -> list[str]:
@@ -166,7 +170,12 @@ def _song_from_file_safe(path: Path) -> dict[str, Any]:
         stem = path.stem
         if re.match(r'^\d+\s*-\s*', stem):
             title = re.sub(r'^\d+\s*-\s*', '', stem).strip() or stem
-            return {'name': title, 'artists': [], 'album_name': '', 'genre': ''}
+            return {
+                'name': title,
+                'artists': [],
+                'album_name': '',
+                'genre': '',
+            }
         if ' - ' in stem:
             artist, title = stem.split(' - ', 1)
             return {
@@ -350,10 +359,14 @@ def read_library_entry_fast(
     genre = canonical_genre(
         str(song.get('genre') or '').strip() or _genre_from_path(path)
     )
-    genre_fields = _library_genre_fields(genre) if genre else {
-        'genre': '',
-        'browse_genre': '',
-    }
+    genre_fields = (
+        _library_genre_fields(genre)
+        if genre
+        else {
+            'genre': '',
+            'browse_genre': '',
+        }
+    )
     artists = _artists_for_entry(relative, song, artist)
     return {
         'file': relative,
@@ -379,7 +392,12 @@ def list_library_files_fast(root: Path) -> list[dict[str, str]]:
             stat = path.stat()
         except OSError:
             continue
-        cache_key = (root_key, relative, int(stat.st_mtime_ns), int(stat.st_size))
+        cache_key = (
+            root_key,
+            relative,
+            int(stat.st_mtime_ns),
+            int(stat.st_size),
+        )
         entry = _FAST_ENTRY_CACHE.get(cache_key)
         if entry is None:
             try:
@@ -454,19 +472,19 @@ def warm_library_genres(
     """Populate genre cache and album tags via MusicBrainz in the background."""
 
     items = list_library_files(root, fetch_missing_genres=False)
-    missing_artists = sorted(
-        {
-            item['artist']
-            for item in items
-            if item['artist']
-            and item['artist'] != 'Unknown Artist'
-            and not canonical_genre(item.get('genre') or '')
-        }
-    )
+    missing_artists = sorted({
+        item['artist']
+        for item in items
+        if item['artist']
+        and item['artist'] != 'Unknown Artist'
+        and not canonical_genre(item.get('genre') or '')
+    })
     if missing_artists:
         warm_artist_genre_cache(missing_artists)
 
-    items = enrich_library_genres(list_library_files(root, fetch_missing_genres=False))
+    items = enrich_library_genres(
+        list_library_files(root, fetch_missing_genres=False)
+    )
     album_samples = _album_samples_without_genre(items)
     albums_warmed = 0
     for index, (_album_key, relative) in enumerate(album_samples, start=1):
@@ -583,7 +601,9 @@ def album_in_library(
 ) -> bool:
     from .downloader import _normalize_duplicate_key
 
-    album_name = str(album.get('name') or album.get('album_name') or '').strip()
+    album_name = str(
+        album.get('name') or album.get('album_name') or ''
+    ).strip()
     if not album_name:
         return False
 
@@ -603,7 +623,7 @@ def album_in_library(
                 break
     if expected_tracks > 0:
         return matched >= expected_tracks
-    return matched > 0
+    return False
 
 
 def _expected_album_track_count(album: dict[str, Any]) -> int:

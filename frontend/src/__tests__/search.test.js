@@ -37,6 +37,12 @@ describe('search result filter', () => {
 
     sm.setResultFilter('tracks')
     expect(sm.filterResults(items)).toEqual([items[0]])
+
+    sm.setResultFilter('artists')
+    expect(sm.filterResults([
+      ...items,
+      { song_id: 'artist:1', media_type: 'artist', name: 'Band' },
+    ])).toEqual([{ song_id: 'artist:1', media_type: 'artist', name: 'Band' }])
   })
 
   it('persists the selected filter', () => {

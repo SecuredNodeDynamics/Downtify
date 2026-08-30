@@ -131,12 +131,24 @@
           <!-- Info -->
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2 mb-0.5">
-              <span class="font-semibold truncate">{{ song.name }}</span>
+            <span
+              class="font-semibold truncate"
+              :class="
+                mediaType(song) === 'artist' ? 'cursor-pointer hover:text-primary' : ''
+              "
+              @click="mediaType(song) === 'artist' && openArtist(song)"
+            >{{ song.name }}</span>
               <span v-if="song.explicit" class="badge-error-soft shrink-0"
                 >E</span
               >
             </div>
-            <p class="text-xs text-base-content/70 truncate">
+            <p
+              class="text-xs text-base-content/70 truncate"
+              :class="
+                mediaType(song) !== 'artist' ? 'cursor-pointer hover:text-primary' : ''
+              "
+              @click="openArtistFromItem(song)"
+            >
               {{ artistsOf(song) }}
             </p>
             <p
@@ -188,8 +200,14 @@
           <div class="flex shrink-0 items-center gap-1">
             <button
               class="icon-btn text-primary hover:bg-primary/10"
-              @click="openDemo(song)"
-              :title="t('search.demo')"
+              @click="
+                mediaType(song) === 'artist' ? openArtist(song) : openDemo(song)
+              "
+              :title="
+                mediaType(song) === 'artist'
+                  ? t('search.openArtist')
+                  : t('search.demo')
+              "
             >
               <Icon icon="clarity:play-solid" class="h-4 w-4" />
             </button>
@@ -206,7 +224,15 @@
             </a>
 
             <button
-              v-if="downloadState(song) === 'owned'"
+              v-if="mediaType(song) === 'artist'"
+              class="icon-btn text-primary hover:bg-primary/10"
+              @click="openArtist(song)"
+              :title="t('search.openArtist')"
+            >
+              <Icon icon="clarity:arrow-right-line" class="h-5 w-5" />
+            </button>
+            <button
+              v-else-if="downloadState(song) === 'owned'"
               class="icon-btn text-success hover:bg-success/10"
               @click="viewOwnedInLibrary(song)"
               :title="t('search.viewInLibrary')"
@@ -225,7 +251,11 @@
               v-else
               class="icon-btn text-primary hover:bg-primary/10"
               @click="download(song)"
-              :title="t('search.download')"
+              :title="
+                downloadState(song) === 'remaining'
+                  ? t('search.downloadRemaining')
+                  : t('search.download')
+              "
             >
               <Icon icon="clarity:download-line" class="h-5 w-5" />
             </button>
@@ -497,14 +527,19 @@
                       >
                         <button
                           class="btn btn-primary btn-sm gap-2 rounded-full sm:shrink-0"
-                          :disabled="downloadState(demoSourceItem) !== 'idle'"
+                          :disabled="
+                        downloadState(demoSourceItem) !== 'idle' &&
+                        downloadState(demoSourceItem) !== 'remaining'
+                      "
                           @click="downloadAlbumFromDemo"
                         >
                           <Icon icon="clarity:download-line" class="h-4 w-4" />
                           {{
                             downloadState(demoSourceItem) === 'queued'
                               ? t('search.inQueue')
-                              : t('search.downloadAlbum')
+                              : downloadState(demoSourceItem) === 'remaining'
+                                ? t('search.downloadRemaining')
+                                : t('search.downloadAlbum')
                           }}
                         </button>
                         <button
@@ -669,6 +704,7 @@ import {
   findOwnedAlbum,
   findOwnedTrack,
 } from '../model/libraryOwnership'
+import { albumLibraryStatus } from '../model/albumDownload'
 import { useAlbumTrackCounts } from '../model/albumTrackCounts'
 import {
   libraryNavigationForAlbum,
@@ -813,6 +849,7 @@ const hasUnfilteredResults = computed(
 
 const emptyFilterMessage = computed(() => {
   if (sm.resultFilter.value === 'albums') return t('search.emptyAlbums')
+  if (sm.resultFilter.value === 'artists') return t('search.emptyArtists')
   if (sm.resultFilter.value === 'tracks') return t('search.emptyTracks')
   return t('search.empty')
 })
@@ -882,19 +919,21 @@ function artistsOf(song) {
 }
 
 function mediaType(song) {
-  return song?.media_type === 'album' ? 'album' : 'track'
+  if (song?.media_type === 'album') return 'album'
+  if (song?.media_type === 'artist') return 'artist'
+  return 'track'
 }
 
 function mediaTypeLabel(song) {
-  return mediaType(song) === 'album'
-    ? t('search.albumType')
-    : t('search.trackType')
+  if (mediaType(song) === 'album') return t('search.albumType')
+  if (mediaType(song) === 'artist') return t('search.artistType')
+  return t('search.trackType')
 }
 
 function mediaTypeClass(song) {
-  return mediaType(song) === 'album'
-    ? 'media-type-pill-album'
-    : 'media-type-pill-track'
+  if (mediaType(song) === 'album') return 'media-type-pill-album'
+  if (mediaType(song) === 'artist') return 'media-type-pill-artist'
+  return 'media-type-pill-track'
 }
 
 function trackCountLabel(count) {
@@ -940,17 +979,46 @@ function externalServiceButtonClass() {
 
 function downloadState(song) {
   if (!song) return 'idle'
-  if (isOwned(song)) return 'owned'
+  if (mediaType(song) === 'artist') return 'artist'
   const item = pt.getBySong(song)
-  if (!item) return 'idle'
-  if (item.isErrored()) return 'error'
-  if (item.isDownloaded()) return 'queued'
-  return 'queued'
+  if (item) {
+    if (item.isErrored()) return 'error'
+    return 'queued'
+  }
+  if (mediaType(song) === 'album') {
+    const status = albumLibraryStatus(song, getCachedLibraryItems() || [])
+    if (status.kind === 'owned' || isOwned(song)) return 'owned'
+    if (status.kind === 'remaining') return 'remaining'
+  } else if (isOwned(song)) {
+    return 'owned'
+  }
+  return 'idle'
 }
 
 function download(song) {
-  if (downloadState(song) !== 'idle') return
+  if (!['idle', 'remaining'].includes(downloadState(song))) return
   emit('download', song)
+}
+
+function openArtist(item) {
+  if (!item) return
+  closeDemo()
+  router.push({
+    name: 'Artist',
+    params: { browseId: item.browse_id || '' },
+    query: { name: item.name || item.artist || '' },
+  })
+}
+
+function openArtistFromItem(item) {
+  if (!item || mediaType(item) === 'artist') return
+  const name = item.artists?.[0] || item.artist
+  if (!name) return
+  closeDemo()
+  router.push({
+    name: 'Artist',
+    query: { name },
+  })
 }
 
 async function libraryItemsForOwned() {
@@ -1027,6 +1095,10 @@ async function playOwnedMedia(item) {
 }
 
 async function openDemo(song) {
+  if (mediaType(song) === 'artist') {
+    openArtist(song)
+    return
+  }
   demoOpen.value = true
   demoLoading.value = true
   demoError.value = ''
@@ -1164,7 +1236,10 @@ function downloadFromDemo() {
 }
 
 function downloadAlbumFromDemo() {
-  if (!demoSourceItem.value || downloadState(demoSourceItem.value) !== 'idle') {
+  if (
+    !demoSourceItem.value ||
+    !['idle', 'remaining'].includes(downloadState(demoSourceItem.value))
+  ) {
     return
   }
   download(demoSourceItem.value)

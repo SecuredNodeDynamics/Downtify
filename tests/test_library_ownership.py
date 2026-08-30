@@ -9,7 +9,10 @@ from downtify.library_index import (
 
 
 def test_media_item_key_prefers_song_and_browse_ids():
-    assert media_item_key({'song_id': 'track:1', 'browse_id': 'album:1'}) == 'track:1'
+    assert (
+        media_item_key({'song_id': 'track:1', 'browse_id': 'album:1'})
+        == 'track:1'
+    )
     assert media_item_key({'browse_id': 'album:1'}) == 'album:1'
 
 
@@ -19,6 +22,7 @@ def test_album_in_library_matches_artist_and_album_name():
         'name': 'Classic 50s Jazz',
         'artists': ['1950s Jazz'],
         'browse_id': 'album:1',
+        'track_count': 1,
     }
     library_items = [
         {
@@ -47,6 +51,7 @@ def test_album_in_library_matches_any_listed_artist():
         'name': 'Swing',
         'artists': ['Connor Price', 'Nic D', '4Korners'],
         'browse_id': 'album:1',
+        'track_count': 1,
     }
     library_items = [
         {
@@ -94,6 +99,25 @@ def test_album_in_library_requires_expected_track_count_when_known():
 
     assert album_in_library(album, partial_library) is False
     assert album_in_library(album, complete_library) is True
+
+
+def test_album_in_library_unknown_track_count_is_not_complete():
+    album = {
+        'media_type': 'album',
+        'name': 'Classic 50s Jazz',
+        'artists': ['1950s Jazz'],
+        'browse_id': 'album:1',
+    }
+    library_items = [
+        {
+            'file': '1950s Jazz/Classic 50s Jazz/01.flac',
+            'artist': '1950s Jazz',
+            'album': 'Classic 50s Jazz',
+            'title': 'Track',
+        }
+    ]
+
+    assert album_in_library(album, library_items) is False
 
 
 def test_track_in_library_from_metadata_matches_title_and_artist():
@@ -147,7 +171,9 @@ def test_media_in_library_uses_duplicate_detection_for_tracks(tmp_path):
         'artists': ['Good Artist'],
         'song_id': 'track:1',
     }
-    (tmp_path / 'Good Artist - Good Song.mp3').write_text('audio', encoding='utf-8')
+    (tmp_path / 'Good Artist - Good Song.mp3').write_text(
+        'audio', encoding='utf-8'
+    )
 
     assert (
         media_in_library(

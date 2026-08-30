@@ -106,7 +106,7 @@ class PlaylistMonitorDB:
                 pass
             try:
                 conn.execute(
-                    'ALTER TABLE monitored_playlists ADD COLUMN image_url TEXT NOT NULL DEFAULT \'\''
+                    "ALTER TABLE monitored_playlists ADD COLUMN image_url TEXT NOT NULL DEFAULT ''"
                 )
             except Exception:
                 pass
@@ -290,9 +290,7 @@ async def check_monitored(
     try:
         tracks = await _fetch_monitored_tracks(item)
     except Exception:
-        logger.exception(
-            'Failed to fetch {} {}', label, item.spotify_id
-        )
+        logger.exception('Failed to fetch {} {}', label, item.spotify_id)
         await asyncio.to_thread(
             db.update_playlist, item.id, last_checked=_now_iso()
         )
@@ -325,6 +323,31 @@ async def check_monitored(
         # monitor's bookkeeping was reset. Adopting the existing file stops the
         # monitor from re-downloading (and repeatedly failing) the same tracks
         # on every check.
+        # Duplicate detection needs album_name. Playlist rows often omit it;
+        # artist discography rows already have it from the album fetch.
+        if not t.get('album_name') or (
+            item.kind == 'playlist' and not t.get('year')
+        ):
+            try:
+                full = await asyncio.to_thread(spotify.track_from_id, tid)
+                for key in (
+                    'cover_url',
+                    'year',
+                    'release_date',
+                    'album_name',
+                    'artists',
+                ):
+                    value = full.get(key)
+                    if value:
+                        t[key] = value
+            except Exception:
+                logger.opt(exception=True).warning(
+                    'Per-track Spotify fetch failed for {}; '
+                    'falling back to {} data',
+                    tid,
+                    label,
+                )
+
         existing = await asyncio.to_thread(
             lambda track=t: downloader.duplicate_filename_for(
                 track, subdir=pl_subdir, stem_index=stem_index
@@ -357,30 +380,6 @@ async def check_monitored(
     for song in new_tracks:
         track_id = song['song_id']
         pl_name = item.name
-
-        # Playlist embed entries are missing release year and use the
-        # playlist cover instead of the album cover. Re-fetching the track
-        # embed gives us both per-track. We still keep the playlist values
-        # as a fallback if the per-track fetch fails for any reason.
-        try:
-            full = await asyncio.to_thread(spotify.track_from_id, track_id)
-            for key in (
-                'cover_url',
-                'year',
-                'release_date',
-                'album_name',
-                'artists',
-            ):
-                value = full.get(key)
-                if value:
-                    song[key] = value
-        except Exception:
-            logger.opt(exception=True).warning(
-                'Per-track Spotify fetch failed for {}; '
-                'falling back to {} data',
-                track_id,
-                label,
-            )
 
         def _make_cb(s: dict, name: str) -> Callable[[float, str], None]:
             def _cb(pct: float, message: str) -> None:
@@ -563,7 +562,9 @@ async def monitor_loop(
                     continue
                 try:
                     history_db = (
-                        get_history_db() if get_history_db is not None else None
+                        get_history_db()
+                        if get_history_db is not None
+                        else None
                     )
                     count = await check_monitored(
                         pl,

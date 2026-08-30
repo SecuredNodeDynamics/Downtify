@@ -2357,6 +2357,17 @@ def album_track_counts_endpoint(payload: dict[str, Any]) -> dict[str, Any]:
     return {'counts': providers.album_track_counts(browse_ids)}
 
 
+@router.get('/api/artist')
+def artist_page_endpoint(
+    browse_id: str = Query(''),
+    q: str = Query(''),
+) -> dict[str, Any]:
+    page = providers.artist_page(browse_id=browse_id, query=q)
+    if not page:
+        raise HTTPException(status_code=404, detail='Artist not found')
+    return page
+
+
 @router.get('/api/image-proxy')
 def image_proxy(url: str = Query('')) -> Response:
     """Proxy album-art CDN URLs for mobile WebViews that block hotlinked images."""

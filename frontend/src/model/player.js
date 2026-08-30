@@ -16,6 +16,9 @@ import {
   syncMediaSessionPosition,
 } from './playerMediaSession.js'
 import { usesEmbeddedServer } from './serverConnection.js'
+import { getCachedLibraryItems } from './librarySession.js'
+import { groupAlbums } from './library.js'
+import { filesWithFollowOnAlbum, nextAlbumAfter } from './playerQueue.js'
 
 const VOLUME_KEY = 'downtify-player-volume'
 const SESSION_KEY = 'downtify-player-session-v1'
@@ -663,12 +666,34 @@ export function syncPlaylistFromFiles(files, options = {}) {
   setPlaylist(paths, options)
 }
 
+function followOnAlbum(context) {
+  if (context?.type !== 'album' || !context.artist || !context.name) return null
+  const albums = groupAlbums(getCachedLibraryItems() || [])
+  return nextAlbumAfter(albums, context.artist, context.name)
+}
+
 function setPlaylist(files, options = {}) {
-  const tracks = (files || []).map((f) =>
+  let tracks = (files || []).map((f) =>
     typeof f === 'string' ? trackFromFile(f) : f
   )
+  let context = options.context || null
+  if (context?.type === 'album' && !shuffle.value) {
+    const nextAlbum = followOnAlbum(context)
+    if (nextAlbum?.files?.length) {
+      const currentFiles = tracks.map((track) => track.file)
+      const packed = filesWithFollowOnAlbum(currentFiles, nextAlbum)
+      tracks = packed.files.map((file) =>
+        tracks.find((track) => track.file === file) || trackFromFile(file)
+      )
+      context = {
+        ...context,
+        followOnStart: packed.followOnStart,
+        followOnName: nextAlbum.name,
+      }
+    }
+  }
   playlist.value = tracks
-  playlistContext.value = options.context || null
+  playlistContext.value = context
   if (restorePlayerSession(tracks.map((track) => track.file))) {
     if (shuffle.value) buildShuffleOrder()
     return
@@ -791,11 +816,48 @@ function prevIndex() {
   return i
 }
 
+function tryContinueArtistDiscography() {
+  if (shuffle.value || repeatMode.value === 'all') return false
+  const ctx = playlistContext.value
+  if (ctx?.type !== 'album') return false
+  const nextAlbum = followOnAlbum(ctx)
+  if (!nextAlbum?.files?.length) return false
+  const start = playlist.value.length
+  const extra = nextAlbum.files
+    .filter((file) => !playlist.value.some((track) => track.file === file))
+    .map((file) => trackFromFile(file))
+  if (!extra.length) return false
+  playlist.value = [...playlist.value, ...extra]
+  playlistContext.value = {
+    type: 'album',
+    name: nextAlbum.name,
+    artist: ctx.artist,
+    continuedFrom: ctx.name,
+  }
+  playAt(start)
+  return true
+}
+
 function next() {
   const i = nextIndex()
   if (i < 0) {
+    if (tryContinueArtistDiscography()) return
     pause()
     return
+  }
+  const followOnStart = Number(playlistContext.value?.followOnStart)
+  if (
+    Number.isFinite(followOnStart) &&
+    followOnStart >= 0 &&
+    i >= followOnStart &&
+    playlistContext.value?.followOnName
+  ) {
+    playlistContext.value = {
+      type: 'album',
+      name: playlistContext.value.followOnName,
+      artist: playlistContext.value.artist,
+      continuedFrom: playlistContext.value.name,
+    }
   }
   playAt(i)
 }

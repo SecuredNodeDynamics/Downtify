@@ -469,9 +469,9 @@ def track_from_id(track_id: str) -> dict[str, Any]:
     return _track_dict(entity, track_id=track_id)
 
 
-def album_tracks_from_id(album_id: str) -> list[dict[str, Any]]:
-    payload = _fetch_embed_json('album', album_id)
-    entity = _entity_from(payload)
+def _album_tracks_from_embed_entity(
+    entity: dict[str, Any], album_id: str
+) -> list[dict[str, Any]]:
     album_name = entity.get('name') or ''
     cover = _cover_url(entity)
     track_items = (
@@ -511,6 +511,23 @@ def album_tracks_from_id(album_id: str) -> list[dict[str, Any]]:
         row['album_track_total'] = album_track_total
         songs.append(row)
     return songs
+
+
+def album_tracks_from_id(album_id: str) -> list[dict[str, Any]]:
+    payload = _fetch_embed_json('album', album_id)
+    entity = _entity_from(payload)
+    token = _token_from_embed_payload(payload)
+    if token:
+        try:
+            gql_tracks = _graphql_all_album_tracks(album_id, token)
+            if gql_tracks:
+                return gql_tracks
+        except Exception:
+            logger.opt(exception=True).warning(
+                'GraphQL album tracks failed for {}; using embed data (limited)',
+                album_id,
+            )
+    return _album_tracks_from_embed_entity(entity, album_id)
 
 
 def _parse_playlist_tracks(entity: dict[str, Any]) -> list[dict[str, Any]]:
@@ -567,6 +584,10 @@ _GRAPHQL_HASH = (
 # sha256 of queryArtistDiscography in the Spotify web player.
 _ARTIST_DISCOGRAPHY_HASH = (
     '4257bb9c1e5eaa6adb95092514dd09a35559f6ad0e284bed5e13547d342490aa'
+)
+# sha256 of getAlbum in the Spotify web player (paginated tracksV2).
+_ALBUM_GRAPHQL_HASH = (
+    'b9bfabef66ed756e5e13f68a942deb60bd4125ec1f1be8cc42769dc0259b4b10'
 )
 
 
@@ -712,9 +733,145 @@ def playlist_tracks_from_id(playlist_id: str) -> list[dict[str, Any]]:
     return _parse_playlist_tracks(entity)
 
 
-def _graphql_artist_discography(
-    artist_id: str, token: str
+def _track_dict_from_album_gql_item(
+    item: dict[str, Any],
+    *,
+    album_name: str,
+    cover_url: str,
+    release_date: str,
+) -> Optional[dict[str, Any]]:
+    if not isinstance(item, dict):
+        return None
+    track = item.get('track')
+    if not isinstance(track, dict):
+        td = _track_dict_from_graphql_item(item)
+        if td and album_name:
+            td['album_name'] = album_name
+        if td and cover_url and not td.get('cover_url'):
+            td['cover_url'] = cover_url
+        if td and release_date and not td.get('release_date'):
+            td['release_date'] = release_date
+            td['year'] = _year_from_release_date(release_date)
+        return td
+    track_id = (
+        _id_from_uri(track.get('uri') or '')
+        or str(track.get('id') or '').strip()
+    )
+    if not track_id:
+        return None
+    artists = [
+        a['profile']['name']
+        for a in (track.get('artists') or {}).get('items', [])
+        if isinstance(a, dict)
+        and isinstance(a.get('profile'), dict)
+        and a['profile'].get('name')
+    ]
+    duration_ms = (track.get('duration') or {}).get('totalMilliseconds') or 0
+    label = (track.get('contentRating') or {}).get('label') or ''
+    return {
+        'song_id': track_id,
+        'name': track.get('name') or '',
+        'artists': artists,
+        'artist': ', '.join(artists),
+        'album_name': album_name,
+        'cover_url': cover_url,
+        'duration': int(duration_ms / 1000) if duration_ms else 0,
+        'preview_url': _preview_url(track),
+        'url': f'https://open.spotify.com/track/{track_id}',
+        'explicit': str(label).upper() == 'EXPLICIT',
+        'release_date': release_date,
+        'year': _year_from_release_date(release_date),
+        'source': 'spotify',
+    }
+
+
+def _graphql_album_fetch_page(
+    album_id: str, token: str, offset: int, limit: int = 50
 ) -> dict[str, Any]:
+    resp = requests.get(
+        _PARTNER_API,
+        params={
+            'operationName': 'getAlbum',
+            'variables': json.dumps({
+                'uri': f'spotify:album:{album_id}',
+                'locale': '',
+                'offset': offset,
+                'limit': limit,
+            }),
+            'extensions': json.dumps({
+                'persistedQuery': {
+                    'version': 1,
+                    'sha256Hash': _ALBUM_GRAPHQL_HASH,
+                }
+            }),
+        },
+        headers={
+            'Authorization': f'Bearer {token}',
+            'User-Agent': _USER_AGENT,
+            'app-platform': 'WebPlayer',
+        },
+        timeout=15,
+    )
+    resp.raise_for_status()
+    data = resp.json()
+    logger.debug(
+        'Spotify GraphQL getAlbum id={} offset={}: {}',
+        album_id,
+        offset,
+        json_log_blob(redact_sensitive_mapping(data))[:12000],
+    )
+    if 'errors' in data:
+        raise ValueError(f'GraphQL errors: {data["errors"]}')
+    return (data.get('data') or {}).get('albumUnion') or {}
+
+
+def _graphql_all_album_tracks(
+    album_id: str, token: str
+) -> list[dict[str, Any]]:
+    songs: list[dict[str, Any]] = []
+    offset = 0
+    limit = 50
+    album_name = ''
+    cover_url = ''
+    release_date = ''
+    while True:
+        union = _graphql_album_fetch_page(album_id, token, offset, limit)
+        if not union:
+            break
+        if not album_name:
+            album_name = str(union.get('name') or '').strip()
+            cover_url = _largest_image(
+                (union.get('coverArt') or {}).get('sources') or []
+            )
+            for key in ('date', 'releaseDate'):
+                release_date = _release_date_raw_from_field(union.get(key))
+                if release_date:
+                    break
+        tracks_wrap = union.get('tracksV2') or union.get('tracks') or {}
+        items = tracks_wrap.get('items') or []
+        for item in items:
+            td = _track_dict_from_album_gql_item(
+                item,
+                album_name=album_name,
+                cover_url=cover_url,
+                release_date=release_date,
+            )
+            if td:
+                songs.append(td)
+        total = tracks_wrap.get('totalCount') or 0
+        offset += len(items)
+        if not items or (total and offset >= total):
+            break
+        if not total and len(items) < limit:
+            break
+    total_count = len(songs)
+    for index, row in enumerate(songs, start=1):
+        row['track_number'] = index
+        row['album_track_total'] = total_count
+    return songs
+
+
+def _graphql_artist_discography(artist_id: str, token: str) -> dict[str, Any]:
     resp = requests.get(
         _PARTNER_API,
         params={

@@ -57,7 +57,7 @@ function isActive(item) {
     return route.name === 'Home'
   }
   if (item.name === 'Search') {
-    return route.name === 'Search'
+    return route.name === 'Search' || route.name === 'Artist'
   }
   return route.name === item.name
 }

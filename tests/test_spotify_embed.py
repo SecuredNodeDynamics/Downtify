@@ -334,9 +334,7 @@ def test_album_ids_from_discography_reads_artist_root():
                     'items': [
                         {
                             'releases': {
-                                'items': [
-                                    {'uri': 'spotify:album:singleX'}
-                                ]
+                                'items': [{'uri': 'spotify:album:singleX'}]
                             }
                         }
                     ]
@@ -377,6 +375,64 @@ def test_embed_image_url_reads_visual_identity_image(monkeypatch):
     )
 
     assert (
-        embed_image_url('artist', 'abc123')
-        == 'https://i.scdn.co/image/large'
+        embed_image_url('artist', 'abc123') == 'https://i.scdn.co/image/large'
     )
+
+
+def test_album_tracks_from_id_prefers_graphql_when_token_present():
+    payload = {
+        'props': {
+            'pageProps': {
+                'state': {
+                    'data': {
+                        'entity': {
+                            'name': 'Truncated',
+                            'trackList': [
+                                {
+                                    'uri': 'spotify:track:onlyone',
+                                    'title': 'Only One',
+                                    'subtitle': _AL1,
+                                }
+                            ],
+                        }
+                    },
+                    'settings': {'session': {'accessToken': 'tok'}},
+                }
+            }
+        }
+    }
+    album_union = {
+        'name': 'Full Album',
+        'coverArt': {'sources': [{'url': 'https://img', 'width': 300}]},
+        'tracksV2': {
+            'totalCount': 2,
+            'items': [
+                {
+                    'track': {
+                        'name': 'First',
+                        'uri': 'spotify:track:aaa',
+                        'duration': {'totalMilliseconds': 1000},
+                        'artists': {'items': [{'profile': {'name': _AL1}}]},
+                    }
+                },
+                {
+                    'track': {
+                        'name': 'Second',
+                        'uri': 'spotify:track:bbb',
+                        'duration': {'totalMilliseconds': 2000},
+                        'artists': {'items': [{'profile': {'name': _AL1}}]},
+                    }
+                },
+            ],
+        },
+    }
+    with (
+        patch('downtify.spotify._fetch_embed_json', return_value=payload),
+        patch(
+            'downtify.spotify._graphql_album_fetch_page',
+            return_value=album_union,
+        ),
+    ):
+        songs = album_tracks_from_id('albumid')
+    assert [song['name'] for song in songs] == ['First', 'Second']
+    assert songs[1]['album_track_total'] == 2

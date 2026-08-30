@@ -126,7 +126,9 @@ import { Icon } from '@iconify/vue'
 
 import CoverImage from './CoverImage.vue'
 import API from '../model/api'
+import { albumLibraryStatus } from '../model/albumDownload'
 import { useAlbumTrackCounts } from '../model/albumTrackCounts'
+import { getCachedLibraryItems } from '../model/librarySession'
 import {
   getLibraryDownloadOfferState,
   libraryDownloadOfferKey,
@@ -222,6 +224,12 @@ function downloadButtonLabel(item, index) {
   if (state === 'queued') return t('search.inQueue')
   if (state === 'added') return t('library.downloadAdded')
   if (state === 'failed') return t('library.downloadFailed')
+  if (
+    item.media_type === 'album' &&
+    albumLibraryStatus(item, getCachedLibraryItems() || []).kind === 'remaining'
+  ) {
+    return t('library.downloadRemaining')
+  }
   return item.media_type === 'album'
     ? t('library.downloadAlbum')
     : t('library.downloadTrack')

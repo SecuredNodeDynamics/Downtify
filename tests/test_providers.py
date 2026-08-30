@@ -297,16 +297,14 @@ def test_search_media_can_return_more_than_old_six_pages(monkeypatch):
 
 
 def test_result_to_album_includes_track_count():
-    album = providers._result_to_album(
-        {
-            'browseId': 'MPREb_test',
-            'title': 'Test Album',
-            'artists': [{'name': 'Artist'}],
-            'year': '2020',
-            'trackCount': 12,
-            'thumbnails': [{'url': 'https://example.com/cover.jpg'}],
-        }
-    )
+    album = providers._result_to_album({
+        'browseId': 'MPREb_test',
+        'title': 'Test Album',
+        'artists': [{'name': 'Artist'}],
+        'year': '2020',
+        'trackCount': 12,
+        'thumbnails': [{'url': 'https://example.com/cover.jpg'}],
+    })
 
     assert album is not None
     assert album['track_count'] == 12
@@ -321,9 +319,16 @@ def test_album_track_counts_uses_cached_lookup(monkeypatch):
         }
         return mapping.get(browse_id, ([], None))
 
-    monkeypatch.setattr(providers, '_cached_album_tracks_and_count', fake_cached)
+    monkeypatch.setattr(
+        providers, '_cached_album_tracks_and_count', fake_cached
+    )
 
-    counts = providers.album_track_counts(['MPREb_a', 'MPREb_b', 'MPREb_a', ''])
+    counts = providers.album_track_counts([
+        'MPREb_a',
+        'MPREb_b',
+        'MPREb_a',
+        '',
+    ])
 
     assert counts == {'MPREb_a': 10, 'MPREb_b': 14}
 
@@ -362,9 +367,9 @@ def test_search_media_from_spotify_track_url(monkeypatch):
     monkeypatch.setattr(
         providers.spotify,
         'parse_spotify_url',
-        lambda url: ('track', '6vIpkg9mdc5kDYvwuO6Qtc')
-        if url == track_url
-        else None,
+        lambda url: (
+            ('track', '6vIpkg9mdc5kDYvwuO6Qtc') if url == track_url else None
+        ),
     )
     monkeypatch.setattr(
         providers.spotify,
@@ -387,7 +392,10 @@ def test_search_media_from_spotify_track_url(monkeypatch):
                         'videoId': 'abc12345678',
                         'title': 'Kaisey Jiyun',
                         'artists': [{'name': 'The Local Train'}],
-                        'album': {'name': 'Aalas Ka Pedh', 'id': 'MPREb_album'},
+                        'album': {
+                            'name': 'Aalas Ka Pedh',
+                            'id': 'MPREb_album',
+                        },
                         'thumbnails': [{'url': 'https://img=w60-h60'}],
                     },
                 ]
@@ -473,9 +481,7 @@ def test_pick_best_still_skips_covers_for_studio_originals():
             'duration_seconds': 258,
         },
     ]
-    picked = providers._pick_best(
-        results, 258, 'Wonderwall', ['Oasis']
-    )
+    picked = providers._pick_best(results, 258, 'Wonderwall', ['Oasis'])
     assert picked is not None
     assert picked['videoId'] == 'oasisstudio1'
 
@@ -485,9 +491,9 @@ def test_spotify_artist_url_builds_search_query(monkeypatch):
     monkeypatch.setattr(
         providers.spotify,
         'parse_spotify_url',
-        lambda url: ('artist', '1nAVKAE4ylldkFvQGo58i8')
-        if url == artist_url
-        else None,
+        lambda url: (
+            ('artist', '1nAVKAE4ylldkFvQGo58i8') if url == artist_url else None
+        ),
     )
     monkeypatch.setattr(
         providers.spotify,
@@ -527,3 +533,112 @@ def test_album_tracks_from_browse_id_maps_youtube_album(monkeypatch):
     assert songs[0]['album_name'] == 'Love Is a Beautiful Journey'
     assert songs[0]['track_number'] == 1
     assert songs[1]['name'] == 'Two'
+
+
+def test_album_tracks_from_browse_id_keeps_tracks_without_video_id(
+    monkeypatch,
+):
+    class FakeYtm:
+        def get_album(self, browse_id):
+            return {
+                'title': 'Partial Album',
+                'year': '2024',
+                'artists': [{'name': 'Artist'}],
+                'thumbnails': [],
+                'trackCount': 2,
+                'tracks': [
+                    {
+                        'title': 'Has Id',
+                        'videoId': 'aaaaaaaaaaa',
+                        'artists': [{'name': 'Artist'}],
+                    },
+                    {
+                        'title': 'Missing Id',
+                        'artists': [{'name': 'Artist'}],
+                    },
+                ],
+            }
+
+    monkeypatch.setattr(providers, '_ytm', lambda: FakeYtm())
+    songs = providers.album_tracks_from_browse_id('MPREb_partial')
+    assert [song['name'] for song in songs] == ['Has Id', 'Missing Id']
+    assert songs[1]['song_id'].startswith('ytm:')
+
+
+def test_album_tracks_from_browse_id_fills_from_audio_playlist(monkeypatch):
+    class FakeYtm:
+        def get_album(self, browse_id):
+            return {
+                'title': 'Short List',
+                'year': '2024',
+                'artists': [{'name': 'Artist'}],
+                'thumbnails': [],
+                'trackCount': 2,
+                'audioPlaylistId': 'OLAK5uy_test',
+                'tracks': [
+                    {'title': 'One', 'artists': [{'name': 'Artist'}]},
+                ],
+            }
+
+        def get_playlist(self, playlist_id, limit=None):
+            assert playlist_id == 'OLAK5uy_test'
+            return {
+                'tracks': [
+                    {
+                        'title': 'One',
+                        'videoId': 'aaaaaaaaaaa',
+                        'artists': [{'name': 'Artist'}],
+                    },
+                    {
+                        'title': 'Two',
+                        'videoId': 'bbbbbbbbbbb',
+                        'artists': [{'name': 'Artist'}],
+                    },
+                ]
+            }
+
+    monkeypatch.setattr(providers, '_ytm', lambda: FakeYtm())
+    songs = providers.album_tracks_from_browse_id('MPREb_fill')
+    assert len(songs) == 2
+    assert songs[0]['song_id'] == 'aaaaaaaaaaa'
+    assert songs[1]['name'] == 'Two'
+
+
+def test_artist_page_maps_albums_and_singles(monkeypatch):
+    class FakeYtm:
+        def search(self, query, filter=None, limit=5):
+            assert filter == 'artists'
+            return [{'artist': 'Salotune', 'browseId': 'UCsalo'}]
+
+        def get_artist(self, browse_id):
+            assert browse_id == 'UCsalo'
+            return {
+                'name': 'Salotune',
+                'thumbnails': [{'url': 'https://example.com/a.jpg'}],
+                'albums': {
+                    'results': [
+                        {
+                            'title': 'Love Is a Beautiful Journey',
+                            'browseId': 'MPREb_album',
+                            'year': '2026',
+                        }
+                    ]
+                },
+                'singles': {
+                    'results': [
+                        {
+                            'title': 'One Single',
+                            'browseId': 'MPREb_single',
+                            'year': '2025',
+                        }
+                    ]
+                },
+            }
+
+    monkeypatch.setattr(providers, '_ytm', lambda: FakeYtm())
+    page = providers.artist_page(query='Salotune')
+    assert page['name'] == 'Salotune'
+    assert [album['name'] for album in page['albums']] == [
+        'Love Is a Beautiful Journey',
+        'One Single',
+    ]

@@ -5,7 +5,10 @@
     class="app-shell flex min-h-dvh flex-col overflow-x-hidden text-base-content lg:min-h-dvh lg:overflow-visible"
   >
     <MobileAppBar />
-    <main class="mobile-main flex-1 overflow-x-hidden">
+    <main
+      class="mobile-main flex-1 overflow-x-hidden"
+      :class="{ 'has-mini-player': showMiniPlayer }"
+    >
       <router-view v-slot="{ Component, route }">
         <transition name="page-instant">
           <keep-alive :include="keepAliveViews">
@@ -15,6 +18,7 @@
       </router-view>
     </main>
     <Footer class="hidden lg:block" />
+    <MiniPlayer />
     <BottomNav />
     <MobileMoreSheet />
     <MobileSearchSheet />
@@ -23,10 +27,12 @@
 
 <script setup>
 import { computed, nextTick, onBeforeMount, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 
 import AppLoadingOverlay from './components/AppLoadingOverlay.vue'
 import BottomNav from './components/BottomNav.vue'
 import Footer from './components/Footer.vue'
+import MiniPlayer from './components/MiniPlayer.vue'
 import MobileAppBar from './components/MobileAppBar.vue'
 import MobileMoreSheet from './components/MobileMoreSheet.vue'
 import MobileSearchSheet from './components/MobileSearchSheet.vue'
@@ -39,16 +45,22 @@ import {
   EMBEDDED_SERVER_READY_EVENT,
 } from './model/embeddedServer'
 import { isCapacitorNative, usesEmbeddedServer } from './model/serverConnection'
+import { usePlayer } from './model/player'
 import { useBinaryThemeManager } from './model/theme'
 
+const route = useRoute()
+const player = usePlayer()
 const isNativeApp = isCapacitorNative()
 const showStarField = computed(
   () => !isNativeApp || router.currentRoute.value.name === 'Home'
 )
+const showMiniPlayer = computed(
+  () => Boolean(player.currentTrack.value) && route.name !== 'Player'
+)
 const keepAliveViews = computed(() =>
   isNativeApp
-    ? ['Player', 'List', 'Search', 'Download']
-    : ['Player', 'List', 'Search', 'Settings', 'Download']
+    ? ['Player', 'List', 'Search', 'Download', 'Artist']
+    : ['Player', 'List', 'Search', 'Settings', 'Download', 'Artist']
 )
 
 const themeMgr = useBinaryThemeManager()

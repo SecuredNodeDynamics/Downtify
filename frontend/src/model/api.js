@@ -180,6 +180,16 @@ function search(query) {
   return API.get('/api/songs/search', { params: { query } })
 }
 
+function getArtist(params = {}) {
+  return API.get('/api/artist', {
+    params: {
+      browse_id: params.browseId || params.browse_id || '',
+      q: params.q || params.name || '',
+    },
+    timeout: 45000,
+  })
+}
+
 function open(songURL) {
   return API.get('/api/song/url', { params: { url: songURL } })
 }
@@ -962,6 +972,7 @@ export function isHealthPayload(data) {
 
 export default {
   search,
+  getArtist,
   open,
   openYoutubeAlbum,
   download,

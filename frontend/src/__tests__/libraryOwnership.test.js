@@ -71,6 +71,7 @@ describe('libraryOwnership', () => {
           name: 'Swing',
           artists: ['Connor Price', 'Nic D'],
           browse_id: 'album:1',
+          track_count: 1,
         },
         [
           {
@@ -106,5 +107,51 @@ describe('libraryOwnership', () => {
         ]
       )
     ).toBe(false)
+  })
+
+  it('does not mark incomplete albums as owned when track count is unknown', async () => {
+    const { isMediaOwnedLocally } = await import('../model/libraryOwnership.js')
+
+    expect(
+      isMediaOwnedLocally(
+        {
+          media_type: 'album',
+          name: 'Live in Israel',
+          artists: ['Uriel Vega'],
+          browse_id: 'album:1',
+        },
+        [
+          {
+            file: 'Uriel Vega/Live in Israel/01.flac',
+            artist: 'Uriel Vega',
+            album: 'Live in Israel',
+            title: 'Intro',
+          },
+        ]
+      )
+    ).toBe(false)
+  })
+
+  it('finds a library album even when it is still incomplete', async () => {
+    const { findLibraryAlbum, findOwnedAlbum } = await import(
+      '../model/libraryOwnership.js'
+    )
+    const item = {
+      media_type: 'album',
+      name: 'Live in Israel',
+      artists: ['Uriel Vega'],
+      browse_id: 'album:1',
+      track_count: 3,
+    }
+    const library = [
+      {
+        file: 'Uriel Vega/Live in Israel/01.flac',
+        artist: 'Uriel Vega',
+        album: 'Live in Israel',
+        title: 'Intro',
+      },
+    ]
+    expect(findLibraryAlbum(item, library)?.files).toHaveLength(1)
+    expect(findOwnedAlbum(item, library)).toBeNull()
   })
 })

@@ -56,7 +56,7 @@ export function isMediaOwnedLocally(item, libraryItems) {
   )
 }
 
-export function findOwnedAlbum(item, libraryItems) {
+export function findLibraryAlbum(item, libraryItems) {
   if (!item || !Array.isArray(libraryItems) || !libraryItems.length) {
     return null
   }
@@ -73,16 +73,18 @@ export function findOwnedAlbum(item, libraryItems) {
     matches.push(album)
   }
   for (const album of matches) {
-    if (!artistKeysMatch(searchArtists, album.artist)) continue
-    if (albumHasExpectedTrackCount(item, album)) return album
+    if (artistKeysMatch(searchArtists, album.artist)) return album
   }
-  const fallback = matches.find((album) =>
-    albumHasExpectedTrackCount(item, album)
-  )
-  return fallback || null
+  return matches[0] || null
 }
 
-function expectedAlbumTrackCount(item) {
+export function findOwnedAlbum(item, libraryItems) {
+  const album = findLibraryAlbum(item, libraryItems)
+  if (!album || !albumHasExpectedTrackCount(item, album)) return null
+  return album
+}
+
+export function expectedAlbumTrackCount(item) {
   for (const field of [
     'track_count',
     'album_track_total',
@@ -95,9 +97,9 @@ function expectedAlbumTrackCount(item) {
   return Array.isArray(item?.tracks) ? item.tracks.length : 0
 }
 
-function albumHasExpectedTrackCount(item, album) {
+export function albumHasExpectedTrackCount(item, album) {
   const expected = expectedAlbumTrackCount(item)
-  if (!expected) return true
+  if (!expected) return false
   const have = Array.isArray(album?.files) ? album.files.length : 0
   return have >= expected
 }
