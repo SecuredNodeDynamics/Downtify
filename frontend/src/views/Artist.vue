@@ -111,7 +111,7 @@ import {
   libraryNavigationForAlbum,
   setLibraryNavigation,
 } from '../model/libraryNavigation'
-import { findOwnedAlbum } from '../model/libraryOwnership'
+import { findLibraryAlbum } from '../model/libraryOwnership'
 import { getCachedLibraryItems } from '../model/librarySession'
 import { useI18n } from '../i18n'
 
@@ -167,8 +167,8 @@ function downloadAlbum(album) {
 }
 
 function viewAlbum(album) {
-  const owned = findOwnedAlbum(album, getCachedLibraryItems() || [])
-  const navigation = libraryNavigationForAlbum(owned)
+  const libraryAlbum = findLibraryAlbum(album, getCachedLibraryItems() || [])
+  const navigation = libraryNavigationForAlbum(libraryAlbum)
   if (!navigation) return
   setLibraryNavigation(navigation)
   router.push({ name: 'List' })

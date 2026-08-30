@@ -701,7 +701,7 @@ import { useSearchManager } from '../model/search'
 import { useProgressTracker, useDownloadManager } from '../model/download'
 import {
   useLibraryOwnership,
-  findOwnedAlbum,
+  findLibraryAlbum,
   findOwnedTrack,
 } from '../model/libraryOwnership'
 import { albumLibraryStatus } from '../model/albumDownload'
@@ -1035,7 +1035,7 @@ async function viewOwnedInLibrary(item) {
   let navigation = null
 
   if (item.media_type === 'album') {
-    navigation = libraryNavigationForAlbum(findOwnedAlbum(item, items))
+    navigation = libraryNavigationForAlbum(findLibraryAlbum(item, items))
   } else {
     const track = findOwnedTrack(item, items)
     if (track) {
@@ -1044,7 +1044,7 @@ async function viewOwnedInLibrary(item) {
       navigation = libraryNavigationForTrack(track, { preferredArtist })
     } else if (item.album_name) {
       navigation = libraryNavigationForAlbum(
-        findOwnedAlbum(
+        findLibraryAlbum(
           {
             media_type: 'album',
             name: item.album_name,
@@ -1066,7 +1066,7 @@ async function viewOwnedInLibrary(item) {
 async function playOwnedMedia(item) {
   if (!item) return
   const items = await libraryItemsForOwned()
-  const album = item.media_type === 'album' ? findOwnedAlbum(item, items) : null
+  const album = item.media_type === 'album' ? findLibraryAlbum(item, items) : null
   const track = album ? null : findOwnedTrack(item, items)
 
   if (album?.files?.length) {
@@ -1078,7 +1078,7 @@ async function playOwnedMedia(item) {
 
   if (!track?.file) return
   const trackAlbum = track.album
-    ? findOwnedAlbum(
+    ? findLibraryAlbum(
         {
           media_type: 'album',
           name: track.album,

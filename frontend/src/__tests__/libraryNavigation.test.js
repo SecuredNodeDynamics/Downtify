@@ -7,7 +7,7 @@ import {
   libraryNavigationForTrack,
   setLibraryNavigation,
 } from '../model/libraryNavigation'
-import { findOwnedAlbum } from '../model/libraryOwnership'
+import { findLibraryAlbum } from '../model/libraryOwnership'
 
 describe('libraryNavigation', () => {
   it('stores and consumes pending library navigation once', () => {
@@ -35,7 +35,7 @@ describe('libraryNavigation', () => {
         title: 'Born to Swing',
       },
     ]
-    const album = findOwnedAlbum(
+    const album = findLibraryAlbum(
       {
         media_type: 'album',
         name: 'Born to Swing',
