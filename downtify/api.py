@@ -641,6 +641,34 @@ def _issue_session(
     }
 
 
+def _monitor_sync_item(playlist: MonitoredPlaylist) -> dict[str, Any]:
+    return {
+        'spotify_id': playlist.spotify_id,
+        'name': playlist.name,
+        'url': playlist.url,
+        'kind': playlist.kind,
+        'interval_minutes': playlist.interval_minutes,
+        'enabled': playlist.enabled,
+        'image_url': playlist.image_url,
+    }
+
+
+def _profile_bundle(user: dict[str, Any]) -> dict[str, Any]:
+    monitors: list[dict[str, Any]] = []
+    if state.monitor_db is not None:
+        monitors = [
+            _monitor_sync_item(item)
+            for item in state.monitor_db.list_playlists(int(user['id']))
+        ]
+    return {
+        'profile_key': str(user.get('profile_key') or ''),
+        'username': user['username'],
+        'display_name': user.get('display_name') or user['username'],
+        'monitors': monitors,
+        'groups': [],
+    }
+
+
 def _history_item_for_ws(history_id: Optional[int]) -> dict[str, Any]:
     if history_id is None or state.history_db is None:
         return {}
@@ -1937,6 +1965,7 @@ async def auth_setup(request: Request, response: Response) -> dict[str, Any]:
             pin=str(payload.get('pin') or ''),
             display_name=str(payload.get('display_name') or ''),
             is_admin=True,
+            profile_key=str(payload.get('profile_key') or ''),
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -2025,6 +2054,7 @@ async def auth_create_user(request: Request) -> dict[str, Any]:
             pin=str(payload.get('pin') or ''),
             display_name=str(payload.get('display_name') or ''),
             is_admin=bool(payload.get('is_admin')),
+            profile_key=str(payload.get('profile_key') or ''),
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -2051,6 +2081,89 @@ async def auth_delete_user(user_id: int, request: Request) -> dict[str, Any]:
             state.monitor_db.delete_playlists_for_user, user_id
         )
     return {'ok': True, 'profiles': state.auth_db.list_profiles()}
+
+
+@router.get('/api/auth/profile')
+async def export_auth_profile(request: Request) -> dict[str, Any]:
+    user = _require_user(request)
+    return _profile_bundle(user)
+
+
+@router.post('/api/auth/profile/sync')
+async def sync_auth_profile(request: Request) -> dict[str, Any]:
+    user = _require_user(request)
+    if state.auth_db is None:
+        raise HTTPException(status_code=500, detail='Auth database not ready')
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+    incoming_key = str(payload.get('profile_key') or '')
+    if incoming_key and not user.get('profile_key'):
+        adopted = await asyncio.to_thread(
+            state.auth_db.adopt_profile_key, int(user['id']), incoming_key
+        )
+        if adopted:
+            user = adopted
+            request.state.user = adopted
+    created = 0
+    updated = 0
+    skipped = 0
+    items = payload.get('monitors')
+    if not isinstance(items, list):
+        items = []
+    db = state.monitor_db
+    for raw in items:
+        if not isinstance(raw, dict):
+            skipped += 1
+            continue
+        kind = str(raw.get('kind') or 'playlist').strip().lower()
+        if kind not in {'playlist', 'artist'}:
+            skipped += 1
+            continue
+        spotify_id = str(raw.get('spotify_id') or '').strip()
+        if not spotify_id:
+            skipped += 1
+            continue
+        name = str(raw.get('name') or '').strip() or spotify_id
+        url = str(raw.get('url') or '').strip() or (
+            f'https://open.spotify.com/{kind}/{spotify_id}'
+        )
+        try:
+            interval_minutes = int(raw.get('interval_minutes') or 60)
+        except (TypeError, ValueError):
+            interval_minutes = 60
+        interval_minutes = max(1, min(interval_minutes, 60 * 24 * 30))
+        image_url = str(raw.get('image_url') or '').strip()
+        enabled = bool(raw.get('enabled', True))
+        if db is None:
+            skipped += 1
+            continue
+        action, _item = await asyncio.to_thread(
+            db.upsert_synced_item,
+            int(user['id']),
+            spotify_id=spotify_id,
+            name=name,
+            url=url,
+            kind=kind,
+            interval_minutes=interval_minutes,
+            enabled=enabled,
+            image_url=image_url,
+        )
+        if action == 'created':
+            created += 1
+        elif action == 'updated':
+            updated += 1
+        else:
+            skipped += 1
+    refreshed = state.auth_db.get_user(int(user['id'])) or user
+    return {
+        'created': created,
+        'updated': updated,
+        'skipped': skipped,
+        'profile': _profile_bundle(refreshed),
+        'user': refreshed,
+    }
 
 
 @router.get('/api/version')

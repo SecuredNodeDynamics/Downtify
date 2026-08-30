@@ -49,7 +49,7 @@ export default {
       'Este servidor pedirá inicio de sesión después. Los monitores actuales quedan en este perfil de administrador.',
     loginTitle: 'Elige un perfil',
     loginHint:
-      'Entra en este servidor Downtify. La biblioteca es compartida; los monitores son por perfil.',
+      'Entra en este servidor Downtify. La biblioteca es compartida; los monitores siguen este perfil entre el teléfono y el servidor.',
     username: 'Usuario',
     displayName: 'Nombre visible',
     password: 'Contraseña',

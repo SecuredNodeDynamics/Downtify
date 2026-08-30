@@ -2428,7 +2428,9 @@ async function testServerConnection() {
   }
 }
 
-function reloadAfterServerChange() {
+async function snapshotThenReload(mutate) {
+  await API.snapshotProfile().catch(() => {})
+  mutate?.()
   if (isCapacitorNative()) {
     API.reconnectBackend()
     window.location.reload()
@@ -2437,13 +2439,18 @@ function reloadAfterServerChange() {
   window.location.reload()
 }
 
+function reloadAfterServerChange() {
+  void snapshotThenReload()
+}
+
 function connectToThisDevice() {
   const current = getCurrentPageServerUrl()
   if (!current) return
   serverUrlInput.value = current
   if (isConnectedToCurrentPage()) return
-  setStoredServerUrl(current)
-  reloadAfterServerChange()
+  void snapshotThenReload(() => {
+    setStoredServerUrl(current)
+  })
 }
 
 function saveServerConnection() {
@@ -2453,23 +2460,26 @@ function saveServerConnection() {
     serverTestMessage.value = t('settings.serverInvalidUrl')
     return
   }
-  setStoredServerUrl(serverUrlInput.value.trim())
-  setConnectionMode('server')
-  connectionMode.value = 'server'
-  reloadAfterServerChange()
+  void snapshotThenReload(() => {
+    setStoredServerUrl(serverUrlInput.value.trim())
+    setConnectionMode('server')
+    connectionMode.value = 'server'
+  })
 }
 
 function resetServerConnection() {
-  setStoredServerUrl('')
-  reloadAfterServerChange()
+  void snapshotThenReload(() => {
+    setStoredServerUrl('')
+  })
 }
 
 function selectConnectionMode(mode) {
   const normalized = mode === 'server' ? 'server' : 'device'
   if (connectionMode.value === normalized) return
-  connectionMode.value = normalized
-  setConnectionMode(normalized)
-  reloadAfterServerChange()
+  void snapshotThenReload(() => {
+    connectionMode.value = normalized
+    setConnectionMode(normalized)
+  })
 }
 
 async function testJellyfinApi() {

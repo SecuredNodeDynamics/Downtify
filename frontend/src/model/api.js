@@ -41,6 +41,11 @@ import {
   ready as authReady,
   storeAuthToken,
 } from './authSession.js'
+import {
+  loadProfileBundle,
+  notifyProfileSynced,
+  storeProfileBundle,
+} from './profileSync.js'
 
 const API = axios.create({ timeout: 20000 })
 
@@ -965,6 +970,52 @@ async function fetchAuthStatus() {
   return res.data
 }
 
+async function fetchAuthProfile() {
+  const res = await API.get('/api/auth/profile')
+  if (res.data) storeProfileBundle(res.data)
+  return res.data
+}
+
+async function snapshotProfile() {
+  if (!authStatus.value.authenticated) return null
+  try {
+    return await fetchAuthProfile()
+  } catch {
+    return null
+  }
+}
+
+async function syncProfileWithBackend() {
+  if (!authStatus.value.authenticated || !authStatus.value.user) return null
+  const user = authStatus.value.user
+  const cached = loadProfileBundle(user)
+  try {
+    if (cached?.monitors?.length || cached?.profile_key) {
+      const res = await API.post('/api/auth/profile/sync', {
+        profile_key: cached.profile_key || user.profile_key || '',
+        username: user.username,
+        monitors: cached.monitors || [],
+        groups: cached.groups || [],
+      })
+      if (res.data?.user) {
+        applyAuthStatus({
+          ...authStatus.value,
+          user: res.data.user,
+          authenticated: true,
+        })
+      }
+      if (res.data?.profile) storeProfileBundle(res.data.profile)
+      notifyProfileSynced(res.data)
+      return res.data
+    }
+    const profile = await fetchAuthProfile()
+    notifyProfileSynced({ profile })
+    return { profile }
+  } catch {
+    return null
+  }
+}
+
 async function setupAccount(payload) {
   const res = await API.post('/api/auth/setup', payload)
   persistAuthResponse(res.data)
@@ -1052,6 +1103,7 @@ async function startBackendSession() {
     authStatus.value.setup_required ||
     (authStatus.value.auth_required && !authStatus.value.authenticated)
   if (blocked) return ''
+  await syncProfileWithBackend()
   const version = await getVersion({ prefetch: false })
   ensureWebSocket()
   return version
@@ -1164,6 +1216,8 @@ export default {
   getVersion,
   reconnectBackend,
   fetchAuthStatus,
+  snapshotProfile,
+  syncProfileWithBackend,
   setupAccount,
   loginAccount,
   logoutAccount,

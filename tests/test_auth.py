@@ -71,6 +71,65 @@ def test_pin_login_and_session(tmp_path: Path) -> None:
     assert auth.user_for_token(token) is None
 
 
+def test_profile_key_is_stable_and_adoptable(tmp_path: Path) -> None:
+    auth = AuthDB(tmp_path / 'auth.db')
+    shared = '11111111-1111-4111-8111-111111111111'
+    first = auth.create_user('admin', password='secret123', profile_key=shared)
+    assert first['profile_key'] == shared
+    kept = auth.adopt_profile_key(
+        first['id'], '22222222-2222-4222-8222-222222222222'
+    )
+    assert kept['profile_key'] == shared
+
+    other = auth.create_user('kid', pin='24680')
+    with auth._connect() as conn:
+        conn.execute(
+            "UPDATE users SET profile_key = '' WHERE id = ?", (other['id'],)
+        )
+    fresh = '33333333-3333-4333-8333-333333333333'
+    filled = auth.adopt_profile_key(other['id'], fresh)
+    assert filled['profile_key'] == fresh
+
+
+def test_monitor_upsert_merges_by_spotify_id(tmp_path: Path) -> None:
+    db = PlaylistMonitorDB(tmp_path / 'monitor.db')
+    created_action, created = db.upsert_synced_item(
+        1,
+        spotify_id='pl1',
+        name='Hits',
+        url='https://open.spotify.com/playlist/pl1',
+        kind='playlist',
+        interval_minutes=60,
+        enabled=True,
+        image_url='',
+    )
+    updated_action, updated = db.upsert_synced_item(
+        1,
+        spotify_id='pl1',
+        name='Hits Weekly',
+        url='https://open.spotify.com/playlist/pl1',
+        kind='playlist',
+        interval_minutes=30,
+        enabled=True,
+        image_url='https://example.test/cover.jpg',
+    )
+    other_user, _item = db.upsert_synced_item(
+        2,
+        spotify_id='pl1',
+        name='Hits',
+        url='https://open.spotify.com/playlist/pl1',
+        kind='playlist',
+    )
+
+    assert created_action == 'created'
+    assert updated_action == 'updated'
+    assert other_user == 'created'
+    assert updated.name == 'Hits Weekly'
+    assert updated.interval_minutes == 30
+    assert len(db.list_playlists(1)) == 1
+    assert created.id == updated.id
+
+
 def test_cannot_delete_last_admin(tmp_path: Path) -> None:
     auth = AuthDB(tmp_path / 'auth.db')
     admin = auth.create_user('admin', password='secret123')

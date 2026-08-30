@@ -453,7 +453,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import Navbar from '/src/components/Navbar.vue'
 import CoverImage from '/src/components/CoverImage.vue'
@@ -461,6 +461,7 @@ import monitorAPI from '/src/model/monitor.js'
 import API from '/src/model/api.js'
 import { removeMonitoredArtist } from '/src/model/monitoredArtists.js'
 import { useI18n } from '/src/i18n'
+import { PROFILE_SYNCED_EVENT } from '/src/model/profileSync.js'
 
 const { t } = useI18n()
 
@@ -836,7 +837,13 @@ function timeAgo(isoString) {
   }
 }
 
-onMounted(load)
+onMounted(() => {
+  void load()
+  window.addEventListener(PROFILE_SYNCED_EVENT, load)
+})
+onBeforeUnmount(() => {
+  window.removeEventListener(PROFILE_SYNCED_EVENT, load)
+})
 </script>
 
 <style scoped>

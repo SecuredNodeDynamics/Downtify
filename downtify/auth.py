@@ -9,6 +9,7 @@ import re
 import secrets
 import sqlite3
 import threading
+import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Optional
@@ -72,6 +73,16 @@ def hash_token(token: str) -> str:
     return hashlib.sha256(token.encode('utf-8')).hexdigest()
 
 
+def normalize_profile_key(value: str) -> str:
+    cleaned = str(value or '').strip()
+    if not cleaned:
+        return ''
+    try:
+        return str(uuid.UUID(cleaned))
+    except ValueError:
+        return ''
+
+
 def normalize_username(value: str) -> str:
     return str(value or '').strip()
 
@@ -120,6 +131,7 @@ def public_user(row: sqlite3.Row | dict[str, Any]) -> dict[str, Any]:
         'is_admin': bool(data.get('is_admin')),
         'has_password': bool(data.get('password_hash')),
         'has_pin': bool(data.get('pin_hash')),
+        'profile_key': str(data.get('profile_key') or ''),
         'created_at': str(data.get('created_at') or ''),
     }
 
@@ -148,7 +160,8 @@ class AuthDB:
                     password_hash TEXT NOT NULL DEFAULT '',
                     pin_hash TEXT NOT NULL DEFAULT '',
                     is_admin INTEGER NOT NULL DEFAULT 0,
-                    created_at TEXT NOT NULL
+                    created_at TEXT NOT NULL,
+                    profile_key TEXT NOT NULL DEFAULT ''
                 );
                 CREATE TABLE IF NOT EXISTS sessions (
                     token_hash TEXT PRIMARY KEY,
@@ -158,6 +171,28 @@ class AuthDB:
                     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
                 );
                 """
+            )
+            self._migrate_profile_key(conn)
+
+    @staticmethod
+    def _migrate_profile_key(conn: sqlite3.Connection) -> None:
+        columns = {row[1] for row in conn.execute('PRAGMA table_info(users)')}
+        if 'profile_key' not in columns:
+            conn.execute(
+                'ALTER TABLE users ADD COLUMN profile_key TEXT NOT NULL '
+                "DEFAULT ''"
+            )
+        conn.execute(
+            'CREATE UNIQUE INDEX IF NOT EXISTS idx_users_profile_key '
+            "ON users(profile_key) WHERE profile_key != ''"
+        )
+        empty = conn.execute(
+            "SELECT id FROM users WHERE profile_key = ''"
+        ).fetchall()
+        for row in empty:
+            conn.execute(
+                'UPDATE users SET profile_key = ? WHERE id = ?',
+                (str(uuid.uuid4()), row['id']),
             )
 
     def has_users(self) -> bool:
@@ -188,6 +223,7 @@ class AuthDB:
         pin: str = '',
         display_name: str = '',
         is_admin: bool = False,
+        profile_key: str = '',
     ) -> dict[str, Any]:
         username = validate_username(username)
         display = str(display_name or '').strip() or username
@@ -200,13 +236,14 @@ class AuthDB:
             raise ValueError('Set a password or a PIN')
         password_hash = hash_secret(password) if password else ''
         pin_hash = hash_secret(pin) if pin else ''
+        key = normalize_profile_key(profile_key) or str(uuid.uuid4())
         with self._lock, self._connect() as conn:
             try:
                 cur = conn.execute(
                     """INSERT INTO users
                        (username, display_name, password_hash, pin_hash,
-                        is_admin, created_at)
-                       VALUES (?, ?, ?, ?, ?, ?)""",
+                        is_admin, created_at, profile_key)
+                       VALUES (?, ?, ?, ?, ?, ?, ?)""",
                     (
                         username,
                         display,
@@ -214,14 +251,60 @@ class AuthDB:
                         pin_hash,
                         1 if is_admin else 0,
                         _now_iso(),
+                        key,
                     ),
                 )
             except sqlite3.IntegrityError as exc:
-                raise ValueError('That username is already taken') from exc
+                if 'profile_key' in str(exc).lower():
+                    key = str(uuid.uuid4())
+                    cur = conn.execute(
+                        """INSERT INTO users
+                           (username, display_name, password_hash, pin_hash,
+                            is_admin, created_at, profile_key)
+                           VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                        (
+                            username,
+                            display,
+                            password_hash,
+                            pin_hash,
+                            1 if is_admin else 0,
+                            _now_iso(),
+                            key,
+                        ),
+                    )
+                else:
+                    raise ValueError('That username is already taken') from exc
             row = conn.execute(
                 'SELECT * FROM users WHERE id = ?', (cur.lastrowid,)
             ).fetchone()
             return public_user(row)
+
+    def adopt_profile_key(
+        self, user_id: int, profile_key: str
+    ) -> Optional[dict[str, Any]]:
+        key = normalize_profile_key(profile_key)
+        if not key:
+            return self.get_user(user_id)
+        with self._lock, self._connect() as conn:
+            row = conn.execute(
+                'SELECT * FROM users WHERE id = ?', (user_id,)
+            ).fetchone()
+            if row is None:
+                return None
+            current = str(row['profile_key'] or '')
+            if current:
+                return public_user(row)
+            try:
+                conn.execute(
+                    'UPDATE users SET profile_key = ? WHERE id = ?',
+                    (key, user_id),
+                )
+            except sqlite3.IntegrityError:
+                return public_user(row)
+            row = conn.execute(
+                'SELECT * FROM users WHERE id = ?', (user_id,)
+            ).fetchone()
+            return public_user(row) if row else None
 
     def delete_user(self, user_id: int) -> bool:
         with self._lock, self._connect() as conn:

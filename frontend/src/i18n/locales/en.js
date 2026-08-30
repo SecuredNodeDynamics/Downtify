@@ -49,7 +49,7 @@ export default {
       'This backend will ask for a login after this. Existing monitors stay on this admin profile.',
     loginTitle: 'Choose a profile',
     loginHint:
-      'Sign in to this Downtify backend. The music library is shared; monitors are per profile.',
+      'Sign in to this Downtify backend. The music library is shared; monitors follow this profile between the phone and server.',
     username: 'Username',
     displayName: 'Display name',
     password: 'Password',

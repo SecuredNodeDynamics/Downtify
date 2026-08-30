@@ -261,6 +261,47 @@ class PlaylistMonitorDB:
             )
             return cur.rowcount
 
+    def upsert_synced_item(
+        self,
+        user_id: int,
+        *,
+        spotify_id: str,
+        name: str,
+        url: str,
+        kind: str = 'playlist',
+        interval_minutes: int = 60,
+        enabled: bool = True,
+        image_url: str = '',
+    ) -> tuple[str, MonitoredPlaylist]:
+        existing = self.get_by_spotify_id(spotify_id, kind, int(user_id))
+        if existing is None:
+            added = self.add_playlist(
+                spotify_id,
+                name,
+                url,
+                interval_minutes=interval_minutes,
+                kind=kind,
+                image_url=image_url,
+                user_id=int(user_id),
+            )
+            if not enabled:
+                updated = self.update_playlist(added.id, enabled=False)
+                return 'created', updated or added
+            return 'created', added
+        kwargs: dict[str, Any] = {}
+        if name and name != existing.name:
+            kwargs['name'] = name
+        if interval_minutes and interval_minutes != existing.interval_minutes:
+            kwargs['interval_minutes'] = int(interval_minutes)
+        if bool(enabled) != existing.enabled:
+            kwargs['enabled'] = bool(enabled)
+        if image_url and image_url != existing.image_url:
+            kwargs['image_url'] = image_url
+        if not kwargs:
+            return 'unchanged', existing
+        updated = self.update_playlist(existing.id, **kwargs)
+        return 'updated', updated or existing
+
     def delete_playlists_for_user(self, user_id: int) -> int:
         with self._connect() as conn:
             cur = conn.execute(

@@ -91,6 +91,7 @@
 import { computed, ref, watch } from 'vue'
 
 import API from '../model/api'
+import { loadProfileBundle } from '../model/profileSync'
 import { useAuthSession } from '../model/authSession'
 import { usesEmbeddedServer } from '../model/serverConnection'
 import { useI18n } from '../i18n'
@@ -143,12 +144,14 @@ async function submit() {
   busy.value = true
   loading.value = true
   try {
+    const cached = loadProfileBundle({ username: username.value })
     if (setupMode.value) {
       await API.setupAccount({
         username: username.value,
         display_name: displayName.value,
         password: password.value,
         pin: pin.value,
+        profile_key: cached?.profile_key || '',
       })
     } else {
       await API.loginAccount({
