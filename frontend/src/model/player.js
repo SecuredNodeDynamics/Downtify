@@ -793,7 +793,11 @@ function setPlaylist(files, options = {}) {
     }
   }
   playlist.value = tracks
-  playlistContext.value = context
+  if (Object.prototype.hasOwnProperty.call(options, 'context')) {
+    playlistContext.value = context
+  } else if (!playlistContext.value) {
+    playlistContext.value = context
+  }
   if (restorePlayerSession(tracks.map((track) => track.file))) {
     if (shuffle.value) buildShuffleOrder()
     return

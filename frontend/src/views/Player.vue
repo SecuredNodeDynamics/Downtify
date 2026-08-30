@@ -17,7 +17,7 @@
 
       <!-- Empty state -->
       <div
-        v-if="files.length === 0 && !loading"
+        v-if="!hasPlayerContent && !loading"
         class="surface rounded-2xl p-12 flex flex-col items-center text-center"
       >
         <Icon
@@ -32,7 +32,7 @@
 
       <!-- Skeleton -->
       <div
-        v-else-if="loading && files.length === 0 && libraryItems.length === 0"
+        v-else-if="loading && !hasPlayerContent"
         class="space-y-3"
       >
         <div class="skeleton h-52 rounded-3xl lg:h-72" />
@@ -200,7 +200,7 @@
                       : 'bg-primary text-primary-content'
                   "
                   @click="player.toggle()"
-                  :disabled="files.length === 0"
+                  :disabled="!hasPlayerContent"
                   :title="playbackActive ? t('player.pause') : t('player.play')"
                 >
                   <Icon
@@ -1398,7 +1398,7 @@ const { t } = useI18n()
 const player = usePlayer()
 const downloadManager = useDownloadManager()
 const playbackActive = computed(
-  () => player.playbackIntent.value || player.isPlaying.value
+  () => Boolean(player.playbackIntent?.value || player.isPlaying.value)
 )
 
 const files = ref(initialPlayerSnapshot.paths)
@@ -1517,6 +1517,14 @@ const albums = computed(() =>
 
 const hasActiveTrack = computed(
   () => player.currentIndex.value >= 0 && !!player.currentTrack.value
+)
+
+const hasPlayerContent = computed(
+  () =>
+    files.value.length > 0 ||
+    libraryItems.value.length > 0 ||
+    player.playlist.value.length > 0 ||
+    hasActiveTrack.value
 )
 
 const lyricsAvailable = computed(
@@ -2343,14 +2351,17 @@ async function fetchPlayerLibraryItems(options = {}) {
 }
 
 async function applyFetchedLibrary(items) {
-  if (!items.length) {
-    libraryItems.value = []
-    files.value = []
+  const list = Array.isArray(items) ? items : []
+  if (!list.length) {
     return
   }
 
-  applyLibraryItems(items)
-  syncPlayerPlaylist(items.map((item) => item.file))
+  applyLibraryItems(list)
+  try {
+    syncPlayerPlaylist(list.map((item) => item.file))
+  } catch {
+    // Keep the listing even if queue sync fails.
+  }
 }
 
 function deferLibraryMetadataRefresh(force = false) {
@@ -2452,12 +2463,9 @@ async function load({ background = false } = {}) {
       if (paths.length > 0) {
         applyLibraryItems(fallbackLibraryItems(paths))
         syncPlayerPlaylist(paths)
-      } else {
-        files.value = []
-        libraryItems.value = []
       }
     } catch {
-      if (!hadCache) {
+      if (!hadCache && !player.playlist.value.length) {
         files.value = []
         libraryItems.value = []
       }
@@ -2699,13 +2707,14 @@ onMounted(() => {
 })
 
 onActivated(() => {
+  applyPlayerNavigationIntent()
   if (libraryItems.value.length > 0) {
     syncPlayerPlaylist(files.value)
-    applyPlayerNavigationIntent()
     void refreshLibraryMetadataInBackground()
-    return
   }
-  void load()
+  if (libraryItems.value.length === 0 || files.value.length === 0) {
+    void load()
+  }
 })
 
 onUnmounted(() => {

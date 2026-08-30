@@ -115,7 +115,7 @@ watch(visible, (isVisible) => {
 })
 
 const playbackActive = computed(
-  () => player.playbackIntent.value || player.isPlaying.value
+  () => Boolean(player.playbackIntent?.value || player.isPlaying.value)
 )
 
 const title = computed(
