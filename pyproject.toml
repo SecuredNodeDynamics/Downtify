@@ -21,7 +21,7 @@ dependencies = [
 dev = [
     "cairosvg>=2.7",
     "codeflash>=0.20.5",
-    "pytest>=8.0",
+    "pytest>=9.1.1",
     "ruff>=0.15.2",
     "zensical>=0.0.43",
 ]
