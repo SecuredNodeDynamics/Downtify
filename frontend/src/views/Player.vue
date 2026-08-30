@@ -87,7 +87,7 @@
                   />
                 </div>
                 <div
-                  v-if="player.isPlaying.value"
+                  v-if="playbackActive"
                   class="absolute bottom-2 right-2 equalizer h-5 sm:bottom-3 sm:right-3"
                   aria-hidden="true"
                 >
@@ -195,21 +195,17 @@
                 <button
                   class="player-play-btn inline-flex items-center justify-center rounded-full shadow-glow-sm transition hover:scale-105 active:scale-95 disabled:opacity-50"
                   :class="
-                    player.isPlaying.value
+                    playbackActive
                       ? 'bg-amber-300 text-amber-950 hover:bg-amber-200'
                       : 'bg-primary text-primary-content'
                   "
                   @click="player.toggle()"
                   :disabled="files.length === 0"
-                  :title="
-                    player.isPlaying.value
-                      ? t('player.pause')
-                      : t('player.play')
-                  "
+                  :title="playbackActive ? t('player.pause') : t('player.play')"
                 >
                   <Icon
                     :icon="
-                      player.isPlaying.value
+                      playbackActive
                         ? 'clarity:pause-solid'
                         : 'clarity:play-solid'
                     "
@@ -1401,6 +1397,9 @@ const initialPlayerSnapshot = getInitialLibrarySnapshot(playerServerKey)
 const { t } = useI18n()
 const player = usePlayer()
 const downloadManager = useDownloadManager()
+const playbackActive = computed(
+  () => player.playbackIntent.value || player.isPlaying.value
+)
 
 const files = ref(initialPlayerSnapshot.paths)
 const libraryItems = ref(initialPlayerSnapshot.items)
@@ -1643,24 +1642,28 @@ async function loadSimilarArtists(artistName) {
   if (!artistName) return
 
   try {
-    const res = await API.getSimilarArtists(artistName)
-    if (seq !== similarArtistsRequestSeq) return
-    similarArtists.value = Array.isArray(res.data?.artists)
-      ? res.data.artists
-      : []
+    try {
+      const res = await API.getSimilarArtists(artistName)
+      if (seq !== similarArtistsRequestSeq) return
+      similarArtists.value = Array.isArray(res.data?.artists)
+        ? res.data.artists
+        : []
+    } catch {
+      // Older connected servers do not expose the dedicated endpoint yet.
+    }
+
+    if (seq === similarArtistsRequestSeq && !similarArtists.value.length) {
+      similarArtists.value = await searchSimilarArtistFallback(artistName)
+    }
+    if (seq === similarArtistsRequestSeq && !similarArtists.value.length) {
+      similarArtists.value = librarySimilarArtistFallback(artistName)
+    }
   } catch {
-    // Older connected servers do not expose the dedicated endpoint yet.
-  }
-
-  if (seq === similarArtistsRequestSeq && !similarArtists.value.length) {
-    similarArtists.value = await searchSimilarArtistFallback(artistName)
-  }
-  if (seq === similarArtistsRequestSeq && !similarArtists.value.length) {
-    similarArtists.value = librarySimilarArtistFallback(artistName)
-  }
-
-  if (seq === similarArtistsRequestSeq) {
-    similarArtistsLoading.value = false
+    if (seq === similarArtistsRequestSeq) similarArtists.value = []
+  } finally {
+    if (seq === similarArtistsRequestSeq) {
+      similarArtistsLoading.value = false
+    }
   }
 }
 

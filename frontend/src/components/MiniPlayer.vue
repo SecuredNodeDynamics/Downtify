@@ -40,12 +40,12 @@
       <button
         type="button"
         class="icon-btn h-9 w-9"
-        :title="player.isPlaying.value ? t('player.pause') : t('player.play')"
+        :title="playbackActive ? t('player.pause') : t('player.play')"
         @click.stop="player.toggle()"
       >
         <Icon
           :icon="
-            player.isPlaying.value ? 'clarity:pause-solid' : 'clarity:play-solid'
+            playbackActive ? 'clarity:pause-solid' : 'clarity:play-solid'
           "
           class="h-5 w-5"
         />
@@ -90,9 +90,14 @@ const player = usePlayer()
 const { t } = useI18n()
 const volumeOpen = ref(false)
 let swipeX = null
+let skipOpenOnClick = false
 
 const visible = computed(
   () => Boolean(player.currentTrack.value) && route.name !== 'Player'
+)
+
+const playbackActive = computed(
+  () => player.playbackIntent.value || player.isPlaying.value
 )
 
 const title = computed(
@@ -114,6 +119,10 @@ const volumeIcon = computed(() => {
 })
 
 function openPlayer() {
+  if (skipOpenOnClick) {
+    skipOpenOnClick = false
+    return
+  }
   volumeOpen.value = false
   router.push({ name: 'Player' })
 }
@@ -132,6 +141,7 @@ function onPointerUp(event) {
   const dx = event.clientX - swipeX
   swipeX = null
   if (Math.abs(dx) < 56) return
+  skipOpenOnClick = true
   if (dx < 0) player.next()
   else player.prev()
 }

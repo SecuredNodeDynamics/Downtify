@@ -8,7 +8,13 @@ import {
   playbackHttpFallbackUrl,
   resolvePlaybackUrl,
 } from './playerAudioUrl.js'
-import { recoveryDelayMs, shouldRecoverPlayback } from './playbackRecovery.js'
+import {
+  clampedSeekSeconds,
+  recoveryDelayMs,
+  seekWouldMove,
+  shouldRecoverOnPause,
+  shouldRecoverPlayback,
+} from './playbackRecovery.js'
 import {
   initPlayerMediaSession,
   syncMediaSessionMetadata,
@@ -18,7 +24,13 @@ import {
 import { usesEmbeddedServer } from './serverConnection.js'
 import { getCachedLibraryItems } from './librarySession.js'
 import { groupAlbums } from './library.js'
-import { filesWithFollowOnAlbum, nextAlbumAfter } from './playerQueue.js'
+import {
+  enrichTrackFromLibrary,
+  filesWithFollowOnAlbum,
+  nextAlbumAfter,
+  nextIndexInOrder,
+  prevIndexInOrder,
+} from './playerQueue.js'
 
 const VOLUME_KEY = 'downtify-player-volume'
 const SESSION_KEY = 'downtify-player-session-v1'
@@ -45,17 +57,41 @@ let playingFile = ''
 // Whether the user wants audio playing right now. Distinct from `isPlaying`,
 // which mirrors the element's actual play/pause state: during a network stall
 // the stream is paused by the browser even though playback is still intended.
-let playbackIntent = false
+const playbackIntent = ref(false)
 let recoverTimer = 0
 let playbackWatchdogTimer = 0
 let recoverAttempts = 0
+let recoverGeneration = 0
 let recovering = false
+let seekClearTimer = 0
 let mediaSessionReady = false
 let lastMediaPositionSyncAt = 0
 let lastSessionPersistAt = 0
 let applyTrackSeq = 0
+let changingTrack = false
 let pendingSession = readPlayerSession()
 let httpFallbackTriedFor = ''
+
+function setPlaybackIntent(value) {
+  playbackIntent.value = Boolean(value)
+}
+
+function beginTrackChange() {
+  changingTrack = true
+  resetRecovery()
+}
+
+function endTrackChange() {
+  changingTrack = false
+}
+
+function clearSeekLock() {
+  isSeeking = false
+  if (seekClearTimer) {
+    clearTimeout(seekClearTimer)
+    seekClearTimer = 0
+  }
+}
 
 function nowMs() {
   return typeof performance !== 'undefined' && performance.now
@@ -120,7 +156,7 @@ function persistPlayerSession(force = false) {
       JSON.stringify({
         file: track.file,
         time: audio?.currentTime || currentTime.value || 0,
-        playing: playbackIntent || isPlaying.value,
+        playing: playbackIntent.value || isPlaying.value,
         repeatMode: repeatMode.value,
         shuffle: shuffle.value,
         context: playlistContext.value,
@@ -146,7 +182,7 @@ function restorePlayerSession(paths) {
   currentIndex.value = index
   currentTime.value = session.time
   void applyTrack(index, {
-    autoplay: false,
+    autoplay: session.playing,
     resetTime: false,
     restoreTime: session.time,
   })
@@ -164,11 +200,11 @@ function syncMediaSessionNow({ position = false } = {}) {
   if (!mediaSessionReady) return
   const track = currentTrackForMediaSession()
   const a = audio
-  const idle = !track || (!playbackIntent && (!a || a.paused))
+  const idle = !track || (!playbackIntent.value && (!a || a.paused))
 
   void syncMediaSessionPlaybackState({
     playing: Boolean(a && !a.paused),
-    paused: Boolean(a && a.paused && playbackIntent),
+    paused: Boolean(a && a.paused && playbackIntent.value),
     idle,
   })
 
@@ -189,7 +225,7 @@ function syncMediaSessionNow({ position = false } = {}) {
 
 function resumePlaybackIfNeeded() {
   const a = audio
-  if (!a || !playbackIntent || !a.paused) return
+  if (!a || !playbackIntent.value || !a.paused) return
   playAudioWithRecovery(a)
 }
 
@@ -199,8 +235,16 @@ function playAudioWithRecovery(el = audio) {
   return el
     .play()
     .then(() => true)
-    .catch(() => {
-      if (el === audio && playbackIntent) {
+    .catch((err) => {
+      if (err?.name === 'AbortError') return false
+      if (err?.name === 'NotAllowedError') {
+        setPlaybackIntent(false)
+        isPlaying.value = false
+        persistPlayerSession(true)
+        return false
+      }
+      if (changingTrack) return false
+      if (el === audio && playbackIntent.value) {
         void switchToHttpPlaybackFallback().then((switched) => {
           if (!switched) scheduleRecovery()
         })
@@ -210,7 +254,7 @@ function playAudioWithRecovery(el = audio) {
 }
 
 async function switchToHttpPlaybackFallback() {
-  if (!audio || !playbackIntent) return false
+  if (!audio || !playbackIntent.value) return false
   const track = playlist.value[currentIndex.value]
   const file = track?.file || playingFile
   if (!file || httpFallbackTriedFor === file) return false
@@ -247,13 +291,18 @@ function clearPlaybackStartWatchdog() {
 
 function armPlaybackStartWatchdog(el = audio) {
   clearPlaybackStartWatchdog()
-  if (!el || !playbackIntent) return
+  if (!el || !playbackIntent.value) return
   const file = playingFile
   const startedAt = nowMs()
   const startTime = Number.isFinite(el.currentTime) ? el.currentTime : 0
   playbackWatchdogTimer = setTimeout(() => {
     playbackWatchdogTimer = 0
-    if (el !== audio || !playbackIntent || isSeeking || playingFile !== file) {
+    if (
+      el !== audio ||
+      !playbackIntent.value ||
+      isSeeking ||
+      playingFile !== file
+    ) {
       return
     }
     const current = Number.isFinite(el.currentTime) ? el.currentTime : 0
@@ -311,18 +360,21 @@ function clearRecoverTimer() {
 function resetRecovery() {
   recoverAttempts = 0
   recovering = false
+  recoverGeneration += 1
   clearRecoverTimer()
   clearPlaybackStartWatchdog()
 }
 
 function recoveryContext({ force = false } = {}) {
   return {
-    playbackIntent,
+    playbackIntent: playbackIntent.value,
     streamed: force || isStreamedPlayback(),
     paused: audio ? audio.paused : true,
     seeking: isSeeking,
     readyState: audio ? audio.readyState : 0,
     attempts: recoverAttempts,
+    changingTrack,
+    force,
   }
 }
 
@@ -340,19 +392,24 @@ function attemptRecovery(options = {}) {
   if (!audio || recovering) return
   if (!shouldRecoverPlayback(recoveryContext(options))) return
 
+  const gen = recoverGeneration
   recovering = true
   recoverAttempts += 1
   const el = audio
   const resumeAt = Number.isFinite(el.currentTime) ? el.currentTime : 0
 
+  const stillCurrent = () =>
+    gen === recoverGeneration && el === audio && playbackIntent.value
+
   const finishFailure = () => {
+    if (gen !== recoverGeneration) return
     recovering = false
     scheduleRecovery(options)
   }
 
   const resume = () => {
-    if (el !== audio) {
-      recovering = false
+    if (!stillCurrent()) {
+      if (gen === recoverGeneration) recovering = false
       return
     }
     try {
@@ -376,6 +433,7 @@ function attemptRecovery(options = {}) {
 
   const onLoaded = () => {
     el.removeEventListener('loadedmetadata', onLoaded)
+    if (!stillCurrent()) return
     resume()
   }
   el.addEventListener('loadedmetadata', onLoaded, { once: true })
@@ -392,6 +450,7 @@ function attemptRecovery(options = {}) {
 
   // If the reload never reports metadata (dead connection), retry with back-off.
   setTimeout(() => {
+    if (gen !== recoverGeneration) return
     if (recovering && el === audio) {
       el.removeEventListener('loadedmetadata', onLoaded)
       finishFailure()
@@ -437,7 +496,7 @@ function ensureAudio() {
     isSeeking = true
   })
   audio.addEventListener('seeked', () => {
-    isSeeking = false
+    clearSeekLock()
     if (audio) currentTime.value = audio.currentTime
   })
   audio.addEventListener('loadedmetadata', () => {
@@ -450,14 +509,19 @@ function ensureAudio() {
   audio.addEventListener('error', () => {
     isPlaying.value = false
     stopProgressTicker()
+    if (changingTrack) return
     void switchToHttpPlaybackFallback().then((switched) => {
       if (!switched) scheduleRecovery()
     })
   })
   // A network underrun on a streamed source: the browser pauses to rebuffer.
   // Give it a moment to recover on its own, then reload-and-resume if not.
-  audio.addEventListener('waiting', scheduleRecovery)
-  audio.addEventListener('stalled', scheduleRecovery)
+  const onBufferStall = () => {
+    if (changingTrack) return
+    scheduleRecovery()
+  }
+  audio.addEventListener('waiting', onBufferStall)
+  audio.addEventListener('stalled', onBufferStall)
   audio.addEventListener('play', () => {
     isPlaying.value = true
     startProgressTicker()
@@ -466,6 +530,7 @@ function ensureAudio() {
   })
   audio.addEventListener('playing', () => {
     isPlaying.value = true
+    endTrackChange()
     resetRecovery()
     startProgressTicker()
     syncMediaSessionNow({ position: true })
@@ -476,7 +541,14 @@ function ensureAudio() {
     if (audio) currentTime.value = audio.currentTime
     syncMediaSessionNow({ position: true })
     persistPlayerSession(true)
-    if (playbackIntent) scheduleRecovery()
+    if (
+      shouldRecoverOnPause({
+        playbackIntent: playbackIntent.value,
+        changingTrack,
+      })
+    ) {
+      scheduleRecovery()
+    }
   })
   return audio
 }
@@ -489,21 +561,25 @@ function coverUrl(file) {
   return API.coverFileURL(file)
 }
 
-function trackFromFile(file) {
-  const noExt = file.replace(/\.[^.]+$/, '')
-  let artist = ''
-  let title = noExt
-  const dash = noExt.indexOf(' - ')
-  if (dash > 0) {
-    artist = noExt.slice(0, dash).trim()
-    title = noExt.slice(dash + 3).trim()
+function libraryMetaByFile() {
+  const map = new Map()
+  for (const item of getCachedLibraryItems() || []) {
+    const file = item?.file
+    if (file && !map.has(file)) map.set(file, item)
   }
+  return map
+}
+
+function trackFromFile(file, metaByFile) {
+  const meta = (metaByFile || libraryMetaByFile()).get(file)
+  const display = enrichTrackFromLibrary(file, meta)
   return {
     file,
     url: fileUrl(file),
     cover: coverUrl(file),
-    title,
-    artist,
+    title: display.title,
+    artist: display.artist,
+    album: display.album,
   }
 }
 
@@ -531,7 +607,7 @@ async function applyTrack(
   if (index < 0 || index >= playlist.value.length) return
   const seq = ++applyTrackSeq
   const a = ensureAudio()
-  const wasPlaying = isPlaying.value || playbackIntent
+  const wasPlaying = isPlaying.value || playbackIntent.value
   const track = playlist.value[index]
   currentIndex.value = index
   if (shuffle.value) {
@@ -553,68 +629,89 @@ async function applyTrack(
     playingFile === track.file &&
     (isSameAudioFile(a.src, track.file) || isSameAudioUrl(a.src, nextUrl))
 
-  if (!sameSource) {
-    a.pause()
-    isPlaying.value = false
-    stopProgressTicker()
-    resetRecovery()
-    playingFile = track.file
-    httpFallbackTriedFor = ''
-    a.src = nextUrl
-    const reportLoadedMetadata = () => {
-      if (seq === applyTrackSeq && playingFile === track.file) {
-        logSlowPlayback('loaded-metadata', startedAt, track)
-      }
-    }
-    const reportPlaying = () => {
-      if (seq === applyTrackSeq && playingFile === track.file) {
-        logSlowPlayback('playing', startedAt, track)
-      }
-    }
-    a.addEventListener('loadedmetadata', reportLoadedMetadata, { once: true })
-    a.addEventListener('playing', reportPlaying, { once: true })
-    a.load()
-    if (resetTime) {
-      a.currentTime = 0
-      currentTime.value = 0
-      duration.value = 0
-    }
-    if (restoreTime > 0) {
-      const applyRestoreTime = () => {
-        if (playingFile !== track.file) return
-        try {
-          a.currentTime = Math.min(
-            restoreTime,
-            Number.isFinite(a.duration)
-              ? Math.max(0, a.duration - 0.25)
-              : restoreTime
-          )
-          currentTime.value = a.currentTime
-        } catch {
-          // Metadata is not ready yet; loadedmetadata will retry.
+  try {
+    if (!sameSource) {
+      beginTrackChange()
+      a.pause()
+      if (seq !== applyTrackSeq) return
+      isPlaying.value = false
+      stopProgressTicker()
+      playingFile = track.file
+      httpFallbackTriedFor = ''
+      a.src = nextUrl
+      const reportLoadedMetadata = () => {
+        if (seq === applyTrackSeq && playingFile === track.file) {
+          logSlowPlayback('loaded-metadata', startedAt, track)
         }
       }
-      a.addEventListener('loadedmetadata', applyRestoreTime, { once: true })
-      applyRestoreTime()
+      const reportPlaying = () => {
+        if (seq === applyTrackSeq && playingFile === track.file) {
+          logSlowPlayback('playing', startedAt, track)
+        }
+      }
+      a.addEventListener('loadedmetadata', reportLoadedMetadata, { once: true })
+      a.addEventListener('playing', reportPlaying, { once: true })
+      a.load()
+      if (resetTime) {
+        currentTime.value = 0
+        duration.value = 0
+        if (!(restoreTime > 0)) {
+          a.addEventListener(
+            'loadedmetadata',
+            () => {
+              if (seq !== applyTrackSeq || playingFile !== track.file) return
+              try {
+                a.currentTime = 0
+              } catch {
+                // Seeking before the resource is seekable can abort the load.
+              }
+              currentTime.value = 0
+            },
+            { once: true }
+          )
+        }
+      }
+      if (restoreTime > 0) {
+        const applyRestoreTime = () => {
+          if (playingFile !== track.file) return
+          try {
+            a.currentTime = Math.min(
+              restoreTime,
+              Number.isFinite(a.duration)
+                ? Math.max(0, a.duration - 0.25)
+                : restoreTime
+            )
+            currentTime.value = a.currentTime
+          } catch {
+            // Metadata is not ready yet; loadedmetadata will retry.
+          }
+        }
+        a.addEventListener('loadedmetadata', applyRestoreTime, { once: true })
+        applyRestoreTime()
+      }
+      if (autoplay || wasPlaying) {
+        setPlaybackIntent(true)
+        await playAudioWithRecovery(a)
+      }
+      preloadPlaybackUrlAt(index + 1)
+      if (shuffle.value && shuffleOrder.length) {
+        preloadPlaybackUrlAt(shuffleOrder[shufflePos + 1])
+      }
+      return
     }
-    if (autoplay || wasPlaying) {
-      playbackIntent = true
+
+    if ((autoplay || wasPlaying) && a.paused) {
+      setPlaybackIntent(true)
       await playAudioWithRecovery(a)
     }
     preloadPlaybackUrlAt(index + 1)
     if (shuffle.value && shuffleOrder.length) {
       preloadPlaybackUrlAt(shuffleOrder[shufflePos + 1])
     }
-    return
-  }
-
-  if ((autoplay || wasPlaying) && a.paused) {
-    playbackIntent = true
-    await playAudioWithRecovery(a)
-  }
-  preloadPlaybackUrlAt(index + 1)
-  if (shuffle.value && shuffleOrder.length) {
-    preloadPlaybackUrlAt(shuffleOrder[shufflePos + 1])
+  } finally {
+    if (seq === applyTrackSeq && !(autoplay || wasPlaying)) {
+      endTrackChange()
+    }
   }
 }
 
@@ -641,8 +738,9 @@ export function syncPlaylistFromFiles(files, options = {}) {
   if (pathsUnchanged) return
 
   if (currentFile && paths.includes(currentFile)) {
-    const wasPlaying = isPlaying.value
-    playlist.value = paths.map((file) => trackFromFile(file))
+    const wasPlaying = isPlaying.value || playbackIntent.value
+    const metaByFile = libraryMetaByFile()
+    playlist.value = paths.map((file) => trackFromFile(file, metaByFile))
     currentIndex.value = paths.indexOf(currentFile)
     if (shuffle.value) buildShuffleOrder()
 
@@ -653,7 +751,7 @@ export function syncPlaylistFromFiles(files, options = {}) {
       return
     }
     if (wasPlaying && a.paused) {
-      playbackIntent = true
+      setPlaybackIntent(true)
       playAudioWithRecovery(a)
     }
     return
@@ -673,8 +771,9 @@ function followOnAlbum(context) {
 }
 
 function setPlaylist(files, options = {}) {
+  const metaByFile = libraryMetaByFile()
   let tracks = (files || []).map((f) =>
-    typeof f === 'string' ? trackFromFile(f) : f
+    typeof f === 'string' ? trackFromFile(f, metaByFile) : f
   )
   let context = options.context || null
   if (context?.type === 'album' && !shuffle.value) {
@@ -683,7 +782,8 @@ function setPlaylist(files, options = {}) {
       const currentFiles = tracks.map((track) => track.file)
       const packed = filesWithFollowOnAlbum(currentFiles, nextAlbum)
       tracks = packed.files.map((file) =>
-        tracks.find((track) => track.file === file) || trackFromFile(file)
+        tracks.find((track) => track.file === file) ||
+          trackFromFile(file, metaByFile)
       )
       context = {
         ...context,
@@ -735,12 +835,13 @@ function play() {
     void applyTrack(currentIndex.value, { autoplay: true, resetTime: false })
     return
   }
-  playbackIntent = true
+  setPlaybackIntent(true)
   playAudioWithRecovery(a)
 }
 
 function pause() {
-  playbackIntent = false
+  setPlaybackIntent(false)
+  endTrackChange()
   resetRecovery()
   clearPlaybackStartWatchdog()
   if (audio) audio.pause()
@@ -748,18 +849,41 @@ function pause() {
 }
 
 function toggle() {
-  if (isPlaying.value) pause()
+  if (playbackIntent.value || isPlaying.value) pause()
   else play()
 }
 
 function seek(seconds) {
   const a = ensureAudio()
-  const max = duration.value || 0
-  const clamped = Math.max(0, Math.min(max, seconds))
-  isSeeking = true
-  a.currentTime = clamped
+  const max =
+    Number.isFinite(duration.value) && duration.value > 0
+      ? duration.value
+      : Number.isFinite(a.duration) && a.duration > 0
+        ? a.duration
+        : 0
+  const clamped = clampedSeekSeconds(seconds, max)
+  if (clamped == null) {
+    clearSeekLock()
+    return
+  }
   currentTime.value = clamped
   lastMediaPositionSyncAt = 0
+  if (!seekWouldMove(a.currentTime, clamped)) {
+    clearSeekLock()
+    syncMediaSessionNow({ position: true })
+    return
+  }
+  isSeeking = true
+  if (seekClearTimer) clearTimeout(seekClearTimer)
+  seekClearTimer = setTimeout(() => {
+    seekClearTimer = 0
+    isSeeking = false
+  }, 750)
+  try {
+    a.currentTime = clamped
+  } catch {
+    clearSeekLock()
+  }
   syncMediaSessionNow({ position: true })
 }
 
@@ -789,31 +913,31 @@ function toggleMute() {
 }
 
 function nextIndex() {
-  if (playlist.value.length === 0) return -1
-  if (shuffle.value) {
-    if (shuffleOrder.length !== playlist.value.length) buildShuffleOrder()
-    const nextPos = (shufflePos + 1) % shuffleOrder.length
-    return shuffleOrder[nextPos]
+  if (shuffle.value && shuffleOrder.length !== playlist.value.length) {
+    buildShuffleOrder()
   }
-  const i = currentIndex.value + 1
-  if (i >= playlist.value.length) {
-    return repeatMode.value === 'all' ? 0 : -1
-  }
-  return i
+  return nextIndexInOrder({
+    length: playlist.value.length,
+    currentIndex: currentIndex.value,
+    shuffle: shuffle.value,
+    shuffleOrder,
+    shufflePos,
+    repeatMode: repeatMode.value,
+  })
 }
 
 function prevIndex() {
-  if (playlist.value.length === 0) return -1
-  if (shuffle.value) {
-    if (shuffleOrder.length !== playlist.value.length) buildShuffleOrder()
-    const prevPos = (shufflePos - 1 + shuffleOrder.length) % shuffleOrder.length
-    return shuffleOrder[prevPos]
+  if (shuffle.value && shuffleOrder.length !== playlist.value.length) {
+    buildShuffleOrder()
   }
-  const i = currentIndex.value - 1
-  if (i < 0) {
-    return repeatMode.value === 'all' ? playlist.value.length - 1 : 0
-  }
-  return i
+  return prevIndexInOrder({
+    length: playlist.value.length,
+    currentIndex: currentIndex.value,
+    shuffle: shuffle.value,
+    shuffleOrder,
+    shufflePos,
+    repeatMode: repeatMode.value,
+  })
 }
 
 function tryContinueArtistDiscography() {
@@ -825,7 +949,7 @@ function tryContinueArtistDiscography() {
   const start = playlist.value.length
   const extra = nextAlbum.files
     .filter((file) => !playlist.value.some((track) => track.file === file))
-    .map((file) => trackFromFile(file))
+    .map((file) => trackFromFile(file, libraryMetaByFile()))
   if (!extra.length) return false
   playlist.value = [...playlist.value, ...extra]
   playlistContext.value = {
@@ -877,7 +1001,7 @@ function onEnded() {
   if (repeatMode.value === 'one') {
     seek(0)
     if (audio) {
-      playbackIntent = true
+      setPlaybackIntent(true)
       playAudioWithRecovery(audio)
     }
     return
@@ -983,6 +1107,7 @@ export function usePlayer() {
     currentTrack,
     upNext,
     isPlaying,
+    playbackIntent,
     currentTime,
     duration,
     progressPct,

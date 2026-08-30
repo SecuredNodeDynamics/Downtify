@@ -44,11 +44,39 @@ export function shouldRecoverPlayback({
   readyState = 0,
   attempts = 0,
   maxAttempts = MAX_RECOVERY_ATTEMPTS,
+  changingTrack = false,
+  force = false,
 } = {}) {
   if (!playbackIntent) return false
+  if (changingTrack && !force) return false
   if (!streamed) return false
   if (seeking) return false
   if (attempts >= maxAttempts) return false
   if (!paused && Number(readyState) >= HEALTHY_READY_STATE) return false
   return true
+}
+
+/** Skip no-op seeks so we never latch ``isSeeking`` waiting for a ``seeked`` event. */
+export function clampedSeekSeconds(seconds, duration) {
+  const max = Number(duration)
+  if (!Number.isFinite(max) || max <= 0) return null
+  const value = Number(seconds)
+  if (!Number.isFinite(value)) return 0
+  return Math.max(0, Math.min(max, value))
+}
+
+export function seekWouldMove(currentTime, target, epsilon = 0.05) {
+  return Math.abs((Number(currentTime) || 0) - Number(target)) >= epsilon
+}
+
+/**
+ * Pause while skipping tracks is not a stall. The HTML5 ``pause`` event is
+ * asynchronous, so it can fire after the new source is already assigned and
+ * would otherwise reload the next song back to 0:00.
+ */
+export function shouldRecoverOnPause({
+  playbackIntent,
+  changingTrack = false,
+} = {}) {
+  return Boolean(playbackIntent) && !changingTrack
 }

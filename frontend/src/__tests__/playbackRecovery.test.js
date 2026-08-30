@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest'
 
 import {
   MAX_RECOVERY_ATTEMPTS,
+  clampedSeekSeconds,
   recoveryDelayMs,
+  seekWouldMove,
+  shouldRecoverOnPause,
   shouldRecoverPlayback,
 } from '../model/playbackRecovery.js'
 
@@ -79,5 +82,60 @@ describe('shouldRecoverPlayback', () => {
         readyState: 2,
       })
     ).toBe(true)
+  })
+
+  it('does not reload while the player is switching tracks', () => {
+    expect(
+      shouldRecoverPlayback({ ...streamingStall, changingTrack: true })
+    ).toBe(false)
+  })
+
+  it('allows a forced watchdog reload during a track change', () => {
+    expect(
+      shouldRecoverPlayback({
+        ...streamingStall,
+        changingTrack: true,
+        force: true,
+      })
+    ).toBe(true)
+  })
+})
+
+describe('clampedSeekSeconds', () => {
+  it('refuses to seek when duration is unknown', () => {
+    expect(clampedSeekSeconds(12, 0)).toBeNull()
+    expect(clampedSeekSeconds(12, NaN)).toBeNull()
+  })
+
+  it('clamps into the track duration', () => {
+    expect(clampedSeekSeconds(-4, 100)).toBe(0)
+    expect(clampedSeekSeconds(140, 100)).toBe(100)
+    expect(clampedSeekSeconds(12, 100)).toBe(12)
+  })
+
+  it('ignores no-op seeks that would never fire seeked', () => {
+    expect(seekWouldMove(0, 0)).toBe(false)
+    expect(seekWouldMove(12, 12.01)).toBe(false)
+    expect(seekWouldMove(12, 20)).toBe(true)
+  })
+})
+
+describe('shouldRecoverOnPause', () => {
+  it('recovers a pause only when playback is still wanted', () => {
+    expect(
+      shouldRecoverOnPause({ playbackIntent: true, changingTrack: false })
+    ).toBe(true)
+  })
+
+  it('ignores the pause that happens while skipping tracks', () => {
+    expect(
+      shouldRecoverOnPause({ playbackIntent: true, changingTrack: true })
+    ).toBe(false)
+  })
+
+  it('ignores a user-initiated pause', () => {
+    expect(
+      shouldRecoverOnPause({ playbackIntent: false, changingTrack: false })
+    ).toBe(false)
   })
 })
