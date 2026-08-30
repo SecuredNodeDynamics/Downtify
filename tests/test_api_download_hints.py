@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import pytest
+from fastapi import HTTPException
+
+from downtify import api
 from downtify.api import _merge_client_track_hints
 
 
@@ -51,3 +55,26 @@ def test_merge_ignores_invalid_track_number():
     )
     assert 'track_number' not in base
     assert 'album_track_total' not in base
+
+
+def test_download_queue_accepts_multiple_album_batches():
+    old_jobs = api.state.download_jobs
+    api.state.download_jobs = {}
+    try:
+        api._ensure_download_queue_capacity(80)
+        api._ensure_download_queue_capacity(120)
+    finally:
+        api.state.download_jobs = old_jobs
+
+
+def test_download_queue_still_rejects_runaway_batches():
+    old_jobs = api.state.download_jobs
+    api.state.download_jobs = {}
+    try:
+        with pytest.raises(HTTPException) as exc:
+            api._ensure_download_queue_capacity(
+                api.MAX_PENDING_DOWNLOAD_JOBS + 1
+            )
+        assert exc.value.status_code == 429
+    finally:
+        api.state.download_jobs = old_jobs

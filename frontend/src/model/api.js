@@ -32,7 +32,7 @@ import {
 
 import { v4 as uuidv4 } from 'uuid'
 
-const API = axios.create()
+const API = axios.create({ timeout: 20000 })
 
 API.interceptors.request.use((config) => {
   config.baseURL = buildApiBaseUrl(getServerConfig())
@@ -185,7 +185,10 @@ function open(songURL) {
 }
 
 function openYoutubeAlbum(browseId) {
-  return API.get('/api/album/youtube', { params: { browse_id: browseId } })
+  return API.get('/api/album/youtube', {
+    params: { browse_id: browseId },
+    timeout: 45000,
+  })
 }
 
 function download(songURL) {
@@ -193,6 +196,7 @@ function download(songURL) {
   const hints = typeof songURL === 'string' ? undefined : songURL
   return API.post('/api/download/url', hints, {
     params: { url, client_id: sessionID },
+    timeout: 0,
   })
 }
 
@@ -789,7 +793,7 @@ function getLibraryLyrics(file) {
 }
 
 function checkLibraryOwned(items) {
-  return API.post('/api/library/owned', { items })
+  return API.post('/api/library/owned', { items }, { timeout: 15000 })
 }
 
 function fetchAlbumTrackCounts(browseIds) {

@@ -828,6 +828,14 @@ def artist_tracks_from_id(artist_id: str) -> list[dict[str, Any]]:
     return _artist_tracks_from_payload(artist_id, payload)
 
 
+def artist_name_from_id(artist_id: str) -> str:
+    """Return the artist display name from the Spotify embed, without discography."""
+
+    payload = _fetch_embed_json('artist', artist_id)
+    entity = _entity_from(payload)
+    return str(entity.get('name') or entity.get('title') or '').strip()
+
+
 def artist_info_and_tracks(
     artist_id: str,
 ) -> tuple[str, list[dict[str, Any]]]:

@@ -101,7 +101,7 @@ DEFAULT_SETTINGS: dict[str, Any] = {
 
 DOWNLOAD_PROGRESS_MIN_INTERVAL = 0.25
 DOWNLOAD_PROGRESS_MIN_DELTA = 1.0
-MAX_PENDING_DOWNLOAD_JOBS = 20
+MAX_PENDING_DOWNLOAD_JOBS = 2000
 
 AUDIO_EXTENSIONS = {'.mp3', '.m4a', '.flac', '.ogg', '.wav', '.aac', '.opus'}
 GITHUB_REPO = 'SecuredNodeDynamics/Downtify'
@@ -484,6 +484,9 @@ class AppState:
         'built_at': 0.0,
         'building': False,
     }
+    library_files_dirty: bool = False
+    library_files_refresh_future: Any = None
+    library_genre_refresh_at: float = 0.0
     library_stats_cache: dict[str, Any] = {
         'root': '',
         'stats': None,
@@ -2151,6 +2154,9 @@ def check_library_owned(payload: dict[str, Any]) -> dict[str, Any]:
         library_items = list_library_files_fast(download_dir)
 
     owned: dict[str, bool] = {}
+    stem_index = None
+    if state.downloader is not None and items:
+        stem_index = state.downloader.build_audio_stem_index()
     for item in items:
         if not isinstance(item, dict):
             continue
@@ -2161,6 +2167,7 @@ def check_library_owned(payload: dict[str, Any]) -> dict[str, Any]:
             item,
             downloader=state.downloader,
             library_items=library_items,
+            stem_index=stem_index,
         )
     return {'owned': owned}
 
@@ -2185,24 +2192,46 @@ def invalidate_library_files_cache() -> None:
     }
 
 
-def schedule_library_files_cache_refresh() -> None:
-    download_dir = _active_download_dir_or_default()
-    root_key = str(download_dir.resolve())
-    cache = state.library_files_cache
-    if cache.get('root') == root_key and cache.get('items'):
-        return
-    if cache.get('building'):
-        return
+def schedule_library_files_cache_refresh(*, force: bool = False) -> None:
+    if force:
+        state.library_files_dirty = True
     loop = state.loop
     if loop is None:
         return
-    state.library_files_cache = {**cache, 'building': True}
-    asyncio.run_coroutine_threadsafe(_refresh_library_files_cache(), loop)
+    cache = state.library_files_cache
+    if cache.get('building'):
+        return
+    if not force and cache.get('items') and not state.library_files_dirty:
+        return
+
+    async def _debounced() -> None:
+        try:
+            if force:
+                await asyncio.sleep(1.2)
+        except asyncio.CancelledError:
+            return
+        if state.library_files_cache.get('building'):
+            return
+        state.library_files_dirty = False
+        await _refresh_library_files_cache()
+        if state.library_files_dirty:
+            schedule_library_files_cache_refresh(force=True)
+
+    prev = state.library_files_refresh_future
+    if prev is not None and not prev.done():
+        prev.cancel()
+    state.library_files_refresh_future = asyncio.run_coroutine_threadsafe(
+        _debounced(), loop
+    )
 
 
 async def _refresh_library_files_cache() -> None:
     download_dir = _active_download_dir_or_default()
     root_key = str(download_dir.resolve())
+    state.library_files_cache = {
+        **state.library_files_cache,
+        'building': True,
+    }
     try:
         items = await asyncio.to_thread(
             list_library_files,
@@ -2238,6 +2267,10 @@ async def _refresh_genres_and_library_cache() -> None:
 
 
 def schedule_library_genre_refresh() -> None:
+    now = time.monotonic()
+    if now - state.library_genre_refresh_at < 60:
+        return
+    state.library_genre_refresh_at = now
     loop = state.loop
     if loop is None:
         return
@@ -4062,6 +4095,7 @@ async def _run_download(
     subdir: Optional[str] = None,
     history_id: Optional[int] = None,
     skip_duplicates: bool = True,
+    stem_index: Optional[dict[str, list[Path]]] = None,
 ) -> Optional[str]:
     """Run a single download to completion, updating jobs state and broadcasting WS events."""
 
@@ -4086,7 +4120,11 @@ async def _run_download(
         state.history_db.mark_running(history_id)
 
     if skip_duplicates:
-        existing = state.downloader.duplicate_filename_for(song, subdir=subdir)
+        existing = await asyncio.to_thread(
+            lambda: state.downloader.duplicate_filename_for(
+                song, subdir=subdir, stem_index=stem_index
+            )
+        )
         if existing:
             job['status'] = 'done'
             job['filename'] = existing
@@ -4258,6 +4296,12 @@ async def _process_batch(
                 'Failed to resolve playlist name for {}', playlist_url
             )
 
+    stem_index = None
+    if state.downloader is not None:
+        stem_index = await asyncio.to_thread(
+            state.downloader.build_audio_stem_index
+        )
+
     async def _bounded(
         song: dict[str, Any],
         song_id: str,
@@ -4269,6 +4313,7 @@ async def _process_batch(
                 song_id,
                 subdir=playlist_subdir,
                 history_id=history_id,
+                stem_index=stem_index,
             )
         except Exception:
             filename = None

@@ -1264,7 +1264,6 @@ function applyLibraryData(items) {
   if (libraryItemsEqual(libraryItems.value, normalized)) return
   libraryItems.value = normalized
   files.value = libraryItems.value.map((item) => item.file)
-  API.warmLibraryCovers(libraryItems.value)
   warmVisibleCoversForCurrentView()
   scheduleGenreRefresh(libraryItems.value)
   applyPendingLibraryNavigation()
@@ -1319,7 +1318,7 @@ function hydrateLibraryFromSession() {
     normalizeLibraryItem(item, libraryGroupOptions.value)
   )
   files.value = snapshot.paths
-  API.warmLibraryCovers(libraryItems.value)
+  warmVisibleCoversForCurrentView()
   return true
 }
 
@@ -1564,13 +1563,12 @@ let genreRefreshTimers = []
 onMounted(() => {
   libraryRefresh.register(refreshFromHeader)
   if (libraryItems.value.length) {
-    API.warmLibraryCovers(libraryItems.value)
     warmVisibleCoversForCurrentView()
   }
   void refreshMonitoredArtists()
   void refresh()
   stopLibraryListener = onLibraryChanged(() => {
-    void refresh({ background: true, force: true })
+    void refresh({ background: true })
   })
 })
 

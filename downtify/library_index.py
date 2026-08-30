@@ -628,13 +628,18 @@ def media_in_library(
     *,
     downloader: Any,
     library_items: list[dict[str, str]],
+    stem_index: Any = None,
 ) -> bool:
     media_type = str(item.get('media_type') or 'track').strip().lower()
     if media_type == 'album':
         return album_in_library(item, library_items)
-    if downloader is not None and downloader.duplicate_filename_for(item):
+    if track_in_library_from_metadata(item, library_items):
         return True
-    return track_in_library_from_metadata(item, library_items)
+    if downloader is not None and downloader.duplicate_filename_for(
+        item, stem_index=stem_index
+    ):
+        return True
+    return False
 
 
 _library_changed_callbacks: list[Callable[[], None]] = []

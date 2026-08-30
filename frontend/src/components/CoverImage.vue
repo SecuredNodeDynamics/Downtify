@@ -76,10 +76,7 @@ const sourceKey = computed(() =>
 )
 
 const imageLoading = computed(() =>
-  props.eager ||
-  usesEmbeddedServer() ||
-  restoredFromCache.value ||
-  displaySrc.value
+  props.eager || restoredFromCache.value || displaySrc.value
     ? 'eager'
     : 'lazy'
 )
@@ -205,7 +202,7 @@ function observeVisibility() {
       observer?.disconnect()
       observer = null
     },
-    { root: null, rootMargin: '700px 0px', threshold: 0.01 }
+    { root: null, rootMargin: '180px 0px', threshold: 0.01 }
   )
   observer.observe(target)
 }

@@ -7,7 +7,7 @@ import os
 import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from difflib import SequenceMatcher
-from threading import Lock
+from threading import Event, Lock
 from typing import Any, Optional
 
 from loguru import logger
@@ -54,6 +54,10 @@ _album_track_cache: dict[
     str,
     tuple[list[dict[str, Any]], Optional[int]],
 ] = {}
+# Raw ytmusicapi ``get_album`` payloads. Serialized so concurrent album
+# downloads cannot race the shared YTMusic client.
+_album_data_cache: dict[str, dict[str, Any]] = {}
+_album_inflight: dict[str, Event] = {}
 # ``artist|album`` (case-folded hints) → album ``browseId`` from a songs filter.
 _album_browse_search_cache: dict[str, str] = {}
 
@@ -522,8 +526,7 @@ def _spotify_search_query(url: str) -> str:
         title = first.get('name') or ''
         return f'{artists} {title}'.strip()
     if kind == 'artist':
-        artist_name, _tracks = spotify.artist_info_and_tracks(sid)
-        return str(artist_name or '').strip()
+        return spotify.artist_name_from_id(sid)
     return ''
 
 
@@ -555,8 +558,6 @@ def search_media(query: str, limit: int = 20) -> list[dict[str, Any]]:
         seen_album_ids.add(album.get('browse_id'))
         albums.append(album)
 
-    _attach_album_track_counts(albums)
-
     combined: list[dict[str, Any]] = []
     seen: set[tuple[str, str]] = set()
     for item in [*songs, *albums]:
@@ -582,13 +583,43 @@ def search_media(query: str, limit: int = 20) -> list[dict[str, Any]]:
     return final
 
 
+def _get_album_data(browse_id: str) -> dict[str, Any]:
+    key = str(browse_id or '').strip()
+    if not key:
+        return {}
+    with _lock:
+        hit = _album_data_cache.get(key)
+        if hit is not None:
+            return hit
+        waiter = _album_inflight.get(key)
+        if waiter is None:
+            waiter = Event()
+            _album_inflight[key] = waiter
+            owner = True
+        else:
+            owner = False
+    if not owner:
+        waiter.wait(timeout=45)
+        with _lock:
+            return _album_data_cache.get(key) or {}
+    data: dict[str, Any] = {}
+    try:
+        data = _ytm().get_album(key) or {}
+    except Exception:
+        logger.exception('YouTube Music get_album failed for {}', key)
+        data = {}
+    with _lock:
+        _album_data_cache[key] = data
+        _album_inflight.pop(key, None)
+        waiter.set()
+    return data
+
+
 def album_tracks_from_browse_id(browse_id: str) -> list[dict[str, Any]]:
     if not browse_id.strip():
         return []
-    try:
-        data = _ytm().get_album(browse_id) or {}
-    except Exception:
-        logger.exception('YouTube Music get_album failed for {}', browse_id)
+    data = _get_album_data(browse_id)
+    if not data:
         return []
 
     album_name = str(data.get('title') or '').strip()
@@ -919,14 +950,7 @@ def _cached_album_tracks_and_count(
         hit = _album_track_cache.get(browse_id)
     if hit is not None:
         return hit
-    try:
-        data = _ytm().get_album(browse_id) or {}
-    except Exception:
-        logger.opt(exception=True).debug(
-            'YouTube Music get_album failed for {}', browse_id
-        )
-        empty: tuple[list[dict[str, Any]], Optional[int]] = ([], None)
-        return empty
+    data = _get_album_data(browse_id)
 
     tracks = [t for t in (data.get('tracks') or []) if isinstance(t, dict)]
     logger.info(

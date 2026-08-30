@@ -84,6 +84,7 @@ export default {
     download: 'Download',
     downloadAlbum: 'Download album',
     downloadTrack: 'Download track',
+    queueAlbumFailed: 'Could not add this album to the queue. Try again.',
     demo: 'Demo',
     playInEmbed: 'Play preview',
     noPreview: 'No audio preview is available for this item.',

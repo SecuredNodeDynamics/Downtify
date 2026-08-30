@@ -17,9 +17,13 @@ def clear_ytm_album_cache():
 
     providers._album_track_cache.clear()
     providers._album_browse_search_cache.clear()
+    providers._album_data_cache.clear()
+    providers._album_inflight.clear()
     yield
     providers._album_track_cache.clear()
     providers._album_browse_search_cache.clear()
+    providers._album_data_cache.clear()
+    providers._album_inflight.clear()
 
 
 def test_enrich_from_match_backfills_artists_when_empty():
@@ -487,7 +491,39 @@ def test_spotify_artist_url_builds_search_query(monkeypatch):
     )
     monkeypatch.setattr(
         providers.spotify,
-        'artist_info_and_tracks',
-        lambda _artist_id: ('Audrey Stclair', []),
+        'artist_name_from_id',
+        lambda _artist_id: 'Audrey Stclair',
     )
     assert providers._spotify_search_query(artist_url) == 'Audrey Stclair'
+
+
+def test_album_tracks_from_browse_id_maps_youtube_album(monkeypatch):
+    class FakeYtm:
+        def get_album(self, browse_id):
+            assert browse_id == 'MPREb_salotune'
+            return {
+                'title': 'Love Is a Beautiful Journey',
+                'year': '2026',
+                'artists': [{'name': 'Salotune'}],
+                'thumbnails': [{'url': 'https://example.com/c.jpg'}],
+                'trackCount': 2,
+                'tracks': [
+                    {
+                        'title': 'One',
+                        'videoId': 'aaaaaaaaaaa',
+                        'artists': [{'name': 'Salotune'}],
+                    },
+                    {
+                        'title': 'Two',
+                        'videoId': 'bbbbbbbbbbb',
+                        'artists': [{'name': 'Salotune'}],
+                    },
+                ],
+            }
+
+    monkeypatch.setattr(providers, '_ytm', lambda: FakeYtm())
+    songs = providers.album_tracks_from_browse_id('MPREb_salotune')
+    assert len(songs) == 2
+    assert songs[0]['album_name'] == 'Love Is a Beautiful Journey'
+    assert songs[0]['track_number'] == 1
+    assert songs[1]['name'] == 'Two'

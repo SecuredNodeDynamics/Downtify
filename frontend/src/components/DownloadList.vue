@@ -79,7 +79,7 @@
         </button>
 
         <button
-          v-if="activeTab === 'history' && sortedHistory.length > 0"
+          v-if="activeTab === 'history' && visibleHistory.length > 0"
           type="button"
           class="queue-action-btn text-error/70 hover:text-error"
           @click="onClearHistory"
@@ -663,7 +663,7 @@
               </div>
 
               <div
-                v-if="historyLoading && sortedHistory.length === 0"
+                v-if="historyLoading && visibleHistory.length === 0"
                 class="space-y-2"
               >
                 <div
@@ -673,7 +673,7 @@
                 />
               </div>
 
-              <div v-else-if="sortedHistory.length === 0" class="queue-empty">
+              <div v-else-if="visibleHistory.length === 0" class="queue-empty">
                 <Icon
                   icon="clarity:history-line"
                   class="mb-4 h-10 w-10 text-base-content/20"
@@ -688,7 +688,7 @@
 
               <ul v-else class="queue-list">
                 <li
-                  v-for="item in sortedHistory"
+                  v-for="item in visibleHistory"
                   :key="item.id"
                   class="queue-item"
                   :class="{
@@ -880,6 +880,7 @@ const {
   markHistoryRetrying,
   historyDate,
 } = useDownloadHistory()
+const visibleHistory = computed(() => sortedHistory.value.slice(0, 80))
 const { t } = useI18n()
 const activeTab = ref('queue')
 const historyLoading = ref(false)
@@ -988,9 +989,15 @@ async function refreshManage({ background = false } = {}) {
   if (!background) manageLoading.value = true
   manageError.value = ''
   try {
-    const res = await API.getLibraryFiles()
+    const cached = getCachedLibraryItems()
+    if (cached?.length && !background) {
+      manageItems.value = decorateLibraryItems(cached)
+    }
+    const items = await API.refreshLibraryInBackground(false, {
+      warmCovers: false,
+    })
     if (seq !== manageFetchSeq) return
-    manageItems.value = decorateLibraryItems(res.data || [])
+    manageItems.value = decorateLibraryItems(items || [])
   } catch {
     if (seq !== manageFetchSeq) return
     manageError.value = t('manage.failedLoad')

@@ -86,6 +86,7 @@ export default {
     download: 'Descargar',
     downloadAlbum: 'Descargar album',
     downloadTrack: 'Descargar pista',
+    queueAlbumFailed: 'No se pudo añadir este álbum a la cola. Inténtalo de nuevo.',
     demo: 'Demo',
     playInEmbed: 'Reproducir vista previa',
     noPreview: 'No hay vista previa de audio para este elemento.',

@@ -709,6 +709,11 @@ function refreshSearch() {
 }
 
 const currentPage = ref(1)
+const paginatedData = computed(() => {
+  if (!props.data) return []
+  const start = (currentPage.value - 1) * PAGE_SIZE
+  return props.data.slice(start, start + PAGE_SIZE)
+})
 const demoOpen = ref(false)
 const demoLoading = ref(false)
 const demoError = ref('')
@@ -733,7 +738,7 @@ const demoAudio = new Audio()
 demoAudio.volume = demoVolume.value
 
 const ownershipItems = computed(() => {
-  const items = [...(props.data || [])]
+  const items = [...paginatedData.value]
   if (demoOpen.value && demoSourceItem.value) {
     items.push(demoSourceItem.value)
   }
@@ -744,7 +749,7 @@ const ownershipItems = computed(() => {
 })
 const { isOwned } = useLibraryOwnership(ownershipItems)
 const { trackCountFor, countsByBrowseId } = useAlbumTrackCounts(
-  computed(() => props.data)
+  computed(() => paginatedData.value)
 )
 
 demoAudio.addEventListener('timeupdate', () => {
@@ -800,12 +805,6 @@ const visiblePages = computed(() => {
   if (pages - previous > 1) visible.push('…')
   visible.push(pages)
   return visible
-})
-
-const paginatedData = computed(() => {
-  if (!props.data) return []
-  const start = (currentPage.value - 1) * PAGE_SIZE
-  return props.data.slice(start, start + PAGE_SIZE)
 })
 
 const hasUnfilteredResults = computed(

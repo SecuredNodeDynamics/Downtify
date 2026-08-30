@@ -301,6 +301,7 @@ async def check_monitored(
     known_tracks = await asyncio.to_thread(db.get_track_filenames, item.id)
 
     pl_subdir = m3u.sanitize_playlist_name(item.name)
+    stem_index = await asyncio.to_thread(downloader.build_audio_stem_index)
 
     new_tracks = []
     for t in tracks:
@@ -325,7 +326,9 @@ async def check_monitored(
         # monitor from re-downloading (and repeatedly failing) the same tracks
         # on every check.
         existing = await asyncio.to_thread(
-            downloader.duplicate_filename_for, t, pl_subdir
+            lambda track=t: downloader.duplicate_filename_for(
+                track, subdir=pl_subdir, stem_index=stem_index
+            )
         )
         if existing:
             try:

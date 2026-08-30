@@ -2672,7 +2672,7 @@ onMounted(() => {
   }
   load()
   stopLibraryListener = onLibraryChanged(() => {
-    void refreshLibraryMetadataInBackground(true)
+    void refreshLibraryMetadataInBackground()
   })
 })
 

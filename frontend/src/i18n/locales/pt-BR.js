@@ -84,6 +84,7 @@ export default {
     download: 'Baixar',
     downloadAlbum: 'Baixar album',
     downloadTrack: 'Baixar faixa',
+    queueAlbumFailed: 'Não foi possível adicionar este álbum à fila. Tente de novo.',
     demo: 'Demo',
     playInEmbed: 'Reproduzir prévia',
     noPreview: 'Nenhuma prévia de áudio disponível para este item.',

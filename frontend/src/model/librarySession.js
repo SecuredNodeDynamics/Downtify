@@ -38,7 +38,7 @@ export function getCachedLibraryPaths() {
 }
 
 export function getCachedLibraryItems() {
-  return cachedLibraryItems ? [...cachedLibraryItems] : null
+  return cachedLibraryItems
 }
 
 export function getLibraryServerKey() {

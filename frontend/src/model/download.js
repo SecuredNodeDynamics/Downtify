@@ -26,12 +26,10 @@ const STATUS = {
   DOWNLOADED: 'Done',
   ERROR: 'Error',
 }
-const MAX_PENDING_DOWNLOADS = 20
+const MAX_PENDING_DOWNLOADS = 2000
 
 const downloadQueue = ref([])
-const activeQueue = computed(() =>
-  [...downloadQueue.value].sort((a, b) => (b.queuedAt || 0) - (a.queuedAt || 0))
-)
+const activeQueue = computed(() => downloadQueue.value)
 const activeDownloadCount = computed(() => activeQueue.value.length)
 
 class DownloadItem {
@@ -80,7 +78,7 @@ class DownloadItem {
 
 export function useProgressTracker() {
   function songKey(song) {
-    return String(song?.song_id || song?.url || '')
+    return String(song?.song_id || song?.browse_id || song?.url || '')
   }
 
   function _findIndex(song) {
@@ -330,29 +328,43 @@ export function useDownloadManager() {
   }
 
   async function queueAlbum(album) {
-    if (!album.browse_id) {
+    if (!album?.browse_id) {
       return { album, failed: true, error: 'Missing album browse id' }
     }
-    if (await isMediaOwned(album)) return { album, skipped: true }
-
-    loading.value = true
+    const estimated = Math.max(1, Number(album.track_count) || 1)
+    const remaining = MAX_PENDING_DOWNLOADS - activeDownloadCount.value
+    if (estimated > remaining) {
+      return {
+        album,
+        failed: true,
+        error: `Download queue is full. ${activeDownloadCount.value} pending, ${Math.max(0, remaining)} slots available.`,
+      }
+    }
+    if (!progressTracker.getBySong(album)) {
+      progressTracker.appendSong(album)
+    }
+    if (await isMediaOwned(album)) {
+      progressTracker.removeSong(album)
+      return { album, skipped: true }
+    }
     try {
       const res = await API.openYoutubeAlbum(album.browse_id)
       const songs = Array.isArray(res.data) ? res.data : []
       if (res.status !== 200 || !songs.length) {
+        progressTracker.removeSong(album)
         return { album, failed: true, error: 'No tracks found for this album' }
       }
       const queued = await queueBatch(songs)
       if (queued?.failed) {
+        progressTracker.removeSong(album)
         return { album, failed: true, error: queued.error }
       }
       return { album, queued: true, count: songs.length }
     } catch (err) {
+      progressTracker.removeSong(album)
       const message = err?.response?.data?.detail || err.message
       console.log('Album queue failed:', message)
       return { album, failed: true, error: message }
-    } finally {
-      loading.value = false
     }
   }
 
@@ -388,6 +400,7 @@ export function useDownloadManager() {
 
   async function queue(song, beginDownload = true) {
     if (!song) return Promise.resolve({ song, filename: null })
+    if (song.media_type === 'album') return queueAlbum(song)
     if (activeDownloadCount.value >= MAX_PENDING_DOWNLOADS) {
       return Promise.resolve({
         song,
@@ -398,7 +411,6 @@ export function useDownloadManager() {
     if (await isMediaOwned(song)) {
       return Promise.resolve({ song, filename: null, skipped: true })
     }
-    if (song.media_type === 'album') return queueAlbum(song)
     progressTracker.appendSong(song)
     if (beginDownload) return download(song)
     return Promise.resolve({ song, filename: null })
