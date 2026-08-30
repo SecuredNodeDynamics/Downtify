@@ -308,3 +308,6 @@ typings/
 data/downtify_monitor.db
 data/settings.json
 .local/
+
+# Local Gradle cache used by Android APK builds (never publish)
+.gradle_home/
