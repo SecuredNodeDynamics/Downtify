@@ -539,62 +539,130 @@ def _search_tokens(value: str) -> list[str]:
     return re.findall(r'[a-z0-9]+', value.casefold())
 
 
-def _search_text(item: dict[str, Any], fields: list[str]) -> str:
-    values: list[str] = []
-    for field in fields:
-        value = item.get(field)
-        if isinstance(value, list):
-            values.extend(str(v) for v in value if v)
-        elif value:
-            values.append(str(value))
-    return ' '.join(values)
+def _item_artist_names(item: dict[str, Any]) -> list[str]:
+    artists = item.get('artists')
+    names: list[str] = []
+    if isinstance(artists, list):
+        names.extend(str(name).strip() for name in artists if str(name).strip())
+    joined = str(item.get('artist') or '').strip()
+    if joined:
+        names.extend(
+            part.strip() for part in joined.split(',') if part.strip()
+        )
+    seen: set[str] = set()
+    unique: list[str] = []
+    for name in names:
+        key = name.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(name)
+    return unique
+
+
+def _joined_tokens(value: str) -> str:
+    return ' '.join(_search_tokens(value))
+
+
+def _name_match_score(name: str, query: str) -> float:
+    n = _joined_tokens(name)
+    q = _joined_tokens(query)
+    if not q or not n:
+        return 0
+    if n == q:
+        return 100
+    if n.startswith(q):
+        return 80
+    q_tokens = _search_tokens(query)
+    n_tokens = _search_tokens(name)
+    significant = [token for token in q_tokens if len(token) >= 2] or q_tokens
+    if significant and all(
+        any(
+            nt == qt or (len(qt) >= 2 and nt.startswith(qt)) for nt in n_tokens
+        )
+        for qt in significant
+    ):
+        return 90 if len(significant) == len(n_tokens) else 70
+    if len(q) >= 4 and q in n:
+        return 25
+    return SequenceMatcher(None, q, n).ratio() * 18
+
+
+def _artist_match_score(item: dict[str, Any], query: str) -> float:
+    names = _item_artist_names(item)
+    if not names:
+        return 0
+    return max(_name_match_score(name, query) for name in names)
+
+
+def _is_artist_intent(query: str, artist_items: list[dict[str, Any]]) -> bool:
+    tokens = _search_tokens(query)
+    if len(tokens) > 5:
+        return False
+    return any(
+        _name_match_score(str(item.get('name') or ''), query) >= 70
+        for item in artist_items
+    )
+
+
+def _item_matches_artist_focus(item: dict[str, Any], query: str) -> bool:
+    media = str(item.get('media_type') or 'track')
+    title = str(item.get('name') or '')
+    if media == 'artist':
+        return _name_match_score(title, query) >= 70
+    if _artist_match_score(item, query) >= 70:
+        return True
+    if media == 'album' and _name_match_score(title, query) >= 70:
+        return True
+    album = str(item.get('album_name') or '')
+    if media == 'track' and _name_match_score(title, query) >= 100:
+        return True
+    if media == 'track' and _name_match_score(album, query) >= 70:
+        return True
+    return False
 
 
 def _search_relevance(item: dict[str, Any], query: str) -> float:
-    q = ' '.join(_search_tokens(query))
-    if not q:
-        return 0
-
-    title = ' '.join(_search_tokens(str(item.get('name') or '')))
-    artists = ' '.join(
-        _search_tokens(_search_text(item, ['artists', 'artist']))
+    media = str(item.get('media_type') or 'track')
+    title = str(item.get('name') or '')
+    album = str(item.get('album_name') or '')
+    title_score = _name_match_score(title, query)
+    artist_score = _artist_match_score(item, query)
+    album_score = _name_match_score(album, query)
+    combo_tokens = set(
+        _search_tokens(' '.join([*_item_artist_names(item), title]))
     )
-    album = ' '.join(_search_tokens(str(item.get('album_name') or '')))
-    haystack = ' '.join(part for part in [title, artists, album] if part)
-    if not haystack:
-        return 0
+    query_tokens = set(_search_tokens(query))
+    combo_score = (
+        100 if query_tokens and combo_tokens == query_tokens else 0
+    )
+    title_tokens = set(_search_tokens(title))
 
-    score = SequenceMatcher(None, q, haystack).ratio() * 40
-    score = max(score, SequenceMatcher(None, q, title).ratio() * 55)
-    if artists:
-        score = max(score, SequenceMatcher(None, q, artists).ratio() * 45)
-    if album:
-        score = max(score, SequenceMatcher(None, q, album).ratio() * 45)
+    if media == 'artist':
+        score = artist_score * 1.25
+        if artist_score >= 100:
+            score += 50
+        elif artist_score >= 70:
+            score += 20
+        return score
 
-    q_tokens = set(_search_tokens(query))
-    hay_tokens = set(_search_tokens(haystack))
-    if q_tokens:
-        score += (len(q_tokens & hay_tokens) / len(q_tokens)) * 35
+    if media == 'album':
+        score = max(album_score, artist_score * 0.85)
+        if artist_score >= 70:
+            score += 4
+        if album_score >= 100:
+            score += 20
+        return score
 
-    if title == q:
+    score = max(title_score, combo_score, artist_score * 0.4)
+    if title_tokens and query_tokens and title_tokens <= query_tokens and artist_score >= 70:
         score += 50
-    elif title.startswith(q) or q in title:
-        score += 25
-
-    if artists == q:
+    elif title_score >= 80 and artist_score >= 70:
         score += 35
-    elif artists.startswith(q) or q in artists:
-        score += 18
-
-    if album == q:
-        score += 35
-    elif album.startswith(q) or q in album:
-        score += 18
-
-    if item.get('media_type') == 'artist':
-        score += 12
-    if item.get('media_type') == 'track':
-        score += 2
+    elif combo_score >= 100:
+        score += 40
+    if artist_score >= 70:
+        score += 8
     return score
 
 
@@ -669,16 +737,18 @@ def search_media(query: str, limit: int = 20) -> list[dict[str, Any]]:
             return []
     song_limit = max(1, limit)
     album_limit = max(1, min(30, limit // 2))
-    artist_limit = max(1, min(5, limit // 8 or 1))
+    artist_limit = max(3, min(8, limit // 8 or 3))
     songs = search_songs(query, limit=song_limit)
     albums = search_albums(query, limit=album_limit)
     artists = search_artists(query, limit=artist_limit)
+    artist_intent = _is_artist_intent(query, artists)
     seen_album_ids = {a.get('browse_id') for a in albums if a.get('browse_id')}
-    for album in _albums_from_song_search(query, limit=album_limit):
-        if album.get('browse_id') in seen_album_ids:
-            continue
-        seen_album_ids.add(album.get('browse_id'))
-        albums.append(album)
+    if not artist_intent:
+        for album in _albums_from_song_search(query, limit=album_limit):
+            if album.get('browse_id') in seen_album_ids:
+                continue
+            seen_album_ids.add(album.get('browse_id'))
+            albums.append(album)
 
     combined: list[dict[str, Any]] = []
     seen: set[tuple[str, str]] = set()
@@ -700,7 +770,18 @@ def search_media(query: str, limit: int = 20) -> list[dict[str, Any]]:
         key=lambda pair: (_search_relevance(pair[1], query), -pair[0]),
         reverse=True,
     )
-    final = [item for _, item in ranked[:limit]]
+    ordered = [item for _, item in ranked]
+    if artist_intent:
+        focused = [
+            item for item in ordered if _item_matches_artist_focus(item, query)
+        ]
+        if focused:
+            ordered = focused
+    final = [item for item in ordered if _search_relevance(item, query) > 18][
+        :limit
+    ]
+    if not final:
+        final = ordered[:limit]
     _attach_album_track_counts(final)
     return final
 

@@ -3,6 +3,7 @@ import { ref, watch, onUnmounted } from 'vue'
 import API from './api'
 import {
   matchesLibraryArtistName,
+  matchesCatalogName,
   normalizeLibrarySearchQuery,
 } from './library'
 
@@ -19,11 +20,26 @@ export function filterOnlineResultsForLibraryView(items, viewMode, query) {
   const list = Array.isArray(items) ? items : []
 
   if (viewMode === 'albums') {
-    return list.filter((item) => item?.media_type === 'album')
+    return list.filter((item) => {
+      if (item?.media_type !== 'album') return false
+      return (
+        matchesCatalogName(item?.name, q) ||
+        matchesLibraryArtistName(onlineArtistsLabel(item), q)
+      )
+    })
   }
 
   if (viewMode === 'tracks') {
-    return list.filter((item) => item?.media_type !== 'album')
+    return list.filter((item) => {
+      if (item?.media_type === 'album' || item?.media_type === 'artist') {
+        return false
+      }
+      return (
+        matchesCatalogName(item?.name, q) ||
+        matchesLibraryArtistName(onlineArtistsLabel(item), q) ||
+        matchesCatalogName(item?.album_name, q)
+      )
+    })
   }
 
   if (viewMode === 'genres') {

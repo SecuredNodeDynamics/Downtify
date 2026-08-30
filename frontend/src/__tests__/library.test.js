@@ -398,8 +398,7 @@ describe('library path helpers', () => {
 
     expect(matchesLibraryTrackItem(kennyArtist, 'Kenny G')).toBe(true)
     expect(matchesLibraryTrackItem(kennyTrack, 'Kenny G')).toBe(true)
-    expect(
-      matchesLibraryFilter(
+    expect(matchesLibraryFilter(
         normalizeLibraryItem({
           file: 'Rip Kane/Album/track.mp3',
           title: 'Unrelated',
@@ -408,6 +407,33 @@ describe('library path helpers', () => {
           genre: 'Kenny G',
         }),
         'Kenny G'
+      )
+    ).toBe(false)
+  })
+
+  it('keeps artist library search on that artist', () => {
+    expect(matchesLibraryArtistName('Audrey Stclair', 'Audrey')).toBe(true)
+    expect(matchesLibraryArtistName('Howard Shore', 'Audrey')).toBe(false)
+    expect(
+      matchesLibraryAlbumEntry(
+        { name: 'The Hobbit', artist: 'Howard Shore' },
+        'Audrey'
+      )
+    ).toBe(false)
+    expect(
+      matchesLibraryAlbumEntry(
+        { name: 'Live Acoustic Nights', artist: 'Audrey Stclair' },
+        'Audrey'
+      )
+    ).toBe(true)
+    expect(
+      matchesLibraryTrackItem(
+        {
+          title: 'The Clouds Burst',
+          artist: 'Howard Shore',
+          album: 'The Hobbit',
+        },
+        'Audrey'
       )
     ).toBe(false)
   })

@@ -622,6 +622,7 @@ import {
   matchesLibraryField,
   matchesLibraryGenreName,
   matchesLibraryTrackItem,
+  compareCatalogSearch,
   normalizeLibraryItem,
   pathParts,
 } from '/src/model/library'
@@ -855,16 +856,28 @@ const librarySearchActive = computed(() =>
 const filteredArtists = computed(() => {
   const q = librarySearchQuery.value
   if (!librarySearchActive.value) return artists.value
-  return artists.value.filter((artist) =>
-    matchesLibraryArtistName(artist.name, q)
-  )
+  return artists.value
+    .filter((artist) => matchesLibraryArtistName(artist.name, q))
+    .slice()
+    .sort((left, right) => compareCatalogSearch(left.name, right.name, q))
 })
 
 const filteredVisibleAlbums = computed(() => {
   const q = librarySearchQuery.value
   const source = visibleAlbums.value
   if (!librarySearchActive.value) return source
-  return source.filter((album) => matchesLibraryAlbumEntry(album, q))
+  return source
+    .filter((album) => matchesLibraryAlbumEntry(album, q))
+    .slice()
+    .sort((left, right) => {
+      const artistCmp = compareCatalogSearch(
+        left.artist || '',
+        right.artist || '',
+        q
+      )
+      if (artistCmp) return artistCmp
+      return compareCatalogSearch(left.name, right.name, q)
+    })
 })
 
 const filteredGenres = computed(() => {

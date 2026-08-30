@@ -487,16 +487,52 @@ export function normalizeLibrarySearchQuery(query) {
     .toLowerCase()
 }
 
-export function matchesLibraryField(field, query) {
+export function catalogSearchTokens(query) {
+  return normalizeLibrarySearchQuery(query).match(/[a-z0-9]+/g) || []
+}
+
+export function catalogNameMatchScore(name, query) {
+  const n = normalizeLibrarySearchQuery(name)
   const q = normalizeLibrarySearchQuery(query)
-  if (!q) return true
-  return String(field || '')
-    .toLowerCase()
-    .includes(q)
+  if (!q) return 1
+  if (!n) return 0
+  if (n === q) return 100
+  if (n.startsWith(q)) return 80
+  const qTokens = catalogSearchTokens(query)
+  const nTokens = catalogSearchTokens(name)
+  const significant = qTokens.filter((token) => token.length >= 2)
+  const tokens = significant.length ? significant : qTokens
+  if (
+    tokens.length &&
+    tokens.every((qt) =>
+      nTokens.some((nt) => nt === qt || (qt.length >= 2 && nt.startsWith(qt)))
+    )
+  ) {
+    return tokens.length === nTokens.length ? 90 : 70
+  }
+  if (q.length >= 4 && n.includes(q)) return 25
+  return 0
+}
+
+export function matchesCatalogName(name, query) {
+  return catalogNameMatchScore(name, query) >= 70
+}
+
+export function compareCatalogSearch(leftName, rightName, query) {
+  return (
+    catalogNameMatchScore(rightName, query) -
+    catalogNameMatchScore(leftName, query)
+  )
+}
+
+export function matchesLibraryField(field, query) {
+  return matchesCatalogName(field, query)
 }
 
 export function matchesLibraryArtistName(artistName, query) {
-  return matchesLibraryField(artistName, query)
+  const q = normalizeLibrarySearchQuery(query)
+  if (!q) return true
+  return matchesCatalogName(artistName, query)
 }
 
 export function matchesLibraryAlbumEntry(album, query) {
@@ -506,8 +542,8 @@ export function matchesLibraryAlbumEntry(album, query) {
     ? album.artists
     : [album?.artist]
   return (
-    matchesLibraryField(album.name, q) ||
-    artistFields.some((artist) => matchesLibraryField(artist, q))
+    matchesCatalogName(album?.name, q) ||
+    artistFields.some((artist) => matchesCatalogName(artist, q))
   )
 }
 
@@ -516,9 +552,9 @@ export function matchesLibraryTrackItem(item, query) {
   if (!q) return true
   const artistFields = libraryItemArtists(item)
   return (
-    matchesLibraryField(item.title, q) ||
-    artistFields.some((artist) => matchesLibraryField(artist, q)) ||
-    matchesLibraryField(item.album, q)
+    matchesCatalogName(item?.title, q) ||
+    artistFields.some((artist) => matchesCatalogName(artist, q)) ||
+    matchesCatalogName(item?.album, q)
   )
 }
 

@@ -273,6 +273,59 @@ def test_search_media_ranks_exact_track_before_unrelated_album(monkeypatch):
     assert results[0]['name'] == 'Perfect'
 
 
+def test_search_media_keeps_artist_queries_on_that_artist(monkeypatch):
+    class FakeYTMusic:
+        def search(self, query, filter=None, limit=20):
+            if filter == 'artists':
+                return [
+                    {
+                        'browseId': 'UC_audrey',
+                        'artist': 'Audrey Stclair',
+                        'thumbnails': [],
+                    }
+                ]
+            if filter == 'songs':
+                return [
+                    {
+                        'videoId': 'audrey12345',
+                        'title': 'SIGN',
+                        'artists': [{'name': 'Audrey Stclair'}],
+                    },
+                    {
+                        'videoId': 'other123456',
+                        'title': 'Clouds',
+                        'artists': [{'name': 'Howard Shore'}],
+                    },
+                ]
+            if filter == 'albums':
+                return [
+                    {
+                        'browseId': 'album_audrey',
+                        'title': 'Live Acoustic Nights',
+                        'artists': [{'name': 'Audrey Stclair'}],
+                    },
+                    {
+                        'browseId': 'album_other',
+                        'title': 'The Hobbit',
+                        'artists': [{'name': 'Howard Shore'}],
+                    },
+                ]
+            return []
+
+    monkeypatch.setattr(providers, '_ytm', lambda: FakeYTMusic())
+    monkeypatch.setattr(providers, 'album_track_counts', lambda _ids: {})
+
+    results = providers.search_media('Audrey Stclair', limit=20)
+    artists = {str(item.get('artist') or '') for item in results}
+    names = [item.get('name') for item in results]
+
+    assert 'Audrey Stclair' in names
+    assert 'Howard Shore' not in artists
+    assert 'The Hobbit' not in names
+    assert 'Clouds' not in names
+    assert 'SIGN' in names
+
+
 def test_search_media_can_return_more_than_old_six_pages(monkeypatch):
     class FakeYTMusic:
         def search(self, query, filter=None, limit=20):

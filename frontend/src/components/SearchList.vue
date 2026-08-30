@@ -96,10 +96,18 @@
     </div>
 
     <!-- Results -->
-    <ul v-else class="space-y-2">
+    <div v-else class="space-y-6">
+      <section v-for="section in resultSections" :key="section.id">
+        <h2
+          v-if="section.title"
+          class="mb-2 px-1 text-xs font-semibold uppercase tracking-[0.16em] text-base-content/45"
+        >
+          {{ section.title }}
+        </h2>
+        <ul class="space-y-2">
       <li
-        v-for="(song, index) in paginatedData"
-        :key="song.song_id || index"
+        v-for="(song, index) in section.items"
+        :key="song.song_id || `${section.id}-${index}`"
         class="surface rounded-2xl p-3 sm:p-4 flex flex-col gap-3 sm:flex-row sm:items-center"
       >
         <div class="flex min-w-0 flex-1 items-center gap-3 sm:gap-4">
@@ -262,7 +270,9 @@
           </div>
         </div>
       </li>
-    </ul>
+        </ul>
+      </section>
+    </div>
 
     <!-- Pagination -->
     <nav
@@ -745,11 +755,50 @@ function refreshSearch() {
 }
 
 const currentPage = ref(1)
-const paginatedData = computed(() => {
-  if (!props.data) return []
-  const start = (currentPage.value - 1) * PAGE_SIZE
-  return props.data.slice(start, start + PAGE_SIZE)
+const groupingResults = computed(() => sm.resultFilter.value === 'both')
+const resultSections = computed(() => {
+  const items = Array.isArray(props.data) ? props.data : []
+  if (!items.length) return []
+  if (!groupingResults.value) {
+    const start = (currentPage.value - 1) * PAGE_SIZE
+    return [
+      {
+        id: 'all',
+        title: '',
+        items: items.slice(start, start + PAGE_SIZE),
+      },
+    ]
+  }
+  const artists = items.filter((item) => mediaType(item) === 'artist')
+  const albums = items.filter((item) => mediaType(item) === 'album')
+  const tracks = items.filter((item) => mediaType(item) === 'track')
+  const sections = []
+  if (artists.length) {
+    sections.push({
+      id: 'artists',
+      title: t('search.sectionArtists'),
+      items: artists,
+    })
+  }
+  if (albums.length) {
+    sections.push({
+      id: 'albums',
+      title: t('search.sectionAlbums'),
+      items: albums,
+    })
+  }
+  if (tracks.length) {
+    sections.push({
+      id: 'tracks',
+      title: t('search.sectionSongs'),
+      items: tracks,
+    })
+  }
+  return sections
 })
+const paginatedData = computed(() =>
+  resultSections.value.flatMap((section) => section.items)
+)
 const demoOpen = ref(false)
 const demoLoading = ref(false)
 const demoError = ref('')
@@ -812,9 +861,10 @@ watch(demoVolumeOpen, (open) => {
   }
 })
 
-const totalPages = computed(() =>
-  Math.ceil((props.data?.length || 0) / PAGE_SIZE)
-)
+const totalPages = computed(() => {
+  if (groupingResults.value) return 1
+  return Math.ceil((props.data?.length || 0) / PAGE_SIZE)
+})
 
 const visiblePages = computed(() => {
   const pages = totalPages.value
