@@ -100,4 +100,4 @@ export function useAuthSession() {
   }
 }
 
-export { status as authStatus }
+export { status as authStatus, ready }
