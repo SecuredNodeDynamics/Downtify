@@ -64,6 +64,7 @@ from . import (
 from .auth import (
     COOKIE_NAME,
     AuthDB,
+    is_admin_api_path,
     is_public_api_path,
     token_from_request,
 )
@@ -615,6 +616,13 @@ async def enforce_auth_middleware(request: Request, call_next):
             return JSONResponse(
                 {'detail': 'Not authenticated'}, status_code=401
             )
+        if (
+            is_admin_api_path(request.url.path)
+            and db is not None
+            and await asyncio.to_thread(db.has_users)
+            and not (user and user.get('is_admin'))
+        ):
+            return JSONResponse({'detail': 'Admin only'}, status_code=403)
     request.state.user = user
     user_token = _auth_user_var.set(user)
     try:

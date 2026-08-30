@@ -106,6 +106,7 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useRoute } from 'vue-router'
 
@@ -119,22 +120,31 @@ import { useI18n } from '../i18n'
 
 const route = useRoute()
 const { t } = useI18n()
-const { user, profiles } = useAuthSession()
+const { user, profiles, canUseAdminPages } = useAuthSession()
 const pt = useProgressTracker()
 const themeMgr = useBinaryThemeManager({
   newLightAlias: 'downtify-light',
   newDarkAlias: 'downtify-dark',
 })
 
-const menuItems = [
+const allMenuItems = [
   { name: 'Monitor', labelKey: 'nav.monitor', icon: 'clarity:eye-line' },
   {
     name: 'Health',
     labelKey: 'nav.health',
     icon: 'clarity:info-standard-line',
+    adminOnly: true,
   },
-  { name: 'Metadata', labelKey: 'nav.metadata', icon: 'clarity:tag-line' },
+  {
+    name: 'Metadata',
+    labelKey: 'nav.metadata',
+    icon: 'clarity:tag-line',
+    adminOnly: true,
+  },
 ]
+const menuItems = computed(() =>
+  allMenuItems.filter((item) => !item.adminOnly || canUseAdminPages.value)
+)
 
 function closeSheet() {
   const sheet = document.getElementById('mobile-more-sheet')

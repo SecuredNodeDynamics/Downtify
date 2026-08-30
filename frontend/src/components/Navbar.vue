@@ -54,6 +54,7 @@
           </button>
 
           <button
+            v-if="canUseAdminPages"
             class="icon-btn"
             :class="{ 'icon-btn-active': route.name === 'Health' }"
             @click="router.push({ name: 'Health' })"
@@ -63,6 +64,7 @@
           </button>
 
           <button
+            v-if="canUseAdminPages"
             class="icon-btn"
             :class="{ 'icon-btn-active': route.name === 'Metadata' }"
             @click="router.push({ name: 'Metadata' })"
@@ -183,6 +185,7 @@ import { useDownloadRefresh } from '../model/downloadRefresh'
 import { useHealthRefresh } from '../model/healthRefresh'
 import { useLibraryRefresh } from '../model/libraryRefresh'
 import { useI18n } from '../i18n'
+import { useAuthSession } from '../model/authSession'
 import appIcon from '../assets/downtify-app-icon.png'
 
 import SearchInput from './SearchInput.vue'
@@ -198,6 +201,7 @@ const themeMgr = useBinaryThemeManager({
 })
 const sm = useSearchManager()
 const { t } = useI18n()
+const { canUseAdminPages } = useAuthSession()
 const { loading: healthRefreshLoading, refresh: refreshHealth } =
   useHealthRefresh()
 const {

@@ -27,7 +27,7 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onBeforeMount, onMounted } from 'vue'
+import { computed, nextTick, onBeforeMount, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 
 import AuthGate from './components/AuthGate.vue'
@@ -47,6 +47,7 @@ import {
   EMBEDDED_SERVER_READY_EVENT,
 } from './model/embeddedServer'
 import { isCapacitorNative, usesEmbeddedServer } from './model/serverConnection'
+import { authStatus, ready as authReady } from './model/authSession'
 import { usePlayer } from './model/player'
 import { useBinaryThemeManager } from './model/theme'
 
@@ -71,10 +72,21 @@ onBeforeMount(() => {
   themeMgr.setDarkAlias('downtify-dark')
 })
 
-router.beforeEach((to, from) => {
-  if (to.name === from.name) return true
-  return true
-})
+watch(
+  () => [
+    authReady.value,
+    authStatus.value.auth_required,
+    authStatus.value.user,
+    route.name,
+  ],
+  () => {
+    if (!route.meta?.requiresAdmin) return
+    if (!authStatus.value.auth_required) return
+    if (authStatus.value.user?.is_admin) return
+    if (route.name === 'Home') return
+    router.replace({ name: 'Home' })
+  }
+)
 
 onMounted(async () => {
   void bootstrapEmbeddedServer().then(() => {

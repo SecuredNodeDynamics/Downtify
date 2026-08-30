@@ -1526,7 +1526,12 @@ const {
   activateLocalDestination,
 } = useDownloadDestination()
 const { t, locale, setLocale, locales } = useI18n()
-const { user: authUser, profiles: authProfiles, isAdmin } = useAuthSession()
+const {
+  user: authUser,
+  profiles: authProfiles,
+  isAdmin,
+  canUseAdminPages,
+} = useAuthSession()
 const accountDisplayName = ref('')
 const accountPassword = ref('')
 const accountPin = ref('')
@@ -1818,141 +1823,146 @@ const jellyfinLibraryOptions = computed(() =>
   }))
 )
 
-const aboutSections = computed(() => [
-  {
-    id: 'search',
-    icon: 'clarity:search-line',
-    title: t('settings.aboutSearchTitle'),
-    text: t('settings.aboutSearchText'),
-    detail: t('settings.aboutSearchDetail'),
-    points: [
-      t('settings.aboutSearchPoint1'),
-      t('settings.aboutSearchPoint2'),
-      t('settings.aboutSearchPoint3'),
-    ],
-    tips: [t('settings.aboutSearchTip1'), t('settings.aboutSearchTip2')],
-  },
-  {
-    id: 'library',
-    icon: 'clarity:library-line',
-    title: t('settings.aboutLibraryTitle'),
-    text: t('settings.aboutLibraryText'),
-    detail: t('settings.aboutLibraryDetail'),
-    points: [
-      t('settings.aboutLibraryPoint1'),
-      t('settings.aboutLibraryPoint2'),
-      t('settings.aboutLibraryPoint3'),
-    ],
-    tips: [t('settings.aboutLibraryTip1'), t('settings.aboutLibraryTip2')],
-  },
-  {
-    id: 'queue',
-    icon: 'clarity:download-line',
-    title: t('settings.aboutQueueTitle'),
-    text: t('settings.aboutQueueText'),
-    detail: t('settings.aboutQueueDetail'),
-    points: [
-      t('settings.aboutQueuePoint1'),
-      t('settings.aboutQueuePoint2'),
-      t('settings.aboutQueuePoint3'),
-    ],
-    tips: [t('settings.aboutQueueTip1'), t('settings.aboutQueueTip2')],
-  },
-  {
-    id: 'player',
-    icon: 'clarity:headphones-line',
-    title: t('settings.aboutPlayerTitle'),
-    text: t('settings.aboutPlayerText'),
-    detail: t('settings.aboutPlayerDetail'),
-    points: [
-      t('settings.aboutPlayerPoint1'),
-      t('settings.aboutPlayerPoint2'),
-      t('settings.aboutPlayerPoint3'),
-    ],
-    tips: [t('settings.aboutPlayerTip1'), t('settings.aboutPlayerTip2')],
-  },
-  {
-    id: 'monitor',
-    icon: 'clarity:eye-line',
-    title: t('settings.aboutMonitorTitle'),
-    text: t('settings.aboutMonitorText'),
-    detail: t('settings.aboutMonitorDetail'),
-    points: [
-      t('settings.aboutMonitorPoint1'),
-      t('settings.aboutMonitorPoint2'),
-      t('settings.aboutMonitorPoint3'),
-    ],
-    tips: [t('settings.aboutMonitorTip1'), t('settings.aboutMonitorTip2')],
-  },
-  {
-    id: 'metadata',
-    icon: 'clarity:tag-line',
-    title: t('settings.aboutMetadataTitle'),
-    text: t('settings.aboutMetadataText'),
-    detail: t('settings.aboutMetadataDetail'),
-    points: [
-      t('settings.aboutMetadataPoint1'),
-      t('settings.aboutMetadataPoint2'),
-      t('settings.aboutMetadataPoint3'),
-    ],
-    tips: [t('settings.aboutMetadataTip1'), t('settings.aboutMetadataTip2')],
-  },
-  {
-    id: 'artistImages',
-    icon: 'clarity:image-gallery-line',
-    title: t('settings.aboutArtistImagesTitle'),
-    text: t('settings.aboutArtistImagesText'),
-    detail: t('settings.aboutArtistImagesDetail'),
-    points: [
-      t('settings.aboutArtistImagesPoint1'),
-      t('settings.aboutArtistImagesPoint2'),
-      t('settings.aboutArtistImagesPoint3'),
-    ],
-    tips: [
-      t('settings.aboutArtistImagesTip1'),
-      t('settings.aboutArtistImagesTip2'),
-    ],
-  },
-  {
-    id: 'jellyfin',
-    icon: 'clarity:server-line',
-    title: t('settings.aboutJellyfinTitle'),
-    text: t('settings.aboutJellyfinText'),
-    detail: t('settings.aboutJellyfinDetail'),
-    points: [
-      t('settings.aboutJellyfinPoint1'),
-      t('settings.aboutJellyfinPoint2'),
-      t('settings.aboutJellyfinPoint3'),
-    ],
-    tips: [t('settings.aboutJellyfinTip1'), t('settings.aboutJellyfinTip2')],
-  },
-  {
-    id: 'health',
-    icon: 'clarity:info-standard-line',
-    title: t('settings.aboutHealthTitle'),
-    text: t('settings.aboutHealthText'),
-    detail: t('settings.aboutHealthDetail'),
-    points: [
-      t('settings.aboutHealthPoint1'),
-      t('settings.aboutHealthPoint2'),
-      t('settings.aboutHealthPoint3'),
-    ],
-    tips: [t('settings.aboutHealthTip1'), t('settings.aboutHealthTip2')],
-  },
-  {
-    id: 'settings',
-    icon: 'clarity:cog-line',
-    title: t('settings.aboutSettingsTitle'),
-    text: t('settings.aboutSettingsText'),
-    detail: t('settings.aboutSettingsDetail'),
-    points: [
-      t('settings.aboutSettingsPoint1'),
-      t('settings.aboutSettingsPoint2'),
-      t('settings.aboutSettingsPoint3'),
-    ],
-    tips: [t('settings.aboutSettingsTip1'), t('settings.aboutSettingsTip2')],
-  },
-])
+const aboutSections = computed(() =>
+  [
+    {
+      id: 'search',
+      icon: 'clarity:search-line',
+      title: t('settings.aboutSearchTitle'),
+      text: t('settings.aboutSearchText'),
+      detail: t('settings.aboutSearchDetail'),
+      points: [
+        t('settings.aboutSearchPoint1'),
+        t('settings.aboutSearchPoint2'),
+        t('settings.aboutSearchPoint3'),
+      ],
+      tips: [t('settings.aboutSearchTip1'), t('settings.aboutSearchTip2')],
+    },
+    {
+      id: 'library',
+      icon: 'clarity:library-line',
+      title: t('settings.aboutLibraryTitle'),
+      text: t('settings.aboutLibraryText'),
+      detail: t('settings.aboutLibraryDetail'),
+      points: [
+        t('settings.aboutLibraryPoint1'),
+        t('settings.aboutLibraryPoint2'),
+        t('settings.aboutLibraryPoint3'),
+      ],
+      tips: [t('settings.aboutLibraryTip1'), t('settings.aboutLibraryTip2')],
+    },
+    {
+      id: 'queue',
+      icon: 'clarity:download-line',
+      title: t('settings.aboutQueueTitle'),
+      text: t('settings.aboutQueueText'),
+      detail: t('settings.aboutQueueDetail'),
+      points: [
+        t('settings.aboutQueuePoint1'),
+        t('settings.aboutQueuePoint2'),
+        t('settings.aboutQueuePoint3'),
+      ],
+      tips: [t('settings.aboutQueueTip1'), t('settings.aboutQueueTip2')],
+    },
+    {
+      id: 'player',
+      icon: 'clarity:headphones-line',
+      title: t('settings.aboutPlayerTitle'),
+      text: t('settings.aboutPlayerText'),
+      detail: t('settings.aboutPlayerDetail'),
+      points: [
+        t('settings.aboutPlayerPoint1'),
+        t('settings.aboutPlayerPoint2'),
+        t('settings.aboutPlayerPoint3'),
+      ],
+      tips: [t('settings.aboutPlayerTip1'), t('settings.aboutPlayerTip2')],
+    },
+    {
+      id: 'monitor',
+      icon: 'clarity:eye-line',
+      title: t('settings.aboutMonitorTitle'),
+      text: t('settings.aboutMonitorText'),
+      detail: t('settings.aboutMonitorDetail'),
+      points: [
+        t('settings.aboutMonitorPoint1'),
+        t('settings.aboutMonitorPoint2'),
+        t('settings.aboutMonitorPoint3'),
+      ],
+      tips: [t('settings.aboutMonitorTip1'), t('settings.aboutMonitorTip2')],
+    },
+    {
+      id: 'metadata',
+      icon: 'clarity:tag-line',
+      adminOnly: true,
+      title: t('settings.aboutMetadataTitle'),
+      text: t('settings.aboutMetadataText'),
+      detail: t('settings.aboutMetadataDetail'),
+      points: [
+        t('settings.aboutMetadataPoint1'),
+        t('settings.aboutMetadataPoint2'),
+        t('settings.aboutMetadataPoint3'),
+      ],
+      tips: [t('settings.aboutMetadataTip1'), t('settings.aboutMetadataTip2')],
+    },
+    {
+      id: 'artistImages',
+      icon: 'clarity:image-gallery-line',
+      adminOnly: true,
+      title: t('settings.aboutArtistImagesTitle'),
+      text: t('settings.aboutArtistImagesText'),
+      detail: t('settings.aboutArtistImagesDetail'),
+      points: [
+        t('settings.aboutArtistImagesPoint1'),
+        t('settings.aboutArtistImagesPoint2'),
+        t('settings.aboutArtistImagesPoint3'),
+      ],
+      tips: [
+        t('settings.aboutArtistImagesTip1'),
+        t('settings.aboutArtistImagesTip2'),
+      ],
+    },
+    {
+      id: 'jellyfin',
+      icon: 'clarity:server-line',
+      title: t('settings.aboutJellyfinTitle'),
+      text: t('settings.aboutJellyfinText'),
+      detail: t('settings.aboutJellyfinDetail'),
+      points: [
+        t('settings.aboutJellyfinPoint1'),
+        t('settings.aboutJellyfinPoint2'),
+        t('settings.aboutJellyfinPoint3'),
+      ],
+      tips: [t('settings.aboutJellyfinTip1'), t('settings.aboutJellyfinTip2')],
+    },
+    {
+      id: 'health',
+      icon: 'clarity:info-standard-line',
+      adminOnly: true,
+      title: t('settings.aboutHealthTitle'),
+      text: t('settings.aboutHealthText'),
+      detail: t('settings.aboutHealthDetail'),
+      points: [
+        t('settings.aboutHealthPoint1'),
+        t('settings.aboutHealthPoint2'),
+        t('settings.aboutHealthPoint3'),
+      ],
+      tips: [t('settings.aboutHealthTip1'), t('settings.aboutHealthTip2')],
+    },
+    {
+      id: 'settings',
+      icon: 'clarity:cog-line',
+      title: t('settings.aboutSettingsTitle'),
+      text: t('settings.aboutSettingsText'),
+      detail: t('settings.aboutSettingsDetail'),
+      points: [
+        t('settings.aboutSettingsPoint1'),
+        t('settings.aboutSettingsPoint2'),
+        t('settings.aboutSettingsPoint3'),
+      ],
+      tips: [t('settings.aboutSettingsTip1'), t('settings.aboutSettingsTip2')],
+    },
+  ].filter((section) => !section.adminOnly || canUseAdminPages.value)
+)
 
 const aboutWorkflowSection = computed(() => ({
   id: 'workflow',

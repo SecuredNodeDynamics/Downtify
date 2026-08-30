@@ -29,6 +29,10 @@ PUBLIC_API_PATHS = frozenset({
     '/api/capabilities',
     '/api/check_update',
 })
+ADMIN_API_PATHS = frozenset({
+    '/api/summary',
+})
+ADMIN_API_PREFIXES = ('/api/metadata',)
 
 
 def _now() -> datetime:
@@ -120,6 +124,15 @@ def validate_pin(pin: str, *, required: bool) -> str:
 
 def is_public_api_path(path: str) -> bool:
     return path in PUBLIC_API_PATHS
+
+
+def is_admin_api_path(path: str) -> bool:
+    if path in ADMIN_API_PATHS:
+        return True
+    return any(
+        path == prefix or path.startswith(f'{prefix}/')
+        for prefix in ADMIN_API_PREFIXES
+    )
 
 
 def public_user(row: sqlite3.Row | dict[str, Any]) -> dict[str, Any]:

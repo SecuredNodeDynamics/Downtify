@@ -5,6 +5,7 @@ import Search from '/src/views/Search.vue'
 import Download from '/src/views/Download.vue'
 import List from '/src/views/Downloads.vue'
 import Player from '/src/views/Player.vue'
+import { authStatus } from '/src/model/authSession.js'
 
 const Artist = () => import('/src/views/Artist.vue')
 const Monitor = () => import('/src/views/Monitor.vue')
@@ -80,13 +81,13 @@ const routes = [
     path: '/health',
     name: 'Health',
     component: Health,
-    meta: { mobileTitleKey: 'nav.health' },
+    meta: { mobileTitleKey: 'nav.health', requiresAdmin: true },
   },
   {
     path: '/metadata',
     name: 'Metadata',
     component: Metadata,
-    meta: { mobileTitleKey: 'nav.metadata' },
+    meta: { mobileTitleKey: 'nav.metadata', requiresAdmin: true },
   },
   {
     path: '/settings',
@@ -99,6 +100,13 @@ const routes = [
 const router = createRouter({
   history: createWebHistory(config.BASEURL),
   routes,
+})
+
+router.beforeEach((to) => {
+  if (!to.meta?.requiresAdmin) return true
+  if (!authStatus.value.auth_required) return true
+  if (authStatus.value.user?.is_admin) return true
+  return { name: 'Home' }
 })
 
 export default router

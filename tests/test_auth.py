@@ -6,7 +6,12 @@ from pathlib import Path
 
 import pytest
 
-from downtify.auth import AuthDB, hash_secret, verify_secret
+from downtify.auth import (
+    AuthDB,
+    hash_secret,
+    is_admin_api_path,
+    verify_secret,
+)
 from downtify.monitor import PlaylistMonitorDB
 
 
@@ -135,3 +140,12 @@ def test_cannot_delete_last_admin(tmp_path: Path) -> None:
     admin = auth.create_user('admin', password='secret123')
     with pytest.raises(ValueError, match='last admin'):
         auth.delete_user(admin['id'])
+
+
+def test_admin_api_paths() -> None:
+    assert is_admin_api_path('/api/metadata/scan')
+    assert is_admin_api_path('/api/metadata/artist-images/status')
+    assert is_admin_api_path('/api/summary')
+    assert not is_admin_api_path('/api/health')
+    assert not is_admin_api_path('/api/library/files')
+    assert not is_admin_api_path('/api/monitor/playlists')

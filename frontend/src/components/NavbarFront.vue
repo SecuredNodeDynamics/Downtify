@@ -40,6 +40,7 @@
           </button>
 
           <button
+            v-if="canUseAdminPages"
             class="icon-btn"
             @click="router.push({ name: 'Health' })"
             :title="t('nav.health')"
@@ -48,6 +49,7 @@
           </button>
 
           <button
+            v-if="canUseAdminPages"
             class="icon-btn"
             @click="router.push({ name: 'Metadata' })"
             :title="t('nav.metadata')"
@@ -104,6 +106,7 @@ import { Icon } from '@iconify/vue'
 import router from '../router'
 import { useBinaryThemeManager } from '../model/theme'
 import { useI18n } from '../i18n'
+import { useAuthSession } from '../model/authSession'
 import { openSettingsModal } from '../model/settingsModal'
 import appIcon from '../assets/downtify-app-icon.png'
 import DownloadCounterPill from './DownloadCounterPill.vue'
@@ -114,4 +117,5 @@ const themeMgr = useBinaryThemeManager({
   newDarkAlias: 'downtify-dark',
 })
 const { t } = useI18n()
+const { canUseAdminPages } = useAuthSession()
 </script>
