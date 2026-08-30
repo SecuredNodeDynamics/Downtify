@@ -6,6 +6,7 @@
 </template>
 
 <script setup>
+defineOptions({ name: 'Download' })
 import { onMounted } from 'vue'
 import Navbar from '/src/components/Navbar.vue'
 import DownloadList from '/src/components/DownloadList.vue'

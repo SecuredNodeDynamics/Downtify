@@ -25,6 +25,7 @@ from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from load_dotenv import load_dotenv
 from loguru import logger
+from starlette.middleware.gzip import GZipMiddleware
 from uvicorn import Config, Server
 
 from downtify import __version__, api, cover_art, desktop, library_index
@@ -148,6 +149,7 @@ def build_app() -> FastAPI:
         ),
         version=runtime_version,
     )
+    app.add_middleware(GZipMiddleware, minimum_size=500)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=['*'],

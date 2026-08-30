@@ -1,12 +1,12 @@
 import { createWebHistory, createRouter } from 'vue-router'
 import config from '/src/config'
 import Home from '/src/views/Front.vue'
-import Search from '/src/views/Search.vue'
-import Download from '/src/views/Download.vue'
-import List from '/src/views/Downloads.vue'
-import Player from '/src/views/Player.vue'
 import { authStatus } from '/src/model/authSession.js'
 
+const Search = () => import('/src/views/Search.vue')
+const Download = () => import('/src/views/Download.vue')
+const List = () => import('/src/views/Downloads.vue')
+const Player = () => import('/src/views/Player.vue')
 const Artist = () => import('/src/views/Artist.vue')
 const Monitor = () => import('/src/views/Monitor.vue')
 const Health = () => import('/src/views/Health.vue')

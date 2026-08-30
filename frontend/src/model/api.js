@@ -46,6 +46,10 @@ import {
   notifyProfileSynced,
   storeProfileBundle,
 } from './profileSync.js'
+import {
+  capacitorAxiosAdapter,
+  shouldUseNativeHttpAdapter,
+} from './nativeHttp.js'
 
 const API = axios.create({ timeout: 20000 })
 
@@ -55,6 +59,9 @@ API.interceptors.request.use((config) => {
   if (headers.Authorization) {
     config.headers = config.headers || {}
     config.headers.Authorization = headers.Authorization
+  }
+  if (shouldUseNativeHttpAdapter(config)) {
+    config.adapter = capacitorAxiosAdapter
   }
   return config
 })
@@ -165,41 +172,50 @@ function ensureWebSocket() {
 function getVersion({ prefetch = false } = {}) {
   if (needsServerConnection()) return Promise.resolve('')
 
-  return API.get('/api/version')
-    .then((res) => {
-      const version = String(res.data ?? '').trim()
-      if (!isValidVersion(version)) {
-        console.warn(
-          'Ignoring invalid /api/version response (is the backend running?)'
-        )
-        return ''
-      }
-      if (isCapacitorNative()) {
+  if (!versionRequest) {
+    versionRequest = API.get('/api/version')
+      .then((res) => {
+        const version = String(res.data ?? '').trim()
+        if (!isValidVersion(version)) {
+          console.warn(
+            'Ignoring invalid /api/version response (is the backend running?)'
+          )
+          return ''
+        }
+        if (isCapacitorNative()) {
+          writeCachedServerVersion(version)
+          return version
+        }
         writeCachedServerVersion(version)
-        if (prefetch) prefetchLibrary()
+        const prevItem = localStorage.getItem('version')
+        console.log('Backend version: ', version)
+        localStorage.setItem('version', version)
+        if (isValidVersion(prevItem) && prevItem !== version) {
+          reloadAppShell()
+        } else if (isBrowserOnApiRoute()) {
+          reloadAppShell()
+        }
         return version
-      }
-      writeCachedServerVersion(version)
-      const prevItem = localStorage.getItem('version')
-      console.log('Backend version: ', version)
-      localStorage.setItem('version', version)
-      if (isValidVersion(prevItem) && prevItem !== version) {
-        reloadAppShell()
-      } else if (isBrowserOnApiRoute()) {
-        reloadAppShell()
-      }
-      if (prefetch) prefetchLibrary()
-      return version
-    })
-    .catch((error) => {
-      console.error(error)
-      console.log('Error getting version; keeping last known version')
-      return ''
-    })
+      })
+      .catch((error) => {
+        console.error(error)
+        console.log('Error getting version; keeping last known version')
+        return ''
+      })
+      .finally(() => {
+        versionRequest = null
+      })
+  }
+
+  return versionRequest.then((version) => {
+    if (prefetch) prefetchLibrary()
+    return version
+  })
 }
 
 sanitizeStoredVersion()
 let backendSessionStarted = false
+let versionRequest = null
 
 function search(query) {
   return API.get('/api/songs/search', { params: { query } })
@@ -959,7 +975,7 @@ function prefetchLibrary() {
     libraryServerKey()
   )
   promise?.then((items) => {
-    if (items?.length) warmLibraryCovers(items)
+    if (items?.length) scheduleCoverWarm(items)
     return items
   })
   return promise
@@ -1111,10 +1127,27 @@ async function startBackendSession() {
     authStatus.value.setup_required ||
     (authStatus.value.auth_required && !authStatus.value.authenticated)
   if (blocked) return ''
-  await syncProfileWithBackend()
-  const version = await getVersion({ prefetch: false })
+  void syncProfileWithBackend()
+  void import('./settings.js').then((mod) => mod.loadSettings())
+  const versionPromise = getVersion({ prefetch: false })
+  void prefetchLibrary()
+  const version = await versionPromise
   ensureWebSocket()
   return version
+}
+
+function scheduleCoverWarm(items) {
+  if (isCapacitorNative() && usesCustomServerUrl()) {
+    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+      window.requestIdleCallback(() => warmLibraryCovers(items), {
+        timeout: 8000,
+      })
+      return
+    }
+    window.setTimeout(() => warmLibraryCovers(items), 1500)
+    return
+  }
+  warmLibraryCovers(items)
 }
 
 function refreshLibraryInBackground(force = false, options = {}) {
@@ -1122,7 +1155,9 @@ function refreshLibraryInBackground(force = false, options = {}) {
     serverKey: libraryServerKey(),
     force,
   }).then((items) => {
-    if (items?.length && options.warmCovers !== false) warmLibraryCovers(items)
+    if (items?.length && options.warmCovers !== false) {
+      scheduleCoverWarm(items)
+    }
     return items
   })
 }

@@ -18,6 +18,7 @@ import androidx.media3.session.MediaSession;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.SettableFuture;
 import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -205,10 +206,45 @@ public class DowntifyAutoService extends MediaLibraryService {
             @Nullable LibraryParams params
         ) {
             requestScan(false);
+            if (snapshot.createdAtMs == 0) {
+                SettableFuture<LibraryResult<ImmutableList<MediaItem>>> future =
+                    SettableFuture.create();
+                scanExecutor.execute(() -> {
+                    try {
+                        future.set(
+                            LibraryResult.ofItemList(
+                                paged(childrenFor(parentId), page, pageSize),
+                                params
+                            )
+                        );
+                    } catch (Exception error) {
+                        future.setException(error);
+                    }
+                });
+                return future;
+            }
             List<MediaItem> children = childrenFor(parentId);
             return Futures.immediateFuture(
                 LibraryResult.ofItemList(paged(children, page, pageSize), params)
             );
+        }
+
+        @NonNull
+        @Override
+        public ListenableFuture<LibraryResult<Void>> onSubscribe(
+            @NonNull MediaLibrarySession session,
+            @NonNull MediaSession.ControllerInfo browser,
+            @NonNull String parentId,
+            @Nullable LibraryParams params
+        ) {
+            requestScan(false);
+            session.notifyChildrenChanged(
+                browser,
+                parentId,
+                childrenFor(parentId).size(),
+                params
+            );
+            return Futures.immediateFuture(LibraryResult.ofVoid(params));
         }
 
         @NonNull
@@ -301,15 +337,53 @@ public class DowntifyAutoService extends MediaLibraryService {
     }
 
     private MediaItem rootItem() {
-        return browsable(ROOT_ID, getString(getApplicationInfo().labelRes), null, false);
+        return browsable(
+            ROOT_ID,
+            getString(getApplicationInfo().labelRes),
+            null,
+            false,
+            MediaMetadata.MEDIA_TYPE_FOLDER_MIXED
+        );
     }
 
     private MediaItem itemFor(String mediaId) {
         if (ROOT_ID.equals(mediaId)) return rootItem();
-        if (ARTISTS_ID.equals(mediaId)) return browsable(ARTISTS_ID, "Artists", null, false);
-        if (ALBUMS_ID.equals(mediaId)) return browsable(ALBUMS_ID, "Albums", null, false);
-        if (GENRES_ID.equals(mediaId)) return browsable(GENRES_ID, "Genres", null, false);
-        if (TRACKS_ID.equals(mediaId)) return browsable(TRACKS_ID, "Tracks", null, false);
+        if (ARTISTS_ID.equals(mediaId)) {
+            return browsable(
+                ARTISTS_ID,
+                "Artists",
+                null,
+                false,
+                MediaMetadata.MEDIA_TYPE_FOLDER_ARTISTS
+            );
+        }
+        if (ALBUMS_ID.equals(mediaId)) {
+            return browsable(
+                ALBUMS_ID,
+                "Albums",
+                null,
+                false,
+                MediaMetadata.MEDIA_TYPE_FOLDER_ALBUMS
+            );
+        }
+        if (GENRES_ID.equals(mediaId)) {
+            return browsable(
+                GENRES_ID,
+                "Genres",
+                null,
+                false,
+                MediaMetadata.MEDIA_TYPE_FOLDER_GENRES
+            );
+        }
+        if (TRACKS_ID.equals(mediaId)) {
+            return browsable(
+                TRACKS_ID,
+                "Tracks",
+                null,
+                false,
+                MediaMetadata.MEDIA_TYPE_FOLDER_MIXED
+            );
+        }
 
         LibrarySnapshot current = library();
         Track track = current.byId.get(mediaId);
@@ -317,15 +391,39 @@ public class DowntifyAutoService extends MediaLibraryService {
 
         if (mediaId.startsWith(ARTIST_PREFIX)) {
             String artist = current.artistNames.get(mediaId);
-            if (artist != null) return browsable(mediaId, artist, null, true);
+            if (artist != null) {
+                return browsable(
+                    mediaId,
+                    artist,
+                    null,
+                    true,
+                    MediaMetadata.MEDIA_TYPE_ARTIST
+                );
+            }
         }
         if (mediaId.startsWith(ALBUM_PREFIX)) {
             String album = current.albumNames.get(mediaId);
-            if (album != null) return browsable(mediaId, album, null, true);
+            if (album != null) {
+                return browsable(
+                    mediaId,
+                    album,
+                    null,
+                    true,
+                    MediaMetadata.MEDIA_TYPE_ALBUM
+                );
+            }
         }
         if (mediaId.startsWith(GENRE_PREFIX)) {
             String genre = current.genreNames.get(mediaId);
-            if (genre != null) return browsable(mediaId, genre, null, true);
+            if (genre != null) {
+                return browsable(
+                    mediaId,
+                    genre,
+                    null,
+                    true,
+                    MediaMetadata.MEDIA_TYPE_GENRE
+                );
+            }
         }
         return null;
     }
@@ -334,10 +432,42 @@ public class DowntifyAutoService extends MediaLibraryService {
         LibrarySnapshot current = library();
         if (ROOT_ID.equals(parentId)) {
             List<MediaItem> roots = new ArrayList<>();
-            roots.add(browsable(ARTISTS_ID, "Artists", "Browse by artist", false));
-            roots.add(browsable(ALBUMS_ID, "Albums", "Browse by album", false));
-            roots.add(browsable(GENRES_ID, "Genres", "Browse by genre", false));
-            roots.add(browsable(TRACKS_ID, "Tracks", "All downloaded tracks", false));
+            roots.add(
+                browsable(
+                    ARTISTS_ID,
+                    "Artists",
+                    "Browse by artist",
+                    false,
+                    MediaMetadata.MEDIA_TYPE_FOLDER_ARTISTS
+                )
+            );
+            roots.add(
+                browsable(
+                    ALBUMS_ID,
+                    "Albums",
+                    "Browse by album",
+                    false,
+                    MediaMetadata.MEDIA_TYPE_FOLDER_ALBUMS
+                )
+            );
+            roots.add(
+                browsable(
+                    GENRES_ID,
+                    "Genres",
+                    "Browse by genre",
+                    false,
+                    MediaMetadata.MEDIA_TYPE_FOLDER_GENRES
+                )
+            );
+            roots.add(
+                browsable(
+                    TRACKS_ID,
+                    "Tracks",
+                    "All downloaded tracks",
+                    false,
+                    MediaMetadata.MEDIA_TYPE_FOLDER_MIXED
+                )
+            );
             return roots;
         }
         if (ARTISTS_ID.equals(parentId)) {
@@ -393,13 +523,14 @@ public class DowntifyAutoService extends MediaLibraryService {
         String mediaId,
         String title,
         @Nullable String subtitle,
-        boolean playable
+        boolean playable,
+        int mediaType
     ) {
         MediaMetadata.Builder metadata = new MediaMetadata.Builder()
             .setTitle(title)
             .setIsBrowsable(true)
             .setIsPlayable(playable)
-            .setMediaType(MediaMetadata.MEDIA_TYPE_FOLDER_MIXED);
+            .setMediaType(mediaType);
         if (subtitle != null) metadata.setSubtitle(subtitle);
         return new MediaItem.Builder()
             .setMediaId(mediaId)
@@ -499,7 +630,7 @@ public class DowntifyAutoService extends MediaLibraryService {
             title = foundTitle;
             artist = foundArtist;
             album = foundAlbum;
-            genre = "Unknown genre";
+            genre = AutoLibraryTags.displayGenre(AutoLibraryTags.readGenre(file));
         }
 
         MediaItem toPlayableItem() {
@@ -608,14 +739,18 @@ public class DowntifyAutoService extends MediaLibraryService {
                     safeIdPart(track.album) +
                     ":" +
                     safeIdPart(track.artist);
-                String genreId = GENRE_PREFIX + safeIdPart(track.genre);
-
                 artistNames.putIfAbsent(artistId, track.artist);
                 albumNames.putIfAbsent(albumId, track.album);
-                genreNames.putIfAbsent(genreId, track.genre);
                 byArtist.computeIfAbsent(artistId, ignored -> new ArrayList<>()).add(track);
                 byAlbum.computeIfAbsent(albumId, ignored -> new ArrayList<>()).add(track);
-                byGenre.computeIfAbsent(genreId, ignored -> new ArrayList<>()).add(track);
+                for (String genreName : AutoLibraryTags.splitGenres(track.genre)) {
+                    String genreId = GENRE_PREFIX + safeIdPart(genreName);
+                    if (genreId.equals(GENRE_PREFIX)) continue;
+                    genreNames.putIfAbsent(genreId, genreName);
+                    byGenre
+                        .computeIfAbsent(genreId, ignored -> new ArrayList<>())
+                        .add(track);
+                }
             }
 
             List<String> artistIds = new ArrayList<>(artistNames.keySet());
@@ -628,7 +763,16 @@ public class DowntifyAutoService extends MediaLibraryService {
                     artistTracks == null || artistTracks.size() == 1
                         ? "1 track"
                         : artistTracks.size() + " tracks";
-                artistItems.put(id, browsable(id, artistNames.get(id), subtitle, true));
+                artistItems.put(
+                    id,
+                    browsable(
+                        id,
+                        artistNames.get(id),
+                        subtitle,
+                        true,
+                        MediaMetadata.MEDIA_TYPE_ARTIST
+                    )
+                );
                 sortTracks(artistTracks);
             }
 
@@ -639,7 +783,16 @@ public class DowntifyAutoService extends MediaLibraryService {
                 String artist = albumTracks == null || albumTracks.isEmpty()
                     ? null
                     : albumTracks.get(0).artist;
-                albumItems.put(id, browsable(id, albumNames.get(id), artist, true));
+                albumItems.put(
+                    id,
+                    browsable(
+                        id,
+                        albumNames.get(id),
+                        artist,
+                        true,
+                        MediaMetadata.MEDIA_TYPE_ALBUM
+                    )
+                );
                 sortTracks(albumTracks);
             }
 
@@ -651,7 +804,16 @@ public class DowntifyAutoService extends MediaLibraryService {
                     genreTracks == null || genreTracks.size() == 1
                         ? "1 track"
                         : genreTracks.size() + " tracks";
-                genreItems.put(id, browsable(id, genreNames.get(id), subtitle, true));
+                genreItems.put(
+                    id,
+                    browsable(
+                        id,
+                        genreNames.get(id),
+                        subtitle,
+                        true,
+                        MediaMetadata.MEDIA_TYPE_GENRE
+                    )
+                );
                 sortTracks(genreTracks);
             }
 

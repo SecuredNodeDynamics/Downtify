@@ -98,7 +98,7 @@ onMounted(async () => {
   if (!usesEmbeddedServer()) {
     void startMountedBackendSession()
   }
-  window.setTimeout(preloadRouteComponents, 700)
+  window.setTimeout(preloadRouteComponents, isNativeApp ? 4000 : 700)
 
   bootstrapAppUpdateNotice()
 

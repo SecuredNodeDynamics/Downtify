@@ -50,27 +50,41 @@
         />
       </label>
 
-      <label v-if="showPassword" class="auth-gate-label">
+      <label v-if="setupMode || showPasswordField" class="auth-gate-label">
         {{ t('auth.password') }}
         <input
           v-model="password"
           class="input input-bordered w-full"
           type="password"
           :autocomplete="setupMode ? 'new-password' : 'current-password'"
-          :required="setupMode && !pin"
+          :required="setupMode ? !pin : true"
         />
       </label>
 
-      <label v-if="showPin" class="auth-gate-label">
+      <label v-if="setupMode ? showSetupPin : showPinField" class="auth-gate-label">
         {{ t('auth.pin') }}
         <input
           v-model="pin"
           class="input input-bordered w-full"
           inputmode="numeric"
-          autocomplete="one-time-code"
-          :required="!showPassword || (!password && deviceMode)"
+          autocomplete="off"
+          maxlength="8"
+          :required="setupMode ? !password : true"
         />
       </label>
+
+      <button
+        v-if="!setupMode && canSwitchMethod"
+        type="button"
+        class="auth-gate-switch"
+        @click="toggleLoginMethod"
+      >
+        {{
+          loginMethod === 'pin'
+            ? t('auth.usePasswordInstead')
+            : t('auth.usePinInstead')
+        }}
+      </button>
 
       <p v-if="errorText" class="auth-gate-error">{{ errorText }}</p>
 
@@ -91,6 +105,11 @@
 import { computed, ref, watch } from 'vue'
 
 import API from '../model/api'
+import {
+  canSwitchLoginMethod,
+  loginRequestBody,
+  preferredLoginMethod,
+} from '../model/authLogin'
 import { loadProfileBundle } from '../model/profileSync'
 import { useAuthSession } from '../model/authSession'
 import { usesEmbeddedServer } from '../model/serverConnection'
@@ -104,6 +123,7 @@ const username = ref('')
 const displayName = ref('')
 const password = ref('')
 const pin = ref('')
+const loginMethod = ref('pin')
 const busy = ref(false)
 const localError = ref('')
 
@@ -114,26 +134,43 @@ const selected = computed(() =>
     (profile) => profile.username.toLowerCase() === username.value.toLowerCase()
   )
 )
-const showPassword = computed(() => {
-  if (setupMode.value) return true
-  if (!selected.value) return !deviceMode.value
-  return selected.value.has_password
-})
-const showPin = computed(() => {
-  if (setupMode.value) return deviceMode.value
-  if (!selected.value) return deviceMode.value
-  return selected.value.has_pin
-})
+const showSetupPin = computed(() => deviceMode.value)
+const canSwitchMethod = computed(
+  () => !setupMode.value && canSwitchLoginMethod(selected.value)
+)
+const showPinField = computed(
+  () => !setupMode.value && loginMethod.value === 'pin'
+)
+const showPasswordField = computed(
+  () => !setupMode.value && loginMethod.value === 'password'
+)
 const errorText = computed(() => localError.value || errorMessage.value || '')
 
-watch(profiles, (list) => {
-  if (username.value || !list?.length) return
-  selectProfile(list[0])
+watch(
+  profiles,
+  (list) => {
+    if (username.value || !list?.length) return
+    selectProfile(list[0])
+  },
+  { immediate: true }
+)
+
+watch(selected, (profile) => {
+  if (setupMode.value) return
+  loginMethod.value = preferredLoginMethod(profile)
 })
 
 function selectProfile(profile) {
   username.value = profile.username
   displayName.value = profile.display_name || profile.username
+  password.value = ''
+  pin.value = ''
+  loginMethod.value = preferredLoginMethod(profile)
+  localError.value = ''
+}
+
+function toggleLoginMethod() {
+  loginMethod.value = loginMethod.value === 'pin' ? 'password' : 'pin'
   password.value = ''
   pin.value = ''
   localError.value = ''
@@ -145,20 +182,19 @@ async function submit() {
   loading.value = true
   try {
     const cached = loadProfileBundle({ username: username.value })
+    const payload = loginRequestBody({
+      username: username.value,
+      displayName: displayName.value,
+      password: password.value,
+      pin: pin.value,
+      method: loginMethod.value,
+      setup: setupMode.value,
+      profileKey: cached?.profile_key || '',
+    })
     if (setupMode.value) {
-      await API.setupAccount({
-        username: username.value,
-        display_name: displayName.value,
-        password: password.value,
-        pin: pin.value,
-        profile_key: cached?.profile_key || '',
-      })
+      await API.setupAccount(payload)
     } else {
-      await API.loginAccount({
-        username: username.value,
-        password: password.value,
-        pin: pin.value,
-      })
+      await API.loginAccount(payload)
     }
     password.value = ''
     pin.value = ''
@@ -215,5 +251,8 @@ async function submit() {
 }
 .auth-gate-error {
   @apply text-sm text-error;
+}
+.auth-gate-switch {
+  @apply btn btn-ghost btn-sm h-auto min-h-0 justify-center px-0 py-1 text-xs font-semibold normal-case tracking-normal text-primary;
 }
 </style>

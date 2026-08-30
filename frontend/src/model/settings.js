@@ -55,8 +55,6 @@ export function loadSettings() {
     })
 }
 
-loadSettings()
-
 export function getServerMediaLocation() {
   return String(settings.value.server_media_location || '').trim()
 }

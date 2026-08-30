@@ -8,6 +8,10 @@ import {
   pickApkAsset,
 } from './apkUpdate.js'
 import {
+  capacitorAxiosAdapter,
+  shouldUseNativeHttpAdapter,
+} from './nativeHttp.js'
+import {
   buildApiBaseUrl,
   getServerConfig,
   isCapacitorNative,
@@ -155,6 +159,12 @@ async function fetchConnectedServerVersion() {
           Accept: 'application/json',
           'Cache-Control': 'no-cache',
         },
+        adapter: shouldUseNativeHttpAdapter({
+          url: '/api/version',
+          baseURL: buildApiBaseUrl(getServerConfig()),
+        })
+          ? capacitorAxiosAdapter
+          : undefined,
       }
     )
     const version = String(response.data || '').trim()
