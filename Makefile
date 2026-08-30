@@ -50,6 +50,12 @@ test:
 android-apk:
 	bash scripts/build-android-apk.sh
 
+desktop-linux:
+	bash scripts/build-linux-deb.sh
+
+desktop-windows:
+	bash scripts/build-windows-installer.sh
+
 publish:
 	bash scripts/publish.sh $(word 2,$(MAKECMDGOALS))
 
@@ -69,4 +75,4 @@ doc:
 %:
 	@:
 
-.PHONY: all build latest clean up down run dev format lint export changelog version doc android-apk publish
+.PHONY: all build latest clean up down run dev format lint export changelog version doc android-apk desktop-linux desktop-windows publish

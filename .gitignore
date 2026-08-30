@@ -311,3 +311,7 @@ data/settings.json
 
 # Local Gradle cache used by Android APK builds (never publish)
 .gradle_home/
+
+# Desktop PyInstaller / installer output
+dist/desktop/
+build/desktop/

@@ -108,6 +108,13 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     'monitor_artist_initial_search': True,
 }
 
+FAMILY_HIDDEN_SETTING_KEYS = (
+    'jellyfin_url',
+    'jellyfin_api_key',
+    'jellyfin_music_library',
+    'discogs_token',
+)
+
 DOWNLOAD_PROGRESS_MIN_INTERVAL = 0.25
 DOWNLOAD_PROGRESS_MIN_DELTA = 1.0
 MAX_PENDING_DOWNLOAD_JOBS = 2000
@@ -570,6 +577,21 @@ def _require_admin(request: Request) -> dict[str, Any]:
     if not user.get('is_admin'):
         raise HTTPException(status_code=403, detail='Admin only')
     return user
+
+
+def _settings_for_request(request: Optional[Request] = None) -> dict[str, Any]:
+    settings = dict(state.settings)
+    db = state.auth_db
+    if db is None or not db.has_users():
+        return settings
+    user = _current_user(request)
+    if user and user.get('is_admin'):
+        return settings
+    for key in FAMILY_HIDDEN_SETTING_KEYS:
+        if key in settings:
+            settings[key] = ''
+    settings['enable_jellyfin_tools'] = False
+    return settings
 
 
 def _monitor_user_id(request: Optional[Request] = None) -> int:
@@ -5068,8 +5090,10 @@ async def write_playlist_m3u_endpoint(request: Request) -> dict[str, Any]:
 
 
 @router.get('/api/settings')
-def get_settings_endpoint(client_id: str = Query('')) -> dict[str, Any]:
-    return state.settings
+def get_settings_endpoint(
+    request: Request, client_id: str = Query('')
+) -> dict[str, Any]:
+    return _settings_for_request(request)
 
 
 @router.post('/api/settings/update')
@@ -5132,7 +5156,7 @@ async def update_settings_endpoint(
                 pass
     if state.settings_path is not None:
         _save_settings(state.settings_path, state.settings)
-    return state.settings
+    return _settings_for_request(request)
 
 
 @router.get('/api/jellyfin/debug')

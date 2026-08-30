@@ -8,10 +8,12 @@ vi.mock('@capacitor/core', () => ({
 }))
 
 import {
+  applyAuthStatus,
   clearAuthToken,
   getStoredAuthToken,
   sessionStorageKey,
   storeAuthToken,
+  useAuthSession,
 } from '../model/authSession.js'
 
 describe('authSession', () => {
@@ -19,6 +21,13 @@ describe('authSession', () => {
 
   afterEach(() => {
     for (const key of Object.keys(storage)) delete storage[key]
+    applyAuthStatus({
+      auth_required: false,
+      setup_required: false,
+      authenticated: false,
+      user: null,
+      profiles: [],
+    })
   })
 
   it('stores tokens per backend URL', () => {
@@ -41,5 +50,39 @@ describe('authSession', () => {
     expect(getStoredAuthToken('http://127.0.0.1:8765')).toBe('device-token')
     clearAuthToken('http://10.128.1.63:8000')
     expect(getStoredAuthToken('http://10.128.1.63:8000')).toBe('')
+  })
+
+  it('hides admin settings for family profiles', () => {
+    applyAuthStatus({
+      auth_required: true,
+      setup_required: false,
+      authenticated: true,
+      user: { username: 'kid', is_admin: false },
+      profiles: [],
+    })
+    const { isAdmin, isFamilyUser, canUseAdminPages } = useAuthSession()
+    expect(isAdmin.value).toBe(false)
+    expect(isFamilyUser.value).toBe(true)
+    expect(canUseAdminPages.value).toBe(false)
+  })
+
+  it('hides admin settings for family even if auth_required is unset', () => {
+    applyAuthStatus({
+      authenticated: true,
+      user: { username: 'kid', is_admin: false },
+    })
+    const { canUseAdminPages } = useAuthSession()
+    expect(canUseAdminPages.value).toBe(false)
+  })
+
+  it('keeps admin settings when login is not required', () => {
+    applyAuthStatus({
+      auth_required: false,
+      authenticated: false,
+      user: null,
+    })
+    const { canUseAdminPages, isFamilyUser } = useAuthSession()
+    expect(isFamilyUser.value).toBe(false)
+    expect(canUseAdminPages.value).toBe(true)
   })
 })

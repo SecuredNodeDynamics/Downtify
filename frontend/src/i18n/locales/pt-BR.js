@@ -853,7 +853,7 @@ export default {
       'Para conectar a um servidor, mude para “Conectar a um servidor” nas Configuracoes gerais.',
     serverRequiredTitle: 'Conecte ao seu servidor Downtify',
     serverRequiredHint:
-      'O app movel precisa do endereco do servidor antes de carregar fila, saude e outros dados. Abra Configuracoes → API e informe seu IP local ou URL do tunel.',
+      'O app movel precisa do endereco do servidor antes de carregar fila, saude e outros dados. Abra Configuracoes e informe seu IP local ou URL do tunel.',
     serverUrl: 'Endereco do servidor',
     serverUrlPlaceholder:
       'https://downtify.janzenmediagroup.com ou http://10.128.1.63:8000',

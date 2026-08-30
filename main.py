@@ -27,7 +27,7 @@ from load_dotenv import load_dotenv
 from loguru import logger
 from uvicorn import Config, Server
 
-from downtify import __version__, api, cover_art, library_index
+from downtify import __version__, api, cover_art, desktop, library_index
 from downtify.downloader import Downloader
 from downtify.history import DownloadHistoryDB
 from downtify.monitor import PlaylistMonitorDB, monitor_loop
@@ -68,6 +68,17 @@ def _setup_logging(level: str) -> None:
         colorize=None,
     )
     logging.basicConfig(handlers=[_InterceptHandler()], level=0, force=True)
+    if desktop.is_desktop():
+        log_file = (
+            Path(os.getenv('DATABASE_DIR', str(desktop.user_data_dir())))
+            / 'downtify.log'
+        )
+        logger.add(
+            str(log_file),
+            rotation='10 MB',
+            retention=5,
+            level=level.upper(),
+        )
     # Explicitly override uvicorn's loggers before it starts — uvicorn will
     # still write to these logger names, and we want them flowing through
     # loguru rather than being printed raw by uvicorn's default handler.
@@ -77,12 +88,16 @@ def _setup_logging(level: str) -> None:
         _log.propagate = False
 
 
-DOWNLOAD_DIR = Path(os.getenv('DOWNLOAD_DIR', '/downloads'))
-DATABASE_DIR = Path(os.getenv('DATABASE_DIR', '/data'))
-WEB_GUI_LOCATION = os.getenv('WEB_GUI_LOCATION', 'frontend/dist')
-DEFAULT_HOST = os.getenv('HOST', '0.0.0.0')
 DEFAULT_PORT = int(os.getenv('DOWNTIFY_PORT', os.getenv('PORT', '8000')))
-VERSION_FILE = runtime_version_path(DATABASE_DIR / 'app-version')
+
+
+def _runtime_dirs() -> tuple[Path, Path, str, Path]:
+    desktop.apply_defaults()
+    download_dir = Path(os.getenv('DOWNLOAD_DIR', '/downloads'))
+    database_dir = Path(os.getenv('DATABASE_DIR', '/data'))
+    web_gui = os.getenv('WEB_GUI_LOCATION', 'frontend/dist')
+    version_file = runtime_version_path(database_dir / 'app-version')
+    return download_dir, database_dir, web_gui, version_file
 
 
 class SPAStaticFiles(StaticFiles):
@@ -118,6 +133,9 @@ def _fix_mime_types() -> None:
 
 
 def build_app() -> FastAPI:
+    DOWNLOAD_DIR, DATABASE_DIR, WEB_GUI_LOCATION, VERSION_FILE = (
+        _runtime_dirs()
+    )
     DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
     DATABASE_DIR.mkdir(parents=True, exist_ok=True)
     runtime_version = read_runtime_version(__version__, VERSION_FILE)
@@ -247,6 +265,17 @@ def build_app() -> FastAPI:
             _delayed_startup_task(12.0, api.start_genre_warmup)
         )
 
+        if desktop.should_open_browser():
+
+            async def _open_browser() -> None:
+                await asyncio.sleep(0.8)
+                desktop.open_app_in_browser(
+                    os.getenv('HOST', '127.0.0.1'),
+                    int(os.getenv('DOWNTIFY_PORT', str(DEFAULT_PORT))),
+                )
+
+            asyncio.create_task(_open_browser())
+
     @app.get('/list')
     def list_downloads() -> list[str]:
         audio_exts = {'.mp3', '.m4a', '.flac', '.ogg', '.wav', '.aac', '.opus'}
@@ -326,14 +355,20 @@ def build_app() -> FastAPI:
 
 
 def _parse_args() -> argparse.Namespace:
+    desktop.apply_defaults()
     parser = argparse.ArgumentParser(prog='downtify')
     # The legacy entrypoint passed ``web`` as the subcommand plus a few
     # spotdl-only flags. We accept and ignore the unsupported ones so
     # existing Docker images keep starting cleanly.
     parser.add_argument('mode', nargs='?', default='web')
-    parser.add_argument('--host', default=DEFAULT_HOST)
-    parser.add_argument('--port', type=int, default=DEFAULT_PORT)
+    parser.add_argument('--host', default=os.getenv('HOST', '0.0.0.0'))
+    parser.add_argument(
+        '--port',
+        type=int,
+        default=int(os.getenv('DOWNTIFY_PORT', os.getenv('PORT', '8000'))),
+    )
     parser.add_argument('--log-level', default='info')
+    parser.add_argument('--no-browser', action='store_true')
     parser.add_argument('--keep-alive', action='store_true')
     parser.add_argument('--keep-sessions', action='store_true')
     parser.add_argument('--web-use-output-dir', action='store_true')
@@ -343,7 +378,27 @@ def _parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = _parse_args()
+    if args.no_browser:
+        os.environ['DOWNTIFY_NO_BROWSER'] = '1'
+    os.environ['HOST'] = args.host
+    os.environ.setdefault('DOWNTIFY_PORT', str(args.port))
     _setup_logging(args.log_level)
+    if desktop.is_desktop() and desktop.port_in_use(args.host, args.port):
+        if desktop.is_our_server(args.host, args.port):
+            logger.info(
+                'Downtify is already running on http://{}:{}',
+                desktop.display_host(args.host),
+                args.port,
+            )
+            desktop.open_app_in_browser(args.host, args.port)
+            return
+        args.port = desktop.choose_free_port(args.host, args.port)
+        logger.warning(
+            'Port {} is in use; starting on {} instead',
+            os.environ.get('DOWNTIFY_PORT'),
+            args.port,
+        )
+    os.environ['DOWNTIFY_PORT'] = str(args.port)
 
     _fix_mime_types()
     app = build_app()
@@ -375,4 +430,7 @@ def main() -> None:
 
 
 if __name__ == '__main__':
+    import multiprocessing
+
+    multiprocessing.freeze_support()
     main()

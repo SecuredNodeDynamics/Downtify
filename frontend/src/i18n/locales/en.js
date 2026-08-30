@@ -835,7 +835,7 @@ export default {
       'To connect to a server instead, switch to “Connect to a server” in General settings.',
     serverRequiredTitle: 'Connect to your Downtify server',
     serverRequiredHint:
-      'The mobile app needs your server address before it can load queue, health, and other server data. Open Settings → API and enter your home IP or tunnel URL.',
+      'The mobile app needs your server address before it can load queue, health, and other server data. Open Settings and enter your home IP or tunnel URL.',
     serverUrl: 'Server address',
     serverUrlPlaceholder:
       'https://downtify.janzenmediagroup.com or http://10.128.1.63:8000',

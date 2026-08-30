@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Downtify
+Comment=Download Spotify playlists and songs with metadata
+Exec=/usr/bin/python3 /opt/downtify/desktop_window.py
+Path=/opt/downtify
+Icon=downtify
+Terminal=false
+Categories=AudioVideo;Audio;Player;
+StartupNotify=true
+StartupWMClass=Downtify
+Keywords=spotify;music;download;youtube;

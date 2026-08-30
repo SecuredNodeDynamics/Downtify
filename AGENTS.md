@@ -84,6 +84,13 @@ Android release APK (requires release keystore — see `docs/android-apk-signing
 bash scripts/build-android-apk.sh
 ```
 
+Linux `.deb` and Windows Inno Setup installer:
+```bash
+make desktop-linux
+# Windows installer must be built on Windows or via GitHub Actions:
+make desktop-windows
+```
+
 Containerized local run:
 ```bash
 make up

@@ -20,6 +20,7 @@ from downtify.api import (
     _is_newer_version,
     _load_settings,
     _normalized_jellyfin_library_name,
+    _settings_for_request,
     _start_docker_self_update,
     check_update,
     jellyfin_libraries_endpoint,
@@ -978,3 +979,45 @@ def test_jellyfin_libraries_keeps_untyped_virtual_folders(monkeypatch):
 
 def test_normalized_jellyfin_library_name_removes_hidden_characters():
     assert _normalized_jellyfin_library_name('\ufeff Music\u200b ') == 'music'
+
+
+class _SettingsRequest:
+    def __init__(self, user):
+        self.state = type('state', (), {'user': user})()
+
+
+def test_family_settings_omit_jellyfin_secrets():
+    class _Auth:
+        def has_users(self):
+            return True
+
+    old_settings = api.state.settings
+    old_db = api.state.auth_db
+    api.state.settings = {
+        **DEFAULT_SETTINGS,
+        'jellyfin_url': 'http://jellyfin.local',
+        'jellyfin_api_key': 'secret-key',
+        'jellyfin_music_library': 'Music',
+        'enable_jellyfin_tools': True,
+        'discogs_token': 'discogs-secret',
+    }
+    api.state.auth_db = _Auth()
+    try:
+        family = _settings_for_request(
+            _SettingsRequest({'id': 2, 'is_admin': False})
+        )
+        assert family['jellyfin_url'] == ''
+        assert family['jellyfin_api_key'] == ''
+        assert family['jellyfin_music_library'] == ''
+        assert family['enable_jellyfin_tools'] is False
+        assert family['discogs_token'] == ''
+        assert api.state.settings['jellyfin_api_key'] == 'secret-key'
+
+        admin = _settings_for_request(
+            _SettingsRequest({'id': 1, 'is_admin': True})
+        )
+        assert admin['jellyfin_api_key'] == 'secret-key'
+        assert admin['enable_jellyfin_tools'] is True
+    finally:
+        api.state.settings = old_settings
+        api.state.auth_db = old_db

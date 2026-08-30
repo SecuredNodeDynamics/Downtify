@@ -31,8 +31,9 @@ PUBLIC_API_PATHS = frozenset({
 })
 ADMIN_API_PATHS = frozenset({
     '/api/summary',
+    '/api/settings/update',
 })
-ADMIN_API_PREFIXES = ('/api/metadata',)
+ADMIN_API_PREFIXES = ('/api/metadata', '/api/jellyfin')
 
 
 def _now() -> datetime:

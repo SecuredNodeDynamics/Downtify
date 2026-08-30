@@ -88,9 +88,13 @@ export function useAuthSession() {
         (status.value.auth_required && !status.value.authenticated))
   )
   const isAdmin = computed(() => Boolean(user.value?.is_admin))
-  const canUseAdminPages = computed(
-    () => !status.value.auth_required || isAdmin.value
+  const isFamilyUser = computed(
+    () => Boolean(user.value) && !isAdmin.value
   )
+  const canUseAdminPages = computed(() => {
+    if (isFamilyUser.value) return false
+    return !status.value.auth_required || isAdmin.value
+  })
   return {
     status,
     user,
@@ -99,6 +103,7 @@ export function useAuthSession() {
     ready,
     needsAuthGate,
     isAdmin,
+    isFamilyUser,
     canUseAdminPages,
     profiles: computed(() => status.value.profiles),
   }

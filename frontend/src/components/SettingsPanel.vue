@@ -203,11 +203,114 @@
               : t('settings.connectionModeServerHint')
           }}
         </p>
-        <p v-if="!isDeviceMode" class="text-[11px] text-base-content/40 mt-1">
+        <p
+          v-if="!isDeviceMode && canUseAdminPages"
+          class="text-[11px] text-base-content/40 mt-1"
+        >
           {{ t('settings.connectionModeServerConfigHint') }}
         </p>
       </div>
 
+      <div
+        v-if="!canUseAdminPages && !isDeviceMode"
+        class="space-y-3"
+      >
+        <label
+          class="block text-xs font-semibold uppercase tracking-wider text-base-content/50"
+        >
+          {{ t('settings.serverConnectionSection') }}
+        </label>
+        <p class="text-sm text-base-content/60">
+          {{ t('settings.serverConnectionHint') }}
+        </p>
+        <div class="surface rounded-xl px-3 py-2.5 text-sm">
+          <span class="text-base-content/50">
+            {{ t('settings.serverUrlCurrent') }}:
+          </span>
+          <span class="ml-1 font-medium text-base-content">
+            {{
+              usesCustomServer
+                ? activeServerDisplay
+                : t('settings.serverUrlDefault')
+            }}
+          </span>
+        </div>
+        <div>
+          <label class="block text-xs text-base-content/50 mb-1.5">
+            {{ t('settings.serverUrl') }}
+          </label>
+          <input
+            v-model="serverUrlInput"
+            type="url"
+            inputmode="url"
+            autocapitalize="off"
+            autocorrect="off"
+            spellcheck="false"
+            class="input-modern h-10 w-full text-sm"
+            :placeholder="t('settings.serverUrlPlaceholder')"
+          />
+          <p class="text-[11px] text-base-content/40 mt-1.5">
+            {{ t('settings.serverSaveHint') }}
+          </p>
+        </div>
+        <div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+          <button
+            v-if="canConnectDevice"
+            type="button"
+            class="btn btn-primary btn-sm h-10 w-full rounded-full px-4 sm:w-auto"
+            :disabled="connectedToThisDevice || serverTestLoading"
+            @click="connectToThisDevice"
+          >
+            {{ t('settings.serverConnectDevice') }}
+          </button>
+          <button
+            type="button"
+            class="btn btn-sm h-10 w-full rounded-full px-4 sm:w-auto"
+            :class="
+              canConnectDevice
+                ? 'border border-white/10 bg-base-100/85 text-base-content hover:bg-base-100'
+                : 'btn-primary'
+            "
+            :disabled="serverTestLoading || !serverUrlInput.trim()"
+            @click="testServerConnection"
+          >
+            <span
+              v-if="serverTestLoading"
+              class="loading loading-spinner loading-xs mr-2"
+            />
+            {{
+              serverTestLoading
+                ? t('settings.serverTesting')
+                : t('settings.serverTest')
+            }}
+          </button>
+          <button
+            type="button"
+            class="btn btn-sm h-10 w-full rounded-full border border-white/10 bg-base-100/85 px-4 text-base-content hover:bg-base-100 sm:w-auto"
+            :disabled="!canSaveServerUrl || serverTestLoading"
+            @click="saveServerConnection"
+          >
+            {{ t('settings.serverSave') }}
+          </button>
+          <button
+            v-if="usesCustomServer && !connectedToThisDevice"
+            type="button"
+            class="btn btn-sm h-10 w-full rounded-full border border-white/10 bg-base-100/85 px-4 text-base-content hover:bg-base-100 sm:w-auto"
+            @click="resetServerConnection"
+          >
+            {{ t('settings.serverClear') }}
+          </button>
+        </div>
+        <p
+          v-if="serverTestMessage"
+          class="text-[11px]"
+          :class="serverTestError ? 'text-error' : 'text-primary'"
+        >
+          {{ serverTestMessage }}
+        </p>
+      </div>
+
+      <template v-if="canUseAdminPages">
       <!-- Language -->
       <div>
         <label
@@ -704,9 +807,13 @@
           {{ t('settings.saveError') }}
         </div>
       </transition>
+      </template>
     </div>
 
-    <div v-else-if="activeTab === 'api'" class="px-4 pb-5 space-y-5 sm:px-6">
+    <div
+      v-else-if="activeTab === 'api' && canUseAdminPages"
+      class="px-4 pb-5 space-y-5 sm:px-6"
+    >
       <div>
         <label
           class="block text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2"
@@ -824,7 +931,7 @@
         </div>
       </div>
 
-      <div>
+      <div v-if="canUseAdminPages">
         <label
           class="block text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2"
         >
@@ -1011,7 +1118,10 @@
       </transition>
     </div>
 
-    <div v-else-if="activeTab === 'logs'" class="px-4 pb-5 space-y-5 sm:px-6">
+    <div
+      v-else-if="activeTab === 'logs' && canUseAdminPages"
+      class="px-4 pb-5 space-y-5 sm:px-6"
+    >
       <div class="flex items-center justify-between gap-3">
         <div>
           <label
@@ -1447,6 +1557,7 @@
 
     <!-- Footer -->
     <div
+      v-if="canUseAdminPages"
       class="flex items-center justify-end gap-2 px-4 py-4 border-t border-white/5 sm:px-6"
     >
       <button
@@ -1549,7 +1660,7 @@ const activeTab = ref('general')
 const tabShellRef = ref(null)
 const activeAboutSectionId = ref('')
 
-const settingsTabs = [
+const ALL_SETTINGS_TABS = [
   { id: 'general', labelKey: 'settings.generalTab' },
   { id: 'accounts', labelKey: 'auth.accounts' },
   { id: 'api', labelKey: 'settings.apiTab' },
@@ -1557,6 +1668,17 @@ const settingsTabs = [
   { id: 'about', labelKey: 'settings.aboutTab' },
   { id: 'help', labelKey: 'settings.helpTab' },
 ]
+const FAMILY_SETTINGS_TAB_IDS = new Set([
+  'general',
+  'accounts',
+  'about',
+  'help',
+])
+const settingsTabs = computed(() =>
+  canUseAdminPages.value
+    ? ALL_SETTINGS_TABS
+    : ALL_SETTINGS_TABS.filter((tab) => FAMILY_SETTINGS_TAB_IDS.has(tab.id))
+)
 
 function scrollActiveTabIntoView() {
   const shell = tabShellRef.value
@@ -1570,7 +1692,7 @@ function scrollActiveTabIntoView() {
 }
 
 function setActiveTab(tab) {
-  if (!settingsTabs.some((item) => item.id === tab)) return
+  if (!settingsTabs.value.some((item) => item.id === tab)) return
   activeTab.value = tab
   nextTick(scrollActiveTabIntoView)
 }
@@ -1659,7 +1781,7 @@ function markUpdateFailed(message) {
 }
 
 function applySettingsTab(tab) {
-  if (settingsTabs.some((item) => item.id === tab)) {
+  if (settingsTabs.value.some((item) => item.id === tab)) {
     setActiveTab(tab)
   }
 }
@@ -1823,8 +1945,8 @@ const jellyfinLibraryOptions = computed(() =>
   }))
 )
 
-const aboutSections = computed(() =>
-  [
+const aboutSections = computed(() => {
+  const sections = [
     {
       id: 'search',
       icon: 'clarity:search-line',
@@ -1893,7 +2015,6 @@ const aboutSections = computed(() =>
     {
       id: 'metadata',
       icon: 'clarity:tag-line',
-      adminOnly: true,
       title: t('settings.aboutMetadataTitle'),
       text: t('settings.aboutMetadataText'),
       detail: t('settings.aboutMetadataDetail'),
@@ -1907,7 +2028,6 @@ const aboutSections = computed(() =>
     {
       id: 'artistImages',
       icon: 'clarity:image-gallery-line',
-      adminOnly: true,
       title: t('settings.aboutArtistImagesTitle'),
       text: t('settings.aboutArtistImagesText'),
       detail: t('settings.aboutArtistImagesDetail'),
@@ -1937,7 +2057,6 @@ const aboutSections = computed(() =>
     {
       id: 'health',
       icon: 'clarity:info-standard-line',
-      adminOnly: true,
       title: t('settings.aboutHealthTitle'),
       text: t('settings.aboutHealthText'),
       detail: t('settings.aboutHealthDetail'),
@@ -1961,8 +2080,10 @@ const aboutSections = computed(() =>
       ],
       tips: [t('settings.aboutSettingsTip1'), t('settings.aboutSettingsTip2')],
     },
-  ].filter((section) => !section.adminOnly || canUseAdminPages.value)
-)
+  ]
+  if (canUseAdminPages.value) return sections
+  return sections.filter((section) => section.id !== 'jellyfin')
+})
 
 const aboutWorkflowSection = computed(() => ({
   id: 'workflow',
@@ -2521,11 +2642,21 @@ async function testJellyfinApi() {
   }
 }
 
+watch(
+  settingsTabs,
+  (tabs) => {
+    if (!tabs.some((item) => item.id === activeTab.value)) {
+      activeTab.value = 'general'
+    }
+  },
+  { immediate: true }
+)
+
 watch(activeTab, (newTab) => {
   if (newTab !== 'about') {
     closeAboutSection()
   }
-  if (newTab === 'api') {
+  if (newTab === 'api' && canUseAdminPages.value) {
     const hasUrl = sm.settings.value.jellyfin_url?.trim()
     const hasApiKey = sm.settings.value.jellyfin_api_key?.trim()
     if (

@@ -32,12 +32,14 @@
 <script setup>
 import { Icon } from '@iconify/vue'
 import { useI18n } from '../i18n'
+import { useAuthSession } from '../model/authSession'
 import { needsServerConnection } from '../model/serverConnection'
 import { openSettings } from '../model/settingsModal'
 
 const { t } = useI18n()
+const { canUseAdminPages } = useAuthSession()
 
 function goToServerSettings() {
-  openSettings('api')
+  openSettings(canUseAdminPages.value ? 'api' : 'general')
 }
 </script>
