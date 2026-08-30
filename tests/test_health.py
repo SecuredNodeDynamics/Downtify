@@ -331,3 +331,29 @@ def test_health_payload_counts_completed_last_24h(tmp_path):
         api.state.history_db = old_history
 
     assert payload['history']['completed_24h'] == 1
+
+
+def test_download_summary_from_library_cache_includes_size(tmp_path):
+    media = tmp_path / 'media'
+    media.mkdir()
+    song = media / 'track.mp3'
+    payload = b'audio-bytes-for-library-size'
+    song.write_bytes(payload)
+
+    old_settings = api.state.settings
+    old_cache = api.state.library_files_cache
+    try:
+        api.state.settings = {'server_media_location': str(media)}
+        api.state.library_files_cache = {
+            'root': str(media.resolve()),
+            'items': [{'file': 'track.mp3', 'title': 'Track'}],
+            'built_at': 0.0,
+            'building': False,
+        }
+        summary = _download_directory_summary(media)
+    finally:
+        api.state.settings = old_settings
+        api.state.library_files_cache = old_cache
+
+    assert summary['audio_count'] == 1
+    assert summary['size_bytes'] == len(payload)

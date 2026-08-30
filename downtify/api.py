@@ -82,6 +82,7 @@ from .library_index import (
     notify_library_changed,
     warm_library_genres,
 )
+from .duplicate_scan import delete_library_files, find_duplicate_groups
 from .monitor import MonitoredPlaylist, PlaylistMonitorDB, check_playlist
 from .versioning import parse_version
 
@@ -1035,6 +1036,26 @@ def _download_directory_summary(download_dir: Path) -> dict[str, Any]:
     return summary
 
 
+def _library_items_size_bytes(root: Path, items: list[dict[str, Any]]) -> int:
+    total = 0
+    for item in items:
+        stored = item.get('size_bytes')
+        if stored not in (None, ''):
+            try:
+                total += max(0, int(stored))
+                continue
+            except (TypeError, ValueError):
+                pass
+        relative = str(item.get('file') or '').strip()
+        if not relative:
+            continue
+        try:
+            total += (root / relative).stat().st_size
+        except OSError:
+            continue
+    return total
+
+
 def _directory_summary_from_library_items(
     path: Path,
     items: list[dict[str, Any]],
@@ -1059,13 +1080,17 @@ def _directory_summary_from_library_items(
             'percent_used': 0,
         }
     audio_count = len(items)
+    size_bytes = _library_items_size_bytes(path, items)
+    if size_bytes <= 0 and audio_count > 0 and exists:
+        walked = _directory_summary(path, external_path=external_path)
+        size_bytes = int(walked.get('size_bytes') or 0)
     return {
         'path': str(path),
         'external_path': external_path,
         'exists': exists,
         'file_count': audio_count,
         'audio_count': audio_count,
-        'size_bytes': 0,
+        'size_bytes': size_bytes,
         'disk': disk,
     }
 
@@ -3121,6 +3146,32 @@ async def _run_metadata_scan(
             'error': str(exc),
             'finished_at': datetime.now(timezone.utc).isoformat(),
         }
+
+
+@router.get('/api/metadata/duplicates')
+def scan_duplicate_tracks() -> dict[str, Any]:
+    download_dir = _active_download_dir_or_default()
+    return find_duplicate_groups(download_dir)
+
+
+@router.post('/api/metadata/duplicates/delete')
+async def delete_duplicate_tracks(request: Request) -> dict[str, Any]:
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+    files = payload.get('files') if isinstance(payload, dict) else None
+    if not isinstance(files, list) or not files:
+        raise HTTPException(status_code=400, detail='files is required')
+    download_dir = _active_download_dir_or_default()
+    result = delete_library_files(
+        download_dir, [str(item) for item in files]
+    )
+    if result['deleted']:
+        invalidate_library_files_cache()
+        notify_library_changed()
+        schedule_library_files_cache_refresh(force=True)
+    return result
 
 
 @router.post('/api/metadata/scan')

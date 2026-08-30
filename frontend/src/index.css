@@ -455,15 +455,23 @@
   }
 
   .settings-tabs-wrap {
-    @apply relative mb-5 w-full min-w-0 pt-4 sm:pt-5;
+    @apply relative mb-5 w-full min-w-0 overflow-hidden pt-4 sm:pt-5;
+  }
+
+  .settings-tab-measure-host {
+    @apply pointer-events-none absolute left-0 top-0 h-0 w-0 overflow-hidden;
   }
 
   .settings-tab-measure {
-    @apply pointer-events-none invisible absolute left-0 top-0 flex h-0 w-max flex-nowrap items-center gap-1 overflow-hidden p-1;
+    @apply flex w-max flex-nowrap items-center gap-1 p-1;
   }
 
   .settings-tab-shell {
     @apply mx-auto flex w-full min-w-0 flex-nowrap items-center gap-1 overflow-hidden rounded-full border border-white/10 bg-base-100/75 p-1;
+  }
+
+  .settings-tab-current {
+    @apply min-w-0 truncate rounded-full bg-primary px-3 py-2.5 text-sm font-medium text-primary-content shadow-glow-sm;
   }
 
   .settings-tab-btn {
@@ -485,7 +493,24 @@
   }
 
   .settings-panel {
-    @apply overflow-x-hidden;
+    @apply overflow-x-clip;
+  }
+
+  .settings-mobile-menu-backdrop {
+    @apply fixed inset-0 z-50 bg-black/30 lg:hidden;
+    padding-top: calc(var(--app-header-height) + var(--app-safe-top) + 0.5rem);
+  }
+
+  .settings-mobile-menu {
+    @apply ml-auto mr-3 flex w-64 max-w-[calc(100vw-1.5rem)] flex-col gap-1 rounded-2xl p-2 shadow-2xl;
+  }
+
+  .settings-mobile-menu-item {
+    @apply flex min-w-0 items-center rounded-xl px-3 py-3 text-left text-sm font-medium text-base-content/70 transition-colors active:bg-white/10;
+  }
+
+  .settings-mobile-menu-item-active {
+    @apply bg-primary text-primary-content shadow-glow-sm;
   }
 
   .app-loading-overlay {

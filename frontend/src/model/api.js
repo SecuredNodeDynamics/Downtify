@@ -268,6 +268,14 @@ function getSummary() {
   return API.get('/api/summary')
 }
 
+function scanLibraryDuplicates() {
+  return API.get('/api/metadata/duplicates', { timeout: 120000 })
+}
+
+function deleteLibraryDuplicates(files) {
+  return API.post('/api/metadata/duplicates/delete', { files })
+}
+
 function startMetadataScan(limit = 100, reset = false, scanAll = false) {
   return API.post('/api/metadata/scan', { limit, reset, all: scanAll })
 }
@@ -1196,6 +1204,8 @@ export default {
   getAppVersion,
   getHealth,
   getSummary,
+  scanLibraryDuplicates,
+  deleteLibraryDuplicates,
   startMetadataScan,
   getMetadataScanStatus,
   applyMetadata,

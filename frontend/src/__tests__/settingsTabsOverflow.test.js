@@ -1,38 +1,42 @@
 import { describe, expect, it } from 'vitest'
 
-import { countOverflowSettingsTabs } from '../model/settingsTabsOverflow.js'
+import {
+  countOverflowSettingsTabs,
+  settingsTabsNeedMenu,
+} from '../model/settingsTabsOverflow.js'
 
-describe('countOverflowSettingsTabs', () => {
-  it('keeps every tab when they fit on one row', () => {
+describe('settingsTabsNeedMenu', () => {
+  it('keeps the full tab row when every label fits', () => {
+    expect(
+      settingsTabsNeedMenu({
+        tabWidths: [72, 80, 48, 56, 64, 52],
+        gap: 4,
+        available: 640,
+      })
+    ).toBe(false)
     expect(
       countOverflowSettingsTabs({
         tabWidths: [72, 80, 48, 56, 64, 52],
-        moreWidth: 44,
         gap: 4,
         available: 640,
       })
     ).toBe(0)
   })
 
-  it('moves trailing tabs into the menu when the row would wrap', () => {
+  it('opens the menu when the labels would wrap', () => {
     expect(
-      countOverflowSettingsTabs({
+      settingsTabsNeedMenu({
         tabWidths: [90, 90, 90, 90, 90, 90],
-        moreWidth: 44,
         gap: 4,
         available: 360,
       })
-    ).toBe(3)
-  })
-
-  it('always leaves at least one tab visible', () => {
+    ).toBe(true)
     expect(
       countOverflowSettingsTabs({
-        tabWidths: [200, 200, 200],
-        moreWidth: 40,
+        tabWidths: [90, 90, 90, 90, 90, 90],
         gap: 4,
-        available: 80,
+        available: 360,
       })
-    ).toBe(2)
+    ).toBe(1)
   })
 })

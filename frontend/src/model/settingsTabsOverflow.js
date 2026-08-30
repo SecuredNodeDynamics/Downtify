@@ -1,30 +1,15 @@
-export function countOverflowSettingsTabs({
-  tabWidths,
-  moreWidth,
-  gap,
-  available,
-}) {
+export function settingsTabsNeedMenu({ tabWidths, gap, available }) {
   const widths = (tabWidths || []).map((value) => Number(value) || 0)
-  const count = widths.length
-  if (count <= 1) return 0
+  if (widths.length <= 1) return false
   const spacing = Math.max(0, Number(gap) || 0)
-  const menu = Math.max(0, Number(moreWidth) || 0)
   const limit = Number(available)
-  if (!Number.isFinite(limit) || limit <= 0) return 0
+  if (!Number.isFinite(limit) || limit <= 0) return false
+  const total =
+    widths.reduce((sum, width) => sum + width, 0) +
+    spacing * (widths.length - 1)
+  return total > limit + 0.5
+}
 
-  const rowWidth = (visible) => {
-    const shown = widths.slice(0, visible)
-    let total = shown.reduce((sum, width) => sum + width, 0)
-    if (shown.length > 1) total += spacing * (shown.length - 1)
-    if (visible < count) {
-      total += (shown.length ? spacing : 0) + menu
-    }
-    return total
-  }
-
-  let visible = count
-  while (visible > 1 && rowWidth(visible) > limit + 0.5) {
-    visible -= 1
-  }
-  return count - visible
+export function countOverflowSettingsTabs(options) {
+  return settingsTabsNeedMenu(options) ? 1 : 0
 }

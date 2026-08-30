@@ -20,18 +20,6 @@
         <HeaderUpdateNotice compact />
         <DownloadCounterPill compact />
         <button
-          v-if="routeAction && routeAction.routeName === route.name"
-          type="button"
-          class="mobile-app-bar-icon shrink-0"
-          :title="routeAction.title || routeAction.label || ''"
-          @click="routeAction.onClick?.()"
-        >
-          <Icon
-            :icon="routeAction.icon || 'clarity:menu-line'"
-            class="h-5 w-5"
-          />
-        </button>
-        <button
           v-if="showLibraryRefresh"
           type="button"
           class="mobile-app-bar-icon shrink-0"
@@ -75,6 +63,18 @@
             icon="clarity:refresh-line"
             class="h-5 w-5 transition-colors"
             :class="downloadRefreshLoading ? 'animate-spin text-primary' : ''"
+          />
+        </button>
+        <button
+          v-if="routeAction && routeAction.routeName === route.name"
+          type="button"
+          class="mobile-app-bar-icon shrink-0"
+          :title="routeAction.title || routeAction.label || ''"
+          @click="routeAction.onClick?.()"
+        >
+          <Icon
+            :icon="routeAction.icon || 'clarity:menu-line'"
+            class="h-5 w-5"
           />
         </button>
       </div>

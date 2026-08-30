@@ -1136,6 +1136,126 @@
       </section>
 
       <section
+        v-if="activeToolTab === 'duplicates'"
+        class="metadata-section"
+      >
+        <div class="metadata-header">
+          <div class="metadata-toolbar">
+            <button
+              class="btn btn-primary btn-sm metadata-btn px-5"
+              :disabled="dupeLoading || dupeDeleting"
+              @click="scanDuplicates"
+            >
+              <span
+                v-if="dupeLoading"
+                class="loading loading-spinner loading-xs mr-2"
+              />
+              <Icon v-else icon="clarity:copy-line" class="h-4 w-4 mr-2" />
+              {{
+                dupeLoading
+                  ? t('metadata.scanningDuplicates')
+                  : t('metadata.scanDuplicates')
+              }}
+            </button>
+            <button
+              class="btn btn-sm metadata-btn border-white/10 bg-base-100/85 hover:bg-base-100"
+              :disabled="
+                dupeLoading || dupeDeleting || selectedDupeCount === 0
+              "
+              @click="deleteSelectedDuplicates"
+            >
+              <span
+                v-if="dupeDeleting"
+                class="loading loading-spinner loading-xs mr-2"
+              />
+              <Icon
+                v-else
+                icon="clarity:trash-line"
+                class="h-4 w-4 mr-2"
+              />
+              {{
+                dupeDeleting
+                  ? t('metadata.dupeDeleting')
+                  : t('metadata.dupeDeleteSelected')
+              }}
+            </button>
+          </div>
+        </div>
+        <p class="mb-4 text-sm text-base-content/60">
+          {{ t('metadata.dupeSubtitle') }}
+        </p>
+        <div v-if="dupeScanned" class="metadata-summary mb-4">
+          <div class="metadata-summary-item">
+            <p class="text-base-content/40">{{ t('metadata.scannedTracks') }}</p>
+            <p class="font-semibold">{{ dupeScanned }}</p>
+          </div>
+          <div class="metadata-summary-item">
+            <p class="text-base-content/40">{{ t('metadata.dupeGroups') }}</p>
+            <p class="font-semibold">{{ dupeGroups.length }}</p>
+          </div>
+          <div class="metadata-summary-item">
+            <p class="text-base-content/40">{{ t('metadata.dupeExtra') }}</p>
+            <p class="font-semibold">{{ dupeExtraCount }}</p>
+          </div>
+        </div>
+        <p
+          v-if="dupeMessage"
+          class="mb-4 text-sm"
+          :class="dupeError ? 'text-error' : 'text-primary'"
+        >
+          {{ dupeMessage }}
+        </p>
+        <p
+          v-else-if="dupeScanned && dupeGroups.length === 0"
+          class="text-sm text-base-content/50"
+        >
+          {{ t('metadata.dupeEmpty') }}
+        </p>
+        <div class="space-y-4">
+          <article
+            v-for="group in dupeGroups"
+            :key="group.id"
+            class="surface rounded-2xl p-4"
+          >
+            <h3 class="text-sm font-semibold">
+              {{ group.artist }} — {{ group.title }}
+            </h3>
+            <ul class="mt-3 space-y-2">
+              <li
+                v-for="copy in group.copies"
+                :key="copy.file"
+                class="flex items-start gap-3 rounded-xl border border-white/10 bg-base-100/70 px-3 py-2.5"
+              >
+                <input
+                  type="checkbox"
+                  class="checkbox checkbox-sm checkbox-primary mt-1"
+                  :checked="Boolean(selectedDupeFiles[copy.file])"
+                  :disabled="dupeDeleting"
+                  @change="toggleDupeFile(copy.file, $event.target.checked)"
+                />
+                <div class="min-w-0 flex-1">
+                  <p class="truncate text-sm font-medium">
+                    {{ copy.file }}
+                  </p>
+                  <p class="mt-1 text-[11px] text-base-content/45">
+                    {{ copy.album || '—' }} ·
+                    {{ formatDupeBytes(copy.size_bytes) }} ·
+                    {{ String(copy.format || '').toUpperCase() }}
+                    <span
+                      v-if="copy.keep"
+                      class="ml-1 text-primary"
+                    >
+                      · {{ t('metadata.dupeKeep') }}
+                    </span>
+                  </p>
+                </div>
+              </li>
+            </ul>
+          </article>
+        </div>
+      </section>
+
+      <section
         v-if="
           activeToolTab === 'jellyfin' &&
           sm.settings.value.enable_jellyfin_tools
@@ -1830,6 +1950,7 @@ import { Icon } from '@iconify/vue'
 import Navbar from '/src/components/Navbar.vue'
 import API from '/src/model/api'
 import { groupAlbums, groupArtists } from '/src/model/library'
+import { notifyLibraryChanged } from '/src/model/librarySession'
 import { useSettingsManager } from '/src/model/settings'
 import { useI18n } from '/src/i18n'
 
@@ -1912,6 +2033,13 @@ const applyingArtistTags = ref({})
 const fixedArtistTags = ref({})
 const repairingAllArtistTags = ref(false)
 const artistTagSummary = ref({ scanned: 0, matched: 0, total: 0 })
+const dupeLoading = ref(false)
+const dupeDeleting = ref(false)
+const dupeError = ref(false)
+const dupeMessage = ref('')
+const dupeScanned = ref(0)
+const dupeGroups = ref([])
+const selectedDupeFiles = ref({})
 const artistReconciliation = ref(null)
 const activeReconciliationBucket = ref('missing_images')
 const reconcilingArtists = ref(false)
@@ -1956,6 +2084,11 @@ const metadataToolTabs = computed(() => {
       label: t('metadata.artistRepairTab'),
       icon: 'clarity:users-line',
     },
+    {
+      id: 'duplicates',
+      label: t('metadata.dupeTab'),
+      icon: 'clarity:copy-line',
+    },
   ]
   if (sm.settings.value.enable_jellyfin_tools) {
     tabs.push({
@@ -1968,6 +2101,19 @@ const metadataToolTabs = computed(() => {
 })
 
 const useMobileToolMenu = computed(() => metadataToolTabs.value.length > 4)
+
+const selectedDupeCount = computed(
+  () =>
+    Object.values(selectedDupeFiles.value).filter(Boolean).length
+)
+
+const dupeExtraCount = computed(() =>
+  dupeGroups.value.reduce(
+    (count, group) =>
+      count + group.copies.filter((copy) => !copy.keep).length,
+    0
+  )
+)
 
 const visibleArtistImageItems = computed(() =>
   activeArtistImageTab.value === 'completed'
@@ -3061,6 +3207,108 @@ async function scanAllArtistTags() {
   } catch {
     artistTagError.value = t('metadata.failedArtistTagScan')
     artistTagLoading.value = false
+  }
+}
+
+function formatDupeBytes(value) {
+  const bytes = Number(value || 0)
+  if (bytes < 1024) return `${bytes} B`
+  const units = ['KB', 'MB', 'GB', 'TB']
+  let size = bytes / 1024
+  let index = 0
+  while (size >= 1024 && index < units.length - 1) {
+    size /= 1024
+    index += 1
+  }
+  return `${size.toFixed(size >= 10 ? 0 : 1)} ${units[index]}`
+}
+
+function applyDuplicateScan(data) {
+  const groups = Array.isArray(data?.groups) ? data.groups : []
+  dupeGroups.value = groups.map((group) => ({
+    ...group,
+    copies: [...(group.copies || [])].sort((left, right) => {
+      if (Boolean(right.keep) !== Boolean(left.keep)) {
+        return left.keep ? -1 : 1
+      }
+      return String(left.file || '').localeCompare(String(right.file || ''))
+    }),
+  }))
+  dupeScanned.value = Number(data?.scanned || 0)
+  const selected = {}
+  for (const group of dupeGroups.value) {
+    for (const copy of group.copies) {
+      if (!copy.keep) {
+        selected[copy.file] = true
+      }
+    }
+  }
+  selectedDupeFiles.value = selected
+}
+
+function toggleDupeFile(file, checked) {
+  const next = { ...selectedDupeFiles.value }
+  if (checked) {
+    next[file] = true
+  } else {
+    delete next[file]
+  }
+  selectedDupeFiles.value = next
+}
+
+async function scanDuplicates() {
+  dupeLoading.value = true
+  dupeError.value = false
+  dupeMessage.value = ''
+  try {
+    const res = await API.scanLibraryDuplicates()
+    applyDuplicateScan(res.data)
+  } catch {
+    dupeError.value = true
+    dupeMessage.value = t('metadata.dupeScanFailed')
+  } finally {
+    dupeLoading.value = false
+  }
+}
+
+async function deleteSelectedDuplicates() {
+  const files = Object.entries(selectedDupeFiles.value)
+    .filter(([, checked]) => checked)
+    .map(([file]) => file)
+  if (!files.length) return
+  if (
+    !window.confirm(
+      t('metadata.dupeDeleteConfirm', { count: files.length })
+    )
+  ) {
+    return
+  }
+  dupeDeleting.value = true
+  dupeError.value = false
+  dupeMessage.value = ''
+  try {
+    const res = await API.deleteLibraryDuplicates(files)
+    const deleted = Number(res.data?.deleted_count || 0)
+    const failed = Number(res.data?.failed_count || 0)
+    if (deleted) {
+      notifyLibraryChanged()
+    }
+    if (failed) {
+      dupeError.value = true
+      dupeMessage.value = t('metadata.dupeDeletePartial', {
+        deleted,
+        failed,
+      })
+    } else {
+      dupeMessage.value = t('metadata.dupeDeleteOk', { count: deleted })
+    }
+    const scan = await API.scanLibraryDuplicates()
+    applyDuplicateScan(scan.data)
+  } catch {
+    dupeError.value = true
+    dupeMessage.value = t('metadata.dupeDeleteFailed')
+  } finally {
+    dupeDeleting.value = false
   }
 }
 
