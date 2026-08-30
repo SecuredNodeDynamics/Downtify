@@ -2,8 +2,10 @@ import { ref, computed } from 'vue'
 
 import API from './api.js'
 import {
+  isCapacitorFilePlaybackUrl,
   isSameAudioFile,
   isSameAudioUrl,
+  playbackHttpFallbackUrl,
   resolvePlaybackUrl,
 } from './playerAudioUrl.js'
 import { recoveryDelayMs, shouldRecoverPlayback } from './playbackRecovery.js'
@@ -50,6 +52,7 @@ let lastMediaPositionSyncAt = 0
 let lastSessionPersistAt = 0
 let applyTrackSeq = 0
 let pendingSession = readPlayerSession()
+let httpFallbackTriedFor = ''
 
 function nowMs() {
   return typeof performance !== 'undefined' && performance.now
@@ -194,9 +197,42 @@ function playAudioWithRecovery(el = audio) {
     .play()
     .then(() => true)
     .catch(() => {
-      if (el === audio && playbackIntent) scheduleRecovery()
+      if (el === audio && playbackIntent) {
+        void switchToHttpPlaybackFallback().then((switched) => {
+          if (!switched) scheduleRecovery()
+        })
+      }
       return false
     })
+}
+
+async function switchToHttpPlaybackFallback() {
+  if (!audio || !playbackIntent) return false
+  const track = playlist.value[currentIndex.value]
+  const file = track?.file || playingFile
+  if (!file || httpFallbackTriedFor === file) return false
+  if (!isCapacitorFilePlaybackUrl(audio.src)) return false
+  const fallback = playbackHttpFallbackUrl(file)
+  if (!fallback || isSameAudioUrl(audio.src, fallback)) return false
+  httpFallbackTriedFor = file
+  const resumeAt = Number.isFinite(audio.currentTime) ? audio.currentTime : 0
+  audio.src = fallback
+  if (track) track.url = fallback
+  audio.load()
+  if (resumeAt > 0) {
+    audio.addEventListener(
+      'loadedmetadata',
+      () => {
+        try {
+          audio.currentTime = resumeAt
+        } catch {
+          // Metadata may not be ready yet.
+        }
+      },
+      { once: true }
+    )
+  }
+  return playAudioWithRecovery(audio)
 }
 
 function clearPlaybackStartWatchdog() {
@@ -230,7 +266,9 @@ function armPlaybackStartWatchdog(el = audio) {
       currentTime: current,
       duration: Number.isFinite(el.duration) ? el.duration : 0,
     })
-    scheduleRecovery({ force: true })
+    void switchToHttpPlaybackFallback().then((switched) => {
+      if (!switched) scheduleRecovery({ force: true })
+    })
   }, PLAYBACK_START_WATCHDOG_MS)
 }
 
@@ -253,8 +291,10 @@ async function ensureMediaSession() {
 }
 
 function isStreamedPlayback() {
-  // Embedded builds play local files via the Capacitor file bridge and never
-  // suffer network underruns; everything else streams over HTTP.
+  // Capacitor file-bridge URLs are local. Loopback HTTP (and remote servers)
+  // can stall and should use stream recovery.
+  if (audio?.src && isCapacitorFilePlaybackUrl(audio.src)) return false
+  if (usesEmbeddedServer() && audio?.src) return true
   return !usesEmbeddedServer()
 }
 
@@ -407,7 +447,9 @@ function ensureAudio() {
   audio.addEventListener('error', () => {
     isPlaying.value = false
     stopProgressTicker()
-    scheduleRecovery()
+    void switchToHttpPlaybackFallback().then((switched) => {
+      if (!switched) scheduleRecovery()
+    })
   })
   // A network underrun on a streamed source: the browser pauses to rebuffer.
   // Give it a moment to recover on its own, then reload-and-resume if not.
@@ -514,6 +556,7 @@ async function applyTrack(
     stopProgressTicker()
     resetRecovery()
     playingFile = track.file
+    httpFallbackTriedFor = ''
     a.src = nextUrl
     const reportLoadedMetadata = () => {
       if (seq === applyTrackSeq && playingFile === track.file) {

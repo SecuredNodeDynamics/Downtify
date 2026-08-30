@@ -438,7 +438,7 @@ export function preloadCoverSourcesBatch(
         } finally {
           queuedPreloadKeys.delete(entry.key)
         }
-        await new Promise((resolve) => setTimeout(resolve, 80))
+        await new Promise((resolve) => setTimeout(resolve, 16))
       }
       batchWorkersRunning -= 1
       if (batchQueue.length && document.visibilityState !== 'hidden') {

@@ -65,6 +65,7 @@ from .downloader import Downloader, preview_audio_for_song
 from .history import DownloadHistoryDB
 from .image_proxy import fetch_remote_image, is_allowed_image_url
 from .library_index import (
+    clear_fast_library_entry_cache,
     list_library_files,
     list_library_files_fast,
     media_in_library,
@@ -613,8 +614,42 @@ def _container_media_path_for(saved: str, container_root: Path) -> Path:
     return requested
 
 
+def _embedded_runtime() -> bool:
+    return os.getenv('DOWNTIFY_EMBEDDED', '').strip().lower() in {
+        '1',
+        'true',
+        'yes',
+    }
+
+
+def _usable_embedded_media_path(saved: str) -> bool:
+    """Reject leftover Docker/NAS paths that are not on this Android device."""
+
+    path = Path(saved).expanduser()
+    try:
+        if path.is_dir():
+            return True
+    except OSError:
+        return False
+    return False
+
+
+def _persist_active_download_dir(target: Path) -> None:
+    data_dir = os.getenv('DATABASE_DIR', '').strip()
+    if not data_dir:
+        return
+    marker = Path(data_dir) / 'active_download_dir.txt'
+    try:
+        marker.parent.mkdir(parents=True, exist_ok=True)
+        marker.write_text(str(target.resolve()), encoding='utf-8')
+    except OSError:
+        pass
+
+
 def _effective_download_dir(fallback: Path | str | None = None) -> Path:
     saved = _server_media_location()
+    if saved and _embedded_runtime() and not _usable_embedded_media_path(saved):
+        saved = ''
     if saved:
         container_root = state.default_download_dir
         return _container_media_path_for(saved, container_root)
@@ -633,6 +668,7 @@ def _apply_download_dir_from_settings() -> Path:
     target.mkdir(parents=True, exist_ok=True)
     if state.downloader is not None:
         state.downloader.download_dir = target
+    _persist_active_download_dir(target)
     return target
 
 
@@ -766,14 +802,60 @@ def _external_download_path(download_dir: Path) -> Optional[str]:
 def _download_directory_summary(download_dir: Path) -> dict[str, Any]:
     external_path = _external_download_path(download_dir)
     storage_dir = download_dir
-
-    summary = _directory_summary(storage_dir, external_path=external_path)
+    files_cache = state.library_files_cache
+    try:
+        root_key = str(storage_dir.resolve())
+    except OSError:
+        root_key = ''
+    if files_cache.get('root') == root_key and files_cache.get('items') is not None:
+        summary = _directory_summary_from_library_items(
+            storage_dir,
+            list(files_cache['items']),
+            external_path=external_path,
+        )
+    else:
+        summary = _directory_summary(storage_dir, external_path=external_path)
     summary['container_path'] = str(download_dir)
     summary['storage_path'] = str(storage_dir)
     summary['storage_path_matches_display'] = (
         external_path is None or str(storage_dir) == external_path
     )
     return summary
+
+
+def _directory_summary_from_library_items(
+    path: Path,
+    items: list[dict[str, Any]],
+    external_path: Optional[str] = None,
+) -> dict[str, Any]:
+    exists = path.exists()
+    try:
+        usage = shutil.disk_usage(path if exists else path.parent)
+        disk = {
+            'total_bytes': usage.total,
+            'used_bytes': usage.used,
+            'free_bytes': usage.free,
+            'percent_used': round((usage.used / usage.total) * 100, 1)
+            if usage.total
+            else 0,
+        }
+    except Exception:
+        disk = {
+            'total_bytes': 0,
+            'used_bytes': 0,
+            'free_bytes': 0,
+            'percent_used': 0,
+        }
+    audio_count = len(items)
+    return {
+        'path': str(path),
+        'external_path': external_path,
+        'exists': exists,
+        'file_count': audio_count,
+        'audio_count': audio_count,
+        'size_bytes': 0,
+        'disk': disk,
+    }
 
 
 def _yt_dlp_tool_info() -> dict[str, Any]:
@@ -1805,6 +1887,12 @@ def get_library_files() -> list[dict[str, Any]]:
         return list(cache['items'])
 
     items = list_library_files_fast(download_dir)
+    state.library_files_cache = {
+        'root': root_key,
+        'items': items,
+        'built_at': time.monotonic(),
+        'building': False,
+    }
     schedule_library_files_cache_refresh()
     return items
 
@@ -2052,6 +2140,7 @@ def check_library_owned(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def invalidate_library_files_cache() -> None:
+    clear_fast_library_entry_cache()
     state.library_files_cache = {
         'root': '',
         'items': [],

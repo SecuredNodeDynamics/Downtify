@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 from pathlib import Path
 from typing import Any, Callable
@@ -28,6 +29,7 @@ from .musicbrainz import (
 _LIST_EXTENSIONS = AUDIO_EXTENSIONS | {'.wav'}
 _ALBUM_GENRE_CACHE_LOADED = False
 _ALBUM_GENRE_CACHE: dict[str, str] = {}
+_FAST_ENTRY_CACHE: dict[tuple[str, str, int, int], dict[str, Any]] = {}
 
 
 def _data_dir() -> Path:
@@ -369,17 +371,36 @@ def list_library_files_fast(root: Path) -> list[dict[str, str]]:
         return []
 
     items: list[dict[str, str]] = []
-    for path in sorted(base.rglob('*')):
-        if not path.is_file():
-            continue
-        if path.suffix.lower() not in _LIST_EXTENSIONS:
-            continue
+    next_cache: dict[tuple[str, str, int, int], dict[str, Any]] = {}
+    root_key = str(base)
+    for path in _iter_audio_files(base):
         relative = path.relative_to(base).as_posix()
         try:
-            items.append(read_library_entry_fast(base, relative))
-        except ValueError:
+            stat = path.stat()
+        except OSError:
             continue
+        cache_key = (root_key, relative, int(stat.st_mtime_ns), int(stat.st_size))
+        entry = _FAST_ENTRY_CACHE.get(cache_key)
+        if entry is None:
+            try:
+                entry = read_library_entry_fast(base, relative)
+            except ValueError:
+                continue
+        next_cache[cache_key] = entry
+        items.append(dict(entry))
+    _FAST_ENTRY_CACHE.clear()
+    _FAST_ENTRY_CACHE.update(next_cache)
     return enrich_library_genres(items)
+
+
+def _iter_audio_files(base: Path):
+    for dirpath, dirnames, filenames in os.walk(base):
+        dirnames.sort()
+        for name in sorted(filenames):
+            suffix = Path(name).suffix.lower()
+            if suffix not in _LIST_EXTENSIONS:
+                continue
+            yield Path(dirpath) / name
 
 
 def list_library_files(
@@ -393,11 +414,7 @@ def list_library_files(
 
     artist_genres: dict[str, str] = {}
     items: list[dict[str, str]] = []
-    for path in sorted(base.rglob('*')):
-        if not path.is_file():
-            continue
-        if path.suffix.lower() not in _LIST_EXTENSIONS:
-            continue
+    for path in _iter_audio_files(base):
         relative = path.relative_to(base).as_posix()
         try:
             items.append(
@@ -627,7 +644,12 @@ def register_library_changed_callback(callback: Callable[[], None]) -> None:
     _library_changed_callbacks.append(callback)
 
 
+def clear_fast_library_entry_cache() -> None:
+    _FAST_ENTRY_CACHE.clear()
+
+
 def notify_library_changed() -> None:
+    clear_fast_library_entry_cache()
     for callback in list(_library_changed_callbacks):
         try:
             callback()

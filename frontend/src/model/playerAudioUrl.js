@@ -7,7 +7,8 @@ import { isCapacitorNative, usesEmbeddedServer } from './serverConnection.js'
 
 const CAPACITOR_FILE_MARKER = '/_capacitor_file_'
 const playbackUrlCache = new Map()
-let playbackRootPromise = null
+const playbackFallbackCache = new Map()
+const playbackRootPromises = new Map()
 
 export function normalizeAudioUrl(url) {
   const value = String(url || '').trim()
@@ -51,24 +52,91 @@ export function isSameAudioFile(currentUrl, file) {
   return normalized === downloadPath || normalized.endsWith(downloadPath)
 }
 
+export function isCapacitorFilePlaybackUrl(url) {
+  return String(url || '').includes(CAPACITOR_FILE_MARKER)
+}
+
+/**
+ * True when a path is a real on-device Android folder the WebView/FileProvider
+ * can read. Docker/NAS leftovers like ``/downloads`` must not be used for
+ * Capacitor.convertFileSrc — the library API still lists files from DOWNLOAD_DIR.
+ */
+export function isUsableEmbeddedMediaRoot(path) {
+  const value = String(path || '')
+    .trim()
+    .replace(/\\/g, '/')
+  if (!value) return false
+  if (
+    value === '/downloads' ||
+    value.startsWith('/downloads/') ||
+    value === '/data' ||
+    value.startsWith('/mnt/') ||
+    value.startsWith('/opt/') ||
+    value.startsWith('/var/')
+  ) {
+    return false
+  }
+  return (
+    value.startsWith('/storage/') ||
+    value.startsWith('/sdcard') ||
+    value.startsWith('/data/user/') ||
+    value.startsWith('/data/data/') ||
+    value.includes('/Android/data/') ||
+    value.includes('/emulated/')
+  )
+}
+
+export function embeddedMediaLocationHint(mediaLocation = '') {
+  const hinted = String(mediaLocation || '').trim()
+  if (isUsableEmbeddedMediaRoot(hinted)) return hinted
+  return ''
+}
+
 export function clearPlaybackUrlCache() {
   playbackUrlCache.clear()
-  playbackRootPromise = null
+  playbackFallbackCache.clear()
+  playbackRootPromises.clear()
 }
 
 async function playbackRootDir(mediaLocation = '') {
-  if (!playbackRootPromise) {
-    playbackRootPromise = activeDownloadRoot(mediaLocation)
+  const usableHint = embeddedMediaLocationHint(mediaLocation)
+  const cacheKey = usableHint || '__embedded_default__'
+  if (!playbackRootPromises.has(cacheKey)) {
+    playbackRootPromises.set(
+      cacheKey,
+      activeDownloadRoot(usableHint).then((root) => {
+        const resolved = String(root || '').trim()
+        return isUsableEmbeddedMediaRoot(resolved) ? resolved : ''
+      })
+    )
   }
-  return playbackRootPromise
+  return playbackRootPromises.get(cacheKey)
+}
+
+function httpPlaybackUrl(file) {
+  return API.downloadFileURL(file)
+}
+
+export function playbackHttpFallbackUrl(file, options = {}) {
+  const rel = String(file || '').trim()
+  if (!rel) return ''
+  const mediaLocation =
+    options.mediaLocation !== undefined
+      ? String(options.mediaLocation || '').trim()
+      : getServerMediaLocation()
+  const cacheKey = `${embeddedMediaLocationHint(mediaLocation)}\0${rel}`
+  if (playbackFallbackCache.has(cacheKey)) {
+    return playbackFallbackCache.get(cacheKey)
+  }
+  return httpPlaybackUrl(rel)
 }
 
 /**
  * Resolve a library-relative audio path to a URL the HTML5 player can seek in.
  *
- * On the embedded Android APK, loopback HTTP streams often reject seeks even
- * when the server supports byte ranges. Reading the file directly through
- * Capacitor's file bridge gives the WebView a seekable local source.
+ * Prefer the Capacitor file bridge when the library root is a real Android
+ * path (seeks are more reliable than loopback HTTP). Always remember the
+ * ``/downloads/...`` URL so playback can fall back if the file bridge 404s.
  */
 export async function resolvePlaybackUrl(file, options = {}) {
   const rel = String(file || '').trim()
@@ -78,10 +146,11 @@ export async function resolvePlaybackUrl(file, options = {}) {
     options.mediaLocation !== undefined
       ? String(options.mediaLocation || '').trim()
       : getServerMediaLocation()
-  const cacheKey = `${mediaLocation}\0${rel}`
+  const cacheKey = `${embeddedMediaLocationHint(mediaLocation)}\0${rel}`
   if (playbackUrlCache.has(cacheKey)) return playbackUrlCache.get(cacheKey)
 
-  let url = ''
+  const httpUrl = httpPlaybackUrl(rel)
+  let url = httpUrl
   if (usesEmbeddedServer() && isCapacitorNative()) {
     const root = await playbackRootDir(mediaLocation)
     if (root) {
@@ -89,8 +158,11 @@ export async function resolvePlaybackUrl(file, options = {}) {
       url = Capacitor.convertFileSrc(absolute)
     }
   }
-  if (!url) url = API.downloadFileURL(rel)
 
   playbackUrlCache.set(cacheKey, url)
+  playbackFallbackCache.set(
+    cacheKey,
+    url && url !== httpUrl ? httpUrl : ''
+  )
   return url
 }

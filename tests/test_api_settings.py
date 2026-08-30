@@ -161,6 +161,39 @@ def test_effective_download_dir_prefers_saved_server_media_location(tmp_path):
         api.state.settings = old_settings
 
 
+def test_effective_download_dir_ignores_missing_path_on_embedded(
+    tmp_path, monkeypatch
+):
+    old_settings = api.state.settings
+    old_default = api.state.default_download_dir
+    try:
+        monkeypatch.setenv('DOWNTIFY_EMBEDDED', '1')
+        fallback = tmp_path / 'Music' / 'Downtify'
+        fallback.mkdir(parents=True)
+        api.state.settings = {'server_media_location': '/downloads'}
+        api.state.default_download_dir = fallback
+
+        assert _effective_download_dir(fallback) == fallback
+    finally:
+        api.state.settings = old_settings
+        api.state.default_download_dir = old_default
+
+
+def test_effective_download_dir_keeps_existing_embedded_folder(
+    tmp_path, monkeypatch
+):
+    old_settings = api.state.settings
+    try:
+        monkeypatch.setenv('DOWNTIFY_EMBEDDED', '1')
+        media = tmp_path / 'storage' / 'emulated' / '0' / 'Music' / 'Downtify'
+        media.mkdir(parents=True)
+        api.state.settings = {'server_media_location': str(media)}
+
+        assert _effective_download_dir(tmp_path / 'fallback') == media
+    finally:
+        api.state.settings = old_settings
+
+
 def test_effective_download_dir_prefers_saved_path_even_when_env_matches(
     tmp_path,
     monkeypatch,

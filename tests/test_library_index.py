@@ -162,3 +162,30 @@ def test_enrich_library_genres_propagates_within_album(tmp_path):
 
     assert len(items) == 2
     assert all(item['genre'] == 'Classical' for item in items)
+
+
+def test_list_library_files_fast_reuses_unchanged_file_entries(
+    tmp_path, monkeypatch
+):
+    album = tmp_path / 'Artist' / 'Album'
+    album.mkdir(parents=True)
+    path = album / '01 - Song.mp3'
+    path.write_bytes(b'audio')
+    calls = {'n': 0}
+    original = library_index.read_library_entry_fast
+
+    def wrapped(*args, **kwargs):
+        calls['n'] += 1
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(library_index, 'read_library_entry_fast', wrapped)
+
+    first = library_index.list_library_files_fast(tmp_path)
+    assert calls['n'] == 1
+    second = library_index.list_library_files_fast(tmp_path)
+    assert calls['n'] == 1
+    assert first == second
+
+    library_index.notify_library_changed()
+    library_index.list_library_files_fast(tmp_path)
+    assert calls['n'] == 2

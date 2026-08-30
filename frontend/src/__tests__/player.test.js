@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   isSameAudioFile,
   isSameAudioUrl,
+  isUsableEmbeddedMediaRoot,
   normalizeAudioUrl,
 } from '../model/playerAudioUrl.js'
 
@@ -37,5 +38,19 @@ describe('player audio urls', () => {
         '/downloads/Artist/Album/Two.mp3'
       )
     ).toBe(false)
+  })
+
+  it('accepts Android library roots and rejects leftover server paths', () => {
+    expect(
+      isUsableEmbeddedMediaRoot('/storage/emulated/0/Music/Downtify')
+    ).toBe(true)
+    expect(
+      isUsableEmbeddedMediaRoot(
+        '/data/user/0/com.securednodedynamics.downtify/files/Music'
+      )
+    ).toBe(true)
+    expect(isUsableEmbeddedMediaRoot('/downloads')).toBe(false)
+    expect(isUsableEmbeddedMediaRoot('/mnt/nas/music')).toBe(false)
+    expect(isUsableEmbeddedMediaRoot('')).toBe(false)
   })
 })

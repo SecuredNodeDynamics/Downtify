@@ -1,15 +1,17 @@
 package com.securednodedynamics.downtify;
 
 import android.content.Intent;
-import android.media.MediaMetadataRetriever;
 import android.net.Uri;
-import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.content.FileProvider;
 import androidx.media3.common.C;
 import androidx.media3.common.MediaItem;
 import androidx.media3.common.MediaMetadata;
 import androidx.media3.exoplayer.ExoPlayer;
+import androidx.media3.session.DefaultMediaNotificationProvider;
 import androidx.media3.session.LibraryResult;
 import androidx.media3.session.MediaLibraryService;
 import androidx.media3.session.MediaSession;
@@ -17,6 +19,8 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import java.io.File;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -25,6 +29,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Native Android Auto / Automotive media surface for downloaded Downtify tracks.
@@ -52,17 +59,30 @@ public class DowntifyAutoService extends MediaLibraryService {
         ".flac",
         ".ogg",
         ".opus",
-        ".wav"
+        ".wav",
+        ".mp4",
     };
 
     private ExoPlayer player;
     private MediaLibrarySession session;
-    private LibrarySnapshot snapshot = LibrarySnapshot.empty();
+    private volatile LibrarySnapshot snapshot = LibrarySnapshot.empty();
+    private final ExecutorService scanExecutor = Executors.newSingleThreadExecutor();
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private final AtomicBoolean scanInFlight = new AtomicBoolean(false);
 
     @Override
     public void onCreate() {
         super.onCreate();
-        player = new ExoPlayer.Builder(this).build();
+        setMediaNotificationProvider(new DefaultMediaNotificationProvider(this));
+        player = new ExoPlayer.Builder(this)
+            .setAudioAttributes(
+                new androidx.media3.common.AudioAttributes.Builder()
+                    .setUsage(C.USAGE_MEDIA)
+                    .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
+                    .build(),
+                true
+            )
+            .build();
         session = new MediaLibrarySession.Builder(
             this,
             player,
@@ -70,6 +90,7 @@ public class DowntifyAutoService extends MediaLibraryService {
         )
             .setId("downtify-auto")
             .build();
+        requestScan(true);
     }
 
     @Nullable
@@ -89,6 +110,7 @@ public class DowntifyAutoService extends MediaLibraryService {
 
     @Override
     public void onDestroy() {
+        scanExecutor.shutdownNow();
         if (session != null) {
             session.release();
             session = null;
@@ -100,14 +122,62 @@ public class DowntifyAutoService extends MediaLibraryService {
         super.onDestroy();
     }
 
-    private synchronized LibrarySnapshot library() {
+    private LibrarySnapshot library() {
+        LibrarySnapshot current = snapshot;
         long now = System.currentTimeMillis();
-        if (now - snapshot.createdAtMs > LIBRARY_CACHE_MS) {
-            snapshot = LibrarySnapshot.scan(
-                new File(EmbeddedServerPlugin.defaultDownloadDir(this))
-            );
+        if (now - current.createdAtMs > LIBRARY_CACHE_MS) {
+            requestScan(false);
         }
-        return snapshot;
+        return current;
+    }
+
+    private void requestScan(boolean force) {
+        if (!force && snapshot.createdAtMs > 0 && !isStale(snapshot)) {
+            return;
+        }
+        if (!scanInFlight.compareAndSet(false, true)) return;
+        final File root = new File(
+            EmbeddedServerPlugin.activeDownloadDir(this)
+        );
+        scanExecutor.execute(() -> {
+            try {
+                LibrarySnapshot next = LibrarySnapshot.scan(root, this);
+                snapshot = next;
+                notifyLibraryUpdated();
+            } finally {
+                scanInFlight.set(false);
+            }
+        });
+    }
+
+    private boolean isStale(LibrarySnapshot current) {
+        return System.currentTimeMillis() - current.createdAtMs >
+        LIBRARY_CACHE_MS;
+    }
+
+    private void notifyLibraryUpdated() {
+        mainHandler.post(() -> {
+            MediaLibrarySession current = session;
+            if (current == null) return;
+            current.notifyChildrenChanged(ROOT_ID, Integer.MAX_VALUE, null);
+            current.notifyChildrenChanged(ARTISTS_ID, Integer.MAX_VALUE, null);
+            current.notifyChildrenChanged(ALBUMS_ID, Integer.MAX_VALUE, null);
+            current.notifyChildrenChanged(GENRES_ID, Integer.MAX_VALUE, null);
+            current.notifyChildrenChanged(TRACKS_ID, Integer.MAX_VALUE, null);
+        });
+    }
+
+    Uri playbackUri(File file) {
+        try {
+            Uri uri = FileProvider.getUriForFile(
+                this,
+                getPackageName() + ".fileprovider",
+                file
+            );
+            return uri;
+        } catch (IllegalArgumentException ignored) {
+            return Uri.fromFile(file);
+        }
     }
 
     private final class AutoSessionCallback
@@ -120,6 +190,7 @@ public class DowntifyAutoService extends MediaLibraryService {
             @NonNull MediaSession.ControllerInfo browser,
             @Nullable LibraryParams params
         ) {
+            requestScan(false);
             return Futures.immediateFuture(LibraryResult.ofItem(rootItem(), params));
         }
 
@@ -133,6 +204,7 @@ public class DowntifyAutoService extends MediaLibraryService {
             int pageSize,
             @Nullable LibraryParams params
         ) {
+            requestScan(false);
             List<MediaItem> children = childrenFor(parentId);
             return Futures.immediateFuture(
                 LibraryResult.ofItemList(paged(children, page, pageSize), params)
@@ -163,6 +235,8 @@ public class DowntifyAutoService extends MediaLibraryService {
             @NonNull String query,
             @Nullable LibraryParams params
         ) {
+            int count = searchTracks(query).size();
+            session.notifySearchResultChanged(browser, query, count, params);
             return Futures.immediateFuture(LibraryResult.ofVoid(params));
         }
 
@@ -176,18 +250,7 @@ public class DowntifyAutoService extends MediaLibraryService {
             int pageSize,
             @Nullable LibraryParams params
         ) {
-            String needle = normalize(query);
-            List<MediaItem> matches = new ArrayList<>();
-            for (Track track : library().tracks) {
-                if (
-                    normalize(track.title).contains(needle) ||
-                    normalize(track.artist).contains(needle) ||
-                    normalize(track.album).contains(needle) ||
-                    normalize(track.genre).contains(needle)
-                ) {
-                    matches.add(track.toPlayableItem());
-                }
-            }
+            List<MediaItem> matches = searchTracks(query);
             return Futures.immediateFuture(
                 LibraryResult.ofItemList(paged(matches, page, pageSize), params)
             );
@@ -218,7 +281,23 @@ public class DowntifyAutoService extends MediaLibraryService {
             }
             return Futures.immediateFuture(playable);
         }
+    }
 
+    private List<MediaItem> searchTracks(String query) {
+        String needle = normalize(query);
+        List<MediaItem> matches = new ArrayList<>();
+        if (needle.isEmpty()) return matches;
+        for (Track track : library().tracks) {
+            if (
+                normalize(track.title).contains(needle) ||
+                normalize(track.artist).contains(needle) ||
+                normalize(track.album).contains(needle) ||
+                normalize(track.genre).contains(needle)
+            ) {
+                matches.add(track.toPlayableItem());
+            }
+        }
+        return matches;
     }
 
     private MediaItem rootItem() {
@@ -361,99 +440,83 @@ public class DowntifyAutoService extends MediaLibraryService {
         return normalized.replaceAll("[^a-z0-9]+", "-").replaceAll("(^-|-$)", "");
     }
 
+    private static String trackMediaId(File file) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(
+                file.getAbsolutePath().getBytes(StandardCharsets.UTF_8)
+            );
+            StringBuilder hex = new StringBuilder(16);
+            for (int i = 0; i < 8; i++) {
+                hex.append(String.format(Locale.US, "%02x", hash[i]));
+            }
+            return TRACK_PREFIX + hex;
+        } catch (Exception ignored) {
+            return TRACK_PREFIX + Integer.toHexString(file.getAbsolutePath().hashCode());
+        }
+    }
+
     private static final class Track {
 
         final File file;
+        final Uri uri;
         final String mediaId;
         final String title;
         final String artist;
         final String album;
         final String genre;
-        final long durationMs;
 
-        Track(File file) {
+        Track(File file, File root, Uri uri) {
             this.file = file;
+            this.uri = uri;
+            this.mediaId = trackMediaId(file);
+
             String fileTitle = file.getName().replaceFirst("\\.[^.]+$", "");
             String foundTitle = fileTitle;
+            if (fileTitle.contains(" - ")) {
+                foundTitle = fileTitle.substring(fileTitle.indexOf(" - ") + 3).trim();
+            }
+
+            File parent = file.getParentFile();
+            File grand = parent == null ? null : parent.getParentFile();
             String foundArtist = "Unknown artist";
             String foundAlbum = "Unknown album";
-            String foundGenre = "Unknown genre";
-            long foundDurationMs = C.TIME_UNSET;
-
-            MediaMetadataRetriever retriever = new MediaMetadataRetriever();
             try {
-                retriever.setDataSource(file.getAbsolutePath());
-                foundTitle =
-                    clean(
-                        retriever.extractMetadata(
-                            MediaMetadataRetriever.METADATA_KEY_TITLE
-                        ),
-                        fileTitle
-                    );
-                foundArtist =
-                    clean(
-                        retriever.extractMetadata(
-                            MediaMetadataRetriever.METADATA_KEY_ARTIST
-                        ),
-                        "Unknown artist"
-                    );
-                foundAlbum =
-                    clean(
-                        retriever.extractMetadata(
-                            MediaMetadataRetriever.METADATA_KEY_ALBUM
-                        ),
-                        "Unknown album"
-                    );
-                foundGenre =
-                    clean(
-                        retriever.extractMetadata(
-                            MediaMetadataRetriever.METADATA_KEY_GENRE
-                        ),
-                        "Unknown genre"
-                    );
-                String duration =
-                    retriever.extractMetadata(
-                        MediaMetadataRetriever.METADATA_KEY_DURATION
-                    );
-                if (duration != null) {
-                    foundDurationMs = Long.parseLong(duration);
+                File resolvedRoot = root.getCanonicalFile();
+                if (grand != null && !grand.equals(resolvedRoot)) {
+                    foundArtist = grand.getName();
+                    foundAlbum = parent.getName();
+                } else if (parent != null && !parent.equals(resolvedRoot)) {
+                    foundArtist = parent.getName();
                 }
             } catch (Exception ignored) {
-                // Metadata is helpful but not required for Android Auto playback.
-            } finally {
-                try {
-                    retriever.release();
-                } catch (Exception ignored) {}
+                if (grand != null) {
+                    foundArtist = grand.getName();
+                    foundAlbum = parent.getName();
+                }
             }
 
             title = foundTitle;
             artist = foundArtist;
             album = foundAlbum;
-            genre = foundGenre;
-            durationMs = foundDurationMs;
-            mediaId = TRACK_PREFIX + Uri.encode(file.getAbsolutePath());
+            genre = "Unknown genre";
         }
 
         MediaItem toPlayableItem() {
-            MediaMetadata.Builder metadata = new MediaMetadata.Builder()
+            MediaMetadata metadata = new MediaMetadata.Builder()
                 .setTitle(title)
                 .setArtist(artist)
                 .setAlbumTitle(album)
                 .setGenre(genre)
                 .setIsBrowsable(false)
                 .setIsPlayable(true)
-                .setMediaType(MediaMetadata.MEDIA_TYPE_MUSIC);
-            if (durationMs > 0) metadata.setDurationMs(durationMs);
+                .setMediaType(MediaMetadata.MEDIA_TYPE_MUSIC)
+                .build();
             return new MediaItem.Builder()
                 .setMediaId(mediaId)
-                .setUri(Uri.fromFile(file))
-                .setMediaMetadata(metadata.build())
+                .setUri(uri)
+                .setMediaMetadata(metadata)
                 .build();
-        }
-
-        private static String clean(String value, String fallback) {
-            String trimmed = value == null ? "" : value.trim();
-            return trimmed.isEmpty() ? fallback : trimmed;
         }
     }
 
@@ -517,7 +580,7 @@ public class DowntifyAutoService extends MediaLibraryService {
             );
         }
 
-        static LibrarySnapshot scan(File root) {
+        static LibrarySnapshot scan(File root, DowntifyAutoService service) {
             List<File> files = new ArrayList<>();
             if (root.isDirectory()) collectAudioFiles(root, files);
             files.sort(Comparator.comparing(File::getAbsolutePath));
@@ -535,7 +598,7 @@ public class DowntifyAutoService extends MediaLibraryService {
             Map<String, List<Track>> byGenre = new LinkedHashMap<>();
 
             for (File file : files) {
-                Track track = new Track(file);
+                Track track = new Track(file, root, service.playbackUri(file));
                 tracks.add(track);
                 byId.put(track.mediaId, track);
 

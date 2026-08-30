@@ -34,6 +34,9 @@ function persist(path, name) {
   } catch {
     // ignore storage errors
   }
+  if (path && isCapacitorNative()) {
+    void EmbeddedServer.setDownloadDir({ path }).catch(() => {})
+  }
 }
 
 export function supportsDeviceStorage() {

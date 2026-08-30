@@ -81,6 +81,7 @@ def configure_environment(
     os.environ['HOST'] = host
     os.environ['DATABASE_DIR'] = data_dir
     os.environ['DOWNLOAD_DIR'] = download_dir
+    os.environ['DOWNTIFY_EMBEDDED'] = '1'
     # The UI is served from the app's bundled assets, not by this server.
     os.environ['DOWNTIFY_SERVE_SPA'] = '0'
     if ffmpeg_location:

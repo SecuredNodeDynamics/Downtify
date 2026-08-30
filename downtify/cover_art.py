@@ -23,7 +23,7 @@ from .artist_art import (
 # keyed by the file's identity (path + mtime + size) so repeated requests are
 # served from memory and auto-invalidate when a file is re-tagged.
 _COVER_CACHE_MAX_ENTRIES = int(
-    os.getenv('DOWNTIFY_COVER_CACHE_ENTRIES', '128')
+    os.getenv('DOWNTIFY_COVER_CACHE_ENTRIES', '384')
 )
 _COVER_CACHE_MAX_BYTES = int(
     os.getenv('DOWNTIFY_COVER_CACHE_BYTES', str(48 * 1024 * 1024))
