@@ -1347,6 +1347,7 @@ import Navbar from '/src/components/Navbar.vue'
 import CoverImage from '/src/components/CoverImage.vue'
 import LibraryArtistMonitor from '/src/components/LibraryArtistMonitor.vue'
 import API from '/src/model/api'
+import { ensureLibraryGenreLookup } from '/src/model/genreRefresh.js'
 import { beginAppLoading, endAppLoading } from '/src/model/appLoading'
 import {
   albumKey,
@@ -1382,7 +1383,6 @@ import { useI18n } from '/src/i18n'
 defineOptions({ name: 'Player' })
 
 const LYRICS_OFFSET_KEY = 'downtify-player-lyrics-offset'
-const GENRE_REFRESH_DELAYS_MS = [15000, 60000, 300000]
 const PLAYBACK_REFRESH_DELAY_MS = 30000
 const NATIVE_SIMILAR_MEDIA_DELAY_MS = 5000
 const WEB_SIMILAR_MEDIA_DELAY_MS = 300
@@ -1490,7 +1490,6 @@ function suppressSimilarMediaClick(event) {
   event.preventDefault()
   event.stopPropagation()
 }
-let genreRefreshTimers = []
 let deferredLibraryRefreshTimer = 0
 let similarArtistsTimer = 0
 let similarTracksTimer = 0
@@ -2409,32 +2408,12 @@ function countUnknownGenres(items) {
   }).length
 }
 
-function clearGenreRefreshTimers() {
-  for (const timer of genreRefreshTimers) {
-    clearTimeout(timer)
-  }
-  genreRefreshTimers = []
-}
-
 async function refreshLibraryMetadata() {
   await refreshLibraryMetadataInBackground()
 }
 
-async function refreshLibraryGenres() {
-  await refreshLibraryMetadata()
-}
-
 function scheduleGenreRefresh(items) {
-  clearGenreRefreshTimers()
-  if (countUnknownGenres(items) === 0) return
-
-  for (const delay of GENRE_REFRESH_DELAYS_MS) {
-    genreRefreshTimers.push(
-      setTimeout(() => {
-        refreshLibraryGenres()
-      }, delay)
-    )
-  }
+  void ensureLibraryGenreLookup(countUnknownGenres(items))
 }
 
 async function load({ background = false } = {}) {
@@ -2717,7 +2696,6 @@ watch(
 
 onUnmounted(() => {
   stopLibraryListener?.()
-  clearGenreRefreshTimers()
   if (lyricScrollRaf) {
     cancelAnimationFrame(lyricScrollRaf)
     lyricScrollRaf = 0

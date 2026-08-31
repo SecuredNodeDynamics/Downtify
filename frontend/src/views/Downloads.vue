@@ -424,55 +424,78 @@
                 @download="queueOnlineDownload"
               />
 
-              <ul
-                v-else-if="viewMode === 'genres' && !selectedGenreName"
-                class="library-browse-grid"
-                :style="virtualListPadStyle"
-              >
-                <li
-                  v-for="genre in renderedGenres"
-                  :key="genre.name"
-                  class="browse-tile-shell"
-                >
-                  <article
-                    class="library-browse-card"
-                    role="button"
-                    tabindex="0"
-                    @click="openGenre(genre.name)"
-                    @keydown.enter="openGenre(genre.name)"
-                    @keydown.space.prevent="openGenre(genre.name)"
+              <template v-else-if="viewMode === 'genres' && !selectedGenreName">
+                <div v-if="showGenreUpdateBar" class="library-genre-update">
+                  <p class="library-genre-update-copy">
+                    {{ genreUpdateMessage }}
+                  </p>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-primary"
+                    :disabled="genreWarmupRunning"
+                    @click="updateLibraryGenres"
                   >
-                    <div class="library-browse-card-cover">
-                      <GenreCover
-                        :name="genre.name"
-                        :files="genre.coverFiles"
-                      />
-                      <button
-                        type="button"
-                        class="library-browse-card-play"
-                        :title="t('library.playGenre')"
-                        @click.stop="playGenre(genre)"
-                      >
-                        <Icon icon="clarity:play-line" class="h-4 w-4" />
-                      </button>
-                    </div>
-                    <div class="library-browse-card-body">
-                      <p class="library-browse-card-title">{{ genre.name }}</p>
-                      <p
-                        v-if="genre.subgenres?.length"
-                        class="library-browse-card-sub truncate"
-                      >
-                        {{ genre.subgenres.slice(0, 3).join(' · ') }}
-                      </p>
-                      <p class="library-browse-card-meta">
-                        {{
-                          t('library.genreMeta', { tracks: genre.files.length })
-                        }}
-                      </p>
-                    </div>
-                  </article>
-                </li>
-              </ul>
+                    <span
+                      v-if="genreWarmupRunning"
+                      class="loading loading-spinner loading-xs"
+                    />
+                    {{
+                      genreWarmupRunning
+                        ? t('library.updatingGenres')
+                        : t('library.updateGenres')
+                    }}
+                  </button>
+                </div>
+                <ul class="library-browse-grid" :style="virtualListPadStyle">
+                  <li
+                    v-for="genre in renderedGenres"
+                    :key="genre.name"
+                    class="browse-tile-shell"
+                  >
+                    <article
+                      class="library-browse-card"
+                      role="button"
+                      tabindex="0"
+                      @click="openGenre(genre.name)"
+                      @keydown.enter="openGenre(genre.name)"
+                      @keydown.space.prevent="openGenre(genre.name)"
+                    >
+                      <div class="library-browse-card-cover">
+                        <GenreCover
+                          :name="genre.name"
+                          :files="genre.coverFiles"
+                        />
+                        <button
+                          type="button"
+                          class="library-browse-card-play"
+                          :title="t('library.playGenre')"
+                          @click.stop="playGenre(genre)"
+                        >
+                          <Icon icon="clarity:play-line" class="h-4 w-4" />
+                        </button>
+                      </div>
+                      <div class="library-browse-card-body">
+                        <p class="library-browse-card-title">
+                          {{ genre.name }}
+                        </p>
+                        <p
+                          v-if="genre.subgenres?.length"
+                          class="library-browse-card-sub truncate"
+                        >
+                          {{ genre.subgenres.slice(0, 3).join(' · ') }}
+                        </p>
+                        <p class="library-browse-card-meta">
+                          {{
+                            t('library.genreMeta', {
+                              tracks: genre.files.length,
+                            })
+                          }}
+                        </p>
+                      </div>
+                    </article>
+                  </li>
+                </ul>
+              </template>
 
               <ul
                 v-else-if="
@@ -639,6 +662,12 @@ import { buildApiBaseUrl, getServerConfig } from '/src/model/serverConnection'
 import { useI18n } from '/src/i18n'
 import { usePlayer } from '/src/model/player'
 import { nextGenrePlaylistStart } from '/src/model/playerQueue.js'
+import {
+  ensureLibraryGenreLookup,
+  genreWarmupStatus,
+  isGenreWarmupRunning,
+  startLibraryGenreLookup,
+} from '/src/model/genreRefresh.js'
 import { consumeLibraryNavigation } from '/src/model/libraryNavigation'
 import { useLibraryRefresh } from '/src/model/libraryRefresh'
 import {
@@ -767,6 +796,31 @@ function resetBrowseScrollPosition() {
 }
 
 const unknownGenreLabel = computed(() => t('player.unknownGenre'))
+const unknownGenreCount = computed(() => countUnknownGenres(libraryItems.value))
+const genreWarmupRunning = computed(() =>
+  isGenreWarmupRunning(genreWarmupStatus.value)
+)
+const showGenreUpdateBar = computed(
+  () =>
+    viewMode.value === 'genres' &&
+    !selectedGenreName.value &&
+    (unknownGenreCount.value > 0 || genreWarmupRunning.value)
+)
+const genreUpdateMessage = computed(() => {
+  const st = genreWarmupStatus.value
+  if (st.status === 'running') {
+    const current = Number(st.current) || 0
+    const total = Number(st.total) || 0
+    if (st.phase === 'albums' && total > 0) {
+      return t('library.updatingGenresProgress', { current, total })
+    }
+    return t('library.updatingGenres')
+  }
+  if (unknownGenreCount.value > 0) {
+    return t('library.unknownGenreHint', { count: unknownGenreCount.value })
+  }
+  return t('library.genresUpdated')
+})
 const libraryGroupOptions = computed(() => ({
   unknownArtist: t('common.unknownArtist'),
 }))
@@ -1350,23 +1404,15 @@ function countUnknownGenres(items) {
   }).length
 }
 
-function clearGenreRefreshTimers() {
-  for (const timer of genreRefreshTimers) {
-    clearTimeout(timer)
-  }
-  genreRefreshTimers = []
+function scheduleGenreRefresh(items) {
+  void ensureLibraryGenreLookup(countUnknownGenres(items))
 }
 
-function scheduleGenreRefresh(items) {
-  clearGenreRefreshTimers()
-  if (countUnknownGenres(items) === 0) return
-
-  for (const delay of [3000, 10000, 30000, 90000, 300000]) {
-    genreRefreshTimers.push(
-      setTimeout(() => {
-        void refresh({ background: true })
-      }, delay)
-    )
+async function updateLibraryGenres() {
+  try {
+    await startLibraryGenreLookup()
+  } catch {
+    // Status polling still shows whatever the server reports.
   }
 }
 
@@ -1626,7 +1672,6 @@ function queueOnlineDownload(song, feedback) {
 }
 
 let stopLibraryListener = null
-let genreRefreshTimers = []
 
 onMounted(() => {
   libraryRefresh.register(refreshFromHeader)
@@ -1660,7 +1705,6 @@ onUnmounted(() => {
     clearTimeout(visibleCoverWarmTimer)
     visibleCoverWarmTimer = null
   }
-  clearGenreRefreshTimers()
   libraryRefresh.unregister()
 })
 </script>
@@ -1784,6 +1828,14 @@ onUnmounted(() => {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.75rem;
+}
+
+.library-genre-update {
+  @apply mb-3 flex items-start justify-between gap-3 rounded-2xl border border-primary/20 bg-base-100/90 px-3 py-2.5;
+}
+
+.library-genre-update-copy {
+  @apply min-w-0 text-xs leading-5 text-base-content/70;
 }
 
 .browse-tile-shell {

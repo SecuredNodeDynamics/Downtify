@@ -296,6 +296,12 @@ export default {
     playArtist: 'Play artist',
     playAlbum: 'Play album',
     playGenre: 'Play genre',
+    updateGenres: 'Update genres',
+    updatingGenres: 'Looking up genres…',
+    updatingGenresProgress: 'Looking up genres… {current} of {total}',
+    unknownGenreHint:
+      '{count} tracks still need a genre. Update categories after new downloads.',
+    genresUpdated: 'Genre categories are up to date.',
     backToArtists: 'Artists',
     backToAlbums: 'Albums',
     backToGenres: 'Genres',

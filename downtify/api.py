@@ -496,6 +496,8 @@ class AppState:
         'error': '',
     }
     genre_warmup_task: Optional[asyncio.Task] = None
+    genre_warmup_debounce_task: Optional[asyncio.Task] = None
+    genre_warmup_rerun: bool = False
     library_files_cache: dict[str, Any] = {
         'root': '',
         'items': [],
@@ -2745,25 +2747,13 @@ async def _refresh_library_files_cache() -> None:
         }
 
 
-async def _refresh_genres_and_library_cache() -> None:
-    download_dir = _active_download_dir_or_default()
-    try:
-        await asyncio.to_thread(warm_library_genres, download_dir)
-    except Exception:
-        logger.opt(exception=True).warning('Library genre refresh failed')
-    invalidate_library_files_cache()
-    await _refresh_library_files_cache()
-
-
 def schedule_library_genre_refresh() -> None:
-    now = time.monotonic()
-    if now - state.library_genre_refresh_at < 60:
-        return
-    state.library_genre_refresh_at = now
     loop = state.loop
     if loop is None:
         return
-    asyncio.run_coroutine_threadsafe(_refresh_genres_and_library_cache(), loop)
+    asyncio.run_coroutine_threadsafe(
+        start_genre_warmup(debounce=8.0), loop
+    )
 
 
 async def warm_library_files_cache() -> None:
@@ -2817,17 +2807,45 @@ async def _run_genre_warmup() -> None:
             'status': 'error',
             'error': str(exc),
         }
+    invalidate_library_files_cache()
+    await _refresh_library_files_cache()
+    if state.genre_warmup_rerun:
+        state.genre_warmup_rerun = False
+        state.genre_warmup_task = asyncio.create_task(_run_genre_warmup())
 
 
-async def start_genre_warmup() -> None:
+def _cancel_genre_warmup_debounce() -> None:
+    task = state.genre_warmup_debounce_task
+    if task is None or task.done():
+        return
+    task.cancel()
+
+
+async def start_genre_warmup(*, debounce: float = 0.0) -> None:
+    _cancel_genre_warmup_debounce()
+    if debounce > 0:
+        async def _delayed() -> None:
+            await asyncio.sleep(debounce)
+            await start_genre_warmup()
+
+        state.genre_warmup_debounce_task = asyncio.create_task(_delayed())
+        return
     task = state.genre_warmup_task
     if task is not None and not task.done():
+        state.genre_warmup_rerun = True
         return
+    state.genre_warmup_rerun = False
     state.genre_warmup_task = asyncio.create_task(_run_genre_warmup())
 
 
 @router.get('/api/library/genres/status')
 def library_genres_status() -> dict[str, Any]:
+    return dict(state.genre_warmup)
+
+
+@router.post('/api/library/genres/refresh')
+async def refresh_library_genres() -> dict[str, Any]:
+    await start_genre_warmup()
     return dict(state.genre_warmup)
 
 

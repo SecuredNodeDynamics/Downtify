@@ -302,6 +302,12 @@ export default {
     playArtist: 'Reproducir artista',
     playAlbum: 'Reproducir album',
     playGenre: 'Reproducir genero',
+    updateGenres: 'Actualizar generos',
+    updatingGenres: 'Buscando generos…',
+    updatingGenresProgress: 'Buscando generos… {current} de {total}',
+    unknownGenreHint:
+      '{count} pistas aun no tienen genero. Actualiza las categorias al anadir musica nueva.',
+    genresUpdated: 'Las categorias de genero estan al dia.',
     backToArtists: 'Artistas',
     backToAlbums: 'Albumes',
     backToGenres: 'Géneros',
