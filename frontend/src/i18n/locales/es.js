@@ -47,9 +47,9 @@ export default {
     setupTitle: 'Crea el primer perfil',
     setupHint:
       'Este servidor pedirá inicio de sesión después. Los monitores actuales quedan en este perfil de administrador.',
-    loginTitle: 'Elige un perfil',
+    loginTitle: 'Iniciar sesión',
     loginHint:
-      'Entra con tu PIN. Puedes cambiar a contraseña si lo prefieres. La biblioteca es compartida; los monitores siguen este perfil entre el teléfono y el servidor.',
+      'Introduce tu usuario y PIN. Puedes cambiar a contraseña si lo prefieres. La biblioteca es compartida; los monitores siguen este perfil entre el teléfono y el servidor.',
     usePasswordInstead: 'Usar contraseña',
     usePinInstead: 'Usar PIN',
     username: 'Usuario',

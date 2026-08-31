@@ -404,11 +404,22 @@ export async function preloadCoverSources({ src, fallbacks = [] } = {}) {
   return ''
 }
 
+let coverWarmPaused = false
+
+export function setCoverWarmPaused(paused) {
+  coverWarmPaused = Boolean(paused)
+  if (coverWarmPaused) cancelPendingCoverPreloads()
+}
+
+export function isCoverWarmPaused() {
+  return coverWarmPaused
+}
+
 export function preloadCoverSourcesBatch(
   entries = [],
   { limit = 24, concurrency = 6 } = {}
 ) {
-  if (document.visibilityState === 'hidden') return
+  if (document.visibilityState === 'hidden' || coverWarmPaused) return
 
   const queue = (entries || [])
     .map((entry) => ({
@@ -427,11 +438,18 @@ export function preloadCoverSourcesBatch(
     batchQueue.push({ ...entry, key })
   }
 
-  const workerLimit = Math.max(1, Math.min(concurrency, 4))
+  const workerLimit = Math.max(
+    1,
+    Math.min(concurrency, isCapacitorNative() ? 2 : 4)
+  )
   while (batchWorkersRunning < workerLimit && batchQueue.length) {
     batchWorkersRunning += 1
     void (async () => {
-      while (batchQueue.length && document.visibilityState !== 'hidden') {
+      while (
+        batchQueue.length &&
+        document.visibilityState !== 'hidden' &&
+        !coverWarmPaused
+      ) {
         const entry = batchQueue.shift()
         try {
           await preloadCoverSources(entry)
@@ -443,7 +461,11 @@ export function preloadCoverSourcesBatch(
         await new Promise((resolve) => setTimeout(resolve, 16))
       }
       batchWorkersRunning -= 1
-      if (batchQueue.length && document.visibilityState !== 'hidden') {
+      if (
+        batchQueue.length &&
+        document.visibilityState !== 'hidden' &&
+        !coverWarmPaused
+      ) {
         preloadCoverSourcesBatch([], { concurrency: workerLimit })
       }
     })()

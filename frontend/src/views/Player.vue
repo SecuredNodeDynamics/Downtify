@@ -31,10 +31,7 @@
       </div>
 
       <!-- Skeleton -->
-      <div
-        v-else-if="loading && !hasPlayerContent"
-        class="space-y-3"
-      >
+      <div v-else-if="loading && !hasPlayerContent" class="space-y-3">
         <div class="skeleton h-52 rounded-3xl lg:h-72" />
         <div class="skeleton h-16 rounded-2xl" />
         <div class="skeleton h-16 rounded-2xl" />
@@ -322,9 +319,7 @@
               </section>
 
               <!-- Volume -->
-              <div
-                class="mt-4 flex w-full max-w-xs items-center gap-3 sm:mt-6"
-              >
+              <div class="mt-4 flex w-full max-w-xs items-center gap-3 sm:mt-6">
                 <button
                   class="icon-btn"
                   @click="player.toggleMute()"
@@ -337,8 +332,8 @@
                       player.isMuted.value || player.volume.value === 0
                         ? 'clarity:volume-mute-line'
                         : player.volume.value < 0.5
-                          ? 'clarity:volume-down-line'
-                          : 'clarity:volume-up-line'
+                        ? 'clarity:volume-down-line'
+                        : 'clarity:volume-up-line'
                     "
                     class="h-5 w-5"
                   />
@@ -1305,9 +1300,9 @@
                     downloadButtonState(selectedSimilarTrack) === 'loading'
                       ? t('common.downloading')
                       : downloadButtonState(selectedSimilarTrack) === 'done' ||
-                          downloadButtonState(selectedSimilarTrack) === 'queued'
-                        ? t('common.done')
-                        : t('common.download')
+                        downloadButtonState(selectedSimilarTrack) === 'queued'
+                      ? t('common.done')
+                      : t('common.download')
                   }}
                 </button>
                 <span
@@ -1346,6 +1341,7 @@ import {
   watch,
   nextTick,
 } from 'vue'
+import { useRoute } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import Navbar from '/src/components/Navbar.vue'
 import CoverImage from '/src/components/CoverImage.vue'
@@ -1397,8 +1393,8 @@ const initialPlayerSnapshot = getInitialLibrarySnapshot(playerServerKey)
 const { t } = useI18n()
 const player = usePlayer()
 const downloadManager = useDownloadManager()
-const playbackActive = computed(
-  () => Boolean(player.playbackIntent?.value || player.isPlaying.value)
+const playbackActive = computed(() =>
+  Boolean(player.playbackIntent?.value || player.isPlaying.value)
 )
 
 const files = ref(initialPlayerSnapshot.paths)
@@ -2708,16 +2704,16 @@ onMounted(() => {
 
 onActivated(() => {
   applyPlayerNavigationIntent()
-  if (libraryItems.value.length > 0) {
-    syncPlayerPlaylist(files.value)
-    window.setTimeout(() => {
-      void refreshLibraryMetadataInBackground()
-    }, 450)
-  }
-  if (libraryItems.value.length === 0 || files.value.length === 0) {
-    void load()
-  }
 })
+
+const playerRoute = useRoute()
+watch(
+  () => playerRoute.name,
+  (name, previous) => {
+    if (name !== 'Player' || previous === 'Player') return
+    applyPlayerNavigationIntent()
+  }
+)
 
 onUnmounted(() => {
   stopLibraryListener?.()
@@ -3127,12 +3123,8 @@ onUnmounted(() => {
   box-shadow: 0 0 12px rgba(26, 208, 92, 0.45);
   transform: translate(-50%, -50%) scale(0.9);
   opacity: 0;
-  transition:
-    left 100ms linear,
-    opacity 160ms ease,
-    transform 160ms ease,
-    width 160ms ease,
-    height 160ms ease;
+  transition: left 100ms linear, opacity 160ms ease, transform 160ms ease,
+    width 160ms ease, height 160ms ease;
   will-change: left, transform;
 }
 
@@ -3234,14 +3226,10 @@ onUnmounted(() => {
 @keyframes download-pulse {
   0%,
   100% {
-    box-shadow:
-      0 0 0 1px rgb(26 208 92 / 0.16),
-      0 0 0 rgb(26 208 92 / 0);
+    box-shadow: 0 0 0 1px rgb(26 208 92 / 0.16), 0 0 0 rgb(26 208 92 / 0);
   }
   50% {
-    box-shadow:
-      0 0 0 1px rgb(26 208 92 / 0.34),
-      0 0 18px rgb(26 208 92 / 0.32);
+    box-shadow: 0 0 0 1px rgb(26 208 92 / 0.34), 0 0 18px rgb(26 208 92 / 0.32);
   }
 }
 
@@ -3344,8 +3332,7 @@ onUnmounted(() => {
 
 .download-button-loading {
   @apply pointer-events-none;
-  animation:
-    download-press 220ms ease-out,
+  animation: download-press 220ms ease-out,
     download-pulse 1.1s ease-in-out infinite;
 }
 
@@ -3355,9 +3342,7 @@ onUnmounted(() => {
 
 .download-button-done {
   animation: download-pop 420ms cubic-bezier(0.16, 1, 0.3, 1);
-  box-shadow:
-    0 0 0 1px rgb(26 208 92 / 0.26),
-    0 0 22px rgb(26 208 92 / 0.32);
+  box-shadow: 0 0 0 1px rgb(26 208 92 / 0.26), 0 0 22px rgb(26 208 92 / 0.32);
 }
 
 .download-button-queued {

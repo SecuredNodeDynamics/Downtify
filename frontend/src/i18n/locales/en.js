@@ -47,9 +47,9 @@ export default {
     setupTitle: 'Create the first profile',
     setupHint:
       'This backend will ask for a login after this. Existing monitors stay on this admin profile.',
-    loginTitle: 'Choose a profile',
+    loginTitle: 'Sign in',
     loginHint:
-      'Sign in with your PIN. You can switch to password if you prefer. The music library is shared; monitors follow this profile between the phone and server.',
+      'Enter your username and PIN. You can switch to password if you prefer. The music library is shared; monitors follow this profile between the phone and server.',
     usePasswordInstead: 'Use password instead',
     usePinInstead: 'Use PIN instead',
     username: 'Username',

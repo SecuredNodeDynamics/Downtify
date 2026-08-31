@@ -298,6 +298,7 @@
 </template>
 
 <script setup>
+defineOptions({ name: 'Health' })
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { Icon } from '@iconify/vue'
 import API, { isHealthPayload } from '../model/api'

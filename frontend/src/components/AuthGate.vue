@@ -15,22 +15,6 @@
         {{ setupMode ? t('auth.setupHint') : t('auth.loginHint') }}
       </p>
 
-      <div v-if="!setupMode && profiles.length" class="auth-gate-profiles">
-        <button
-          v-for="profile in profiles"
-          :key="profile.id"
-          type="button"
-          class="auth-gate-profile"
-          :class="{ 'auth-gate-profile-active': username === profile.username }"
-          @click="selectProfile(profile)"
-        >
-          <span class="auth-gate-profile-name">{{
-            profile.display_name || profile.username
-          }}</span>
-          <span class="auth-gate-profile-meta">{{ profile.username }}</span>
-        </button>
-      </div>
-
       <label class="auth-gate-label">
         {{ t('auth.username') }}
         <input
@@ -61,7 +45,10 @@
         />
       </label>
 
-      <label v-if="setupMode ? showSetupPin : showPinField" class="auth-gate-label">
+      <label
+        v-if="setupMode ? showSetupPin : showPinField"
+        class="auth-gate-label"
+      >
         {{ t('auth.pin') }}
         <input
           v-model="pin"
@@ -93,8 +80,8 @@
           busy
             ? t('common.loading')
             : setupMode
-              ? t('auth.createAdmin')
-              : t('auth.signIn')
+            ? t('auth.createAdmin')
+            : t('auth.signIn')
         }}
       </button>
     </form>
@@ -116,6 +103,7 @@ import { usesEmbeddedServer } from '../model/serverConnection'
 import { useI18n } from '../i18n'
 import appIcon from '../assets/downtify-app-icon.png'
 
+const LAST_USERNAME_KEY = 'downtify-last-username'
 const { t } = useI18n()
 const { needsAuthGate, status, profiles, errorMessage, loading } =
   useAuthSession()
@@ -147,10 +135,14 @@ const showPasswordField = computed(
 const errorText = computed(() => localError.value || errorMessage.value || '')
 
 watch(
-  profiles,
-  (list) => {
-    if (username.value || !list?.length) return
-    selectProfile(list[0])
+  () => needsAuthGate.value,
+  (open) => {
+    if (!open || username.value) return
+    try {
+      username.value = localStorage.getItem(LAST_USERNAME_KEY) || ''
+    } catch {
+      username.value = ''
+    }
   },
   { immediate: true }
 )
@@ -159,15 +151,6 @@ watch(selected, (profile) => {
   if (setupMode.value) return
   loginMethod.value = preferredLoginMethod(profile)
 })
-
-function selectProfile(profile) {
-  username.value = profile.username
-  displayName.value = profile.display_name || profile.username
-  password.value = ''
-  pin.value = ''
-  loginMethod.value = preferredLoginMethod(profile)
-  localError.value = ''
-}
 
 function toggleLoginMethod() {
   loginMethod.value = loginMethod.value === 'pin' ? 'password' : 'pin'
@@ -195,6 +178,11 @@ async function submit() {
       await API.setupAccount(payload)
     } else {
       await API.loginAccount(payload)
+    }
+    try {
+      localStorage.setItem(LAST_USERNAME_KEY, username.value)
+    } catch {
+      // Ignore storage failures.
     }
     password.value = ''
     pin.value = ''
@@ -233,21 +221,6 @@ async function submit() {
 }
 .auth-gate-label {
   @apply flex flex-col gap-1 text-xs font-semibold uppercase tracking-wider text-base-content/50;
-}
-.auth-gate-profiles {
-  @apply grid gap-2;
-}
-.auth-gate-profile {
-  @apply flex flex-col items-start rounded-xl border border-white/10 px-3 py-2 text-left transition-colors;
-}
-.auth-gate-profile-active {
-  @apply border-primary/50 bg-primary/10;
-}
-.auth-gate-profile-name {
-  @apply text-sm font-semibold normal-case;
-}
-.auth-gate-profile-meta {
-  @apply text-[11px] font-normal normal-case text-base-content/50;
 }
 .auth-gate-error {
   @apply text-sm text-error;

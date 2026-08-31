@@ -3,8 +3,12 @@
 </template>
 
 <script setup>
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { isCapacitorNative } from '../model/serverConnection'
+
+const props = defineProps({
+  paused: { type: Boolean, default: false },
+})
 
 const canvasRef = ref(null)
 
@@ -159,8 +163,8 @@ function updateStars(now) {
     const driftSpeed = reduceMotion
       ? 0
       : lowPowerMode
-        ? star.driftSpeed * 0.28
-        : star.driftSpeed
+      ? star.driftSpeed * 0.28
+      : star.driftSpeed
     star.vx +=
       (star.baseX - star.x) * 0.006 +
       Math.cos(star.driftAngle) * driftSpeed +
@@ -237,9 +241,23 @@ function setActive(nextActive) {
   }
 }
 
-function handleVisibilityChange() {
-  setActive(document.visibilityState !== 'hidden')
+function syncActiveState(nativeActive = true) {
+  setActive(
+    nativeActive && !props.paused && document.visibilityState !== 'hidden'
+  )
 }
+
+function handleVisibilityChange() {
+  syncActiveState()
+}
+
+watch(
+  () => props.paused,
+  (paused) => {
+    if (!paused) resizeCanvas()
+    syncActiveState()
+  }
+)
 
 function handleMotionPreferenceChange(event) {
   reduceMotion = event.matches
@@ -247,7 +265,7 @@ function handleMotionPreferenceChange(event) {
 
 onMounted(() => {
   isMounted = true
-  isActive = document.visibilityState !== 'hidden'
+  isActive = !props.paused && document.visibilityState !== 'hidden'
   lowPowerMode = isCapacitorNative()
   updateTheme()
   motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)')
@@ -275,7 +293,7 @@ onMounted(() => {
   import('@capacitor/app')
     .then(({ App }) =>
       App.addListener('appStateChange', ({ isActive: nativeActive }) => {
-        setActive(nativeActive && document.visibilityState !== 'hidden')
+        syncActiveState(nativeActive)
       })
     )
     .then((listener) => {

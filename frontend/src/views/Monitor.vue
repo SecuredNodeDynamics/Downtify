@@ -453,6 +453,7 @@
 </template>
 
 <script setup>
+defineOptions({ name: 'Monitor' })
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import Navbar from '/src/components/Navbar.vue'

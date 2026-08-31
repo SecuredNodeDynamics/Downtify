@@ -12,6 +12,7 @@ import {
 } from './serverConnection.js'
 import { libraryCoverFolders } from './library.js'
 import {
+  hydrateLibraryFromPersistence,
   notifyLibraryChanged,
   persistLibraryCache,
   refreshLibraryInBackground as refreshLibrarySession,
@@ -20,6 +21,7 @@ import {
 } from './librarySession.js'
 import {
   invalidateArtistCoverCaches,
+  isCoverWarmPaused,
   preloadCoverSourcesBatch,
 } from './imageLoader.js'
 import {
@@ -1127,6 +1129,7 @@ async function startBackendSession() {
     authStatus.value.setup_required ||
     (authStatus.value.auth_required && !authStatus.value.authenticated)
   if (blocked) return ''
+  hydrateLibraryFromPersistence(libraryServerKey())
   void syncProfileWithBackend()
   void import('./settings.js').then((mod) => mod.loadSettings())
   const versionPromise = getVersion({ prefetch: false })
@@ -1137,17 +1140,20 @@ async function startBackendSession() {
 }
 
 function scheduleCoverWarm(items) {
-  if (isCapacitorNative() && usesCustomServerUrl()) {
+  if (isCoverWarmPaused()) return
+  const run = () => {
+    if (isCoverWarmPaused()) return
+    warmLibraryCovers(items)
+  }
+  if (isCapacitorNative()) {
     if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
-      window.requestIdleCallback(() => warmLibraryCovers(items), {
-        timeout: 8000,
-      })
+      window.requestIdleCallback(run, { timeout: 8000 })
       return
     }
-    window.setTimeout(() => warmLibraryCovers(items), 1500)
+    window.setTimeout(run, 1500)
     return
   }
-  warmLibraryCovers(items)
+  run()
 }
 
 function refreshLibraryInBackground(force = false, options = {}) {

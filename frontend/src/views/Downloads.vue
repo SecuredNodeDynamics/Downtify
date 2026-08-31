@@ -281,6 +281,7 @@
               <ul
                 v-else-if="viewMode === 'artists' && !selectedArtist"
                 class="library-browse-grid"
+                :style="virtualListPadStyle"
               >
                 <li
                   v-for="artist in renderedArtists"
@@ -353,6 +354,7 @@
                   !selectedAlbum
                 "
                 class="library-browse-grid"
+                :style="virtualListPadStyle"
               >
                 <li
                   v-for="album in renderedVisibleAlbums"
@@ -425,6 +427,7 @@
               <ul
                 v-else-if="viewMode === 'genres' && !selectedGenreName"
                 class="library-browse-grid"
+                :style="virtualListPadStyle"
               >
                 <li
                   v-for="genre in renderedGenres"
@@ -479,6 +482,7 @@
                   selectedGenreName
                 "
                 class="library-track-list space-y-2"
+                :style="virtualListPadStyle"
               >
                 <li
                   v-for="file in renderedVisibleFiles"
@@ -644,6 +648,10 @@ import { useSearchManager } from '/src/model/search'
 import { needsServerConnection } from '/src/model/serverConnection'
 import { refreshMonitoredArtists } from '/src/model/monitoredArtists'
 import { preloadCoverSourcesBatch } from '/src/model/imageLoader'
+import {
+  libraryGridColumns,
+  virtualBrowseWindow,
+} from '/src/model/libraryBrowseWindow'
 
 defineOptions({ name: 'List' })
 
@@ -681,6 +689,10 @@ const GRID_RENDER_STEP = 32
 const TRACK_RENDER_INITIAL = 60
 const TRACK_RENDER_STEP = 60
 const renderLimit = ref(GRID_RENDER_INITIAL)
+const virtualStart = ref(0)
+const virtualEnd = ref(TRACK_RENDER_INITIAL)
+const virtualPadTop = ref(0)
+const virtualPadBottom = ref(0)
 
 function currentBrowseScrollKey() {
   if (selectedAlbumKey.value) {
@@ -732,7 +744,9 @@ function restoreBrowseScrollPosition(key) {
   restoreBrowseRenderLimit(key)
   const apply = () => {
     const el = browseBodyRef.value
-    if (el) el.scrollTop = top
+    if (!el) return
+    el.scrollTop = top
+    updateVirtualWindow(el)
   }
   nextTick(() => {
     apply()
@@ -742,9 +756,12 @@ function restoreBrowseScrollPosition(key) {
 
 function resetBrowseScrollPosition() {
   renderLimit.value = initialRenderLimitForCurrentView()
+  virtualStart.value = 0
+  virtualPadTop.value = 0
   nextTick(() => {
     const el = browseBodyRef.value
     if (el) el.scrollTop = 0
+    updateVirtualWindow(el)
   })
 }
 
@@ -931,23 +948,65 @@ const currentRenderableItems = computed(() => {
 })
 
 const renderedArtists = computed(() =>
-  filteredArtists.value.slice(0, renderLimit.value)
+  filteredArtists.value.slice(virtualStart.value, virtualEnd.value)
 )
 
 const renderedVisibleAlbums = computed(() =>
-  filteredVisibleAlbums.value.slice(0, renderLimit.value)
+  filteredVisibleAlbums.value.slice(virtualStart.value, virtualEnd.value)
 )
 
 const renderedGenres = computed(() =>
-  filteredGenres.value.slice(0, renderLimit.value)
+  filteredGenres.value.slice(virtualStart.value, virtualEnd.value)
 )
 
 const renderedVisibleFiles = computed(() =>
-  filteredVisibleFiles.value.slice(0, renderLimit.value)
+  filteredVisibleFiles.value.slice(virtualStart.value, virtualEnd.value)
+)
+
+const virtualListPadStyle = computed(() => ({
+  paddingTop: `${virtualPadTop.value}px`,
+  paddingBottom: `${virtualPadBottom.value}px`,
+}))
+
+const isLibraryTrackList = computed(
+  () =>
+    viewMode.value === 'tracks' ||
+    Boolean(selectedAlbum.value) ||
+    Boolean(selectedGenreName.value) ||
+    (Boolean(selectedArtist.value) && selectedArtistAlbums.value.length === 0)
+)
+
+function updateVirtualWindow(el = browseBodyRef.value) {
+  const track = isLibraryTrackList.value
+  const width = typeof window === 'undefined' ? 375 : window.innerWidth
+  const win = virtualBrowseWindow({
+    count: currentRenderableItems.value.length,
+    columns: track ? 1 : libraryGridColumns(width),
+    itemSize: track ? 76 : 188,
+    scrollTop: el?.scrollTop || 0,
+    viewportHeight: el?.clientHeight || 640,
+  })
+  virtualStart.value = win.start
+  virtualEnd.value = Math.max(win.end, win.start)
+  virtualPadTop.value = win.padTop
+  virtualPadBottom.value = win.padBottom
+}
+
+watch(
+  () => [
+    currentRenderableItems.value.length,
+    viewMode.value,
+    selectedArtistName.value,
+    selectedAlbumKey.value,
+    selectedGenreName.value,
+  ],
+  () => {
+    nextTick(() => updateVirtualWindow())
+  }
 )
 
 const hasMoreRenderedItems = computed(
-  () => currentRenderableItems.value.length > renderLimit.value
+  () => currentRenderableItems.value.length > virtualEnd.value
 )
 
 const showLibraryNoSearchResults = computed(() => {
@@ -1124,20 +1183,11 @@ function warmVisibleCoversForCurrentView() {
 }
 
 function growRenderedItems() {
-  if (!hasMoreRenderedItems.value) return
-  renderLimit.value = Math.min(
-    renderLimit.value + renderStepForCurrentView(),
-    currentRenderableItems.value.length
-  )
-  saveBrowseRenderLimit()
-  scheduleVisibleCoverWarm(warmVisibleCoversForCurrentView)
+  updateVirtualWindow()
 }
 
 function onBrowseScroll(event) {
-  const el = event.currentTarget
-  if (!el || !hasMoreRenderedItems.value) return
-  const remaining = el.scrollHeight - el.scrollTop - el.clientHeight
-  if (remaining < 900) growRenderedItems()
+  updateVirtualWindow(event.currentTarget)
 }
 
 async function loadArtistDownloadAlbums() {
@@ -1588,16 +1638,10 @@ onMounted(() => {
 onActivated(() => {
   libraryRefresh.register(refreshFromHeader)
   restoreBrowseScrollPosition(currentBrowseScrollKey())
-  if (files.value.length > 0) {
-    requestAnimationFrame(() => {
-      warmVisibleCoversForCurrentView()
-    })
-    window.setTimeout(() => {
-      void refresh({ background: true })
-    }, 450)
-    return
-  }
-  void refresh()
+  requestAnimationFrame(() => {
+    updateVirtualWindow()
+    if (files.value.length > 0) warmVisibleCoversForCurrentView()
+  })
 })
 
 onDeactivated(() => {
@@ -1735,6 +1779,15 @@ onUnmounted(() => {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.75rem;
+}
+
+.browse-tile-shell {
+  content-visibility: auto;
+  contain-intrinsic-size: 12rem;
+}
+
+.library-track-list .browse-tile-shell {
+  contain-intrinsic-size: 4.75rem;
 }
 
 @media (min-width: 640px) {

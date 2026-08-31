@@ -1136,10 +1136,7 @@
         </div>
       </section>
 
-      <section
-        v-if="activeToolTab === 'duplicates'"
-        class="metadata-section"
-      >
+      <section v-if="activeToolTab === 'duplicates'" class="metadata-section">
         <div class="metadata-header">
           <div class="metadata-toolbar">
             <button
@@ -1160,20 +1157,14 @@
             </button>
             <button
               class="btn btn-sm metadata-btn border-white/10 bg-base-100/85 hover:bg-base-100"
-              :disabled="
-                dupeLoading || dupeDeleting || selectedDupeCount === 0
-              "
+              :disabled="dupeLoading || dupeDeleting || selectedDupeCount === 0"
               @click="deleteSelectedDuplicates"
             >
               <span
                 v-if="dupeDeleting"
                 class="loading loading-spinner loading-xs mr-2"
               />
-              <Icon
-                v-else
-                icon="clarity:trash-line"
-                class="h-4 w-4 mr-2"
-              />
+              <Icon v-else icon="clarity:trash-line" class="h-4 w-4 mr-2" />
               {{
                 dupeDeleting
                   ? t('metadata.dupeDeleting')
@@ -1187,7 +1178,9 @@
         </p>
         <div v-if="dupeScanned" class="metadata-summary mb-4">
           <div class="metadata-summary-item">
-            <p class="text-base-content/40">{{ t('metadata.scannedTracks') }}</p>
+            <p class="text-base-content/40">
+              {{ t('metadata.scannedTracks') }}
+            </p>
             <p class="font-semibold">{{ dupeScanned }}</p>
           </div>
           <div class="metadata-summary-item">
@@ -1242,10 +1235,7 @@
                     {{ copy.album || '—' }} ·
                     {{ formatDupeBytes(copy.size_bytes) }} ·
                     {{ String(copy.format || '').toUpperCase() }}
-                    <span
-                      v-if="copy.keep"
-                      class="ml-1 text-primary"
-                    >
+                    <span v-if="copy.keep" class="ml-1 text-primary">
                       · {{ t('metadata.dupeKeep') }}
                     </span>
                   </p>
@@ -1945,6 +1935,7 @@
 </template>
 
 <script setup>
+defineOptions({ name: 'Metadata' })
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 
@@ -2105,14 +2096,12 @@ const metadataToolTabs = computed(() => {
 const useMobileToolMenu = computed(() => metadataToolTabs.value.length > 4)
 
 const selectedDupeCount = computed(
-  () =>
-    Object.values(selectedDupeFiles.value).filter(Boolean).length
+  () => Object.values(selectedDupeFiles.value).filter(Boolean).length
 )
 
 const dupeExtraCount = computed(() =>
   dupeGroups.value.reduce(
-    (count, group) =>
-      count + group.copies.filter((copy) => !copy.keep).length,
+    (count, group) => count + group.copies.filter((copy) => !copy.keep).length,
     0
   )
 )
@@ -3282,9 +3271,7 @@ async function deleteSelectedDuplicates() {
     .map(([file]) => file)
   if (!files.length) return
   if (
-    !window.confirm(
-      t('metadata.dupeDeleteConfirm', { count: files.length })
-    )
+    !window.confirm(t('metadata.dupeDeleteConfirm', { count: files.length }))
   ) {
     return
   }

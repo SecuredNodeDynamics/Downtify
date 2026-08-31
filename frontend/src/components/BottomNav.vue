@@ -72,7 +72,9 @@ function closeMoreSheet() {
 
 function navigate(item) {
   mobileSearch.closeSheet()
-  const moreOpen = Boolean(document.getElementById('mobile-more-sheet')?.checked)
+  const moreOpen = Boolean(
+    document.getElementById('mobile-more-sheet')?.checked
+  )
   closeMoreSheet()
 
   if (item.name === 'More') {
