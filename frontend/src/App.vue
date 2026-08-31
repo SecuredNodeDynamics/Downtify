@@ -84,7 +84,10 @@ import StarField from './components/StarField.vue'
 import HomePage from './views/Front.vue'
 import router, { preloadRouteComponents } from './router'
 import API from './model/api'
-import { startServerRouteAutoSwitch } from './model/serverRouteAuto'
+import {
+  applyPreferredServerRoute,
+  startServerRouteAutoSwitch,
+} from './model/serverRouteAuto'
 import { bootstrapAppUpdateNotice } from './model/appUpdateNotice'
 import {
   bootstrapEmbeddedServer,
@@ -195,6 +198,10 @@ watch(
 )
 
 onMounted(async () => {
+  if (isNativeApp) {
+    const switched = await applyPreferredServerRoute().catch(() => false)
+    if (switched) API.reconnectBackend()
+  }
   void bootstrapEmbeddedServer().then(() => {
     if (usesEmbeddedServer()) {
       window.dispatchEvent(new CustomEvent(EMBEDDED_SERVER_READY_EVENT))
