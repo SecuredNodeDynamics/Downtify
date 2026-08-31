@@ -2131,6 +2131,52 @@ async def auth_create_user(request: Request) -> dict[str, Any]:
     return {'user': created, 'profiles': state.auth_db.list_profiles()}
 
 
+@router.post('/api/auth/users/{user_id}')
+async def auth_update_user(user_id: int, request: Request) -> dict[str, Any]:
+    admin = _require_admin(request)
+    if int(admin['id']) == int(user_id):
+        raise HTTPException(
+            status_code=400,
+            detail='Use your own account settings to change your login',
+        )
+    if state.auth_db is None:
+        raise HTTPException(status_code=500, detail='Auth database not ready')
+    target = await asyncio.to_thread(state.auth_db.get_user, user_id)
+    if target is None:
+        raise HTTPException(status_code=404, detail='User not found')
+    if target.get('is_admin'):
+        raise HTTPException(
+            status_code=400, detail='Cannot reset another admin login'
+        )
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+    password = payload.get('password') if 'password' in payload else None
+    pin = payload.get('pin') if 'pin' in payload else None
+    display_name = (
+        payload.get('display_name') if 'display_name' in payload else None
+    )
+    if password is None and pin is None and display_name is None:
+        raise HTTPException(
+            status_code=400, detail='Enter a new password or PIN'
+        )
+    try:
+        updated = await asyncio.to_thread(
+            state.auth_db.set_credentials,
+            int(user_id),
+            password=password,
+            pin=pin,
+            display_name=display_name,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if updated is None:
+        raise HTTPException(status_code=404, detail='User not found')
+    await asyncio.to_thread(state.auth_db.delete_user_sessions, int(user_id))
+    return {'user': updated, 'profiles': state.auth_db.list_profiles()}
+
+
 @router.delete('/api/auth/users/{user_id}')
 async def auth_delete_user(user_id: int, request: Request) -> dict[str, Any]:
     admin = _require_admin(request)

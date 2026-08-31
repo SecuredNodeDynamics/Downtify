@@ -1,6 +1,12 @@
 import { computed, ref } from 'vue'
 
-import { buildApiBaseUrl, getServerConfig } from './serverConnection.js'
+import {
+  buildApiBaseUrl,
+  getServerConfig,
+  getStoredPrivateServerUrl,
+  getStoredPublicServerUrl,
+  parseServerUrl,
+} from './serverConnection.js'
 
 const TOKEN_PREFIX = 'downtify-session-token:'
 
@@ -23,10 +29,31 @@ export function sessionStorageKey(
   return `${TOKEN_PREFIX}${String(baseUrl || '').replace(/\/+$/, '')}`
 }
 
+function canonicalBase(url) {
+  const parsed = parseServerUrl(url)
+  return parsed ? buildApiBaseUrl(parsed).replace(/\/+$/, '') : ''
+}
+
+function siblingRemoteBaseUrls(baseUrl) {
+  const priv = canonicalBase(getStoredPrivateServerUrl())
+  const pub = canonicalBase(getStoredPublicServerUrl())
+  if (!priv || !pub) return []
+  const current = canonicalBase(baseUrl || buildApiBaseUrl(getServerConfig()))
+  if (current === priv) return [pub]
+  if (current === pub) return [priv]
+  return []
+}
+
 export function getStoredAuthToken(baseUrl) {
   if (typeof localStorage === 'undefined') return ''
   try {
-    return localStorage.getItem(sessionStorageKey(baseUrl)) || ''
+    const primary = localStorage.getItem(sessionStorageKey(baseUrl)) || ''
+    if (primary) return primary
+    for (const sibling of siblingRemoteBaseUrls(baseUrl)) {
+      const token = localStorage.getItem(sessionStorageKey(sibling)) || ''
+      if (token) return token
+    }
+    return ''
   } catch {
     return ''
   }
@@ -38,6 +65,11 @@ export function storeAuthToken(token, baseUrl) {
   try {
     if (token) localStorage.setItem(key, token)
     else localStorage.removeItem(key)
+    for (const sibling of siblingRemoteBaseUrls(baseUrl)) {
+      const siblingKey = sessionStorageKey(sibling)
+      if (token) localStorage.setItem(siblingKey, token)
+      else localStorage.removeItem(siblingKey)
+    }
   } catch {
     // ignore quota / private mode
   }
@@ -88,9 +120,7 @@ export function useAuthSession() {
         (status.value.auth_required && !status.value.authenticated))
   )
   const isAdmin = computed(() => Boolean(user.value?.is_admin))
-  const isFamilyUser = computed(
-    () => Boolean(user.value) && !isAdmin.value
-  )
+  const isFamilyUser = computed(() => Boolean(user.value) && !isAdmin.value)
   const canUseAdminPages = computed(() => {
     if (isFamilyUser.value) return false
     return !status.value.auth_required || isAdmin.value

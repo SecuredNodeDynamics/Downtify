@@ -10,6 +10,7 @@ import {
   usesEmbeddedServer,
   usesCustomServerUrl,
 } from './serverConnection.js'
+import { failOverToPublicServerRoute } from './serverRouteAuto.js'
 import { libraryCoverFolders } from './library.js'
 import {
   hydrateLibraryFromPersistence,
@@ -87,6 +88,17 @@ API.interceptors.response.use(
     if (currentPageUrl) {
       config.__downtifyRetriedCurrentPage = true
       config.baseURL = currentPageUrl
+      return API.request(config)
+    }
+    const canFailOver =
+      config &&
+      !config.__downtifyRouteFailOver &&
+      !error?.response &&
+      isCapacitorNative()
+    if (canFailOver && failOverToPublicServerRoute()) {
+      config.__downtifyRouteFailOver = true
+      config.baseURL = buildApiBaseUrl(getServerConfig())
+      reconnectBackend()
       return API.request(config)
     }
     return Promise.reject(error)
@@ -1112,6 +1124,17 @@ async function createAccount(payload) {
   return res.data
 }
 
+async function updateFamilyAccount(userId, payload) {
+  const res = await API.post(`/api/auth/users/${userId}`, payload)
+  if (Array.isArray(res.data?.profiles)) {
+    applyAuthStatus({
+      ...authStatus.value,
+      profiles: res.data.profiles,
+    })
+  }
+  return res.data
+}
+
 async function deleteAccount(userId) {
   const res = await API.delete(`/api/auth/users/${userId}`)
   if (Array.isArray(res.data?.profiles)) {
@@ -1285,6 +1308,7 @@ export default {
   logoutAccount,
   updateAccount,
   createAccount,
+  updateFamilyAccount,
   deleteAccount,
   isHealthPayload,
 }

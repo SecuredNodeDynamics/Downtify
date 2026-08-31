@@ -1,4 +1,5 @@
 import { Capacitor } from '@capacitor/core'
+import { ref } from 'vue'
 
 const STORAGE_KEY = 'downtify-server-url'
 const PRIVATE_URL_KEY = 'downtify-server-url-private'
@@ -7,6 +8,8 @@ const ACTIVE_ROUTE_KEY = 'downtify-server-url-active'
 
 export const SERVER_ROUTE_PRIVATE = 'private'
 export const SERVER_ROUTE_PUBLIC = 'public'
+export const SERVER_ROUTE_CHANGED_EVENT = 'downtify:server-route-changed'
+export const serverRouteEpoch = ref(0)
 
 // The embedded (on-device) backend listens here. Must match the port used by
 // the native EmbeddedServer plugin / downtify.mobile.DEFAULT_PORT.
@@ -89,6 +92,18 @@ export function repairStoredServerUrl() {
   }
 }
 
+function bumpServerRouteEpoch() {
+  serverRouteEpoch.value += 1
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(SERVER_ROUTE_CHANGED_EVENT))
+  }
+}
+
+export function canonicalServerUrl(input) {
+  const parsed = parseServerUrl(input)
+  return parsed ? buildApiBaseUrl(parsed) : ''
+}
+
 function readStorage(key) {
   try {
     return localStorage.getItem(key) || ''
@@ -166,6 +181,7 @@ export function setActiveServerRoute(route) {
       ? readStorage(PUBLIC_URL_KEY)
       : readStorage(PRIVATE_URL_KEY)
   writeStorage(STORAGE_KEY, url)
+  bumpServerRouteEpoch()
 }
 
 export function setStoredPrivateServerUrl(url) {
@@ -215,11 +231,15 @@ export function getStoredServerUrl() {
 export function setStoredServerUrl(url) {
   const trimmed = String(url || '').trim()
   writeStorage(STORAGE_KEY, trimmed)
-  if (!trimmed) return
+  if (!trimmed) {
+    bumpServerRouteEpoch()
+    return
+  }
   const kind = classifyServerUrl(trimmed) || SERVER_ROUTE_PRIVATE
   if (kind === SERVER_ROUTE_PUBLIC) writeStorage(PUBLIC_URL_KEY, trimmed)
   else writeStorage(PRIVATE_URL_KEY, trimmed)
   writeStorage(ACTIVE_ROUTE_KEY, kind)
+  bumpServerRouteEpoch()
 }
 
 export function clearActiveServerUrl() {

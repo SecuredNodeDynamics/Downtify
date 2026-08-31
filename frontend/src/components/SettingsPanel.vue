@@ -179,29 +179,81 @@
         >
           {{ t('auth.familyAccounts') }}
         </label>
-        <div class="space-y-2">
+        <div class="space-y-3">
           <div
             v-for="profile in authProfiles"
             :key="profile.id"
-            class="flex items-center justify-between gap-3 rounded-xl border border-white/10 px-3 py-2"
+            class="space-y-3 rounded-xl border border-white/10 px-3 py-3"
           >
-            <div class="min-w-0">
-              <p class="truncate text-sm font-semibold">
-                {{ profile.display_name || profile.username }}
-              </p>
-              <p class="truncate text-[11px] text-base-content/40">
-                {{ profile.username }}
-                <span v-if="profile.is_admin"> · {{ t('auth.admin') }}</span>
-              </p>
+            <div class="flex items-center justify-between gap-3">
+              <div class="min-w-0">
+                <p class="truncate text-sm font-semibold">
+                  {{ profile.display_name || profile.username }}
+                </p>
+                <p class="truncate text-[11px] text-base-content/40">
+                  {{ profile.username }}
+                  <span v-if="profile.is_admin"> · {{ t('auth.admin') }}</span>
+                  <span v-else-if="profile.has_pin && profile.has_password">
+                    · {{ t('auth.password') }} · {{ t('auth.pin') }}
+                  </span>
+                  <span v-else-if="profile.has_pin">
+                    · {{ t('auth.pin') }}
+                  </span>
+                  <span v-else-if="profile.has_password">
+                    · {{ t('auth.password') }}
+                  </span>
+                </p>
+              </div>
+              <button
+                v-if="authUser && profile.id !== authUser.id"
+                type="button"
+                class="btn btn-ghost btn-sm text-error"
+                @click="removeAccount(profile)"
+              >
+                {{ t('common.delete') }}
+              </button>
             </div>
-            <button
-              v-if="authUser && profile.id !== authUser.id"
-              type="button"
-              class="btn btn-ghost btn-sm text-error"
-              @click="removeAccount(profile)"
+            <div
+              v-if="authUser && profile.id !== authUser.id && !profile.is_admin"
+              class="space-y-2"
             >
-              {{ t('common.delete') }}
-            </button>
+              <p class="text-[11px] text-base-content/45">
+                {{ t('auth.resetLoginHint') }}
+              </p>
+              <SecretField
+                v-model="familyDraft(profile.id).password"
+                autocomplete="new-password"
+                :placeholder="t('auth.newPassword')"
+                :label="t('auth.newPassword')"
+                :aria-label="t('auth.newPassword')"
+              />
+              <SecretField
+                v-model="familyDraft(profile.id).pin"
+                autocomplete="new-password"
+                inputmode="numeric"
+                :maxlength="8"
+                :placeholder="t('auth.pin')"
+                :label="t('auth.pin')"
+                :aria-label="t('auth.pin')"
+              />
+              <p v-if="familySaveError[profile.id]" class="text-sm text-error">
+                {{ familySaveError[profile.id] }}
+              </p>
+              <p
+                v-else-if="familySaveMessage[profile.id]"
+                class="text-sm text-success"
+              >
+                {{ familySaveMessage[profile.id] }}
+              </p>
+              <button
+                type="button"
+                class="btn btn-primary btn-sm"
+                :disabled="Boolean(familySaving[profile.id])"
+                @click="resetFamilyLogin(profile)"
+              >
+                {{ t('auth.resetLogin') }}
+              </button>
+            </div>
           </div>
         </div>
 
@@ -290,7 +342,9 @@
           {{
             isDeviceMode
               ? t('settings.connectionModeDeviceHint')
-              : t('settings.connectionModeServerHint')
+              : canUseAdminPages
+              ? t('settings.connectionModeServerHint')
+              : t('settings.connectionModeServerFamilyHint')
           }}
         </p>
         <p
@@ -299,29 +353,18 @@
         >
           {{ t('settings.connectionModeServerConfigHint') }}
         </p>
-        <p
-          v-else-if="!isDeviceMode && !canUseAdminPages"
-          class="text-[11px] text-base-content/40 mt-1"
-        >
-          {{ t('settings.connectionModeServerFamilyHint') }}
-        </p>
       </div>
 
       <div
         v-if="!canUseAdminPages && embeddedAvailable && !isDeviceMode"
         class="space-y-2"
       >
-        <div class="surface rounded-xl px-3 py-2.5 text-sm">
-          <span class="text-base-content/50">
-            {{ t('settings.serverUrlCurrent') }}:
-          </span>
-          <span class="ml-1 font-medium text-base-content">
-            {{
-              usesCustomServer
-                ? activeServerDisplay
-                : t('settings.serverUrlUnset')
-            }}
-          </span>
+        <div class="surface rounded-xl px-3 py-2.5 text-sm font-medium">
+          {{
+            usesCustomServer
+              ? t('settings.serverUrlFamilyConnected')
+              : t('settings.serverUrlUnset')
+          }}
         </div>
       </div>
 
@@ -1546,11 +1589,10 @@ import {
   loadCapabilities,
 } from '../model/capabilities'
 import {
-  formatServerDisplay,
   getConnectionMode,
-  getServerConfig,
   isCapacitorNative,
   isEmbeddedServerAvailable,
+  serverRouteEpoch,
   setConnectionMode,
   usesCustomServerUrl,
 } from '../model/serverConnection'
@@ -1601,6 +1643,10 @@ const newPassword = ref('')
 const newPin = ref('')
 const newAccountSaving = ref(false)
 const newAccountError = ref('')
+const familyDrafts = reactive({})
+const familySaving = reactive({})
+const familySaveError = reactive({})
+const familySaveMessage = reactive({})
 const folderPickerError = ref('')
 const activeTab = ref('general')
 const settingsPanelRef = ref(null)
@@ -1775,10 +1821,10 @@ const jellyfinTestLoading = ref(false)
 const jellyfinTestMessage = ref('')
 const jellyfinTestError = ref(false)
 const embeddedAvailable = computed(() => isEmbeddedServerAvailable())
-const usesCustomServer = computed(() => usesCustomServerUrl())
-const activeServerDisplay = computed(() =>
-  formatServerDisplay(getServerConfig())
-)
+const usesCustomServer = computed(() => {
+  serverRouteEpoch.value
+  return usesCustomServerUrl()
+})
 const connectionMode = ref(getConnectionMode())
 const isDeviceMode = computed(
   () => embeddedAvailable.value && connectionMode.value === 'device'
@@ -1877,6 +1923,42 @@ async function saveOwnAccount() {
       err?.response?.data?.detail || err?.message || t('auth.failed')
   } finally {
     accountSaving.value = false
+  }
+}
+
+function familyDraft(profileId) {
+  const id = String(profileId)
+  if (!familyDrafts[id]) {
+    familyDrafts[id] = { password: '', pin: '' }
+  }
+  return familyDrafts[id]
+}
+
+async function resetFamilyLogin(profile) {
+  const id = String(profile.id)
+  const draft = familyDraft(id)
+  familySaveError[id] = ''
+  familySaveMessage[id] = ''
+  const payload = {}
+  if (draft.password) payload.password = draft.password
+  if (draft.pin) payload.pin = draft.pin
+  if (!payload.password && !payload.pin) {
+    familySaveError[id] = t('auth.resetLoginNeedValue')
+    return
+  }
+  familySaving[id] = true
+  try {
+    await API.updateFamilyAccount(profile.id, payload)
+    draft.password = ''
+    draft.pin = ''
+    familySaveMessage[id] = t('auth.resetLoginSaved', {
+      name: profile.display_name || profile.username,
+    })
+  } catch (err) {
+    familySaveError[id] =
+      err?.response?.data?.detail || err?.message || t('auth.failed')
+  } finally {
+    familySaving[id] = false
   }
 }
 

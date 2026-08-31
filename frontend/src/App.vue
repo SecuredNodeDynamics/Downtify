@@ -84,6 +84,7 @@ import StarField from './components/StarField.vue'
 import HomePage from './views/Front.vue'
 import router, { preloadRouteComponents } from './router'
 import API from './model/api'
+import { startServerRouteAutoSwitch } from './model/serverRouteAuto'
 import { bootstrapAppUpdateNotice } from './model/appUpdateNotice'
 import {
   bootstrapEmbeddedServer,
@@ -203,6 +204,7 @@ onMounted(async () => {
   if (!usesEmbeddedServer()) {
     void startMountedBackendSession()
   }
+  startServerRouteAutoSwitch(() => API.reconnectBackend())
   window.setTimeout(preloadRouteComponents, 200)
 
   bootstrapAppUpdateNotice()

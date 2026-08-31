@@ -52,6 +52,25 @@ describe('authSession', () => {
     expect(getStoredAuthToken('http://10.128.1.63:8000')).toBe('')
   })
 
+  it('reuses a login token between home network and Cloudflare URLs', () => {
+    vi.stubGlobal('localStorage', {
+      getItem: (key) => storage[key] ?? null,
+      setItem: (key, value) => {
+        storage[key] = value
+      },
+      removeItem: (key) => {
+        delete storage[key]
+      },
+    })
+    storage['downtify-server-url-private'] = 'http://10.128.1.63:8000'
+    storage['downtify-server-url-public'] =
+      'https://downtify.janzenmediagroup.com'
+    storeAuthToken('shared-token', 'http://10.128.1.63:8000')
+    expect(getStoredAuthToken('https://downtify.janzenmediagroup.com')).toBe(
+      'shared-token'
+    )
+  })
+
   it('hides admin settings for family profiles', () => {
     applyAuthStatus({
       auth_required: true,

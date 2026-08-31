@@ -142,6 +142,23 @@ def test_cannot_delete_last_admin(tmp_path: Path) -> None:
         auth.delete_user(admin['id'])
 
 
+def test_admin_can_reset_family_pin_and_password(tmp_path: Path) -> None:
+    auth = AuthDB(tmp_path / 'auth.db')
+    auth.create_user('admin', password='secret123')
+    kid = auth.create_user('kid', pin='24680', display_name='Kid')
+    token = auth.create_session(kid['id'])
+
+    updated = auth.set_credentials(kid['id'], pin='13579', password='newpass1')
+    auth.delete_user_sessions(kid['id'])
+
+    assert updated['has_pin'] is True
+    assert updated['has_password'] is True
+    assert auth.authenticate('kid', pin='24680') is None
+    assert auth.authenticate('kid', pin='13579')['id'] == kid['id']
+    assert auth.authenticate('kid', password='newpass1')['id'] == kid['id']
+    assert auth.user_for_token(token) is None
+
+
 def test_admin_api_paths() -> None:
     assert is_admin_api_path('/api/metadata/scan')
     assert is_admin_api_path('/api/metadata/artist-images/status')
@@ -156,4 +173,6 @@ def test_admin_api_paths() -> None:
     assert not is_admin_api_path('/api/health')
     assert not is_admin_api_path('/api/update')
     assert not is_admin_api_path('/api/library/files')
-    assert not is_admin_api_path('/api/monitor/playlists')
+    assert is_admin_api_path('/api/auth/users')
+    assert is_admin_api_path('/api/auth/users/3')
+    assert not is_admin_api_path('/api/auth/me')

@@ -160,6 +160,7 @@ import {
   parseServerUrl,
   SERVER_ROUTE_PRIVATE,
   SERVER_ROUTE_PUBLIC,
+  serverRouteEpoch,
   setActiveServerRoute,
   setConnectionMode,
   setStoredPrivateServerUrl,
@@ -177,11 +178,18 @@ const serverTestLoading = ref(false)
 const serverTestMessage = ref('')
 const serverTestError = ref(false)
 
-const usesCustomServer = computed(() => usesCustomServerUrl())
-const activeRoute = computed(() => getActiveServerRoute())
-const activeServerDisplay = computed(() =>
-  formatServerDisplay(getServerConfig())
-)
+const usesCustomServer = computed(() => {
+  serverRouteEpoch.value
+  return usesCustomServerUrl()
+})
+const activeServerDisplay = computed(() => {
+  serverRouteEpoch.value
+  return formatServerDisplay(getServerConfig())
+})
+const activeRoute = computed(() => {
+  serverRouteEpoch.value
+  return getActiveServerRoute()
+})
 const canConnectDevice = computed(() => canConnectToCurrentPage())
 const connectedToThisDevice = computed(() => isConnectedToCurrentPage())
 const activeInput = computed(() =>

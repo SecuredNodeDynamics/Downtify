@@ -70,6 +70,11 @@ export default {
     admin: 'Admin',
     credentialsHint:
       'Leave password or PIN blank to keep the current value. On-device profiles can use a PIN only.',
+    resetLogin: 'Update login',
+    resetLoginHint:
+      'Enter a new password and/or PIN for this profile. Leave a field blank to keep it. They will need to sign in again.',
+    resetLoginNeedValue: 'Enter a new password or PIN.',
+    resetLoginSaved: 'Login updated for {name}.',
     saved: 'Profile updated.',
     failed: 'Could not update the profile.',
     deleteConfirm: 'Delete profile "{name}"? Their monitors will be removed.',
@@ -888,9 +893,10 @@ export default {
     serverRoutePrivate: 'Home network',
     serverRoutePublic: 'Cloudflare',
     serverRouteHint:
-      'Choose Home network or Cloudflare, then Test and Save address to use that connection. Both addresses stay saved.',
+      'Save both addresses. The app uses Home network when that server is reachable (home Wi‑Fi) and Cloudflare when you are on cellular or away from home.',
     serverUrlCurrent: 'Connected to',
     serverUrlDefault: 'This page (same host)',
+    serverUrlFamilyConnected: 'Connected to Downtify Server',
     serverUrlUnset: 'Not set — ask an admin',
     serverTest: 'Test connection',
     serverTesting: 'Testing…',

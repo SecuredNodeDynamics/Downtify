@@ -69,6 +69,11 @@ export default {
     admin: 'Admin',
     credentialsHint:
       'Deixe a senha ou o PIN em branco para manter o valor atual. No aparelho, o perfil pode usar só o PIN.',
+    resetLogin: 'Atualizar login',
+    resetLoginHint:
+      'Informe uma nova senha e/ou PIN para este perfil. Deixe um campo em branco para manter. Eles precisarao entrar de novo.',
+    resetLoginNeedValue: 'Informe uma nova senha ou PIN.',
+    resetLoginSaved: 'Login atualizado para {name}.',
     saved: 'Perfil atualizado.',
     failed: 'Não foi possível atualizar o perfil.',
     deleteConfirm:
@@ -907,9 +912,10 @@ export default {
     serverRoutePrivate: 'Rede local',
     serverRoutePublic: 'Cloudflare',
     serverRouteHint:
-      'Escolha Rede local ou Cloudflare, depois Teste e Salvar endereco para usar essa conexao. Os dois enderecos permanecem salvos.',
+      'Salve os dois enderecos. O app usa a rede local quando esse servidor esta acessivel (Wi‑Fi de casa) e o Cloudflare quando voce esta no celular ou fora de casa.',
     serverUrlCurrent: 'Conectado a',
     serverUrlDefault: 'Esta pagina (mesmo host)',
+    serverUrlFamilyConnected: 'Conectado ao servidor Downtify',
     serverUrlUnset: 'Nao definido — peca a um administrador',
     serverTest: 'Testar conexao',
     serverTesting: 'Testando…',
