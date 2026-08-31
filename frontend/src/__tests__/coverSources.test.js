@@ -20,9 +20,8 @@ vi.mock('../model/serverConnection.js', async (importOriginal) => {
 
 describe('coverSourcesForNowPlaying', () => {
   beforeEach(async () => {
-    const { isCapacitorNative, usesEmbeddedServer } = await import(
-      '../model/serverConnection.js'
-    )
+    const { isCapacitorNative, usesEmbeddedServer } =
+      await import('../model/serverConnection.js')
     isCapacitorNative.mockReturnValue(false)
     usesEmbeddedServer.mockReturnValue(false)
     const API = (await import('../model/api.js')).default
@@ -58,7 +57,7 @@ describe('coverSourcesForNowPlaying', () => {
 
     const sources = API.coverSourcesForGenreFile('Artist/Album/Track.m4a')
 
-    expect(sources.src).toContain('/api/metadata/artist-images/folder-preview?')
+    expect(sources.src).toContain('/api/library/artist-cover?')
     expect(sources.src).toContain('folder=Artist%2FAlbum')
     expect(sources.fallbacks.at(-1)).toContain('/cover?')
   })
@@ -68,7 +67,7 @@ describe('coverSourcesForNowPlaying', () => {
 
     const sources = API.coverSourcesForAlbumFile('Artist/Album/Track.m4a')
 
-    expect(sources.src).toContain('/api/metadata/artist-images/folder-preview?')
+    expect(sources.src).toContain('/api/library/artist-cover?')
     expect(sources.src).toContain('folder=Artist%2FAlbum')
     expect(sources.fallbacks.at(-1)).toContain('/cover?')
   })
@@ -87,9 +86,8 @@ describe('coverSourcesForNowPlaying', () => {
   })
 
   it('prefers the embedded image proxy for standalone native remote artwork', async () => {
-    const { isCapacitorNative, usesEmbeddedServer } = await import(
-      '../model/serverConnection.js'
-    )
+    const { isCapacitorNative, usesEmbeddedServer } =
+      await import('../model/serverConnection.js')
     isCapacitorNative.mockReturnValue(true)
     usesEmbeddedServer.mockReturnValue(true)
     const API = (await import('../model/api.js')).default
@@ -104,9 +102,8 @@ describe('coverSourcesForNowPlaying', () => {
   })
 
   it('prefers direct artwork for server-connected native remote artwork', async () => {
-    const { isCapacitorNative, usesEmbeddedServer } = await import(
-      '../model/serverConnection.js'
-    )
+    const { isCapacitorNative, usesEmbeddedServer } =
+      await import('../model/serverConnection.js')
     isCapacitorNative.mockReturnValue(true)
     usesEmbeddedServer.mockReturnValue(false)
     const API = (await import('../model/api.js')).default

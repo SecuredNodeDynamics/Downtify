@@ -173,6 +173,10 @@ def test_admin_api_paths() -> None:
     assert not is_admin_api_path('/api/health')
     assert not is_admin_api_path('/api/update')
     assert not is_admin_api_path('/api/library/files')
+    assert not is_admin_api_path('/api/library/artist-cover')
+    assert not is_admin_api_path(
+        '/api/metadata/artist-images/folder-preview'
+    )
     assert is_admin_api_path('/api/auth/users')
     assert is_admin_api_path('/api/auth/users/3')
     assert not is_admin_api_path('/api/auth/me')

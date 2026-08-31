@@ -94,6 +94,34 @@ export function applyAuthStatus(data) {
   return next
 }
 
+function headerAuthorization(headers) {
+  if (!headers) return ''
+  if (typeof headers.get === 'function') {
+    return String(
+      headers.get('Authorization') || headers.get('authorization') || ''
+    )
+  }
+  const json = typeof headers.toJSON === 'function' ? headers.toJSON() : headers
+  return String(json?.Authorization || json?.authorization || '')
+}
+
+export function requestHasAuthorization(config) {
+  const headers = config?.headers
+  if (!headers) return false
+  return Boolean(
+    headerAuthorization(headers) || headerAuthorization(headers.common)
+  )
+}
+
+export function shouldMarkAuthUnauthorized(status, config) {
+  if (Number(status) !== 401) return false
+  const requestUrl = String(config?.url || '')
+  if (requestUrl.includes('/api/auth/')) return false
+  // Browser <img> and tokenless cover fetches 401 when auth is on. That must
+  // not sign family users out while Library JSON still used a valid token.
+  return requestHasAuthorization(config)
+}
+
 export function markAuthUnauthorized() {
   const profiles = status.value.profiles
   applyAuthStatus({

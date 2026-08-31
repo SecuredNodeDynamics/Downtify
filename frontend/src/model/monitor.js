@@ -1,6 +1,11 @@
 import axios from 'axios'
 
-import { authHeaders, authStatus, markAuthUnauthorized } from './authSession.js'
+import {
+  authHeaders,
+  authStatus,
+  markAuthUnauthorized,
+  shouldMarkAuthUnauthorized,
+} from './authSession.js'
 import {
   capacitorAxiosAdapter,
   shouldUseNativeHttpAdapter,
@@ -29,8 +34,7 @@ API.interceptors.response.use(
   (response) => response,
   (error) => {
     const status = error?.response?.status
-    const requestUrl = String(error?.config?.url || '')
-    if (status === 401 && !requestUrl.includes('/api/auth/')) {
+    if (shouldMarkAuthUnauthorized(status, error?.config)) {
       markAuthUnauthorized()
     }
     return Promise.reject(error)

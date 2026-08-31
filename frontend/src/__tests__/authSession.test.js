@@ -12,6 +12,7 @@ import {
   clearAuthToken,
   getStoredAuthToken,
   sessionStorageKey,
+  shouldMarkAuthUnauthorized,
   storeAuthToken,
   useAuthSession,
 } from '../model/authSession.js'
@@ -69,6 +70,24 @@ describe('authSession', () => {
     expect(getStoredAuthToken('https://downtify.janzenmediagroup.com')).toBe(
       'shared-token'
     )
+  })
+
+  it('does not treat tokenless 401s as a signed-out session', () => {
+    expect(shouldMarkAuthUnauthorized(401, { url: '/api/library/files' })).toBe(
+      false
+    )
+    expect(
+      shouldMarkAuthUnauthorized(401, {
+        url: '/api/library/artist-cover',
+        headers: { Authorization: 'Bearer family-token' },
+      })
+    ).toBe(true)
+    expect(
+      shouldMarkAuthUnauthorized(403, {
+        url: '/api/metadata/scan',
+        headers: { Authorization: 'Bearer family-token' },
+      })
+    ).toBe(false)
   })
 
   it('hides admin settings for family profiles', () => {

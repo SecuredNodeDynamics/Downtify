@@ -189,7 +189,12 @@ function urlMatchesArtistFolder(url, artistName) {
   const value = String(url || '').trim()
   const name = String(artistName || '').trim()
   if (!value || !name) return false
-  if (!value.includes('artist-images/folder-preview')) return false
+  if (
+    !value.includes('artist-images/folder-preview') &&
+    !value.includes('/api/library/artist-cover')
+  ) {
+    return false
+  }
   try {
     const parsed = new URL(value, 'http://downtify.local')
     const folder = parsed.searchParams.get('folder') || ''

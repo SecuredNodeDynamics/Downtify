@@ -36,6 +36,12 @@ ADMIN_API_PATHS = frozenset({
     '/api/library/genres/cancel',
 })
 ADMIN_API_PREFIXES = ('/api/metadata', '/api/jellyfin', '/api/auth/users')
+# Library tiles load artist photos from this metadata URL (and <img> sends the
+# session cookie). Family profiles must be able to read it; write/scan routes
+# under /api/metadata stay admin-only.
+ADMIN_API_PATH_EXCEPTIONS = frozenset({
+    '/api/metadata/artist-images/folder-preview',
+})
 
 
 def _now() -> datetime:
@@ -130,6 +136,8 @@ def is_public_api_path(path: str) -> bool:
 
 
 def is_admin_api_path(path: str) -> bool:
+    if path in ADMIN_API_PATH_EXCEPTIONS:
+        return False
     if path in ADMIN_API_PATHS:
         return True
     return any(

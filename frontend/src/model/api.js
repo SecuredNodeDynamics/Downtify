@@ -41,6 +41,7 @@ import {
   clearAuthToken,
   getStoredAuthToken,
   markAuthUnauthorized,
+  shouldMarkAuthUnauthorized,
   ready as authReady,
   storeAuthToken,
 } from './authSession.js'
@@ -74,8 +75,7 @@ API.interceptors.response.use(
   (error) => {
     const config = error?.config
     const status = error?.response?.status
-    const requestUrl = String(config?.url || '')
-    if (status === 401 && !requestUrl.includes('/api/auth/')) {
+    if (shouldMarkAuthUnauthorized(status, config)) {
       markAuthUnauthorized()
     }
     const canRetryCurrentPage =
@@ -464,7 +464,7 @@ function coverFolderURL(folderPath, size = DEFAULT_COVER_SIZE) {
   const folder = String(folderPath || '').trim()
   if (!folder) return ''
   return apiAssetUrl(
-    `/api/metadata/artist-images/folder-preview?${new URLSearchParams(
+    `/api/library/artist-cover?${new URLSearchParams(
       withCoverSize({ folder }, size)
     )}`
   )

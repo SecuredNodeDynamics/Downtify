@@ -3024,6 +3024,11 @@ def image_proxy(url: str = Query('')) -> Response:
     )
 
 
+@router.get('/api/library/artist-cover')
+def library_artist_cover(folder: str = Query(...), size: int = 0) -> Response:
+    return _artist_folder_image_response(folder, size)
+
+
 @router.get('/api/library/cover')
 def library_cover(file: str = Query(''), size: int = 0) -> Response:
     download_dir = (
@@ -4054,10 +4059,7 @@ def _with_clean_artist_image_preview(
     ]
 
 
-@router.get('/api/metadata/artist-images/folder-preview')
-def artist_folder_image_preview(
-    folder: str = Query(...), size: int = 0
-) -> Response:
+def _artist_folder_image_response(folder: str, size: int = 0) -> Response:
     if state.downloader is None:
         raise HTTPException(status_code=500, detail='Downloader not ready')
     download_dir = _active_download_dir().resolve()
@@ -4095,6 +4097,13 @@ def artist_folder_image_preview(
             'ETag': f'"{int(image.stat().st_mtime)}"',
         },
     )
+
+
+@router.get('/api/metadata/artist-images/folder-preview')
+def artist_folder_image_preview(
+    folder: str = Query(...), size: int = 0
+) -> Response:
+    return _artist_folder_image_response(folder, size)
 
 
 @router.get('/api/metadata/artist-images/preview')
