@@ -1,6 +1,7 @@
 import { ref } from 'vue'
 
 import API from './api.js'
+import { notifyLibraryChanged } from './librarySession.js'
 
 export const genreWarmupStatus = ref({
   status: 'idle',
@@ -8,20 +9,48 @@ export const genreWarmupStatus = ref({
   current: 0,
   total: 0,
   error: '',
+  started_at: '',
+  updated_at: '',
+  tagged_tracks: 0,
+  total_tracks: 0,
 })
+
+const STALL_MS = 45_000
 
 let pollTimer = null
 let inFlight = null
 let lastAutoStartUnknowns = -1
+let lastPolledStatus = ''
 
 export function resetGenreLookupMemory() {
   lastAutoStartUnknowns = -1
   inFlight = null
+  lastPolledStatus = ''
   stopGenreWarmupPolling()
 }
 
 export function isGenreWarmupRunning(status = genreWarmupStatus.value) {
   return status?.status === 'running'
+}
+
+export function genreWarmupPercent(status = genreWarmupStatus.value) {
+  const total = Number(status?.total) || 0
+  const current = Number(status?.current) || 0
+  if (total <= 0) return 0
+  return Math.max(0, Math.min(100, Math.round((current / total) * 100)))
+}
+
+export function isGenreWarmupStalled(
+  status = genreWarmupStatus.value,
+  now = Date.now()
+) {
+  if (status?.status !== 'running') return false
+  const phase = String(status?.phase || '')
+  if (phase === 'library' || !phase) return false
+  const raw = status.updated_at || ''
+  const then = Date.parse(raw)
+  if (!Number.isFinite(then)) return false
+  return now - then > STALL_MS
 }
 
 export function stopGenreWarmupPolling() {
@@ -34,11 +63,19 @@ async function refreshGenreWarmupStatus() {
   try {
     const res = await API.getLibraryGenresStatus()
     if (res?.data) genreWarmupStatus.value = res.data
-    if (res?.data?.status !== 'running') {
+    const status = res?.data?.status || ''
+    if (status !== 'running') {
+      if (lastPolledStatus === 'running' && status) {
+        notifyLibraryChanged()
+      }
+      lastPolledStatus = status
       stopGenreWarmupPolling()
+      return
     }
+    lastPolledStatus = status
   } catch {
-    stopGenreWarmupPolling()
+    // Keep polling through brief network errors so the bar does not
+    // freeze on "running" after a single failed status check.
   }
 }
 
@@ -53,6 +90,15 @@ export function startGenreWarmupPolling() {
 export async function startLibraryGenreLookup() {
   const res = await API.startLibraryGenreRefresh()
   if (res?.data) genreWarmupStatus.value = res.data
+  lastPolledStatus = res?.data?.status || 'running'
+  startGenreWarmupPolling()
+  return res?.data
+}
+
+export async function cancelLibraryGenreLookup() {
+  const res = await API.cancelLibraryGenreRefresh()
+  if (res?.data) genreWarmupStatus.value = res.data
+  lastPolledStatus = res?.data?.status || 'cancelled'
   startGenreWarmupPolling()
   return res?.data
 }
@@ -73,6 +119,7 @@ export async function ensureLibraryGenreLookup(unknownCount) {
         startGenreWarmupPolling()
         return
       }
+      if (current.status === 'cancelled') return
       if (
         current.status === 'complete' &&
         unknownCount === lastAutoStartUnknowns

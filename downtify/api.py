@@ -30,6 +30,7 @@ import shlex
 import shutil
 import subprocess
 import sys
+import threading
 import time
 import unicodedata
 from datetime import datetime, timedelta, timezone
@@ -71,6 +72,8 @@ from .auth import (
 from .cover_art import clear_cover_cache, cover_response_for_file
 from .cover_art import resize_image_bytes as cover_art_resize
 from .downloader import Downloader, preview_audio_for_song
+from .duplicate_scan import delete_library_files, find_duplicate_groups
+from .genres import GenreWarmupCancelled
 from .history import DownloadHistoryDB
 from .image_proxy import fetch_remote_image, is_allowed_image_url
 from .library_index import (
@@ -82,7 +85,6 @@ from .library_index import (
     notify_library_changed,
     warm_library_genres,
 )
-from .duplicate_scan import delete_library_files, find_duplicate_groups
 from .monitor import MonitoredPlaylist, PlaylistMonitorDB, check_playlist
 from .versioning import parse_version
 
@@ -493,10 +495,14 @@ class AppState:
         'albums_warmed': 0,
         'tagged_tracks': 0,
         'total_tracks': 0,
+        'started_at': '',
+        'updated_at': '',
         'error': '',
     }
     genre_warmup_task: Optional[asyncio.Task] = None
     genre_warmup_debounce_task: Optional[asyncio.Task] = None
+    genre_warmup_cancel: Optional[threading.Event] = None
+    genre_warmup_needs_flush: bool = False
     genre_warmup_rerun: bool = False
     library_files_cache: dict[str, Any] = {
         'root': '',
@@ -2772,46 +2778,91 @@ async def _run_genre_warmup() -> None:
         if state.downloader is not None
         else state.default_download_dir
     )
+    started_at = datetime.now(timezone.utc).isoformat()
+    cancel_event = threading.Event()
+    state.genre_warmup_cancel = cancel_event
+    state.genre_warmup_needs_flush = False
     state.genre_warmup = {
         **state.genre_warmup,
         'status': 'running',
-        'phase': 'artists',
+        'phase': 'library',
+        'current': 0,
+        'total': 0,
+        'started_at': started_at,
+        'updated_at': started_at,
         'error': '',
     }
 
     def progress(update: dict[str, Any]) -> None:
+        if cancel_event.is_set():
+            raise GenreWarmupCancelled()
+        current = int(update.get('current') or 0)
         state.genre_warmup = {
             **state.genre_warmup,
             'status': 'running',
+            'updated_at': datetime.now(timezone.utc).isoformat(),
             **update,
         }
+        if current and current % 5 == 0:
+            state.genre_warmup_needs_flush = True
 
+    async def _live_flush() -> None:
+        try:
+            while True:
+                await asyncio.sleep(5)
+                if not state.genre_warmup_needs_flush:
+                    continue
+                state.genre_warmup_needs_flush = False
+                invalidate_library_files_cache()
+                await _refresh_library_files_cache()
+        except asyncio.CancelledError:
+            return
+
+    flush_task = asyncio.create_task(_live_flush())
+    cancelled = False
     try:
         result = await asyncio.to_thread(
             warm_library_genres,
             download_dir,
             progress_cb=progress,
+            cancel_event=cancel_event,
         )
         state.genre_warmup = {
+            **state.genre_warmup,
             'status': 'complete',
             'phase': 'done',
-            'current': 0,
-            'total': 0,
+            'updated_at': datetime.now(timezone.utc).isoformat(),
             'error': '',
             **result,
+        }
+    except GenreWarmupCancelled:
+        cancelled = True
+        state.genre_warmup_rerun = False
+        state.genre_warmup = {
+            **state.genre_warmup,
+            'status': 'cancelled',
+            'phase': 'done',
+            'updated_at': datetime.now(timezone.utc).isoformat(),
+            'error': '',
         }
     except Exception as exc:
         logger.opt(exception=True).warning('Genre warmup failed')
         state.genre_warmup = {
             **state.genre_warmup,
             'status': 'error',
+            'updated_at': datetime.now(timezone.utc).isoformat(),
             'error': str(exc),
         }
-    invalidate_library_files_cache()
-    await _refresh_library_files_cache()
-    if state.genre_warmup_rerun:
-        state.genre_warmup_rerun = False
-        state.genre_warmup_task = asyncio.create_task(_run_genre_warmup())
+    finally:
+        flush_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError, Exception):
+            await flush_task
+        state.genre_warmup_cancel = None
+        invalidate_library_files_cache()
+        await _refresh_library_files_cache()
+        if state.genre_warmup_rerun and not cancelled:
+            state.genre_warmup_rerun = False
+            state.genre_warmup_task = asyncio.create_task(_run_genre_warmup())
 
 
 def _cancel_genre_warmup_debounce() -> None:
@@ -2824,6 +2875,7 @@ def _cancel_genre_warmup_debounce() -> None:
 async def start_genre_warmup(*, debounce: float = 0.0) -> None:
     _cancel_genre_warmup_debounce()
     if debounce > 0:
+
         async def _delayed() -> None:
             await asyncio.sleep(debounce)
             await start_genre_warmup()
@@ -2835,6 +2887,17 @@ async def start_genre_warmup(*, debounce: float = 0.0) -> None:
         state.genre_warmup_rerun = True
         return
     state.genre_warmup_rerun = False
+    started_at = datetime.now(timezone.utc).isoformat()
+    state.genre_warmup = {
+        **state.genre_warmup,
+        'status': 'running',
+        'phase': 'library',
+        'current': 0,
+        'total': 0,
+        'started_at': started_at,
+        'updated_at': started_at,
+        'error': '',
+    }
     state.genre_warmup_task = asyncio.create_task(_run_genre_warmup())
 
 
@@ -2846,6 +2909,22 @@ def library_genres_status() -> dict[str, Any]:
 @router.post('/api/library/genres/refresh')
 async def refresh_library_genres() -> dict[str, Any]:
     await start_genre_warmup()
+    return dict(state.genre_warmup)
+
+
+@router.post('/api/library/genres/cancel')
+async def cancel_library_genres() -> dict[str, Any]:
+    state.genre_warmup_rerun = False
+    _cancel_genre_warmup_debounce()
+    cancel_event = state.genre_warmup_cancel
+    if cancel_event is not None:
+        cancel_event.set()
+    if state.genre_warmup.get('status') == 'running':
+        state.genre_warmup = {
+            **state.genre_warmup,
+            'status': 'cancelled',
+            'updated_at': datetime.now(timezone.utc).isoformat(),
+        }
     return dict(state.genre_warmup)
 
 

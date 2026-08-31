@@ -7,12 +7,12 @@ import os
 import time
 from difflib import SequenceMatcher
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 import requests
 from loguru import logger
 
-from .genres import canonical_genre, pick_genre_from_tags
+from .genres import GenreWarmupCancelled, canonical_genre, pick_genre_from_tags
 from .lastfm import lookup_artist_genre as lookup_artist_genre_lastfm
 
 MUSICBRAINZ_RECORDING_URL = 'https://musicbrainz.org/ws/2/recording/'
@@ -263,16 +263,34 @@ def _fetch_artist_genre_from_musicbrainz(artist_name: str) -> str:
         return ''
 
 
-def warm_artist_genre_cache(artist_names: list[str]) -> None:
+def warm_artist_genre_cache(
+    artist_names: list[str],
+    progress_cb: Callable[[dict[str, Any]], None] | None = None,
+    cancel_event: Any = None,
+) -> None:
     """Populate the on-disk artist genre cache for library browsing."""
 
     seen: set[str] = set()
+    names: list[str] = []
     for artist_name in artist_names:
         key = _norm(str(artist_name or '').strip())
         if not key or key in seen:
             continue
         seen.add(key)
+        names.append(artist_name)
+    total = len(names)
+    for index, artist_name in enumerate(names, start=1):
+        if cancel_event is not None and cancel_event.is_set():
+            raise GenreWarmupCancelled()
         lookup_artist_genre(artist_name, fetch=True)
+        if progress_cb is not None:
+            progress_cb(
+                {
+                    'phase': 'artists',
+                    'current': index,
+                    'total': total,
+                }
+            )
 
 
 def _throttle_musicbrainz() -> None:

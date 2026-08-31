@@ -1,4 +1,10 @@
-from downtify.genres import browse_genre, canonical_genre, pick_genre_from_tags
+from downtify.genres import (
+    GenreWarmupCancelled,
+    browse_genre,
+    canonical_genre,
+    pick_genre_from_tags,
+)
+from downtify.library_index import _raise_if_genre_warmup_cancelled
 
 
 def test_canonical_genre_rejects_non_genre_tags():
@@ -40,3 +46,16 @@ def test_pick_genre_from_tags_prefers_higher_ranked_valid_tag():
         {'name': 'indie rock', 'count': 20},
     ]
     assert pick_genre_from_tags(tags) == 'Indie Rock'
+
+
+def test_genre_warmup_cancel_event_stops_lookup() -> None:
+    from threading import Event
+
+    idle = Event()
+    _raise_if_genre_warmup_cancelled(idle)
+    idle.set()
+    try:
+        _raise_if_genre_warmup_cancelled(idle)
+    except GenreWarmupCancelled:
+        return
+    raise AssertionError('expected GenreWarmupCancelled')

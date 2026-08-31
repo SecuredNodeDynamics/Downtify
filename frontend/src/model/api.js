@@ -869,6 +869,10 @@ function startLibraryGenreRefresh() {
   return API.post('/api/library/genres/refresh', null, { timeout: 15000 })
 }
 
+function cancelLibraryGenreRefresh() {
+  return API.post('/api/library/genres/cancel', null, { timeout: 15000 })
+}
+
 function deleteDownload(file) {
   return API.delete('/delete', { params: { file } })
 }
@@ -1229,6 +1233,7 @@ export default {
   fetchAlbumTrackCounts,
   getLibraryGenresStatus,
   startLibraryGenreRefresh,
+  cancelLibraryGenreRefresh,
   deleteDownload,
   writePlaylistM3u,
   getQueue,

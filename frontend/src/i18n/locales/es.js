@@ -304,7 +304,15 @@ export default {
     playGenre: 'Reproducir genero',
     updateGenres: 'Actualizar generos',
     updatingGenres: 'Buscando generos…',
+    updatingGenresLibrary: 'Leyendo la biblioteca…',
     updatingGenresProgress: 'Buscando generos… {current} de {total}',
+    updatingGenresStalled:
+      'Sigue en marcha. Una consulta esta tardando mas de lo habitual.',
+    cancelGenreUpdate: 'Detener',
+    genreUpdateCancelled:
+      'Se detuvo la actualizacion de generos. Puedes reanudarla.',
+    genreUpdateFailed: 'Fallo la actualizacion de generos. Puedes reintentar.',
+    genreUpdateComplete: 'Actualizadas {tagged} de {total} pistas.',
     unknownGenreHint:
       '{count} pistas aun no tienen genero. Actualiza las categorias al anadir musica nueva.',
     genresUpdated: 'Las categorias de genero estan al dia.',

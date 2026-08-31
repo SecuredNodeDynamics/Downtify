@@ -7,7 +7,7 @@ import re
 from pathlib import Path
 from typing import Any, Callable
 
-from .genres import browse_genre, canonical_genre
+from .genres import GenreWarmupCancelled, browse_genre, canonical_genre
 from .metadata_repair import (
     AUDIO_EXTENSIONS,
     _genre_from_path,
@@ -464,13 +464,22 @@ def _album_samples_without_genre(
     return samples
 
 
+def _raise_if_genre_warmup_cancelled(cancel_event: Any) -> None:
+    if cancel_event is not None and cancel_event.is_set():
+        raise GenreWarmupCancelled()
+
+
 def warm_library_genres(
     root: Path,
     *,
     progress_cb: Callable[[dict[str, Any]], None] | None = None,
+    cancel_event: Any = None,
 ) -> dict[str, int]:
     """Populate genre cache and album tags via MusicBrainz in the background."""
 
+    _raise_if_genre_warmup_cancelled(cancel_event)
+    if progress_cb is not None:
+        progress_cb({'phase': 'library', 'current': 0, 'total': 0})
     items = list_library_files(root, fetch_missing_genres=False)
     missing_artists = sorted({
         item['artist']
@@ -480,14 +489,20 @@ def warm_library_genres(
         and not canonical_genre(item.get('genre') or '')
     })
     if missing_artists:
-        warm_artist_genre_cache(missing_artists)
+        warm_artist_genre_cache(
+            missing_artists,
+            progress_cb=progress_cb,
+            cancel_event=cancel_event,
+        )
 
+    _raise_if_genre_warmup_cancelled(cancel_event)
     items = enrich_library_genres(
         list_library_files(root, fetch_missing_genres=False)
     )
     album_samples = _album_samples_without_genre(items)
     albums_warmed = 0
     for index, (_album_key, relative) in enumerate(album_samples, start=1):
+        _raise_if_genre_warmup_cancelled(cancel_event)
         try:
             path = safe_library_path(root, relative)
             song = _song_from_file_safe(path)
@@ -497,6 +512,8 @@ def warm_library_genres(
                 albums_warmed += 1
                 remember_artist_genre(_artist_name(relative, enriched), genre)
                 _remember_album_genre(_album_key, genre)
+        except GenreWarmupCancelled:
+            raise
         except Exception:
             continue
         if progress_cb is not None:
@@ -507,6 +524,7 @@ def warm_library_genres(
                 'albums_warmed': albums_warmed,
             })
 
+    _raise_if_genre_warmup_cancelled(cancel_event)
     final_items = enrich_library_genres(
         list_library_files(root, fetch_missing_genres=False)
     )

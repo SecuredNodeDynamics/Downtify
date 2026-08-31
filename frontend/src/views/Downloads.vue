@@ -426,25 +426,46 @@
 
               <template v-else-if="viewMode === 'genres' && !selectedGenreName">
                 <div v-if="showGenreUpdateBar" class="library-genre-update">
-                  <p class="library-genre-update-copy">
-                    {{ genreUpdateMessage }}
-                  </p>
-                  <button
-                    type="button"
-                    class="btn btn-sm btn-primary"
-                    :disabled="genreWarmupRunning"
-                    @click="updateLibraryGenres"
-                  >
-                    <span
+                  <div class="min-w-0 flex-1">
+                    <p class="library-genre-update-copy">
+                      {{ genreUpdateMessage }}
+                    </p>
+                    <div
+                      v-if="genreWarmupRunning && genreProgressPercent > 0"
+                      class="library-genre-update-meter"
+                    >
+                      <div
+                        class="library-genre-update-meter-fill"
+                        :style="{ width: `${genreProgressPercent}%` }"
+                      />
+                    </div>
+                  </div>
+                  <div class="flex shrink-0 items-center gap-2">
+                    <button
                       v-if="genreWarmupRunning"
-                      class="loading loading-spinner loading-xs"
-                    />
-                    {{
-                      genreWarmupRunning
-                        ? t('library.updatingGenres')
-                        : t('library.updateGenres')
-                    }}
-                  </button>
+                      type="button"
+                      class="btn btn-sm btn-ghost"
+                      @click="stopLibraryGenreUpdate"
+                    >
+                      {{ t('library.cancelGenreUpdate') }}
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-primary"
+                      :disabled="genreWarmupRunning"
+                      @click="updateLibraryGenres"
+                    >
+                      <span
+                        v-if="genreWarmupRunning"
+                        class="loading loading-spinner loading-xs"
+                      />
+                      {{
+                        genreWarmupRunning
+                          ? t('library.updatingGenres')
+                          : t('library.updateGenres')
+                      }}
+                    </button>
+                  </div>
                 </div>
                 <ul class="library-browse-grid" :style="virtualListPadStyle">
                   <li
@@ -663,9 +684,12 @@ import { useI18n } from '/src/i18n'
 import { usePlayer } from '/src/model/player'
 import { nextGenrePlaylistStart } from '/src/model/playerQueue.js'
 import {
+  cancelLibraryGenreLookup,
   ensureLibraryGenreLookup,
+  genreWarmupPercent,
   genreWarmupStatus,
   isGenreWarmupRunning,
+  isGenreWarmupStalled,
   startLibraryGenreLookup,
 } from '/src/model/genreRefresh.js'
 import { consumeLibraryNavigation } from '/src/model/libraryNavigation'
@@ -800,21 +824,46 @@ const unknownGenreCount = computed(() => countUnknownGenres(libraryItems.value))
 const genreWarmupRunning = computed(() =>
   isGenreWarmupRunning(genreWarmupStatus.value)
 )
-const showGenreUpdateBar = computed(
-  () =>
-    viewMode.value === 'genres' &&
-    !selectedGenreName.value &&
-    (unknownGenreCount.value > 0 || genreWarmupRunning.value)
+const genreProgressPercent = computed(() =>
+  genreWarmupPercent(genreWarmupStatus.value)
 )
+const showGenreUpdateBar = computed(() => {
+  if (viewMode.value !== 'genres' || selectedGenreName.value) return false
+  const status = genreWarmupStatus.value?.status
+  return (
+    unknownGenreCount.value > 0 ||
+    status === 'running' ||
+    status === 'error' ||
+    status === 'cancelled'
+  )
+})
 const genreUpdateMessage = computed(() => {
   const st = genreWarmupStatus.value
   if (st.status === 'running') {
     const current = Number(st.current) || 0
     const total = Number(st.total) || 0
-    if (st.phase === 'albums' && total > 0) {
+    if (isGenreWarmupStalled(st)) {
+      return t('library.updatingGenresStalled')
+    }
+    if (st.phase === 'library') {
+      return t('library.updatingGenresLibrary')
+    }
+    if ((st.phase === 'artists' || st.phase === 'albums') && total > 0) {
       return t('library.updatingGenresProgress', { current, total })
     }
     return t('library.updatingGenres')
+  }
+  if (st.status === 'error') {
+    return st.error || t('library.genreUpdateFailed')
+  }
+  if (st.status === 'cancelled') {
+    return t('library.genreUpdateCancelled')
+  }
+  if (st.status === 'complete' && Number(st.total_tracks) > 0) {
+    return t('library.genreUpdateComplete', {
+      tagged: Number(st.tagged_tracks) || 0,
+      total: Number(st.total_tracks) || 0,
+    })
   }
   if (unknownGenreCount.value > 0) {
     return t('library.unknownGenreHint', { count: unknownGenreCount.value })
@@ -1416,6 +1465,14 @@ async function updateLibraryGenres() {
   }
 }
 
+async function stopLibraryGenreUpdate() {
+  try {
+    await cancelLibraryGenreLookup()
+  } catch {
+    // Keep the current status if cancel cannot be reached.
+  }
+}
+
 function pathsToLibraryItems(paths) {
   const options = libraryGroupOptions.value
   return (paths || []).map((file) => normalizeLibraryItem({ file }, options))
@@ -1836,6 +1893,14 @@ onUnmounted(() => {
 
 .library-genre-update-copy {
   @apply min-w-0 text-xs leading-5 text-base-content/70;
+}
+
+.library-genre-update-meter {
+  @apply mt-2 h-1 overflow-hidden rounded-full bg-base-content/10;
+}
+
+.library-genre-update-meter-fill {
+  @apply h-full rounded-full bg-primary transition-[width] duration-300;
 }
 
 .browse-tile-shell {

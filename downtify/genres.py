@@ -5,6 +5,11 @@ from __future__ import annotations
 import re
 from typing import Any
 
+
+class GenreWarmupCancelled(Exception):
+    """Raised when a live genre lookup is stopped from the UI."""
+
+
 _BROWSE_GENRES: tuple[str, ...] = (
     'Pop',
     'Rock',

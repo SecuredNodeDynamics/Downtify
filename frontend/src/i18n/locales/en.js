@@ -298,7 +298,14 @@ export default {
     playGenre: 'Play genre',
     updateGenres: 'Update genres',
     updatingGenres: 'Looking up genres…',
+    updatingGenresLibrary: 'Reading your library…',
     updatingGenresProgress: 'Looking up genres… {current} of {total}',
+    updatingGenresStalled:
+      'Still working. A lookup is taking longer than usual.',
+    cancelGenreUpdate: 'Stop',
+    genreUpdateCancelled: 'Genre update stopped. You can start it again.',
+    genreUpdateFailed: 'Genre update failed. You can try again.',
+    genreUpdateComplete: 'Updated {tagged} of {total} tracks.',
     unknownGenreHint:
       '{count} tracks still need a genre. Update categories after new downloads.',
     genresUpdated: 'Genre categories are up to date.',
