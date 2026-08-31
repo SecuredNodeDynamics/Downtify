@@ -638,6 +638,7 @@ import {
 import { buildApiBaseUrl, getServerConfig } from '/src/model/serverConnection'
 import { useI18n } from '/src/i18n'
 import { usePlayer } from '/src/model/player'
+import { nextGenrePlaylistStart } from '/src/model/playerQueue.js'
 import { consumeLibraryNavigation } from '/src/model/libraryNavigation'
 import { useLibraryRefresh } from '/src/model/libraryRefresh'
 import {
@@ -1578,8 +1579,12 @@ function playAlbum(album) {
 
 function playGenre(genre) {
   saveBrowseScrollPosition()
-  player.setPlaylist(genre.files, {
-    startIndex: 0,
+  const files = genre.files || []
+  const startIndex = nextGenrePlaylistStart(files, [
+    player.currentTrack.value?.file,
+  ])
+  player.setPlaylist(files, {
+    startIndex,
     context: { type: 'genre', name: genre.name },
   })
   router.push({ name: 'Player' })

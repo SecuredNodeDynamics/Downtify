@@ -4,8 +4,11 @@ import {
   enrichTrackFromLibrary,
   filesWithFollowOnAlbum,
   nextAlbumAfter,
+  nextGenrePlaylistStart,
   nextIndexInOrder,
+  pickRandomStartIndex,
   prevIndexInOrder,
+  resetGenrePlayStartMemory,
 } from '../model/playerQueue.js'
 
 describe('player up next album continuation', () => {
@@ -21,9 +24,7 @@ describe('player up next album continuation', () => {
   })
 
   it('appends follow-on album files after the current album', () => {
-    expect(
-      filesWithFollowOnAlbum(['a1.mp3', 'a2.mp3'], albums[1])
-    ).toEqual({
+    expect(filesWithFollowOnAlbum(['a1.mp3', 'a2.mp3'], albums[1])).toEqual({
       files: ['a1.mp3', 'a2.mp3', 'b1.mp3'],
       followOnStart: 2,
     })
@@ -89,5 +90,25 @@ describe('library track display', () => {
       artist: 'Howard Shore',
       album: 'The Hobbit',
     })
+  })
+})
+
+describe('genre play start', () => {
+  it('avoids indexes when picking a random start', () => {
+    expect(pickRandomStartIndex(3, [0, 1], () => 0)).toBe(2)
+    expect(pickRandomStartIndex(1, [0], () => 0)).toBe(0)
+  })
+
+  it('starts a different first track the next time a genre is played', () => {
+    resetGenrePlayStartMemory()
+    const files = ['a.mp3', 'b.mp3', 'c.mp3']
+    expect(nextGenrePlaylistStart(files, [], () => 0)).toBe(0)
+    expect(nextGenrePlaylistStart(files, [], () => 0)).toBe(1)
+  })
+
+  it('avoids the song that is already playing when starting a genre', () => {
+    resetGenrePlayStartMemory()
+    const files = ['a.mp3', 'b.mp3', 'c.mp3']
+    expect(nextGenrePlaylistStart(files, ['a.mp3'], () => 0)).toBe(1)
   })
 })
