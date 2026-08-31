@@ -1016,29 +1016,30 @@ async function syncProfileWithBackend() {
   const user = authStatus.value.user
   const cached = loadProfileBundle(user)
   try {
-    if (cached?.monitors?.length || cached?.profile_key) {
-      const res = await API.post('/api/auth/profile/sync', {
-        profile_key: cached.profile_key || user.profile_key || '',
-        username: user.username,
-        monitors: cached.monitors || [],
-        groups: cached.groups || [],
+    const res = await API.post('/api/auth/profile/sync', {
+      profile_key: cached?.profile_key || user.profile_key || '',
+      username: user.username,
+      monitors: cached?.monitors || [],
+      groups: cached?.groups || [],
+    })
+    if (res.data?.user) {
+      applyAuthStatus({
+        ...authStatus.value,
+        user: res.data.user,
+        authenticated: true,
       })
-      if (res.data?.user) {
-        applyAuthStatus({
-          ...authStatus.value,
-          user: res.data.user,
-          authenticated: true,
-        })
-      }
-      if (res.data?.profile) storeProfileBundle(res.data.profile)
-      notifyProfileSynced(res.data)
-      return res.data
     }
-    const profile = await fetchAuthProfile()
-    notifyProfileSynced({ profile })
-    return { profile }
+    if (res.data?.profile) storeProfileBundle(res.data.profile)
+    notifyProfileSynced(res.data)
+    return res.data
   } catch {
-    return null
+    try {
+      const profile = await fetchAuthProfile()
+      notifyProfileSynced({ profile })
+      return { profile }
+    } catch {
+      return null
+    }
   }
 }
 
@@ -1130,7 +1131,7 @@ async function startBackendSession() {
     (authStatus.value.auth_required && !authStatus.value.authenticated)
   if (blocked) return ''
   hydrateLibraryFromPersistence(libraryServerKey())
-  void syncProfileWithBackend()
+  await syncProfileWithBackend()
   void import('./settings.js').then((mod) => mod.loadSettings())
   const versionPromise = getVersion({ prefetch: false })
   void prefetchLibrary()

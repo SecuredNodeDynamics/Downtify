@@ -1,10 +1,20 @@
 import { ref } from 'vue'
 
+import { AUTH_CHANGED_EVENT, authStatus } from './authSession.js'
 import monitorAPI from './monitor.js'
+import { PROFILE_SYNCED_EVENT } from './profileSync.js'
 
 const monitoredArtists = ref([])
 const monitoredArtistMap = ref(new Map())
 const ALIAS_STORAGE_KEY = 'downtify.monitor.artist-aliases'
+
+function aliasStorageKey() {
+  const user = authStatus.value.user
+  const who = user
+    ? `${user.id || 'id'}:${String(user.username || '').toLowerCase()}`
+    : 'anon'
+  return `${ALIAS_STORAGE_KEY}:${who}`
+}
 
 let loadPromise = null
 let lastRefreshAt = 0
@@ -21,7 +31,7 @@ export function normalizeMonitoredArtistName(value) {
 
 function readArtistAliases() {
   try {
-    const raw = sessionStorage.getItem(ALIAS_STORAGE_KEY)
+    const raw = sessionStorage.getItem(aliasStorageKey())
     if (!raw) return {}
     const parsed = JSON.parse(raw)
     return parsed && typeof parsed === 'object' ? parsed : {}
@@ -38,7 +48,7 @@ function writeArtistAlias(libraryArtistName, monitoredArtistName) {
   const aliases = readArtistAliases()
   aliases[libraryKey] = monitoredKey
   try {
-    sessionStorage.setItem(ALIAS_STORAGE_KEY, JSON.stringify(aliases))
+    sessionStorage.setItem(aliasStorageKey(), JSON.stringify(aliases))
   } catch {
     // Ignore quota or privacy errors.
   }
@@ -58,7 +68,7 @@ function removeArtistAliasesFor(monitoredArtistName) {
   }
   if (!changed) return
   try {
-    sessionStorage.setItem(ALIAS_STORAGE_KEY, JSON.stringify(aliases))
+    sessionStorage.setItem(aliasStorageKey(), JSON.stringify(aliases))
   } catch {
     // Ignore quota or privacy errors.
   }
@@ -115,6 +125,43 @@ function dedupeMonitoredItems(items) {
 function applyMonitoredArtists(items) {
   monitoredArtists.value = dedupeMonitoredItems(items)
   rebuildMonitoredArtistMap(monitoredArtists.value)
+}
+
+export function resetMonitoredArtists() {
+  applyMonitoredArtists([])
+  lastRefreshAt = 0
+  loadPromise = null
+}
+
+export function applySyncedMonitors(monitors) {
+  if (!Array.isArray(monitors)) return
+  applyMonitoredArtists(monitors)
+  lastRefreshAt = Date.now()
+}
+
+function authIdentityKey() {
+  const user = authStatus.value.user
+  if (!user) return 'anon'
+  return `${user.id}:${String(user.username || '').toLowerCase()}`
+}
+
+let lastAuthKey = authIdentityKey()
+
+if (typeof window !== 'undefined') {
+  window.addEventListener(AUTH_CHANGED_EVENT, () => {
+    const key = authIdentityKey()
+    if (key === lastAuthKey) return
+    lastAuthKey = key
+    resetMonitoredArtists()
+  })
+  window.addEventListener(PROFILE_SYNCED_EVENT, (event) => {
+    const monitors = event.detail?.profile?.monitors
+    if (Array.isArray(monitors)) {
+      applySyncedMonitors(monitors)
+      return
+    }
+    void refreshMonitoredArtists({ force: true })
+  })
 }
 
 export function upsertMonitoredArtist(item, libraryArtistName = '') {
@@ -215,5 +262,6 @@ export function useMonitoredArtists() {
     refreshMonitoredArtists,
     upsertMonitoredArtist,
     removeMonitoredArtist,
+    resetMonitoredArtists,
   }
 }

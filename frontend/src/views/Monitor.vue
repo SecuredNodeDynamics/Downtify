@@ -462,6 +462,7 @@ import monitorAPI from '/src/model/monitor.js'
 import API from '/src/model/api.js'
 import { removeMonitoredArtist } from '/src/model/monitoredArtists.js'
 import { useI18n } from '/src/i18n'
+import { AUTH_CHANGED_EVENT, authStatus } from '/src/model/authSession.js'
 import { PROFILE_SYNCED_EVENT } from '/src/model/profileSync.js'
 
 const { t } = useI18n()
@@ -838,12 +839,27 @@ function timeAgo(isoString) {
   }
 }
 
+let lastMonitorUserId = authStatus.value.user?.id ?? null
+
+function onAuthChanged() {
+  const nextId = authStatus.value.user?.id ?? null
+  if (nextId === lastMonitorUserId) return
+  lastMonitorUserId = nextId
+  if (nextId == null) {
+    setPlaylists([])
+    return
+  }
+  void load()
+}
+
 onMounted(() => {
   void load()
   window.addEventListener(PROFILE_SYNCED_EVENT, load)
+  window.addEventListener(AUTH_CHANGED_EVENT, onAuthChanged)
 })
 onBeforeUnmount(() => {
   window.removeEventListener(PROFILE_SYNCED_EVENT, load)
+  window.removeEventListener(AUTH_CHANGED_EVENT, onAuthChanged)
 })
 </script>
 

@@ -28,7 +28,11 @@ export function loginRequestBody({
     }
   }
   if (method === 'password') {
-    return { username, password, pin: '' }
+    const body = { username, password, pin: '' }
+    if (profileKey) body.profile_key = profileKey
+    return body
   }
-  return { username, password: '', pin }
+  const body = { username, password: '', pin }
+  if (profileKey) body.profile_key = profileKey
+  return body
 }

@@ -1,10 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
+  applySyncedMonitors,
   findMonitoredArtist,
   monitoredArtistMap,
   monitoredArtists,
   normalizeMonitoredArtistName,
+  resetMonitoredArtists,
   upsertMonitoredArtist,
 } from '../model/monitoredArtists.js'
 
@@ -76,5 +78,19 @@ describe('monitoredArtists', () => {
 
     expect(monitoredArtists.value).toHaveLength(1)
     expect(monitoredArtists.value[0].id).toBe(2)
+  })
+
+  it('applies synced profile monitors for the current user', () => {
+    resetMonitoredArtists()
+    applySyncedMonitors([
+      {
+        id: 9,
+        kind: 'artist',
+        name: 'Radiohead',
+        spotify_id: 'radiohead',
+        enabled: true,
+      },
+    ])
+    expect(findMonitoredArtist('Radiohead')?.spotify_id).toBe('radiohead')
   })
 })

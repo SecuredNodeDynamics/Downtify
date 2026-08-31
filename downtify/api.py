@@ -2050,6 +2050,13 @@ async def auth_login(request: Request, response: Response) -> dict[str, Any]:
         raise HTTPException(
             status_code=401, detail='Invalid username, password, or PIN'
         )
+    incoming_key = str(payload.get('profile_key') or '')
+    if incoming_key and not user.get('profile_key'):
+        adopted = await asyncio.to_thread(
+            db.adopt_profile_key, int(user['id']), incoming_key
+        )
+        if adopted:
+            user = adopted
     return _issue_session(response, request, user)
 
 

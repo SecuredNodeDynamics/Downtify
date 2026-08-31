@@ -1,19 +1,57 @@
 import axios from 'axios'
+
+import { authHeaders, authStatus, markAuthUnauthorized } from './authSession.js'
+import {
+  capacitorAxiosAdapter,
+  shouldUseNativeHttpAdapter,
+} from './nativeHttp.js'
+import { loadProfileBundle, storeProfileBundle } from './profileSync.js'
 import { buildApiBaseUrl, getServerConfig } from './serverConnection.js'
 
 const API = axios.create()
-const CACHE_KEY = 'downtify.monitor.playlists'
 const artistLookupCache = new Map()
 const ARTIST_LOOKUP_TTL_MS = 10 * 60 * 1000
 
 API.interceptors.request.use((config) => {
   config.baseURL = buildApiBaseUrl(getServerConfig())
+  const headers = authHeaders()
+  if (headers.Authorization) {
+    config.headers = config.headers || {}
+    config.headers.Authorization = headers.Authorization
+  }
+  if (shouldUseNativeHttpAdapter(config)) {
+    config.adapter = capacitorAxiosAdapter
+  }
   return config
 })
 
+API.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const status = error?.response?.status
+    const requestUrl = String(error?.config?.url || '')
+    if (status === 401 && !requestUrl.includes('/api/auth/')) {
+      markAuthUnauthorized()
+    }
+    return Promise.reject(error)
+  }
+)
+
+export function monitorListCacheKey() {
+  const base = String(buildApiBaseUrl(getServerConfig()) || '').replace(
+    /\/+$/,
+    ''
+  )
+  const user = authStatus.value.user
+  const who = user
+    ? `${user.id || 'id'}:${String(user.username || '').toLowerCase()}`
+    : 'anon'
+  return `downtify.monitor.playlists:${base}:${who}`
+}
+
 function readCachedPlaylists() {
   try {
-    const raw = sessionStorage.getItem(CACHE_KEY)
+    const raw = sessionStorage.getItem(monitorListCacheKey())
     if (!raw) return null
     const parsed = JSON.parse(raw)
     return Array.isArray(parsed) ? parsed : null
@@ -22,15 +60,43 @@ function readCachedPlaylists() {
   }
 }
 
-function writeCachedPlaylists(items) {
+function persistUserMonitorBundle(items, { allowEmpty = false } = {}) {
+  const user = authStatus.value.user
+  if (!user) return
+  const existing = loadProfileBundle(user) || {}
+  const existingMonitors = Array.isArray(existing.monitors)
+    ? existing.monitors
+    : []
+  const incoming = items || []
+  if (!allowEmpty && incoming.length === 0 && existingMonitors.length > 0) {
+    return
+  }
+  storeProfileBundle({
+    profile_key: user.profile_key || existing.profile_key || '',
+    username: user.username || existing.username || '',
+    display_name:
+      user.display_name || existing.display_name || user.username || '',
+    monitors: incoming.map((item) => ({
+      spotify_id: item?.spotify_id,
+      name: item?.name,
+      url: item?.url,
+      kind: item?.kind,
+      interval_minutes: item?.interval_minutes,
+      enabled: item?.enabled,
+      image_url: item?.image_url,
+    })),
+    groups: Array.isArray(existing.groups) ? existing.groups : [],
+  })
+}
+
+function writeCachedPlaylists(items, { allowEmptyBundle = false } = {}) {
+  const deduped = dedupeMonitoredPlaylists(items)
   try {
-    sessionStorage.setItem(
-      CACHE_KEY,
-      JSON.stringify(dedupeMonitoredPlaylists(items))
-    )
+    sessionStorage.setItem(monitorListCacheKey(), JSON.stringify(deduped))
   } catch {
     // Ignore quota or privacy errors.
   }
+  persistUserMonitorBundle(deduped, { allowEmpty: allowEmptyBundle })
 }
 
 function normalizeMonitoredArtistName(value) {
@@ -118,10 +184,10 @@ function addMonitoredPlaylist(url, intervalMinutes = 60, kind = 'playlist') {
     kind,
   }).then((res) => {
     const cached = readCachedPlaylists() || []
-    writeCachedPlaylists([
-      res.data,
-      ...cached.filter((item) => item.id !== res.data.id),
-    ])
+    writeCachedPlaylists(
+      [res.data, ...cached.filter((item) => item.id !== res.data.id)],
+      { allowEmptyBundle: true }
+    )
     return res
   })
 }
@@ -133,7 +199,8 @@ function updateMonitoredPlaylist(id, updates) {
   }).then((res) => {
     const cached = readCachedPlaylists() || []
     writeCachedPlaylists(
-      cached.map((item) => (item.id === id ? { ...item, ...res.data } : item))
+      cached.map((item) => (item.id === id ? { ...item, ...res.data } : item)),
+      { allowEmptyBundle: true }
     )
     return res
   })
@@ -142,7 +209,10 @@ function updateMonitoredPlaylist(id, updates) {
 function deleteMonitoredPlaylist(id) {
   return API.delete(`/api/monitor/playlists/${id}`).then((res) => {
     const cached = readCachedPlaylists() || []
-    writeCachedPlaylists(cached.filter((item) => item.id !== id))
+    writeCachedPlaylists(
+      cached.filter((item) => item.id !== id),
+      { allowEmptyBundle: true }
+    )
     return res
   })
 }

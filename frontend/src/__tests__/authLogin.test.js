@@ -55,4 +55,20 @@ describe('authLogin', () => {
       })
     ).toEqual({ username: 'admin', password: 'secret123', pin: '' })
   })
+
+  it('includes profile_key on login so devices can share a user', () => {
+    expect(
+      loginRequestBody({
+        username: 'Artyom',
+        pin: '24680',
+        method: 'pin',
+        profileKey: '11111111-1111-4111-8111-111111111111',
+      })
+    ).toEqual({
+      username: 'Artyom',
+      password: '',
+      pin: '24680',
+      profile_key: '11111111-1111-4111-8111-111111111111',
+    })
+  })
 })
