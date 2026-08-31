@@ -200,12 +200,11 @@ function syncMediaSessionNow({ position = false } = {}) {
   if (!mediaSessionReady) return
   const track = currentTrackForMediaSession()
   const a = audio
-  const idle = !track || (!playbackIntent.value && (!a || a.paused))
-
+  const playing = Boolean(a && !a.paused)
   void syncMediaSessionPlaybackState({
-    playing: Boolean(a && !a.paused),
-    paused: Boolean(a && a.paused && playbackIntent.value),
-    idle,
+    playing,
+    paused: Boolean(track && !playing),
+    idle: !track,
   })
 
   if (track) {
@@ -327,9 +326,8 @@ function armPlaybackStartWatchdog(el = audio) {
 async function ensureMediaSession() {
   if (mediaSessionReady) return
   await initPlayerMediaSession({
-    play,
-    pause,
-    prev,
+    toggle,
+    previous: skipPreviousTrack,
     next,
     seek,
     seekBy: (delta) => {
@@ -610,6 +608,7 @@ async function applyTrack(
   const wasPlaying = isPlaying.value || playbackIntent.value
   const track = playlist.value[index]
   currentIndex.value = index
+  void ensureMediaSession()
   if (shuffle.value) {
     if (shuffleOrder.length !== playlist.value.length) buildShuffleOrder()
     const pos = shuffleOrder.indexOf(index)
@@ -781,8 +780,9 @@ function setPlaylist(files, options = {}) {
     if (nextAlbum?.files?.length) {
       const currentFiles = tracks.map((track) => track.file)
       const packed = filesWithFollowOnAlbum(currentFiles, nextAlbum)
-      tracks = packed.files.map((file) =>
-        tracks.find((track) => track.file === file) ||
+      tracks = packed.files.map(
+        (file) =>
+          tracks.find((track) => track.file === file) ||
           trackFromFile(file, metaByFile)
       )
       context = {
@@ -863,8 +863,8 @@ function seek(seconds) {
     Number.isFinite(duration.value) && duration.value > 0
       ? duration.value
       : Number.isFinite(a.duration) && a.duration > 0
-        ? a.duration
-        : 0
+      ? a.duration
+      : 0
   const clamped = clampedSeekSeconds(seconds, max)
   if (clamped == null) {
     clearSeekLock()
@@ -990,15 +990,22 @@ function next() {
   playAt(i)
 }
 
+function skipPreviousTrack() {
+  const i = prevIndex()
+  if (i < 0) {
+    seek(0)
+    return
+  }
+  playAt(i)
+}
+
 function prev() {
   const a = ensureAudio()
   if (a.currentTime > 3) {
     seek(0)
     return
   }
-  const i = prevIndex()
-  if (i < 0) return
-  playAt(i)
+  skipPreviousTrack()
 }
 
 function onEnded() {

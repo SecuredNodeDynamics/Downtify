@@ -19,10 +19,43 @@ let resumeListener = null
 let usingWebSession = false
 
 export function mediaSessionPlaybackState({ playing, paused, idle }) {
-  if (idle) return 'none'
   if (playing) return 'playing'
   if (paused) return 'paused'
-  return 'none'
+  if (idle) return 'none'
+  return 'paused'
+}
+
+export function createHeadsetClickRouter({
+  toggle,
+  next,
+  previous,
+  windowMs = 420,
+} = {}) {
+  let count = 0
+  let timer = 0
+
+  function flush() {
+    const n = count
+    count = 0
+    timer = 0
+    if (n >= 3) previous?.()
+    else if (n === 2) next?.()
+    else toggle?.()
+  }
+
+  function cancel() {
+    if (timer) clearTimeout(timer)
+    timer = 0
+    count = 0
+  }
+
+  function onPlayPause() {
+    count += 1
+    if (timer) clearTimeout(timer)
+    timer = setTimeout(flush, windowMs)
+  }
+
+  return { onPlayPause, cancel }
 }
 
 export function artworkSourcesForTrack(track) {
@@ -46,7 +79,16 @@ function bindWebAction(session, action, handler) {
 export async function initPlayerMediaSession(handlers = {}) {
   if (initialized) return
 
+  const headset = createHeadsetClickRouter({
+    toggle: () => handlers.toggle?.(),
+    next: () => handlers.next?.(),
+    previous: () => {
+      if (typeof handlers.previous === 'function') handlers.previous()
+      else handlers.prev?.()
+    },
+  })
   const call = (name) => () => {
+    headset.cancel()
     const fn = handlers[name]
     if (typeof fn === 'function') fn()
   }
@@ -54,11 +96,14 @@ export async function initPlayerMediaSession(handlers = {}) {
   if (isCapacitorNative()) {
     initialized = true
     usingWebSession = false
-    await MediaSession.setActionHandler({ action: 'play' }, call('play'))
-    await MediaSession.setActionHandler({ action: 'pause' }, call('pause'))
+    await MediaSession.setActionHandler({ action: 'play' }, headset.onPlayPause)
+    await MediaSession.setActionHandler(
+      { action: 'pause' },
+      headset.onPlayPause
+    )
     await MediaSession.setActionHandler(
       { action: 'previoustrack' },
-      call('prev')
+      call('previous')
     )
     await MediaSession.setActionHandler({ action: 'nexttrack' }, call('next'))
     await MediaSession.setActionHandler({ action: 'seekbackward' }, () => {
@@ -83,9 +128,9 @@ export async function initPlayerMediaSession(handlers = {}) {
   if (!session) return
   initialized = true
   usingWebSession = true
-  bindWebAction(session, 'play', call('play'))
-  bindWebAction(session, 'pause', call('pause'))
-  bindWebAction(session, 'previoustrack', call('prev'))
+  bindWebAction(session, 'play', headset.onPlayPause)
+  bindWebAction(session, 'pause', headset.onPlayPause)
+  bindWebAction(session, 'previoustrack', call('previous'))
   bindWebAction(session, 'nexttrack', call('next'))
   bindWebAction(session, 'seekbackward', () => handlers.seekBy?.(-15))
   bindWebAction(session, 'seekforward', () => handlers.seekBy?.(15))
