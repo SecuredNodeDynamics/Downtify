@@ -57,6 +57,8 @@ export default {
     password: 'Password',
     newPassword: 'New password',
     pin: 'PIN',
+    showSecret: 'Show {name}',
+    hideSecret: 'Hide {name}',
     createAdmin: 'Create admin profile',
     signIn: 'Sign in',
     signOut: 'Sign out',

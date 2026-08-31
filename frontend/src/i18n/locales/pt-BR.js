@@ -56,6 +56,8 @@ export default {
     password: 'Senha',
     newPassword: 'Nova senha',
     pin: 'PIN',
+    showSecret: 'Mostrar {name}',
+    hideSecret: 'Ocultar {name}',
     createAdmin: 'Criar perfil de administrador',
     signIn: 'Entrar',
     signOut: 'Sair',

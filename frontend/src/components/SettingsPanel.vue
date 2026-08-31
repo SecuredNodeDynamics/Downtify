@@ -135,21 +135,24 @@
         >
           {{ t('auth.newPassword') }}
         </label>
-        <input
+        <SecretField
           v-model="accountPassword"
-          class="input input-bordered w-full rounded-xl"
-          type="password"
           autocomplete="new-password"
+          :label="t('auth.newPassword')"
+          :aria-label="t('auth.newPassword')"
         />
         <label
           class="mt-3 block text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2"
         >
           {{ t('auth.pin') }}
         </label>
-        <input
+        <SecretField
           v-model="accountPin"
-          class="input input-bordered w-full rounded-xl"
+          autocomplete="new-password"
           inputmode="numeric"
+          :maxlength="8"
+          :label="t('auth.pin')"
+          :aria-label="t('auth.pin')"
         />
         <p class="text-[11px] text-base-content/40 mt-1.5">
           {{ t('auth.credentialsHint') }}
@@ -214,17 +217,21 @@
             class="input input-bordered w-full rounded-xl"
             :placeholder="t('auth.displayName')"
           />
-          <input
+          <SecretField
             v-model="newPassword"
-            class="input input-bordered w-full rounded-xl"
-            type="password"
+            autocomplete="new-password"
             :placeholder="t('auth.password')"
+            :label="t('auth.password')"
+            :aria-label="t('auth.password')"
           />
-          <input
+          <SecretField
             v-model="newPin"
-            class="input input-bordered w-full rounded-xl"
+            autocomplete="new-password"
             inputmode="numeric"
+            :maxlength="8"
             :placeholder="t('auth.pin')"
+            :label="t('auth.pin')"
+            :aria-label="t('auth.pin')"
           />
           <p v-if="newAccountError" class="text-sm text-error">
             {{ newAccountError }}
@@ -1714,6 +1721,7 @@ import {
 } from '../model/appVersion'
 import { installApkUpdate } from '../model/apkUpdate'
 import ThemedSelect from './ThemedSelect.vue'
+import SecretField from './SecretField.vue'
 
 const route = useRoute()
 
