@@ -196,3 +196,44 @@ def test_musicbrainz_scores_multi_artist_coverage_higher():
         musicbrainz._candidate_score(full_match, song)
         > musicbrainz._candidate_score(partial_match, song)
     )
+
+
+def test_lookup_artist_genre_remembers_misses(monkeypatch, tmp_path):
+    musicbrainz._ARTIST_GENRE_CACHE.clear()
+    musicbrainz._ARTIST_GENRE_CACHE_LOADED = True
+    monkeypatch.setattr(
+        musicbrainz,
+        '_artist_genre_cache_path',
+        lambda: tmp_path / 'artist_genre_cache.json',
+    )
+    calls = {'n': 0}
+
+    def fake_fetch(_name):
+        calls['n'] += 1
+        return ''
+
+    monkeypatch.setattr(
+        musicbrainz, 'lookup_artist_genre_lastfm', lambda *_a, **_k: ''
+    )
+    monkeypatch.setattr(
+        musicbrainz, '_fetch_artist_genre_from_musicbrainz', fake_fetch
+    )
+
+    assert musicbrainz.lookup_artist_genre('Nobody') == ''
+    assert musicbrainz.lookup_artist_genre('Nobody') == ''
+    assert calls['n'] == 1
+
+
+def test_warm_artist_genre_cache_skips_cached_names(monkeypatch):
+    musicbrainz._ARTIST_GENRE_CACHE.clear()
+    musicbrainz._ARTIST_GENRE_CACHE['nas'] = 'Jazz'
+    musicbrainz._ARTIST_GENRE_CACHE_LOADED = True
+    called: list[str] = []
+    monkeypatch.setattr(
+        musicbrainz,
+        'lookup_artist_genre',
+        lambda name, fetch=True: called.append(name) or 'Jazz',
+    )
+
+    assert musicbrainz.warm_artist_genre_cache(['Nas']) == 0
+    assert called == []

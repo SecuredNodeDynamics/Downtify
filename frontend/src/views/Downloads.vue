@@ -702,9 +702,13 @@ import {
 import { useSearchManager } from '/src/model/search'
 import { needsServerConnection } from '/src/model/serverConnection'
 import { refreshMonitoredArtists } from '/src/model/monitoredArtists'
-import { preloadCoverSourcesBatch } from '/src/model/imageLoader'
+import {
+  preloadCoverSourcesBatch,
+  setCoverWarmPaused,
+} from '/src/model/imageLoader'
 import {
   libraryGridColumns,
+  libraryGridRowSize,
   virtualBrowseWindow,
 } from '/src/model/libraryBrowseWindow'
 
@@ -886,11 +890,10 @@ const albums = computed(() =>
 )
 
 const genres = computed(() =>
-  groupGenres(
-    libraryItems.value,
-    unknownGenreLabel.value,
-    libraryGroupOptions.value
-  )
+  groupGenres(libraryItems.value, unknownGenreLabel.value, {
+    ...libraryGroupOptions.value,
+    includeUnknown: false,
+  })
 )
 
 const artistCoverMap = computed(() => {
@@ -1083,20 +1086,90 @@ const isLibraryTrackList = computed(
     (Boolean(selectedArtist.value) && selectedArtistAlbums.value.length === 0)
 )
 
-function updateVirtualWindow(el = browseBodyRef.value) {
-  const track = isLibraryTrackList.value
-  const width = typeof window === 'undefined' ? 375 : window.innerWidth
-  const win = virtualBrowseWindow({
-    count: currentRenderableItems.value.length,
-    columns: track ? 1 : libraryGridColumns(width),
-    itemSize: track ? 76 : 188,
-    scrollTop: el?.scrollTop || 0,
-    viewportHeight: el?.clientHeight || 640,
+function browseItemSize(el, track) {
+  if (track) {
+    const tile = el?.querySelector('.library-track-list > .browse-tile-shell')
+    if (tile) {
+      return Math.max(1, Math.round(tile.getBoundingClientRect().height + 8))
+    }
+    return 76
+  }
+  const tile = el?.querySelector('.library-browse-grid > .browse-tile-shell')
+  if (tile) {
+    const grid = el.querySelector('.library-browse-grid')
+    const gap = grid
+      ? Number.parseFloat(getComputedStyle(grid).rowGap) || 12
+      : 12
+    return Math.max(1, Math.round(tile.getBoundingClientRect().height + gap))
+  }
+  const width =
+    el?.clientWidth || (typeof window === 'undefined' ? 375 : window.innerWidth)
+  return libraryGridRowSize({
+    containerWidth: width,
+    columns: libraryGridColumns(
+      typeof window === 'undefined' ? width : window.innerWidth
+    ),
   })
+}
+
+let lastBrowseItemSize = 0
+let virtualFrame = 0
+let scrollIdleTimer = 0
+
+function applyVirtualWindow(win) {
+  if (
+    virtualStart.value === win.start &&
+    virtualEnd.value === Math.max(win.end, win.start) &&
+    virtualPadTop.value === win.padTop &&
+    virtualPadBottom.value === win.padBottom
+  ) {
+    return false
+  }
   virtualStart.value = win.start
   virtualEnd.value = Math.max(win.end, win.start)
   virtualPadTop.value = win.padTop
   virtualPadBottom.value = win.padBottom
+  return true
+}
+
+function updateVirtualWindow(el = browseBodyRef.value) {
+  const track = isLibraryTrackList.value
+  const width = typeof window === 'undefined' ? 375 : window.innerWidth
+  let itemSize = browseItemSize(el, track)
+  if (lastBrowseItemSize > 0 && Math.abs(itemSize - lastBrowseItemSize) <= 1) {
+    itemSize = lastBrowseItemSize
+  } else if (el && lastBrowseItemSize > 0 && lastBrowseItemSize !== itemSize) {
+    el.scrollTop = (el.scrollTop / lastBrowseItemSize) * itemSize
+  }
+  lastBrowseItemSize = itemSize
+  const win = virtualBrowseWindow({
+    count: currentRenderableItems.value.length,
+    columns: track ? 1 : libraryGridColumns(width),
+    itemSize,
+    scrollTop: el?.scrollTop || 0,
+    viewportHeight: el?.clientHeight || 640,
+  })
+  applyVirtualWindow(win)
+}
+
+function markBrowseScrolling() {
+  setCoverWarmPaused(true)
+  if (scrollIdleTimer) clearTimeout(scrollIdleTimer)
+  scrollIdleTimer = window.setTimeout(() => {
+    scrollIdleTimer = 0
+    setCoverWarmPaused(false)
+    warmVisibleCoversForCurrentView()
+  }, 180)
+}
+
+function onBrowseScroll(event) {
+  const el = event.currentTarget
+  markBrowseScrolling()
+  if (virtualFrame) return
+  virtualFrame = requestAnimationFrame(() => {
+    virtualFrame = 0
+    updateVirtualWindow(el)
+  })
 }
 
 watch(
@@ -1293,10 +1366,6 @@ function growRenderedItems() {
   updateVirtualWindow()
 }
 
-function onBrowseScroll(event) {
-  updateVirtualWindow(event.currentTarget)
-}
-
 async function loadArtistDownloadAlbums() {
   const artist = selectedArtist.value
   if (!artist?.name || artistDownloadLoading.value) return
@@ -1415,6 +1484,7 @@ watch(
 watch(
   () => currentBrowseScrollKey(),
   (key) => {
+    lastBrowseItemSize = 0
     restoreBrowseRenderLimit(key)
   }
 )
@@ -1769,6 +1839,15 @@ onUnmounted(() => {
     clearTimeout(visibleCoverWarmTimer)
     visibleCoverWarmTimer = null
   }
+  if (virtualFrame) {
+    cancelAnimationFrame(virtualFrame)
+    virtualFrame = 0
+  }
+  if (scrollIdleTimer) {
+    clearTimeout(scrollIdleTimer)
+    scrollIdleTimer = 0
+  }
+  setCoverWarmPaused(false)
   libraryRefresh.unregister()
 })
 </script>
@@ -1911,12 +1990,11 @@ onUnmounted(() => {
 }
 
 .browse-tile-shell {
-  content-visibility: auto;
-  contain-intrinsic-size: 12rem;
+  min-height: 0;
 }
 
 .library-track-list .browse-tile-shell {
-  contain-intrinsic-size: 4.75rem;
+  min-height: 0;
 }
 
 @media (min-width: 640px) {
@@ -1948,7 +2026,7 @@ onUnmounted(() => {
 }
 
 .library-browse-card-body {
-  @apply p-2.5;
+  @apply box-border flex h-[5.75rem] shrink-0 flex-col justify-center overflow-hidden p-2.5;
 }
 
 .library-browse-card-title {
@@ -1956,7 +2034,7 @@ onUnmounted(() => {
 }
 
 .library-browse-card-sub {
-  @apply mt-0.5 line-clamp-2 text-[11px] leading-4 text-base-content/50;
+  @apply mt-0.5 line-clamp-2 min-h-8 text-[11px] leading-4 text-base-content/50;
 }
 
 .library-browse-card-meta {

@@ -126,11 +126,12 @@ export async function ensureLibraryGenreLookup(
         startGenreWarmupPolling()
         return
       }
-      if (current.status === 'cancelled') return
       if (
-        current.status === 'complete' &&
-        unknownCount === lastAutoStartUnknowns
+        current.status === 'cancelled' ||
+        current.status === 'complete' ||
+        current.status === 'error'
       ) {
+        lastAutoStartUnknowns = unknownCount
         return
       }
       lastAutoStartUnknowns = unknownCount

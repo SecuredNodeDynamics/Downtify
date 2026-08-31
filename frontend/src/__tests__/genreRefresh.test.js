@@ -53,6 +53,14 @@ describe('genre refresh', () => {
     expect(API.startLibraryGenreRefresh).toHaveBeenCalledTimes(1)
   })
 
+  it('does not auto-start after the server already completed a lookup', async () => {
+    API.getLibraryGenresStatus.mockResolvedValue({
+      data: { status: 'complete' },
+    })
+    await ensureLibraryGenreLookup(703)
+    expect(API.startLibraryGenreRefresh).not.toHaveBeenCalled()
+  })
+
   it('does not start genre lookup for family profiles', async () => {
     await ensureLibraryGenreLookup(4, { allowed: false })
     expect(API.getLibraryGenresStatus).not.toHaveBeenCalled()

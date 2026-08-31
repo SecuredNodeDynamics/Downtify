@@ -12,7 +12,12 @@ from typing import Any, Callable, Optional
 import requests
 from loguru import logger
 
-from .genres import GenreWarmupCancelled, canonical_genre, pick_genre_from_tags
+from .genres import (
+    GENRE_LOOKUP_MISS,
+    GenreWarmupCancelled,
+    canonical_genre,
+    pick_genre_from_tags,
+)
 from .lastfm import lookup_artist_genre as lookup_artist_genre_lastfm
 
 MUSICBRAINZ_RECORDING_URL = 'https://musicbrainz.org/ws/2/recording/'
@@ -167,8 +172,14 @@ def _load_artist_genre_cache() -> None:
             payload = json.loads(path.read_text(encoding='utf-8'))
             if isinstance(payload, dict):
                 for key, value in payload.items():
-                    genre = canonical_genre(str(value or ''))
-                    if isinstance(key, str) and genre:
+                    if not isinstance(key, str):
+                        continue
+                    raw = str(value or '')
+                    if raw == GENRE_LOOKUP_MISS:
+                        _ARTIST_GENRE_CACHE[key] = GENRE_LOOKUP_MISS
+                        continue
+                    genre = canonical_genre(raw)
+                    if genre:
                         _ARTIST_GENRE_CACHE[key] = genre
         except Exception:
             logger.opt(exception=True).warning(
@@ -206,8 +217,10 @@ def lookup_artist_genre(artist_name: str, *, fetch: bool = True) -> str:
 
     _load_artist_genre_cache()
     cache_key = _norm(name)
-    cached = _ARTIST_GENRE_CACHE.get(cache_key, '')
-    if cached:
+    if cache_key in _ARTIST_GENRE_CACHE:
+        cached = _ARTIST_GENRE_CACHE[cache_key]
+        if cached == GENRE_LOOKUP_MISS:
+            return ''
         genre = canonical_genre(cached)
         if genre:
             if genre != cached:
@@ -219,10 +232,18 @@ def lookup_artist_genre(artist_name: str, *, fetch: bool = True) -> str:
         return ''
 
     genre = canonical_genre(lookup_artist_genre_lastfm(name))
+    checked = True
     if not genre:
-        genre = canonical_genre(_fetch_artist_genre_from_musicbrainz(name))
+        fetched = _fetch_artist_genre_from_musicbrainz(name)
+        if fetched is None:
+            checked = False
+        else:
+            genre = canonical_genre(fetched)
     if genre:
         _ARTIST_GENRE_CACHE[cache_key] = genre
+        _save_artist_genre_cache()
+    elif checked:
+        _ARTIST_GENRE_CACHE[cache_key] = GENRE_LOOKUP_MISS
         _save_artist_genre_cache()
     return genre
 
@@ -237,7 +258,7 @@ def remember_artist_genre(artist_name: str, genre: str) -> None:
     _save_artist_genre_cache()
 
 
-def _fetch_artist_genre_from_musicbrainz(artist_name: str) -> str:
+def _fetch_artist_genre_from_musicbrainz(artist_name: str) -> str | None:
     artist_id = lookup_artist_id(artist_name)
     if not artist_id:
         return ''
@@ -260,21 +281,24 @@ def _fetch_artist_genre_from_musicbrainz(artist_name: str) -> str:
             'MusicBrainz artist genre lookup failed for {!r}',
             artist_name,
         )
-        return ''
+        return None
 
 
 def warm_artist_genre_cache(
     artist_names: list[str],
     progress_cb: Callable[[dict[str, Any]], None] | None = None,
     cancel_event: Any = None,
-) -> None:
+) -> int:
     """Populate the on-disk artist genre cache for library browsing."""
 
     seen: set[str] = set()
     names: list[str] = []
+    _load_artist_genre_cache()
     for artist_name in artist_names:
         key = _norm(str(artist_name or '').strip())
         if not key or key in seen:
+            continue
+        if key in _ARTIST_GENRE_CACHE:
             continue
         seen.add(key)
         names.append(artist_name)
@@ -291,6 +315,7 @@ def warm_artist_genre_cache(
                     'total': total,
                 }
             )
+    return total
 
 
 def _throttle_musicbrainz() -> None:

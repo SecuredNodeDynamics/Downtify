@@ -4,6 +4,22 @@ export function libraryGridColumns(width = 0) {
   return 2
 }
 
+export function libraryGridRowSize({
+  containerWidth = 360,
+  columns = 2,
+  bodyHeight = 92,
+  gap = 12,
+} = {}) {
+  const cols = Math.max(1, Number(columns) || 1)
+  const width = Math.max(1, Number(containerWidth) || 1)
+  const g = Math.max(0, Number(gap) || 0)
+  const tile = (width - g * (cols - 1)) / cols
+  return Math.max(
+    1,
+    Math.round(tile + Math.max(0, Number(bodyHeight) || 0) + g)
+  )
+}
+
 export function virtualBrowseWindow({
   count,
   columns = 1,

@@ -189,3 +189,33 @@ def test_list_library_files_fast_reuses_unchanged_file_entries(
     library_index.notify_library_changed()
     library_index.list_library_files_fast(tmp_path)
     assert calls['n'] == 2
+
+
+def test_apply_genre_tag_writes_missing_id3_genre(tmp_path):
+    artist_dir = tmp_path / 'Artist' / 'Album'
+    artist_dir.mkdir(parents=True)
+    path = artist_dir / '01 - Song.mp3'
+    path.write_bytes(b'audio')
+    tags = ID3()
+    tags.add(TIT2(encoding=3, text='Song'))
+    tags.add(TPE1(encoding=3, text='Artist'))
+    tags.save(path)
+
+    assert library_index.apply_genre_tag(path, 'Jazz') is True
+    items = library_index.list_library_files_fast(tmp_path)
+    assert items[0]['genre'] == 'Jazz'
+    assert library_index.apply_genre_tag(path, 'Rock') is False
+
+
+def test_list_library_files_fast_keeps_unmapped_id3_genre(tmp_path):
+    artist_dir = tmp_path / 'Artist' / 'Album'
+    artist_dir.mkdir(parents=True)
+    path = artist_dir / '01 - Song.mp3'
+    path.write_bytes(b'audio')
+    tags = ID3()
+    tags.add(TCON(encoding=3, text='Easy Listening'))
+    tags.save(path)
+
+    items = library_index.list_library_files_fast(tmp_path)
+    assert items[0]['genre'] == 'Easy Listening'
+    assert items[0]['browse_genre'] == 'Jazz'

@@ -10,6 +10,9 @@ class GenreWarmupCancelled(Exception):
     """Raised when a live genre lookup is stopped from the UI."""
 
 
+GENRE_LOOKUP_MISS = '-'
+
+
 _BROWSE_GENRES: tuple[str, ...] = (
     'Pop',
     'Rock',
@@ -155,6 +158,12 @@ _BROWSE_RULES: tuple[tuple[tuple[str, ...], str], ...] = (
     ),
     (('world', 'afrobeat', 'celtic', 'flamenco', 'bossa nova'), 'World'),
     (('gospel', 'christian', 'worship'), 'World'),
+    (('easy listening', 'lounge', 'exotica'), 'Jazz'),
+    (('new age',), 'World'),
+    (('holiday', 'christmas', 'xmas'), 'Soundtrack'),
+    (('children', 'kids', 'nursery'), 'Pop'),
+    (('comedy', 'spoken', 'spoken word', 'audiobook'), 'World'),
+    (('oldies', 'adult contemporary', 'soft rock'), 'Pop'),
     (('ballad',), 'Pop'),
 )
 
@@ -215,7 +224,8 @@ def is_recognized_genre(value: str) -> bool:
         return False
     for keywords, _parent in _BROWSE_RULES:
         for keyword in keywords:
-            if slug == keyword or keyword in slug:
+            key = _slug(keyword)
+            if key and (slug == key or key in slug):
                 return True
     for suffix in _GENRE_SUFFIXES:
         if slug == suffix or slug.endswith(f' {suffix}'):
@@ -224,8 +234,12 @@ def is_recognized_genre(value: str) -> bool:
 
 
 def normalize_genre_label(value: str) -> str:
-    for part in _split_genre_parts(value):
+    parts = _split_genre_parts(value)
+    for part in parts:
         if is_recognized_genre(part):
+            return _title_case_genre(part)
+    for part in parts:
+        if not is_non_genre_tag(part):
             return _title_case_genre(part)
     return ''
 
@@ -245,8 +259,11 @@ def browse_genre(value: str) -> str:
     matches: list[tuple[int, str]] = []
     for keywords, parent in _BROWSE_RULES:
         for keyword in keywords:
-            if slug == keyword or keyword in slug:
-                matches.append((len(keyword), parent))
+            key = _slug(keyword)
+            if not key:
+                continue
+            if slug == key or key in slug:
+                matches.append((len(key), parent))
     if matches:
         return max(matches, key=lambda item: item[0])[1]
     if is_recognized_genre(slug):

@@ -7,7 +7,12 @@ import re
 from pathlib import Path
 from typing import Any, Callable
 
-from .genres import GenreWarmupCancelled, browse_genre, canonical_genre
+from .genres import (
+    GENRE_LOOKUP_MISS,
+    GenreWarmupCancelled,
+    browse_genre,
+    canonical_genre,
+)
 from .metadata_repair import (
     AUDIO_EXTENSIONS,
     _genre_from_path,
@@ -56,8 +61,14 @@ def _load_album_genre_cache() -> None:
             payload = json.loads(path.read_text(encoding='utf-8'))
             if isinstance(payload, dict):
                 for key, value in payload.items():
-                    genre = canonical_genre(str(value or ''))
-                    if isinstance(key, str) and genre:
+                    if not isinstance(key, str):
+                        continue
+                    raw = str(value or '')
+                    if raw == GENRE_LOOKUP_MISS:
+                        _ALBUM_GENRE_CACHE[key] = GENRE_LOOKUP_MISS
+                        continue
+                    genre = canonical_genre(raw)
+                    if genre:
                         _ALBUM_GENRE_CACHE[key] = genre
         except Exception:
             pass
@@ -80,12 +91,20 @@ def _save_album_genre_cache() -> None:
 
 def _remember_album_genre(album_key: str, genre: str) -> None:
     key = str(album_key or '').strip()
-    label = canonical_genre(genre)
-    if not key or not label:
+    if not key:
         return
+    label = canonical_genre(genre)
     _load_album_genre_cache()
-    _ALBUM_GENRE_CACHE[key] = label
+    _ALBUM_GENRE_CACHE[key] = label or GENRE_LOOKUP_MISS
     _save_album_genre_cache()
+
+
+def _album_lookup_cached(album_key: str) -> bool:
+    key = str(album_key or '').strip()
+    if not key:
+        return False
+    _load_album_genre_cache()
+    return key in _ALBUM_GENRE_CACHE
 
 
 def _album_genre_from_cache(album_key: str) -> str:
@@ -93,7 +112,10 @@ def _album_genre_from_cache(album_key: str) -> str:
     if not key:
         return ''
     _load_album_genre_cache()
-    return canonical_genre(_ALBUM_GENRE_CACHE.get(key, ''))
+    raw = _ALBUM_GENRE_CACHE.get(key, '')
+    if raw == GENRE_LOOKUP_MISS:
+        return ''
+    return canonical_genre(raw)
 
 
 def _path_parts(file: str) -> list[str]:
@@ -459,6 +481,8 @@ def _album_samples_without_genre(
         album_key = _album_folder_key(str(item.get('file') or ''))
         if not album_key or album_key in seen:
             continue
+        if _album_lookup_cached(album_key):
+            continue
         seen.add(album_key)
         samples.append((album_key, str(item.get('file') or '')))
     return samples
@@ -467,6 +491,72 @@ def _album_samples_without_genre(
 def _raise_if_genre_warmup_cancelled(cancel_event: Any) -> None:
     if cancel_event is not None and cancel_event.is_set():
         raise GenreWarmupCancelled()
+
+
+def apply_genre_tag(path: Path, genre: str) -> bool:
+    """Write *genre* onto *path* when the file does not already have one."""
+
+    from mutagen import File as MutagenFile
+    from mutagen.id3 import ID3, TCON, ID3NoHeaderError
+
+    label = canonical_genre(genre)
+    if not label:
+        return False
+    try:
+        audio = MutagenFile(str(path), easy=True)
+        if audio is not None:
+            if getattr(audio, 'tags', None) is None:
+                audio.add_tags()
+            raw = audio.tags.get('genre') if audio.tags is not None else None
+            existing = ''
+            if isinstance(raw, list) and raw:
+                existing = str(raw[0] or '')
+            elif raw:
+                existing = str(raw)
+            if canonical_genre(existing):
+                return False
+            audio['genre'] = label
+            audio.save()
+            return True
+    except Exception:
+        pass
+    try:
+        try:
+            tags = ID3(str(path))
+        except ID3NoHeaderError:
+            tags = ID3()
+        frame = tags.get('TCON')
+        existing = ''
+        if frame is not None:
+            text = getattr(frame, 'text', None)
+            existing = str(text[0] if text else frame)
+        if canonical_genre(existing):
+            return False
+        tags.add(TCON(encoding=3, text=label))
+        tags.save(path)
+        return True
+    except Exception:
+        return False
+
+
+def _write_filled_genres(
+    root: Path,
+    items: list[dict[str, str]],
+    missing_files: set[str],
+) -> None:
+    for item in items:
+        relative = str(item.get('file') or '')
+        if relative not in missing_files:
+            continue
+        genre = canonical_genre(item.get('genre') or '')
+        if not genre:
+            continue
+        try:
+            path = safe_library_path(root, relative)
+        except ValueError:
+            continue
+        if apply_genre_tag(path, genre):
+            missing_files.discard(relative)
 
 
 def warm_library_genres(
@@ -480,7 +570,13 @@ def warm_library_genres(
     _raise_if_genre_warmup_cancelled(cancel_event)
     if progress_cb is not None:
         progress_cb({'phase': 'library', 'current': 0, 'total': 0})
-    items = list_library_files(root, fetch_missing_genres=False)
+    items = list_library_files_fast(root)
+    missing_files = {
+        str(item.get('file') or '')
+        for item in items
+        if str(item.get('file') or '')
+        and not canonical_genre(item.get('genre') or '')
+    }
     missing_artists = sorted({
         item['artist']
         for item in items
@@ -488,17 +584,17 @@ def warm_library_genres(
         and item['artist'] != 'Unknown Artist'
         and not canonical_genre(item.get('genre') or '')
     })
+    artists_warmed = 0
     if missing_artists:
-        warm_artist_genre_cache(
+        artists_warmed = warm_artist_genre_cache(
             missing_artists,
             progress_cb=progress_cb,
             cancel_event=cancel_event,
-        )
+        ) or 0
 
     _raise_if_genre_warmup_cancelled(cancel_event)
-    items = enrich_library_genres(
-        list_library_files(root, fetch_missing_genres=False)
-    )
+    items = enrich_library_genres(items)
+    _write_filled_genres(root, items, missing_files)
     album_samples = _album_samples_without_genre(items)
     albums_warmed = 0
     for index, (_album_key, relative) in enumerate(album_samples, start=1):
@@ -508,10 +604,19 @@ def warm_library_genres(
             song = _song_from_file_safe(path)
             enriched = enrich_song_metadata(song)
             genre = canonical_genre(str(enriched.get('genre') or ''))
+            _remember_album_genre(_album_key, genre)
             if genre:
                 albums_warmed += 1
                 remember_artist_genre(_artist_name(relative, enriched), genre)
-                _remember_album_genre(_album_key, genre)
+                for item in items:
+                    if _album_folder_key(str(item.get('file') or '')) != (
+                        _album_key
+                    ):
+                        continue
+                    if canonical_genre(item.get('genre') or ''):
+                        continue
+                    item.update(_library_genre_fields(genre))
+                _write_filled_genres(root, items, missing_files)
         except GenreWarmupCancelled:
             raise
         except Exception:
@@ -525,14 +630,13 @@ def warm_library_genres(
             })
 
     _raise_if_genre_warmup_cancelled(cancel_event)
-    final_items = enrich_library_genres(
-        list_library_files(root, fetch_missing_genres=False)
-    )
+    final_items = enrich_library_genres(items)
+    _write_filled_genres(root, final_items, missing_files)
     tagged = sum(
         1 for item in final_items if canonical_genre(item.get('genre') or '')
     )
     return {
-        'artists_warmed': len(missing_artists),
+        'artists_warmed': artists_warmed,
         'albums_warmed': albums_warmed,
         'tagged_tracks': tagged,
         'total_tracks': len(final_items),

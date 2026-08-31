@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   libraryGridColumns,
+  libraryGridRowSize,
   virtualBrowseWindow,
 } from '../model/libraryBrowseWindow.js'
 
@@ -10,6 +11,17 @@ describe('libraryBrowseWindow', () => {
     expect(libraryGridColumns(375)).toBe(2)
     expect(libraryGridColumns(640)).toBe(3)
     expect(libraryGridColumns(1200)).toBe(4)
+  })
+
+  it('estimates grid row height from tile width plus body and gap', () => {
+    expect(
+      libraryGridRowSize({
+        containerWidth: 351,
+        columns: 2,
+        bodyHeight: 72,
+        gap: 12,
+      })
+    ).toBe(254)
   })
 
   it('windows a long track list around the viewport', () => {

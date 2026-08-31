@@ -235,6 +235,9 @@ describe('library path helpers', () => {
     const genres = groupGenres([item], 'Unknown genre')
     expect(genres).toHaveLength(1)
     expect(genres[0].name).toBe('Unknown genre')
+    expect(
+      groupGenres([item], 'Unknown genre', { includeUnknown: false })
+    ).toEqual([])
   })
 
   it('merges hip hop genre spelling variants into one bucket', () => {

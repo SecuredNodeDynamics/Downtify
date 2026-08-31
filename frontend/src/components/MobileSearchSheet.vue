@@ -1,34 +1,36 @@
 <template>
-  <input id="mobile-search-sheet" type="checkbox" class="modal-toggle" />
-  <div
-    class="modal modal-top mobile-search-modal lg:hidden"
-    @click.self="close"
-  >
-    <div class="modal-box mobile-search-sheet">
-      <form class="flex items-center" @submit.prevent="submit">
-        <SearchField
-          ref="searchFieldRef"
-          root-class="w-full flex-1"
-          input-id="mobile-search-input"
-          v-model="query"
-          :placeholder="placeholder"
-          :submit-icon="'search'"
-          :submit-disabled="!canSubmit"
-          @submit="submit"
-          @clear="onClear"
-        />
-      </form>
-      <p v-if="isPlayerSearch" class="mt-2 text-xs text-base-content/50">
-        {{ t('search.libraryHint') }}
-      </p>
+  <Teleport to="body">
+    <input id="mobile-search-sheet" type="checkbox" class="modal-toggle" />
+    <div
+      class="modal modal-top mobile-search-modal lg:hidden"
+      @click.self="close"
+    >
+      <div class="modal-box mobile-search-sheet">
+        <form class="flex items-center" @submit.prevent="submit">
+          <SearchField
+            ref="searchFieldRef"
+            root-class="w-full flex-1"
+            input-id="mobile-search-input"
+            v-model="query"
+            :placeholder="placeholder"
+            :submit-icon="'search'"
+            :submit-disabled="!canSubmit"
+            @submit="submit"
+            @clear="onClear"
+          />
+        </form>
+        <p v-if="isPlayerSearch" class="mt-2 text-xs text-base-content/50">
+          {{ t('search.libraryHint') }}
+        </p>
+      </div>
+      <label
+        for="mobile-search-sheet"
+        class="modal-backdrop"
+        aria-hidden="true"
+        @click.prevent="close"
+      />
     </div>
-    <label
-      for="mobile-search-sheet"
-      class="modal-backdrop"
-      aria-hidden="true"
-      @click.prevent="close"
-    />
-  </div>
+  </Teleport>
 </template>
 
 <script setup>

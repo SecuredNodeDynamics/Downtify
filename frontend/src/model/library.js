@@ -440,9 +440,12 @@ export function libraryGenreName(item, unknownLabel = 'Unknown', options = {}) {
 
 export function groupGenres(items, unknownLabel = 'Unknown', options = {}) {
   const grouped = new Map()
+  const includeUnknown = options.includeUnknown !== false
 
   for (const raw of items) {
     const item = normalizeLibraryItem(raw, options)
+    const tagged = String(item.browse_genre || item.genre || '').trim()
+    if (!tagged && !includeUnknown) continue
     const name = libraryGenreName(item, unknownLabel, options)
     if (!grouped.has(name)) {
       grouped.set(name, {

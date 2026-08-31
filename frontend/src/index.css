@@ -434,10 +434,16 @@
     @apply ml-auto inline-flex h-4 min-w-[1rem] shrink-0 items-center justify-center rounded-full bg-primary px-1 text-[9px] font-bold text-primary-content;
   }
 
+  .mobile-search-modal.modal {
+    z-index: 1200;
+    align-items: flex-start;
+    padding-top: calc(var(--app-header-height) + var(--app-safe-top));
+  }
+
   .mobile-search-sheet {
     @apply w-full max-w-none rounded-b-3xl border-0 bg-base-100 px-4 pb-4;
     margin-top: 0;
-    padding-top: calc(var(--app-safe-top) + 0.75rem);
+    padding-top: 0.75rem;
     position: relative;
     z-index: 1;
   }
@@ -472,6 +478,10 @@
 
   .settings-tab-btn-active {
     @apply bg-primary text-primary-content shadow-glow-sm hover:text-primary-content;
+  }
+
+  #mobile-search-sheet:checked + .mobile-search-modal {
+    z-index: 1200;
   }
 
   /* DaisyUI puts modal-backdrop at z-index:-1, so taps miss it and hit the page. */
