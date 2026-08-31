@@ -4276,7 +4276,6 @@ async function syncJellyfinAfterImageRepairs(repairedCount) {
   @apply flex min-h-11 min-w-0 items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium text-base-content/70 transition-colors active:bg-white/10;
   touch-action: manipulation;
 }
-}
 
 .metadata-mobile-menu-item-active {
   @apply bg-primary text-primary-content shadow-glow-sm;
