@@ -7,8 +7,8 @@
       class="bottom-nav-item"
       :class="{ 'bottom-nav-item-active': isActive(item) }"
       :title="t(item.labelKey)"
-      @pointerup.stop.prevent="onNav(item)"
-      @click.stop.prevent="onNav(item)"
+      @pointerdown="onPointerDown(item, $event)"
+      @click="onClick(item, $event)"
     >
       <span class="bottom-nav-icon-wrap">
         <Icon :icon="item.icon" class="h-6 w-6" />
@@ -42,7 +42,7 @@ const items = [
   },
 ]
 
-let lastNavAt = 0
+let pointerHandledAt = 0
 
 const moreRoutes = new Set([
   'Monitor',
@@ -70,10 +70,7 @@ function closeMoreSheet() {
   if (sheet) sheet.checked = false
 }
 
-function onNav(item) {
-  const now = Date.now()
-  if (now - lastNavAt < 350) return
-  lastNavAt = now
+function navigate(item) {
   mobileSearch.closeSheet()
   const moreOpen = Boolean(document.getElementById('mobile-more-sheet')?.checked)
   closeMoreSheet()
@@ -87,6 +84,21 @@ function onNav(item) {
     mobileSearch.openSheetAndFocus()
     return
   }
+  if (route.name === item.name) return
   router.push({ name: item.name })
+}
+
+function onPointerDown(item, event) {
+  if (event.pointerType === 'mouse' && event.button !== 0) return
+  pointerHandledAt = Date.now()
+  navigate(item)
+}
+
+function onClick(item, event) {
+  if (Date.now() - pointerHandledAt < 500) {
+    event.preventDefault()
+    return
+  }
+  navigate(item)
 }
 </script>

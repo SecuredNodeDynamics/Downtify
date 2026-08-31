@@ -215,7 +215,7 @@ async function submit() {
 
 <style scoped>
 .auth-gate {
-  @apply fixed inset-0 z-[190] flex items-center justify-center bg-base-100/80 p-4 backdrop-blur-[4px];
+  @apply fixed inset-0 z-[13000] flex items-center justify-center bg-base-100/80 p-4 backdrop-blur-[4px];
   padding-top: var(--app-safe-top);
   padding-bottom: var(--app-safe-bottom);
 }

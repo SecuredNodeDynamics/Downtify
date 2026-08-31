@@ -12,6 +12,7 @@ import NavbarFront from '/src/components/NavbarFront.vue'
 import API from '../model/api'
 
 export default {
+  name: 'Home',
   components: { NavbarFront, Hero },
   setup() {
     onMounted(() => {

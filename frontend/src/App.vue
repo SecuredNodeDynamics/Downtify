@@ -11,11 +11,9 @@
       :class="{ 'has-mini-player': showMiniPlayer }"
     >
       <router-view v-slot="{ Component, route }">
-        <transition name="page-instant">
-          <keep-alive :include="keepAliveViews">
-            <component :is="Component" :key="route.name" />
-          </keep-alive>
-        </transition>
+        <keep-alive :include="keepAliveViews">
+          <component :is="Component" :key="route.name" />
+        </keep-alive>
       </router-view>
     </main>
     <Footer class="hidden lg:block" />
@@ -62,8 +60,8 @@ const showMiniPlayer = computed(
 )
 const keepAliveViews = computed(() =>
   isNativeApp
-    ? ['Player', 'List', 'Search', 'Download', 'Artist']
-    : ['Player', 'List', 'Search', 'Settings', 'Download', 'Artist']
+    ? ['Home', 'Player', 'List', 'Search', 'Download', 'Artist']
+    : ['Home', 'Player', 'List', 'Search', 'Settings', 'Download', 'Artist']
 )
 
 const themeMgr = useBinaryThemeManager()
@@ -98,7 +96,7 @@ onMounted(async () => {
   if (!usesEmbeddedServer()) {
     void startMountedBackendSession()
   }
-  window.setTimeout(preloadRouteComponents, isNativeApp ? 800 : 700)
+  window.setTimeout(preloadRouteComponents, 200)
 
   bootstrapAppUpdateNotice()
 
@@ -141,30 +139,3 @@ async function startMountedBackendSession() {
 }
 </script>
 
-<style>
-.page-enter-active,
-.page-leave-active,
-.page-fast-enter-active,
-.page-fast-leave-active {
-  transition:
-    opacity 0.2s ease,
-    transform 0.2s ease;
-}
-
-.page-fast-enter-active,
-.page-fast-leave-active {
-  transition-duration: 0.12s;
-}
-
-.page-enter-from,
-.page-leave-to {
-  opacity: 0;
-  transform: translateY(8px);
-}
-
-.page-fast-enter-from,
-.page-fast-leave-to {
-  opacity: 0;
-  transform: none;
-}
-</style>

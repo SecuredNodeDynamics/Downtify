@@ -1589,8 +1589,12 @@ onActivated(() => {
   libraryRefresh.register(refreshFromHeader)
   restoreBrowseScrollPosition(currentBrowseScrollKey())
   if (files.value.length > 0) {
-    warmVisibleCoversForCurrentView()
-    void refresh({ background: true })
+    requestAnimationFrame(() => {
+      warmVisibleCoversForCurrentView()
+    })
+    window.setTimeout(() => {
+      void refresh({ background: true })
+    }, 450)
     return
   }
   void refresh()

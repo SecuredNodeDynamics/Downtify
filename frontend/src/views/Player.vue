@@ -2710,7 +2710,9 @@ onActivated(() => {
   applyPlayerNavigationIntent()
   if (libraryItems.value.length > 0) {
     syncPlayerPlaylist(files.value)
-    void refreshLibraryMetadataInBackground()
+    window.setTimeout(() => {
+      void refreshLibraryMetadataInBackground()
+    }, 450)
   }
   if (libraryItems.value.length === 0 || files.value.length === 0) {
     void load()
