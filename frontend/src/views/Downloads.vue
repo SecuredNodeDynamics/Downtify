@@ -681,6 +681,7 @@ import {
 } from '/src/model/librarySession'
 import { buildApiBaseUrl, getServerConfig } from '/src/model/serverConnection'
 import { useI18n } from '/src/i18n'
+import { useAuthSession } from '/src/model/authSession'
 import { usePlayer } from '/src/model/player'
 import { nextGenrePlaylistStart } from '/src/model/playerQueue.js'
 import {
@@ -715,6 +716,7 @@ const initialLibrarySnapshot = getInitialLibrarySnapshot(libraryServerKey)
 const { t } = useI18n()
 const player = usePlayer()
 const router = useRouter()
+const { canUseAdminPages } = useAuthSession()
 const libraryRefresh = useLibraryRefresh()
 const dm = useDownloadManager()
 const sm = useSearchManager()
@@ -828,6 +830,7 @@ const genreProgressPercent = computed(() =>
   genreWarmupPercent(genreWarmupStatus.value)
 )
 const showGenreUpdateBar = computed(() => {
+  if (!canUseAdminPages.value) return false
   if (viewMode.value !== 'genres' || selectedGenreName.value) return false
   const status = genreWarmupStatus.value?.status
   return (
@@ -1454,10 +1457,13 @@ function countUnknownGenres(items) {
 }
 
 function scheduleGenreRefresh(items) {
-  void ensureLibraryGenreLookup(countUnknownGenres(items))
+  void ensureLibraryGenreLookup(countUnknownGenres(items), {
+    allowed: canUseAdminPages.value,
+  })
 }
 
 async function updateLibraryGenres() {
+  if (!canUseAdminPages.value) return
   try {
     await startLibraryGenreLookup()
   } catch {
@@ -1466,6 +1472,7 @@ async function updateLibraryGenres() {
 }
 
 async function stopLibraryGenreUpdate() {
+  if (!canUseAdminPages.value) return
   try {
     await cancelLibraryGenreLookup()
   } catch {

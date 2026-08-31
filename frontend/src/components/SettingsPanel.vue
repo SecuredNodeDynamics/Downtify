@@ -299,20 +299,18 @@
         >
           {{ t('settings.connectionModeServerConfigHint') }}
         </p>
+        <p
+          v-else-if="!isDeviceMode && !canUseAdminPages"
+          class="text-[11px] text-base-content/40 mt-1"
+        >
+          {{ t('settings.connectionModeServerFamilyHint') }}
+        </p>
       </div>
 
       <div
-        v-if="!canUseAdminPages && !isDeviceMode"
-        class="space-y-3"
+        v-if="!canUseAdminPages && embeddedAvailable && !isDeviceMode"
+        class="space-y-2"
       >
-        <label
-          class="block text-xs font-semibold uppercase tracking-wider text-base-content/50"
-        >
-          {{ t('settings.serverConnectionSection') }}
-        </label>
-        <p class="text-sm text-base-content/60">
-          {{ t('settings.serverConnectionHint') }}
-        </p>
         <div class="surface rounded-xl px-3 py-2.5 text-sm">
           <span class="text-base-content/50">
             {{ t('settings.serverUrlCurrent') }}:
@@ -321,582 +319,511 @@
             {{
               usesCustomServer
                 ? activeServerDisplay
-                : t('settings.serverUrlDefault')
+                : t('settings.serverUrlUnset')
             }}
           </span>
         </div>
-        <div>
-          <label class="block text-xs text-base-content/50 mb-1.5">
-            {{ t('settings.serverUrl') }}
-          </label>
-          <input
-            v-model="serverUrlInput"
-            type="url"
-            inputmode="url"
-            autocapitalize="off"
-            autocorrect="off"
-            spellcheck="false"
-            class="input-modern h-10 w-full text-sm"
-            :placeholder="t('settings.serverUrlPlaceholder')"
-          />
-          <p class="text-[11px] text-base-content/40 mt-1.5">
-            {{ t('settings.serverSaveHint') }}
-          </p>
-        </div>
-        <div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-          <button
-            v-if="canConnectDevice"
-            type="button"
-            class="btn btn-primary btn-sm h-10 w-full rounded-full px-4 sm:w-auto"
-            :disabled="connectedToThisDevice || serverTestLoading"
-            @click="connectToThisDevice"
-          >
-            {{ t('settings.serverConnectDevice') }}
-          </button>
-          <button
-            type="button"
-            class="btn btn-sm h-10 w-full rounded-full px-4 sm:w-auto"
-            :class="
-              canConnectDevice
-                ? 'border border-white/10 bg-base-100/85 text-base-content hover:bg-base-100'
-                : 'btn-primary'
-            "
-            :disabled="serverTestLoading || !serverUrlInput.trim()"
-            @click="testServerConnection"
-          >
-            <span
-              v-if="serverTestLoading"
-              class="loading loading-spinner loading-xs mr-2"
-            />
-            {{
-              serverTestLoading
-                ? t('settings.serverTesting')
-                : t('settings.serverTest')
-            }}
-          </button>
-          <button
-            type="button"
-            class="btn btn-sm h-10 w-full rounded-full border border-white/10 bg-base-100/85 px-4 text-base-content hover:bg-base-100 sm:w-auto"
-            :disabled="!canSaveServerUrl || serverTestLoading"
-            @click="saveServerConnection"
-          >
-            {{ t('settings.serverSave') }}
-          </button>
-          <button
-            v-if="usesCustomServer && !connectedToThisDevice"
-            type="button"
-            class="btn btn-sm h-10 w-full rounded-full border border-white/10 bg-base-100/85 px-4 text-base-content hover:bg-base-100 sm:w-auto"
-            @click="resetServerConnection"
-          >
-            {{ t('settings.serverClear') }}
-          </button>
-        </div>
-        <p
-          v-if="serverTestMessage"
-          class="text-[11px]"
-          :class="serverTestError ? 'text-error' : 'text-primary'"
-        >
-          {{ serverTestMessage }}
-        </p>
       </div>
 
       <template v-if="canUseAdminPages">
-      <!-- Language -->
-      <div>
-        <label
-          class="block text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2"
-        >
-          {{ t('settings.language') }}
-        </label>
-        <select
-          class="select w-full rounded-xl bg-base-100/85 border border-white/10 focus:border-primary/60"
-          :value="locale"
-          @change="setLocale($event.target.value)"
-        >
-          <option v-for="l in locales" :key="l.code" :value="l.code">
-            {{ l.name }}
-          </option>
-        </select>
-        <p class="text-[11px] text-base-content/40 mt-1.5">
-          {{ t('settings.languageHint') }}
-        </p>
-      </div>
-
-      <div>
-        <label
-          class="block text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2"
-        >
-          {{ t('settings.monitorArtistInitialSearch') }}
-        </label>
-        <label
-          class="flex cursor-pointer items-center justify-between gap-4 rounded-xl border border-white/10 bg-base-100/70 px-3 py-3"
-        >
-          <span class="text-sm text-base-content/80">
-            {{ t('settings.monitorArtistInitialSearchHint') }}
-          </span>
-          <input
-            v-model="sm.settings.value.monitor_artist_initial_search"
-            type="checkbox"
-            class="toggle toggle-primary shrink-0"
-          />
-        </label>
-      </div>
-
-      <!-- Download destination (irrelevant in on-device mode: files are
-           always saved locally by the embedded backend). -->
-      <div v-if="!isDeviceMode">
-        <label
-          class="block text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2"
-        >
-          {{ t('settings.downloadDestination') }}
-        </label>
-        <div class="grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            class="rounded-xl border px-3 py-2 text-sm transition-colors text-left"
-            :class="[
-              destination === 'server'
-                ? 'border-primary/50 bg-primary/10 text-primary'
-                : 'border-white/10 hover:border-white/20 hover:bg-white/5',
-            ]"
-            @click="setDestination('server')"
-          >
-            {{ t('settings.downloadDestinationServer') }}
-          </button>
-          <button
-            type="button"
-            class="rounded-xl border px-3 py-2 text-sm transition-colors text-left"
-            :class="[
-              destination === 'local'
-                ? 'border-primary/50 bg-primary/10 text-primary'
-                : 'border-white/10 hover:border-white/20 hover:bg-white/5',
-            ]"
-            @click="selectLocalDestination"
-          >
-            {{ t('settings.downloadDestinationLocal') }}
-          </button>
-        </div>
-        <p class="text-[11px] text-base-content/40 mt-1.5">
-          {{
-            destination === 'local'
-              ? localDestinationHint
-              : t('settings.downloadDestinationServerHint')
-          }}
-        </p>
-        <div v-if="destination === 'server'" class="mt-3">
-          <label class="block text-xs text-base-content/50 mb-1.5">
-            {{ t('settings.serverMediaLocation') }}
-          </label>
-          <input
-            v-model="sm.settings.value.server_media_location"
-            type="text"
-            class="input-modern h-10 w-full text-sm"
-            :placeholder="t('settings.serverMediaLocationPlaceholder')"
-          />
-          <p class="text-[11px] text-base-content/40 mt-1.5">
-            {{ t('settings.serverMediaLocationHint') }}
-          </p>
-        </div>
-        <p
-          v-if="localFolderBlockReason"
-          class="text-[11px] text-base-content/40 mt-1.5"
-        >
-          {{ localFolderBlockMessage }}
-        </p>
-        <div
-          v-if="isLocal"
-          class="mt-3 rounded-xl border border-white/10 bg-base-100/85 px-3 py-3 space-y-2"
-        >
-          <div class="flex items-start gap-3">
-            <Icon
-              icon="clarity:folder-open-line"
-              class="mt-0.5 h-5 w-5 shrink-0 text-primary"
-            />
-            <div class="min-w-0 flex-1">
-              <p class="text-sm font-medium">
-                {{ t('settings.localFolderLabel') }}
-              </p>
-              <p class="truncate text-sm text-base-content/80">
-                {{ localFolderName || t('settings.localFolderNone') }}
-              </p>
-              <p class="mt-1 text-[11px] text-base-content/40">
-                {{ localFolderDetailHint }}
-              </p>
-            </div>
-          </div>
-          <div
-            v-if="!usesBrowserDownloads"
-            class="flex flex-wrap items-center gap-2"
-          >
-            <button
-              type="button"
-              class="btn btn-sm h-9 rounded-full border-white/10 bg-base-100/85 hover:bg-base-100"
-              @click="changeLocalFolder"
-            >
-              {{ t('settings.changeLocalFolder') }}
-            </button>
-          </div>
-          <p
-            v-if="!localFolderReady && !usesNativeDownloads"
-            class="text-[11px] text-warning"
-          >
-            {{ t('settings.localFolderPermissionNeeded') }}
-          </p>
-        </div>
-        <p v-if="folderPickerError" class="text-[11px] text-error mt-2">
-          {{ folderPickerError }}
-        </p>
-      </div>
-
-      <!-- Download location (on-device mode): the embedded backend reads &
-           writes this folder so the Library and Player tabs see the media. -->
-      <div v-if="isDeviceMode">
-        <label
-          class="block text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2"
-        >
-          {{ t('settings.downloadLocation') }}
-        </label>
-        <div
-          class="rounded-xl border border-white/10 bg-base-100/85 px-3 py-3 space-y-2"
-        >
-          <div class="flex items-start gap-3">
-            <Icon
-              icon="clarity:music-note-line"
-              class="mt-0.5 h-5 w-5 shrink-0 text-primary"
-            />
-            <div class="min-w-0 flex-1">
-              <p class="text-sm font-medium">
-                {{ deviceLocationLabel }}
-              </p>
-              <p class="truncate text-[11px] text-base-content/50">
-                {{ deviceLocationPath || t('settings.deviceLocationDefault') }}
-              </p>
-            </div>
-          </div>
-          <div class="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              class="btn btn-sm h-9 rounded-full border-white/10 bg-base-100/85 hover:bg-base-100"
-              @click="chooseDeviceFolder"
-            >
-              {{ t('settings.chooseFolder') }}
-            </button>
-            <button
-              v-if="sm.settings.value.server_media_location"
-              type="button"
-              class="btn btn-sm h-9 rounded-full border-white/10 bg-base-100/85 hover:bg-base-100"
-              @click="resetDeviceFolder"
-            >
-              {{ t('settings.useMusicLibrary') }}
-            </button>
-          </div>
-          <p v-if="!deviceStorageGranted" class="text-[11px] text-warning">
-            {{ t('settings.deviceStoragePermission') }}
-          </p>
-        </div>
-        <p class="text-[11px] text-base-content/40 mt-1.5">
-          {{ t('settings.downloadLocationHint') }}
-        </p>
-        <p v-if="deviceDownloadError" class="text-[11px] text-error mt-2">
-          {{ deviceDownloadError }}
-        </p>
-      </div>
-
-      <!-- Audio source -->
-      <div>
-        <label
-          class="block text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2"
-        >
-          {{ t('settings.audioSource') }}
-        </label>
-        <div class="grid grid-cols-2 gap-2">
-          <button
-            v-for="provider in sm.settingsOptions.audio_providers"
-            :key="provider"
-            type="button"
-            class="rounded-xl border px-3 py-2 text-sm transition-colors text-left"
-            :class="[
-              sm.settings.value.audio_providers[0] === provider
-                ? 'border-primary/50 bg-primary/10 text-primary'
-                : 'border-white/10 hover:border-white/20 hover:bg-white/5',
-            ]"
-            @click="sm.settings.value.audio_providers = [provider]"
-          >
-            {{ providerLabel(provider) }}
-          </button>
-        </div>
-      </div>
-
-      <!-- Lyrics source -->
-      <div>
-        <label
-          class="block text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2"
-        >
-          {{ t('settings.lyricsSource') }}
-        </label>
-        <label
-          class="flex items-start gap-3 rounded-xl border border-white/10 bg-base-100/85 px-3 py-2.5 cursor-pointer hover:border-white/20 mb-2"
-        >
-          <input
-            type="checkbox"
-            class="checkbox checkbox-sm checkbox-primary mt-0.5"
-            v-model="sm.settings.value.download_lyrics"
-          />
-          <span class="flex-1 text-sm">
-            <span class="block">{{ t('settings.downloadLyrics') }}</span>
-            <span class="block text-[11px] text-base-content/50">
-              {{ t('settings.downloadLyricsHint') }}
-            </span>
-          </span>
-        </label>
-        <div class="flex items-baseline justify-between mb-1.5">
-          <span class="text-xs text-base-content/50">
-            {{ t('settings.lyricsProvider') }}
-          </span>
-          <span class="text-[10px] text-base-content/40">
-            {{ t('settings.lyricsHint') }}
-          </span>
-        </div>
-        <select
-          class="select w-full rounded-xl bg-base-100/85 border border-white/10 focus:border-primary/60 disabled:opacity-40"
-          v-model="sm.settings.value.lyrics_providers[0]"
-          :disabled="!sm.settings.value.download_lyrics"
-        >
-          <option
-            v-for="provider in sm.settingsOptions.lyrics_providers"
-            :key="provider"
-            :value="provider"
-          >
-            {{ provider }}
-          </option>
-        </select>
-      </div>
-
-      <!-- Format & bitrate -->
-      <div class="grid grid-cols-2 gap-3">
+        <!-- Language -->
         <div>
           <label
             class="block text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2"
           >
-            {{ t('settings.format') }}
+            {{ t('settings.language') }}
           </label>
           <select
             class="select w-full rounded-xl bg-base-100/85 border border-white/10 focus:border-primary/60"
-            v-model="sm.settings.value.format"
+            :value="locale"
+            @change="setLocale($event.target.value)"
           >
-            <option v-for="fmt in formatOptions" :key="fmt" :value="fmt">
-              {{ fmt.toUpperCase() }}
+            <option v-for="l in locales" :key="l.code" :value="l.code">
+              {{ l.name }}
             </option>
           </select>
-          <p
-            v-if="isDeviceMode && !ffmpegAvailable"
-            class="text-[11px] text-base-content/40 mt-1.5"
-          >
-            {{ t('settings.deviceFormatNoFfmpeg') }}
+          <p class="text-[11px] text-base-content/40 mt-1.5">
+            {{ t('settings.languageHint') }}
           </p>
         </div>
+
         <div>
-          <div class="flex items-baseline justify-between mb-2">
-            <label
-              class="block text-xs font-semibold uppercase tracking-wider text-base-content/50"
+          <label
+            class="block text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2"
+          >
+            {{ t('settings.monitorArtistInitialSearch') }}
+          </label>
+          <label
+            class="flex cursor-pointer items-center justify-between gap-4 rounded-xl border border-white/10 bg-base-100/70 px-3 py-3"
+          >
+            <span class="text-sm text-base-content/80">
+              {{ t('settings.monitorArtistInitialSearchHint') }}
+            </span>
+            <input
+              v-model="sm.settings.value.monitor_artist_initial_search"
+              type="checkbox"
+              class="toggle toggle-primary shrink-0"
+            />
+          </label>
+        </div>
+
+        <!-- Download destination (irrelevant in on-device mode: files are
+           always saved locally by the embedded backend). -->
+        <div v-if="!isDeviceMode">
+          <label
+            class="block text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2"
+          >
+            {{ t('settings.downloadDestination') }}
+          </label>
+          <div class="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              class="rounded-xl border px-3 py-2 text-sm transition-colors text-left"
+              :class="[
+                destination === 'server'
+                  ? 'border-primary/50 bg-primary/10 text-primary'
+                  : 'border-white/10 hover:border-white/20 hover:bg-white/5',
+              ]"
+              @click="setDestination('server')"
             >
-              {{ t('settings.quality') }}
+              {{ t('settings.downloadDestinationServer') }}
+            </button>
+            <button
+              type="button"
+              class="rounded-xl border px-3 py-2 text-sm transition-colors text-left"
+              :class="[
+                destination === 'local'
+                  ? 'border-primary/50 bg-primary/10 text-primary'
+                  : 'border-white/10 hover:border-white/20 hover:bg-white/5',
+              ]"
+              @click="selectLocalDestination"
+            >
+              {{ t('settings.downloadDestinationLocal') }}
+            </button>
+          </div>
+          <p class="text-[11px] text-base-content/40 mt-1.5">
+            {{
+              destination === 'local'
+                ? localDestinationHint
+                : t('settings.downloadDestinationServerHint')
+            }}
+          </p>
+          <div v-if="destination === 'server'" class="mt-3">
+            <label class="block text-xs text-base-content/50 mb-1.5">
+              {{ t('settings.serverMediaLocation') }}
             </label>
-            <span
-              v-if="sm.settings.value.format === 'flac'"
-              class="text-[10px] text-base-content/40"
+            <input
+              v-model="sm.settings.value.server_media_location"
+              type="text"
+              class="input-modern h-10 w-full text-sm"
+              :placeholder="t('settings.serverMediaLocationPlaceholder')"
+            />
+            <p class="text-[11px] text-base-content/40 mt-1.5">
+              {{ t('settings.serverMediaLocationHint') }}
+            </p>
+          </div>
+          <p
+            v-if="localFolderBlockReason"
+            class="text-[11px] text-base-content/40 mt-1.5"
+          >
+            {{ localFolderBlockMessage }}
+          </p>
+          <div
+            v-if="isLocal"
+            class="mt-3 rounded-xl border border-white/10 bg-base-100/85 px-3 py-3 space-y-2"
+          >
+            <div class="flex items-start gap-3">
+              <Icon
+                icon="clarity:folder-open-line"
+                class="mt-0.5 h-5 w-5 shrink-0 text-primary"
+              />
+              <div class="min-w-0 flex-1">
+                <p class="text-sm font-medium">
+                  {{ t('settings.localFolderLabel') }}
+                </p>
+                <p class="truncate text-sm text-base-content/80">
+                  {{ localFolderName || t('settings.localFolderNone') }}
+                </p>
+                <p class="mt-1 text-[11px] text-base-content/40">
+                  {{ localFolderDetailHint }}
+                </p>
+              </div>
+            </div>
+            <div
+              v-if="!usesBrowserDownloads"
+              class="flex flex-wrap items-center gap-2"
             >
-              {{ t('settings.qualityIgnored') }}
+              <button
+                type="button"
+                class="btn btn-sm h-9 rounded-full border-white/10 bg-base-100/85 hover:bg-base-100"
+                @click="changeLocalFolder"
+              >
+                {{ t('settings.changeLocalFolder') }}
+              </button>
+            </div>
+            <p
+              v-if="!localFolderReady && !usesNativeDownloads"
+              class="text-[11px] text-warning"
+            >
+              {{ t('settings.localFolderPermissionNeeded') }}
+            </p>
+          </div>
+          <p v-if="folderPickerError" class="text-[11px] text-error mt-2">
+            {{ folderPickerError }}
+          </p>
+        </div>
+
+        <!-- Download location (on-device mode): the embedded backend reads &
+           writes this folder so the Library and Player tabs see the media. -->
+        <div v-if="isDeviceMode">
+          <label
+            class="block text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2"
+          >
+            {{ t('settings.downloadLocation') }}
+          </label>
+          <div
+            class="rounded-xl border border-white/10 bg-base-100/85 px-3 py-3 space-y-2"
+          >
+            <div class="flex items-start gap-3">
+              <Icon
+                icon="clarity:music-note-line"
+                class="mt-0.5 h-5 w-5 shrink-0 text-primary"
+              />
+              <div class="min-w-0 flex-1">
+                <p class="text-sm font-medium">
+                  {{ deviceLocationLabel }}
+                </p>
+                <p class="truncate text-[11px] text-base-content/50">
+                  {{
+                    deviceLocationPath || t('settings.deviceLocationDefault')
+                  }}
+                </p>
+              </div>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                class="btn btn-sm h-9 rounded-full border-white/10 bg-base-100/85 hover:bg-base-100"
+                @click="chooseDeviceFolder"
+              >
+                {{ t('settings.chooseFolder') }}
+              </button>
+              <button
+                v-if="sm.settings.value.server_media_location"
+                type="button"
+                class="btn btn-sm h-9 rounded-full border-white/10 bg-base-100/85 hover:bg-base-100"
+                @click="resetDeviceFolder"
+              >
+                {{ t('settings.useMusicLibrary') }}
+              </button>
+            </div>
+            <p v-if="!deviceStorageGranted" class="text-[11px] text-warning">
+              {{ t('settings.deviceStoragePermission') }}
+            </p>
+          </div>
+          <p class="text-[11px] text-base-content/40 mt-1.5">
+            {{ t('settings.downloadLocationHint') }}
+          </p>
+          <p v-if="deviceDownloadError" class="text-[11px] text-error mt-2">
+            {{ deviceDownloadError }}
+          </p>
+        </div>
+
+        <!-- Audio source -->
+        <div>
+          <label
+            class="block text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2"
+          >
+            {{ t('settings.audioSource') }}
+          </label>
+          <div class="grid grid-cols-2 gap-2">
+            <button
+              v-for="provider in sm.settingsOptions.audio_providers"
+              :key="provider"
+              type="button"
+              class="rounded-xl border px-3 py-2 text-sm transition-colors text-left"
+              :class="[
+                sm.settings.value.audio_providers[0] === provider
+                  ? 'border-primary/50 bg-primary/10 text-primary'
+                  : 'border-white/10 hover:border-white/20 hover:bg-white/5',
+              ]"
+              @click="sm.settings.value.audio_providers = [provider]"
+            >
+              {{ providerLabel(provider) }}
+            </button>
+          </div>
+        </div>
+
+        <!-- Lyrics source -->
+        <div>
+          <label
+            class="block text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2"
+          >
+            {{ t('settings.lyricsSource') }}
+          </label>
+          <label
+            class="flex items-start gap-3 rounded-xl border border-white/10 bg-base-100/85 px-3 py-2.5 cursor-pointer hover:border-white/20 mb-2"
+          >
+            <input
+              type="checkbox"
+              class="checkbox checkbox-sm checkbox-primary mt-0.5"
+              v-model="sm.settings.value.download_lyrics"
+            />
+            <span class="flex-1 text-sm">
+              <span class="block">{{ t('settings.downloadLyrics') }}</span>
+              <span class="block text-[11px] text-base-content/50">
+                {{ t('settings.downloadLyricsHint') }}
+              </span>
+            </span>
+          </label>
+          <div class="flex items-baseline justify-between mb-1.5">
+            <span class="text-xs text-base-content/50">
+              {{ t('settings.lyricsProvider') }}
+            </span>
+            <span class="text-[10px] text-base-content/40">
+              {{ t('settings.lyricsHint') }}
             </span>
           </div>
           <select
-            class="select w-full rounded-xl bg-base-100/85 border border-white/10 focus:border-primary/60"
-            v-model="sm.settings.value.bitrate"
-            :disabled="sm.settings.value.format === 'flac'"
+            class="select w-full rounded-xl bg-base-100/85 border border-white/10 focus:border-primary/60 disabled:opacity-40"
+            v-model="sm.settings.value.lyrics_providers[0]"
+            :disabled="!sm.settings.value.download_lyrics"
           >
             <option
-              v-for="bitrate in sm.settingsOptions.bitrate"
-              :key="bitrate"
-              :value="bitrate"
+              v-for="provider in sm.settingsOptions.lyrics_providers"
+              :key="provider"
+              :value="provider"
             >
-              {{ bitrate }} kbps
+              {{ provider }}
             </option>
           </select>
         </div>
-      </div>
 
-      <!-- Metadata -->
-      <div>
-        <label
-          class="block text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2"
-        >
-          {{ t('settings.metadataSection') }}
-        </label>
-        <label
-          class="flex items-start gap-3 rounded-xl border border-white/10 bg-base-100/85 px-3 py-2.5 cursor-pointer hover:border-white/20"
-        >
-          <input
-            type="checkbox"
-            class="checkbox checkbox-sm checkbox-primary mt-0.5"
-            v-model="sm.settings.value.enhance_metadata"
-          />
-          <span class="flex-1 text-sm">
-            <span class="block">{{ t('settings.enhanceMetadata') }}</span>
-            <span class="block text-[11px] text-base-content/50">
-              {{ t('settings.enhanceMetadataHint') }}
-            </span>
-          </span>
-        </label>
-        <label class="mt-3 block text-xs text-base-content/55">
-          <span class="mb-1 block font-semibold text-base-content/70">
-            {{ t('settings.artistFolderPolicy') }}
-          </span>
-          <select
-            class="select h-10 w-full rounded-xl border-white/10 bg-base-100/85 text-sm"
-            v-model="sm.settings.value.artist_folder_policy"
+        <!-- Format & bitrate -->
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label
+              class="block text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2"
+            >
+              {{ t('settings.format') }}
+            </label>
+            <select
+              class="select w-full rounded-xl bg-base-100/85 border border-white/10 focus:border-primary/60"
+              v-model="sm.settings.value.format"
+            >
+              <option v-for="fmt in formatOptions" :key="fmt" :value="fmt">
+                {{ fmt.toUpperCase() }}
+              </option>
+            </select>
+            <p
+              v-if="isDeviceMode && !ffmpegAvailable"
+              class="text-[11px] text-base-content/40 mt-1.5"
+            >
+              {{ t('settings.deviceFormatNoFfmpeg') }}
+            </p>
+          </div>
+          <div>
+            <div class="flex items-baseline justify-between mb-2">
+              <label
+                class="block text-xs font-semibold uppercase tracking-wider text-base-content/50"
+              >
+                {{ t('settings.quality') }}
+              </label>
+              <span
+                v-if="sm.settings.value.format === 'flac'"
+                class="text-[10px] text-base-content/40"
+              >
+                {{ t('settings.qualityIgnored') }}
+              </span>
+            </div>
+            <select
+              class="select w-full rounded-xl bg-base-100/85 border border-white/10 focus:border-primary/60"
+              v-model="sm.settings.value.bitrate"
+              :disabled="sm.settings.value.format === 'flac'"
+            >
+              <option
+                v-for="bitrate in sm.settingsOptions.bitrate"
+                :key="bitrate"
+                :value="bitrate"
+              >
+                {{ bitrate }} kbps
+              </option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Metadata -->
+        <div>
+          <label
+            class="block text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2"
           >
-            <option value="artwork_available">
-              {{ t('settings.artistFolderPolicyArtwork') }}
-            </option>
-            <option value="primary_only">
-              {{ t('settings.artistFolderPolicyPrimary') }}
-            </option>
-            <option value="existing_only">
-              {{ t('settings.artistFolderPolicyExisting') }}
-            </option>
-          </select>
-          <span class="mt-1 block text-[11px] text-base-content/50">
-            {{ t('settings.artistFolderPolicyHint') }}
-          </span>
-        </label>
-      </div>
-
-      <!-- Playlists -->
-      <div>
-        <label
-          class="block text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2"
-        >
-          {{ t('settings.playlistsSection') }}
-        </label>
-        <label
-          class="flex items-start gap-3 rounded-xl border border-white/10 bg-base-100/85 px-3 py-2.5 cursor-pointer hover:border-white/20"
-        >
-          <input
-            type="checkbox"
-            class="checkbox checkbox-sm checkbox-primary mt-0.5"
-            v-model="sm.settings.value.generate_m3u"
-          />
-          <span class="flex-1 text-sm">
-            <span class="block">{{ t('settings.generateM3u') }}</span>
-            <span class="block text-[11px] text-base-content/50">
-              {{ t('settings.generateM3uHint') }}
-            </span>
-          </span>
-        </label>
-      </div>
-
-      <!-- File organization -->
-      <div>
-        <label
-          class="block text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2"
-        >
-          {{ t('settings.organizationSection') }}
-        </label>
-        <div class="space-y-2">
+            {{ t('settings.metadataSection') }}
+          </label>
           <label
             class="flex items-start gap-3 rounded-xl border border-white/10 bg-base-100/85 px-3 py-2.5 cursor-pointer hover:border-white/20"
           >
             <input
               type="checkbox"
               class="checkbox checkbox-sm checkbox-primary mt-0.5"
-              v-model="sm.settings.value.organize_by_artist"
+              v-model="sm.settings.value.enhance_metadata"
             />
             <span class="flex-1 text-sm">
-              <span class="block">{{ t('settings.organizeByArtist') }}</span>
+              <span class="block">{{ t('settings.enhanceMetadata') }}</span>
               <span class="block text-[11px] text-base-content/50">
-                {{ t('settings.organizeByArtistHint') }}
+                {{ t('settings.enhanceMetadataHint') }}
               </span>
             </span>
           </label>
+          <label class="mt-3 block text-xs text-base-content/55">
+            <span class="mb-1 block font-semibold text-base-content/70">
+              {{ t('settings.artistFolderPolicy') }}
+            </span>
+            <select
+              class="select h-10 w-full rounded-xl border-white/10 bg-base-100/85 text-sm"
+              v-model="sm.settings.value.artist_folder_policy"
+            >
+              <option value="artwork_available">
+                {{ t('settings.artistFolderPolicyArtwork') }}
+              </option>
+              <option value="primary_only">
+                {{ t('settings.artistFolderPolicyPrimary') }}
+              </option>
+              <option value="existing_only">
+                {{ t('settings.artistFolderPolicyExisting') }}
+              </option>
+            </select>
+            <span class="mt-1 block text-[11px] text-base-content/50">
+              {{ t('settings.artistFolderPolicyHint') }}
+            </span>
+          </label>
+        </div>
+
+        <!-- Playlists -->
+        <div>
           <label
-            class="flex items-start gap-3 rounded-xl border border-white/10 bg-base-100/85 px-3 py-2.5 transition-colors"
-            :class="
-              sm.settings.value.organize_by_artist
-                ? 'cursor-pointer hover:border-white/20'
-                : 'cursor-not-allowed opacity-50'
-            "
+            class="block text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2"
+          >
+            {{ t('settings.playlistsSection') }}
+          </label>
+          <label
+            class="flex items-start gap-3 rounded-xl border border-white/10 bg-base-100/85 px-3 py-2.5 cursor-pointer hover:border-white/20"
           >
             <input
               type="checkbox"
               class="checkbox checkbox-sm checkbox-primary mt-0.5"
-              v-model="sm.settings.value.organize_by_album"
-              :disabled="!sm.settings.value.organize_by_artist"
+              v-model="sm.settings.value.generate_m3u"
             />
             <span class="flex-1 text-sm">
-              <span class="block">{{ t('settings.organizeByAlbum') }}</span>
+              <span class="block">{{ t('settings.generateM3u') }}</span>
               <span class="block text-[11px] text-base-content/50">
-                {{ t('settings.organizeByAlbumHint') }}
+                {{ t('settings.generateM3uHint') }}
               </span>
             </span>
           </label>
         </div>
-      </div>
 
-      <!-- Parallel downloads -->
-      <div>
-        <label
-          class="block text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2"
-        >
-          {{ t('settings.parallelDownloads') }}
-        </label>
-        <div class="grid grid-cols-3 gap-1.5 sm:grid-cols-6">
-          <button
-            v-for="n in sm.settingsOptions.max_parallel_downloads"
-            :key="n"
-            type="button"
-            class="rounded-xl border px-2 py-2 text-sm font-medium transition-colors text-center"
-            :class="[
-              sm.settings.value.max_parallel_downloads === n
-                ? 'border-primary/50 bg-primary/10 text-primary'
-                : 'border-white/10 hover:border-white/20 hover:bg-white/5',
-            ]"
-            @click="sm.settings.value.max_parallel_downloads = n"
+        <!-- File organization -->
+        <div>
+          <label
+            class="block text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2"
           >
-            {{ n }}
-          </button>
+            {{ t('settings.organizationSection') }}
+          </label>
+          <div class="space-y-2">
+            <label
+              class="flex items-start gap-3 rounded-xl border border-white/10 bg-base-100/85 px-3 py-2.5 cursor-pointer hover:border-white/20"
+            >
+              <input
+                type="checkbox"
+                class="checkbox checkbox-sm checkbox-primary mt-0.5"
+                v-model="sm.settings.value.organize_by_artist"
+              />
+              <span class="flex-1 text-sm">
+                <span class="block">{{ t('settings.organizeByArtist') }}</span>
+                <span class="block text-[11px] text-base-content/50">
+                  {{ t('settings.organizeByArtistHint') }}
+                </span>
+              </span>
+            </label>
+            <label
+              class="flex items-start gap-3 rounded-xl border border-white/10 bg-base-100/85 px-3 py-2.5 transition-colors"
+              :class="
+                sm.settings.value.organize_by_artist
+                  ? 'cursor-pointer hover:border-white/20'
+                  : 'cursor-not-allowed opacity-50'
+              "
+            >
+              <input
+                type="checkbox"
+                class="checkbox checkbox-sm checkbox-primary mt-0.5"
+                v-model="sm.settings.value.organize_by_album"
+                :disabled="!sm.settings.value.organize_by_artist"
+              />
+              <span class="flex-1 text-sm">
+                <span class="block">{{ t('settings.organizeByAlbum') }}</span>
+                <span class="block text-[11px] text-base-content/50">
+                  {{ t('settings.organizeByAlbumHint') }}
+                </span>
+              </span>
+            </label>
+          </div>
         </div>
-        <p class="text-[11px] text-base-content/40 mt-1.5">
-          {{ t('settings.parallelDownloadsHint') }}
-        </p>
-      </div>
 
-      <!-- Save status -->
-      <transition
-        enter-active-class="transition duration-200"
-        enter-from-class="opacity-0 -translate-y-1"
-        enter-to-class="opacity-100 translate-y-0"
-        leave-active-class="transition duration-200"
-        leave-from-class="opacity-100"
-        leave-to-class="opacity-0"
-      >
-        <div
-          v-if="sm.isSaved.value === true"
-          class="surface rounded-xl p-3 flex items-center gap-2 text-sm text-primary"
-        >
-          <Icon icon="clarity:check-line" class="h-4 w-4 shrink-0" />
-          {{ t('settings.saved') }}
+        <!-- Parallel downloads -->
+        <div>
+          <label
+            class="block text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2"
+          >
+            {{ t('settings.parallelDownloads') }}
+          </label>
+          <div class="grid grid-cols-3 gap-1.5 sm:grid-cols-6">
+            <button
+              v-for="n in sm.settingsOptions.max_parallel_downloads"
+              :key="n"
+              type="button"
+              class="rounded-xl border px-2 py-2 text-sm font-medium transition-colors text-center"
+              :class="[
+                sm.settings.value.max_parallel_downloads === n
+                  ? 'border-primary/50 bg-primary/10 text-primary'
+                  : 'border-white/10 hover:border-white/20 hover:bg-white/5',
+              ]"
+              @click="sm.settings.value.max_parallel_downloads = n"
+            >
+              {{ n }}
+            </button>
+          </div>
+          <p class="text-[11px] text-base-content/40 mt-1.5">
+            {{ t('settings.parallelDownloadsHint') }}
+          </p>
         </div>
-        <div
-          v-else-if="sm.isSaved.value === false"
-          class="surface rounded-xl p-3 flex items-center gap-2 text-sm text-error"
+
+        <!-- Save status -->
+        <transition
+          enter-active-class="transition duration-200"
+          enter-from-class="opacity-0 -translate-y-1"
+          enter-to-class="opacity-100 translate-y-0"
+          leave-active-class="transition duration-200"
+          leave-from-class="opacity-100"
+          leave-to-class="opacity-0"
         >
-          <Icon
-            icon="clarity:exclamation-circle-line"
-            class="h-4 w-4 shrink-0"
-          />
-          {{ t('settings.saveError') }}
-        </div>
-      </transition>
+          <div
+            v-if="sm.isSaved.value === true"
+            class="surface rounded-xl p-3 flex items-center gap-2 text-sm text-primary"
+          >
+            <Icon icon="clarity:check-line" class="h-4 w-4 shrink-0" />
+            {{ t('settings.saved') }}
+          </div>
+          <div
+            v-else-if="sm.isSaved.value === false"
+            class="surface rounded-xl p-3 flex items-center gap-2 text-sm text-error"
+          >
+            <Icon
+              icon="clarity:exclamation-circle-line"
+              class="h-4 w-4 shrink-0"
+            />
+            {{ t('settings.saveError') }}
+          </div>
+        </transition>
       </template>
     </div>
 
@@ -933,92 +860,8 @@
           </div>
         </div>
 
-        <div v-else class="space-y-3">
-          <div class="surface rounded-xl px-3 py-2.5 text-sm">
-            <span class="text-base-content/50">
-              {{ t('settings.serverUrlCurrent') }}:
-            </span>
-            <span class="ml-1 font-medium text-base-content">
-              {{
-                usesCustomServer
-                  ? activeServerDisplay
-                  : t('settings.serverUrlDefault')
-              }}
-            </span>
-          </div>
-          <div>
-            <label class="block text-xs text-base-content/50 mb-1.5">
-              {{ t('settings.serverUrl') }}
-            </label>
-            <input
-              v-model="serverUrlInput"
-              type="url"
-              inputmode="url"
-              autocapitalize="off"
-              autocorrect="off"
-              spellcheck="false"
-              class="input-modern h-10 w-full text-sm"
-              :placeholder="t('settings.serverUrlPlaceholder')"
-            />
-            <p class="text-[11px] text-base-content/40 mt-1.5">
-              {{ t('settings.serverSaveHint') }}
-            </p>
-          </div>
-          <div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-            <button
-              v-if="canConnectDevice"
-              type="button"
-              class="btn btn-primary btn-sm h-10 w-full rounded-full px-4 sm:w-auto"
-              :disabled="connectedToThisDevice || serverTestLoading"
-              @click="connectToThisDevice"
-            >
-              {{ t('settings.serverConnectDevice') }}
-            </button>
-            <button
-              type="button"
-              class="btn btn-sm h-10 w-full rounded-full px-4 sm:w-auto"
-              :class="
-                canConnectDevice
-                  ? 'border border-white/10 bg-base-100/85 text-base-content hover:bg-base-100'
-                  : 'btn-primary'
-              "
-              :disabled="serverTestLoading || !serverUrlInput.trim()"
-              @click="testServerConnection"
-            >
-              <span
-                v-if="serverTestLoading"
-                class="loading loading-spinner loading-xs mr-2"
-              />
-              {{
-                serverTestLoading
-                  ? t('settings.serverTesting')
-                  : t('settings.serverTest')
-              }}
-            </button>
-            <button
-              type="button"
-              class="btn btn-sm h-10 w-full rounded-full border border-white/10 bg-base-100/85 px-4 text-base-content hover:bg-base-100 sm:w-auto"
-              :disabled="!canSaveServerUrl || serverTestLoading"
-              @click="saveServerConnection"
-            >
-              {{ t('settings.serverSave') }}
-            </button>
-            <button
-              v-if="usesCustomServer && !connectedToThisDevice"
-              type="button"
-              class="btn btn-sm h-10 w-full rounded-full border border-white/10 bg-base-100/85 px-4 text-base-content hover:bg-base-100 sm:w-auto"
-              @click="resetServerConnection"
-            >
-              {{ t('settings.serverClear') }}
-            </button>
-          </div>
-          <p
-            v-if="serverTestMessage"
-            class="text-[11px]"
-            :class="serverTestError ? 'text-error' : 'text-primary'"
-          >
-            {{ serverTestMessage }}
-          </p>
+        <div v-else>
+          <ServerConnectionFields />
         </div>
       </div>
 
@@ -1651,7 +1494,8 @@
         <pre
           v-if="updateResult.terminal_output || updateResult.pull_output"
           class="mt-3 max-h-40 overflow-auto rounded-xl border border-white/10 bg-black/30 p-3 text-xs text-base-content/70"
-          >{{ updateResult.terminal_output || updateResult.pull_output }}</pre>
+          >{{ updateResult.terminal_output || updateResult.pull_output }}</pre
+        >
       </div>
     </div>
 
@@ -1671,10 +1515,17 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick, reactive } from 'vue'
+import {
+  ref,
+  computed,
+  watch,
+  onMounted,
+  onBeforeUnmount,
+  nextTick,
+  reactive,
+} from 'vue'
 import { useRoute } from 'vue-router'
 import { Icon } from '@iconify/vue'
-import axios from 'axios'
 import { useSettingsManager } from '../model/settings'
 import { useDownloadDestination } from '../model/downloadDestination'
 import {
@@ -1695,20 +1546,12 @@ import {
   loadCapabilities,
 } from '../model/capabilities'
 import {
-  buildApiBaseUrl,
-  canConnectToCurrentPage,
-  canSaveServerUrlInput,
   formatServerDisplay,
   getConnectionMode,
-  getCurrentPageServerUrl,
   getServerConfig,
-  getStoredServerUrl,
   isCapacitorNative,
-  isConnectedToCurrentPage,
   isEmbeddedServerAvailable,
-  parseServerUrl,
   setConnectionMode,
-  setStoredServerUrl,
   usesCustomServerUrl,
 } from '../model/serverConnection'
 import { useAuthSession } from '../model/authSession'
@@ -1722,6 +1565,7 @@ import {
 import { installApkUpdate } from '../model/apkUpdate'
 import ThemedSelect from './ThemedSelect.vue'
 import SecretField from './SecretField.vue'
+import ServerConnectionFields from './ServerConnectionFields.vue'
 
 const route = useRoute()
 
@@ -1806,8 +1650,7 @@ const activeSettingsTabLabel = computed(
 )
 const useMobileAppBarMenu = computed(
   () =>
-    isNativeSettingsMenu ||
-    (showSettingsTabMenu.value && isMobileAppBar.value)
+    isNativeSettingsMenu || (showSettingsTabMenu.value && isMobileAppBar.value)
 )
 
 function syncSettingsMobileAction() {
@@ -1931,12 +1774,11 @@ const jellyfinLibraryError = ref('')
 const jellyfinTestLoading = ref(false)
 const jellyfinTestMessage = ref('')
 const jellyfinTestError = ref(false)
-const serverUrlInput = ref(getStoredServerUrl())
-const serverTestLoading = ref(false)
-const serverTestMessage = ref('')
-const serverTestError = ref(false)
-const usesCustomServer = computed(() => usesCustomServerUrl())
 const embeddedAvailable = computed(() => isEmbeddedServerAvailable())
+const usesCustomServer = computed(() => usesCustomServerUrl())
+const activeServerDisplay = computed(() =>
+  formatServerDisplay(getServerConfig())
+)
 const connectionMode = ref(getConnectionMode())
 const isDeviceMode = computed(
   () => embeddedAvailable.value && connectionMode.value === 'device'
@@ -1968,14 +1810,6 @@ const formatOptions = computed(() => {
   const filtered = all.filter((fmt) => supported.includes(fmt))
   return filtered.length ? filtered : all
 })
-const activeServerDisplay = computed(() =>
-  formatServerDisplay(getServerConfig())
-)
-const canConnectDevice = computed(() => canConnectToCurrentPage())
-const connectedToThisDevice = computed(() => isConnectedToCurrentPage())
-const canSaveServerUrl = computed(() =>
-  canSaveServerUrlInput(serverUrlInput.value)
-)
 const repairLog = ref([])
 const repairLogLoading = ref(false)
 const repairLogError = ref('')
@@ -2376,7 +2210,7 @@ const canRunUpdate = computed(() => {
   if (usesApkUpdateFlow()) {
     return Boolean(
       updateStatus.value?.update_available ||
-      updateStatus.value?.needs_apk_update
+        updateStatus.value?.needs_apk_update
     )
   }
   return Boolean(updateStatus.value?.update_available)
@@ -2751,43 +2585,6 @@ async function onJellyfinConfigChange() {
   }
 }
 
-async function testServerConnection() {
-  serverTestMessage.value = ''
-  serverTestError.value = false
-  const parsed = parseServerUrl(serverUrlInput.value)
-  if (!parsed) {
-    serverTestError.value = true
-    serverTestMessage.value = t('settings.serverInvalidUrl')
-    return
-  }
-  serverTestLoading.value = true
-  try {
-    const client = axios.create({
-      baseURL: buildApiBaseUrl(parsed),
-      timeout: 15000,
-    })
-    const [healthRes, versionRes] = await Promise.all([
-      client.get('/api/health'),
-      client.get('/api/version'),
-    ])
-    const version = String(versionRes.data || '').trim()
-    if (!healthRes.data || healthRes.status !== 200) {
-      throw new Error(t('settings.serverTestFailed'))
-    }
-    serverTestMessage.value = t('settings.serverTestSuccess', {
-      version: version || '?',
-    })
-  } catch (err) {
-    serverTestError.value = true
-    const detail = err?.response?.data?.detail || err?.message
-    serverTestMessage.value = detail
-      ? `${t('settings.serverTestFailed')}: ${detail}`
-      : t('settings.serverTestFailed')
-  } finally {
-    serverTestLoading.value = false
-  }
-}
-
 async function snapshotThenReload(mutate) {
   await API.snapshotProfile().catch(() => {})
   mutate?.()
@@ -2797,40 +2594,6 @@ async function snapshotThenReload(mutate) {
     return
   }
   window.location.reload()
-}
-
-function reloadAfterServerChange() {
-  void snapshotThenReload()
-}
-
-function connectToThisDevice() {
-  const current = getCurrentPageServerUrl()
-  if (!current) return
-  serverUrlInput.value = current
-  if (isConnectedToCurrentPage()) return
-  void snapshotThenReload(() => {
-    setStoredServerUrl(current)
-  })
-}
-
-function saveServerConnection() {
-  const parsed = parseServerUrl(serverUrlInput.value)
-  if (!parsed) {
-    serverTestError.value = true
-    serverTestMessage.value = t('settings.serverInvalidUrl')
-    return
-  }
-  void snapshotThenReload(() => {
-    setStoredServerUrl(serverUrlInput.value.trim())
-    setConnectionMode('server')
-    connectionMode.value = 'server'
-  })
-}
-
-function resetServerConnection() {
-  void snapshotThenReload(() => {
-    setStoredServerUrl('')
-  })
 }
 
 function selectConnectionMode(mode) {

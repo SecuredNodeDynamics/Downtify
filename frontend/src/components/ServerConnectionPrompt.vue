@@ -14,7 +14,11 @@
             {{ t('settings.serverRequiredTitle') }}
           </p>
           <p class="mt-1 text-sm text-base-content/70">
-            {{ t('settings.serverRequiredHint') }}
+            {{
+              canUseAdminPages
+                ? t('settings.serverRequiredHint')
+                : t('settings.serverRequiredHintFamily')
+            }}
           </p>
         </div>
         <button
@@ -22,7 +26,11 @@
           class="btn btn-primary btn-sm h-10 rounded-full px-5"
           @click="goToServerSettings"
         >
-          {{ t('settings.serverConnectionSection') }}
+          {{
+            canUseAdminPages
+              ? t('settings.serverConnectionSection')
+              : t('nav.settings')
+          }}
         </button>
       </div>
     </div>

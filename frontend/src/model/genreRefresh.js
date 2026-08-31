@@ -103,7 +103,14 @@ export async function cancelLibraryGenreLookup() {
   return res?.data
 }
 
-export async function ensureLibraryGenreLookup(unknownCount) {
+export async function ensureLibraryGenreLookup(
+  unknownCount,
+  { allowed = true } = {}
+) {
+  if (!allowed) {
+    if (!isGenreWarmupRunning()) stopGenreWarmupPolling()
+    return
+  }
   if (!unknownCount) {
     lastAutoStartUnknowns = 0
     if (!isGenreWarmupRunning()) stopGenreWarmupPolling()

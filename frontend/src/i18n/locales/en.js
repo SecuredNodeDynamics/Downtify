@@ -857,7 +857,7 @@ export default {
     jellyfinSection: 'Jellyfin API',
     serverConnectionSection: 'Downtify server',
     serverConnectionHint:
-      'For the mobile app, enter your Downtify server address — a home LAN IP (with port) or a public URL such as a Cloudflare tunnel. Leave empty when using the browser on the same host as the server.',
+      'Save a home network address (LAN IP) and a public URL (Cloudflare) so you can switch without retyping. Leave both empty when using the browser on the same host as the server.',
     modeSection: 'Mode',
     connectionModeDevice: 'Run on this device',
     connectionModeServer: 'Connect to a server',
@@ -866,6 +866,8 @@ export default {
     connectionModeServerHint:
       'Use your Downtify server — LAN IP (for example 10.128.1.63:8000) or a public URL such as a Cloudflare tunnel.',
     connectionModeServerConfigHint: 'Set the server address in Settings → API.',
+    connectionModeServerFamilyHint:
+      'An admin sets the home IP and Cloudflare addresses in Settings → API. Family profiles can switch between this device and that saved server.',
     runningOnThisDevice: 'Running on this device',
     runningOnThisDeviceHint:
       'Search, downloads and conversion all happen locally. Nothing is sent to an external Downtify server.',
@@ -873,12 +875,23 @@ export default {
       'To connect to a server instead, switch to “Connect to a server” in General settings.',
     serverRequiredTitle: 'Connect to your Downtify server',
     serverRequiredHint:
-      'The mobile app needs your server address before it can load queue, health, and other server data. Open Settings and enter your home IP or tunnel URL.',
+      'The mobile app needs your server address before it can load queue, health, and other server data. Open Settings and enter your home IP, Cloudflare URL, or both.',
+    serverRequiredHintFamily:
+      'An admin must save the server address in Settings → API. Switch to “Run on this device”, or ask an admin to set the home IP or Cloudflare URL.',
     serverUrl: 'Server address',
     serverUrlPlaceholder:
       'https://downtify.janzenmediagroup.com or http://10.128.1.63:8000',
+    serverUrlPrivate: 'Private URL (home IP)',
+    serverUrlPrivatePlaceholder: 'http://10.128.1.63:8000',
+    serverUrlPublic: 'Public URL (Cloudflare)',
+    serverUrlPublicPlaceholder: 'https://downtify.janzenmediagroup.com',
+    serverRoutePrivate: 'Home network',
+    serverRoutePublic: 'Cloudflare',
+    serverRouteHint:
+      'Choose Home network or Cloudflare, then Test and Save address to use that connection. Both addresses stay saved.',
     serverUrlCurrent: 'Connected to',
     serverUrlDefault: 'This page (same host)',
+    serverUrlUnset: 'Not set — ask an admin',
     serverTest: 'Test connection',
     serverTesting: 'Testing…',
     serverTestSuccess: 'Connected to Downtify v{version}',
@@ -888,7 +901,7 @@ export default {
     serverConnectDevice: 'Connect to this device',
     serverClear: 'Clear saved server',
     serverSaveHint:
-      'Use Connect to this device when you are already browsing Downtify on the server. For a remote server, enter its IP or tunnel URL and tap Save address. The app reloads after connecting.',
+      'Use Connect to this device when you are already browsing Downtify on the server. Save a LAN IP and a Cloudflare URL, then switch with Home network / Cloudflare and Save address. The app reloads after connecting.',
     enableJellyfinTools: 'Enable Jellyfin tools',
     enableJellyfinToolsHint:
       'Show the Metadata page reconciliation and Jellyfin refresh tools.',

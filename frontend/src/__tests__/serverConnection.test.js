@@ -11,11 +11,19 @@ import { Capacitor } from '@capacitor/core'
 import {
   buildApiBaseUrl,
   canSaveServerUrlInput,
+  classifyServerUrl,
+  getActiveServerRoute,
   getCurrentPageServerUrl,
   getConnectionMode,
+  getStoredPrivateServerUrl,
+  getStoredPublicServerUrl,
+  getStoredServerUrl,
   isConnectedToCurrentPage,
   parseServerUrl,
   repairStoredServerUrl,
+  setActiveServerRoute,
+  setStoredPrivateServerUrl,
+  setStoredPublicServerUrl,
   setStoredServerUrl,
 } from '../model/serverConnection.js'
 
@@ -184,6 +192,54 @@ describe('serverConnection', () => {
     Capacitor.isPluginAvailable.mockReturnValue(true)
 
     expect(getConnectionMode()).toBe('device')
+  })
+
+  it('classifies LAN IPs as private and hostnames as public', () => {
+    expect(classifyServerUrl('http://10.128.1.63:8000')).toBe('private')
+    expect(classifyServerUrl('192.168.1.50:8765')).toBe('private')
+    expect(classifyServerUrl('https://downtify.janzenmediagroup.com')).toBe(
+      'public'
+    )
+  })
+
+  it('migrates a saved LAN URL into the private slot', () => {
+    const storage = {
+      'downtify-server-url': 'http://10.128.1.63:8000',
+    }
+    vi.stubGlobal('localStorage', {
+      getItem: (key) => storage[key] ?? null,
+      setItem: (key, value) => {
+        storage[key] = value
+      },
+      removeItem: (key) => {
+        delete storage[key]
+      },
+    })
+    expect(getStoredServerUrl()).toBe('http://10.128.1.63:8000')
+    expect(getStoredPrivateServerUrl()).toBe('http://10.128.1.63:8000')
+    expect(getStoredPublicServerUrl()).toBe('')
+    expect(getActiveServerRoute()).toBe('private')
+  })
+
+  it('keeps private and public URLs and switches the active one', () => {
+    const storage = {}
+    vi.stubGlobal('localStorage', {
+      getItem: (key) => storage[key] ?? null,
+      setItem: (key, value) => {
+        storage[key] = value
+      },
+      removeItem: (key) => {
+        delete storage[key]
+      },
+    })
+    setStoredPrivateServerUrl('http://10.128.1.63:8000')
+    setStoredPublicServerUrl('https://downtify.janzenmediagroup.com')
+    setActiveServerRoute('private')
+    expect(getStoredServerUrl()).toBe('http://10.128.1.63:8000')
+    setActiveServerRoute('public')
+    expect(getStoredServerUrl()).toBe('https://downtify.janzenmediagroup.com')
+    expect(getStoredPrivateServerUrl()).toBe('http://10.128.1.63:8000')
+    expect(getActiveServerRoute()).toBe('public')
   })
 
   afterEach(() => {

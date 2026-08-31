@@ -53,6 +53,12 @@ describe('genre refresh', () => {
     expect(API.startLibraryGenreRefresh).toHaveBeenCalledTimes(1)
   })
 
+  it('does not start genre lookup for family profiles', async () => {
+    await ensureLibraryGenreLookup(4, { allowed: false })
+    expect(API.getLibraryGenresStatus).not.toHaveBeenCalled()
+    expect(API.startLibraryGenreRefresh).not.toHaveBeenCalled()
+  })
+
   it('does not auto-restart after the user stops a lookup', async () => {
     API.getLibraryGenresStatus.mockResolvedValue({
       data: { status: 'cancelled' },

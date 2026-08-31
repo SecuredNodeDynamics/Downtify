@@ -32,6 +32,8 @@ PUBLIC_API_PATHS = frozenset({
 ADMIN_API_PATHS = frozenset({
     '/api/summary',
     '/api/settings/update',
+    '/api/library/genres/refresh',
+    '/api/library/genres/cancel',
 })
 ADMIN_API_PREFIXES = ('/api/metadata', '/api/jellyfin')
 

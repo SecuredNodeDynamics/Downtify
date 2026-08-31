@@ -880,7 +880,7 @@ export default {
     jellyfinSection: 'API de Jellyfin',
     serverConnectionSection: 'Servidor Downtify',
     serverConnectionHint:
-      'Para la app movil, introduce la direccion de tu servidor Downtify: una IP local (con puerto) o una URL publica como un tunel de Cloudflare. Dejalo vacio si usas el navegador en el mismo host que el servidor.',
+      'Guarda una direccion de red local (IP) y una URL publica (Cloudflare) para cambiar sin volver a escribir. Dejalas vacias si usas el navegador en el mismo host que el servidor.',
     modeSection: 'Modo',
     connectionModeDevice: 'Ejecutar en este dispositivo',
     connectionModeServer: 'Conectar a un servidor',
@@ -890,6 +890,8 @@ export default {
       'Usa tu servidor Downtify: IP de LAN (por ejemplo 10.128.1.63:8000) o una URL publica como un tunel de Cloudflare.',
     connectionModeServerConfigHint:
       'Configura la direccion del servidor en Ajustes → API.',
+    connectionModeServerFamilyHint:
+      'Un administrador configura la IP local y Cloudflare en Ajustes → API. Los perfiles familiares pueden cambiar entre este dispositivo y ese servidor guardado.',
     runningOnThisDevice: 'Ejecutandose en este dispositivo',
     runningOnThisDeviceHint:
       'La busqueda, las descargas y la conversion ocurren localmente. No se envia nada a un servidor Downtify externo.',
@@ -897,12 +899,23 @@ export default {
       'Para conectar a un servidor, cambia a «Conectar a un servidor» en Ajustes generales.',
     serverRequiredTitle: 'Conecta tu servidor Downtify',
     serverRequiredHint:
-      'La app movil necesita la direccion del servidor antes de cargar cola, salud y otros datos. Abre Ajustes e introduce tu IP local o URL del tunel.',
+      'La app movil necesita la direccion del servidor antes de cargar cola, salud y otros datos. Abre Ajustes e introduce tu IP local, la URL de Cloudflare, o ambas.',
+    serverRequiredHintFamily:
+      'Un administrador debe guardar la direccion del servidor en Ajustes → API. Cambia a «Ejecutar en este dispositivo» o pide a un administrador que configure la IP local o Cloudflare.',
     serverUrl: 'Direccion del servidor',
     serverUrlPlaceholder:
       'https://downtify.janzenmediagroup.com o http://10.128.1.63:8000',
+    serverUrlPrivate: 'URL privada (IP local)',
+    serverUrlPrivatePlaceholder: 'http://10.128.1.63:8000',
+    serverUrlPublic: 'URL publica (Cloudflare)',
+    serverUrlPublicPlaceholder: 'https://downtify.janzenmediagroup.com',
+    serverRoutePrivate: 'Red local',
+    serverRoutePublic: 'Cloudflare',
+    serverRouteHint:
+      'Elige Red local o Cloudflare, luego Prueba y Guardar direccion para usar esa conexion. Ambas direcciones se conservan.',
     serverUrlCurrent: 'Conectado a',
     serverUrlDefault: 'Esta pagina (mismo host)',
+    serverUrlUnset: 'Sin configurar — pide a un administrador',
     serverTest: 'Probar conexion',
     serverTesting: 'Probando…',
     serverTestSuccess: 'Conectado a Downtify v{version}',
@@ -912,7 +925,7 @@ export default {
     serverConnectDevice: 'Conectar a este dispositivo',
     serverClear: 'Borrar servidor guardado',
     serverSaveHint:
-      'Usa Conectar a este dispositivo si ya estas navegando Downtify en el servidor. Para un servidor remoto, introduce su IP o URL del tunel y pulsa Guardar direccion. La app se recarga al conectar.',
+      'Usa Conectar a este dispositivo si ya estas navegando Downtify en el servidor. Guarda una IP local y una URL de Cloudflare, luego cambia con Red local / Cloudflare y Guardar direccion. La app se recarga al conectar.',
     enableJellyfinTools: 'Activar herramientas Jellyfin',
     enableJellyfinToolsHint:
       'Muestra las herramientas de comparacion y actualizacion de Jellyfin en Metadatos.',

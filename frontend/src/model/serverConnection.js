@@ -1,6 +1,12 @@
 import { Capacitor } from '@capacitor/core'
 
 const STORAGE_KEY = 'downtify-server-url'
+const PRIVATE_URL_KEY = 'downtify-server-url-private'
+const PUBLIC_URL_KEY = 'downtify-server-url-public'
+const ACTIVE_ROUTE_KEY = 'downtify-server-url-active'
+
+export const SERVER_ROUTE_PRIVATE = 'private'
+export const SERVER_ROUTE_PUBLIC = 'public'
 
 // The embedded (on-device) backend listens here. Must match the port used by
 // the native EmbeddedServer plugin / downtify.mobile.DEFAULT_PORT.
@@ -83,22 +89,148 @@ export function repairStoredServerUrl() {
   }
 }
 
-export function getStoredServerUrl() {
+function readStorage(key) {
   try {
-    return localStorage.getItem(STORAGE_KEY) || ''
+    return localStorage.getItem(key) || ''
   } catch {
     return ''
   }
 }
 
-export function setStoredServerUrl(url) {
-  const trimmed = String(url || '').trim()
+function writeStorage(key, value) {
+  const trimmed = String(value || '').trim()
   try {
-    if (trimmed) localStorage.setItem(STORAGE_KEY, trimmed)
-    else localStorage.removeItem(STORAGE_KEY)
+    if (trimmed) localStorage.setItem(key, trimmed)
+    else localStorage.removeItem(key)
   } catch {
     // ignore quota / private mode errors
   }
+}
+
+const IPV4_HOST = /^(?:\d{1,3}\.){3}\d{1,3}$/
+
+export function classifyServerUrl(input) {
+  const parsed = parseServerUrl(input)
+  if (!parsed) return null
+  const host = String(parsed.BACKEND || '')
+    .trim()
+    .toLowerCase()
+    .replace(/^\[|\]$/g, '')
+  if (
+    host === 'localhost' ||
+    host === '127.0.0.1' ||
+    host === '::1' ||
+    host.endsWith('.local') ||
+    host.endsWith('.lan') ||
+    host.endsWith('.home') ||
+    host.endsWith('.internal')
+  ) {
+    return SERVER_ROUTE_PRIVATE
+  }
+  if (IPV4_HOST.test(host) || host.includes(':')) {
+    return SERVER_ROUTE_PRIVATE
+  }
+  return SERVER_ROUTE_PUBLIC
+}
+
+export function getStoredPrivateServerUrl() {
+  migrateServerAddressSlots()
+  return readStorage(PRIVATE_URL_KEY)
+}
+
+export function getStoredPublicServerUrl() {
+  migrateServerAddressSlots()
+  return readStorage(PUBLIC_URL_KEY)
+}
+
+export function getActiveServerRoute() {
+  migrateServerAddressSlots()
+  const stored = readStorage(ACTIVE_ROUTE_KEY)
+  if (stored === SERVER_ROUTE_PUBLIC || stored === SERVER_ROUTE_PRIVATE) {
+    return stored
+  }
+  const active = readStorage(STORAGE_KEY)
+  const classified = classifyServerUrl(active)
+  if (classified) return classified
+  if (readStorage(PRIVATE_URL_KEY)) return SERVER_ROUTE_PRIVATE
+  if (readStorage(PUBLIC_URL_KEY)) return SERVER_ROUTE_PUBLIC
+  return SERVER_ROUTE_PRIVATE
+}
+
+export function setActiveServerRoute(route) {
+  const normalized =
+    route === SERVER_ROUTE_PUBLIC ? SERVER_ROUTE_PUBLIC : SERVER_ROUTE_PRIVATE
+  writeStorage(ACTIVE_ROUTE_KEY, normalized)
+  const url =
+    normalized === SERVER_ROUTE_PUBLIC
+      ? readStorage(PUBLIC_URL_KEY)
+      : readStorage(PRIVATE_URL_KEY)
+  writeStorage(STORAGE_KEY, url)
+}
+
+export function setStoredPrivateServerUrl(url) {
+  writeStorage(PRIVATE_URL_KEY, url)
+  if (getActiveServerRoute() === SERVER_ROUTE_PRIVATE) {
+    writeStorage(STORAGE_KEY, url)
+  }
+}
+
+export function setStoredPublicServerUrl(url) {
+  writeStorage(PUBLIC_URL_KEY, url)
+  if (getActiveServerRoute() === SERVER_ROUTE_PUBLIC) {
+    writeStorage(STORAGE_KEY, url)
+  }
+}
+
+export function migrateServerAddressSlots() {
+  const active = readStorage(STORAGE_KEY)
+  const priv = readStorage(PRIVATE_URL_KEY)
+  const pub = readStorage(PUBLIC_URL_KEY)
+  if (priv || pub) {
+    if (!readStorage(ACTIVE_ROUTE_KEY)) {
+      const kind =
+        classifyServerUrl(active) ||
+        (priv ? SERVER_ROUTE_PRIVATE : SERVER_ROUTE_PUBLIC)
+      writeStorage(ACTIVE_ROUTE_KEY, kind)
+    }
+    if (!active) {
+      const route = readStorage(ACTIVE_ROUTE_KEY)
+      const url = route === SERVER_ROUTE_PUBLIC ? pub : priv || pub
+      if (url) writeStorage(STORAGE_KEY, url)
+    }
+    return
+  }
+  if (!active) return
+  const kind = classifyServerUrl(active) || SERVER_ROUTE_PRIVATE
+  if (kind === SERVER_ROUTE_PUBLIC) writeStorage(PUBLIC_URL_KEY, active)
+  else writeStorage(PRIVATE_URL_KEY, active)
+  writeStorage(ACTIVE_ROUTE_KEY, kind)
+}
+
+export function getStoredServerUrl() {
+  migrateServerAddressSlots()
+  return readStorage(STORAGE_KEY)
+}
+
+export function setStoredServerUrl(url) {
+  const trimmed = String(url || '').trim()
+  writeStorage(STORAGE_KEY, trimmed)
+  if (!trimmed) return
+  const kind = classifyServerUrl(trimmed) || SERVER_ROUTE_PRIVATE
+  if (kind === SERVER_ROUTE_PUBLIC) writeStorage(PUBLIC_URL_KEY, trimmed)
+  else writeStorage(PRIVATE_URL_KEY, trimmed)
+  writeStorage(ACTIVE_ROUTE_KEY, kind)
+}
+
+export function clearActiveServerUrl() {
+  writeStorage(STORAGE_KEY, '')
+}
+
+export function clearSavedServerAddresses() {
+  writeStorage(STORAGE_KEY, '')
+  writeStorage(PRIVATE_URL_KEY, '')
+  writeStorage(PUBLIC_URL_KEY, '')
+  writeStorage(ACTIVE_ROUTE_KEY, '')
 }
 
 export function usesCustomServerUrl() {
@@ -161,8 +293,8 @@ function envOrLocation() {
       process.env.PORT !== undefined
         ? process.env.PORT
         : hasWindow
-          ? window.location.port
-          : '',
+        ? window.location.port
+        : '',
     BASEURL: process.env.BASEURL || '',
   }
 }
@@ -242,4 +374,5 @@ export function canSaveServerUrlInput(
 
 if (typeof window !== 'undefined') {
   repairStoredServerUrl()
+  migrateServerAddressSlots()
 }

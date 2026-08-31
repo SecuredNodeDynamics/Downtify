@@ -1379,6 +1379,7 @@ import {
   isCapacitorNative,
 } from '/src/model/serverConnection'
 import { useI18n } from '/src/i18n'
+import { useAuthSession } from '/src/model/authSession'
 
 defineOptions({ name: 'Player' })
 
@@ -1391,6 +1392,7 @@ const playerServerKey = buildApiBaseUrl(getServerConfig())
 const initialPlayerSnapshot = getInitialLibrarySnapshot(playerServerKey)
 
 const { t } = useI18n()
+const { canUseAdminPages } = useAuthSession()
 const player = usePlayer()
 const downloadManager = useDownloadManager()
 const playbackActive = computed(() =>
@@ -2413,7 +2415,9 @@ async function refreshLibraryMetadata() {
 }
 
 function scheduleGenreRefresh(items) {
-  void ensureLibraryGenreLookup(countUnknownGenres(items))
+  void ensureLibraryGenreLookup(countUnknownGenres(items), {
+    allowed: canUseAdminPages.value,
+  })
 }
 
 async function load({ background = false } = {}) {
