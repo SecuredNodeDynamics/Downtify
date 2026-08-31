@@ -7,7 +7,8 @@
       class="bottom-nav-item"
       :class="{ 'bottom-nav-item-active': isActive(item) }"
       :title="t(item.labelKey)"
-      @click="onNav(item)"
+      @pointerup.stop.prevent="onNav(item)"
+      @click.stop.prevent="onNav(item)"
     >
       <span class="bottom-nav-icon-wrap">
         <Icon :icon="item.icon" class="h-6 w-6" />
@@ -41,6 +42,8 @@ const items = [
   },
 ]
 
+let lastNavAt = 0
+
 const moreRoutes = new Set([
   'Monitor',
   'Health',
@@ -62,12 +65,22 @@ function isActive(item) {
   return route.name === item.name
 }
 
+function closeMoreSheet() {
+  const sheet = document.getElementById('mobile-more-sheet')
+  if (sheet) sheet.checked = false
+}
+
 function onNav(item) {
+  const now = Date.now()
+  if (now - lastNavAt < 350) return
+  lastNavAt = now
   mobileSearch.closeSheet()
+  const moreOpen = Boolean(document.getElementById('mobile-more-sheet')?.checked)
+  closeMoreSheet()
 
   if (item.name === 'More') {
     const sheet = document.getElementById('mobile-more-sheet')
-    if (sheet) sheet.checked = true
+    if (sheet && !moreOpen) sheet.checked = true
     return
   }
   if (item.name === 'Search') {

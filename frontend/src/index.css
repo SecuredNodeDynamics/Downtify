@@ -378,7 +378,7 @@
 
   /* Android-style mobile shell */
   .mobile-app-bar {
-    @apply fixed inset-x-0 top-0 z-40 border-b border-white/10 bg-base-100/95 backdrop-blur-md;
+    @apply fixed inset-x-0 top-0 z-50 border-b border-white/10 bg-base-100/95 backdrop-blur-md;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.28);
   }
   [data-theme='downtify-light'] .mobile-app-bar {
@@ -406,13 +406,14 @@
   .mobile-app-bar-icon,
   .mobile-app-bar-logo {
     @apply inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-base-content/90 transition-colors active:bg-white/10;
+    touch-action: manipulation;
   }
   .mobile-app-bar-icon-error {
     @apply text-error active:bg-error/10;
   }
 
   .bottom-nav {
-    @apply fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-white/10 bg-base-100/95 backdrop-blur-md;
+    @apply fixed inset-x-0 bottom-0 z-50 grid grid-cols-5 border-t border-white/10 bg-base-100/95 backdrop-blur-md;
     height: calc(var(--app-bottom-nav-height) + var(--app-safe-bottom));
     padding-bottom: var(--app-safe-bottom);
     box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.24);
@@ -424,6 +425,7 @@
 
   .bottom-nav-item {
     @apply flex min-w-0 flex-col items-center justify-center gap-0.5 px-1 pt-1 text-[10px] font-medium text-base-content/55 transition-colors active:bg-primary/10;
+    touch-action: manipulation;
   }
 
   .bottom-nav-item-active {
@@ -505,16 +507,20 @@
   }
 
   .settings-mobile-menu-backdrop {
-    @apply fixed inset-0 z-50 bg-black/30 lg:hidden;
-    padding-top: calc(var(--app-header-height) + var(--app-safe-top) + 0.5rem);
+    @apply fixed z-40 bg-black/30 lg:hidden;
+    top: calc(var(--app-header-height) + var(--app-safe-top));
+    right: 0;
+    bottom: calc(var(--app-bottom-nav-height) + var(--app-safe-bottom));
+    left: 0;
   }
 
   .settings-mobile-menu {
-    @apply ml-auto mr-3 flex w-64 max-w-[calc(100vw-1.5rem)] flex-col gap-1 rounded-2xl p-2 shadow-2xl;
+    @apply ml-auto mr-3 mt-2 flex w-64 max-w-[calc(100vw-1.5rem)] flex-col gap-1 rounded-2xl p-2 shadow-2xl;
   }
 
   .settings-mobile-menu-item {
-    @apply flex min-w-0 items-center rounded-xl px-3 py-3 text-left text-sm font-medium text-base-content/70 transition-colors active:bg-white/10;
+    @apply flex min-h-11 min-w-0 items-center rounded-xl px-3 py-3 text-left text-sm font-medium text-base-content/70 transition-colors active:bg-white/10;
+    touch-action: manipulation;
   }
 
   .settings-mobile-menu-item-active {
@@ -639,6 +645,7 @@
 
   .mobile-more-item {
     @apply flex min-h-12 items-center gap-3 rounded-2xl px-3 text-sm font-medium transition-colors active:bg-white/10;
+    touch-action: manipulation;
   }
 
   .mobile-more-item-active {

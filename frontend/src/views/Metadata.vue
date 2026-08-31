@@ -50,7 +50,8 @@
             :class="{
               'metadata-mobile-menu-item-active': activeToolTab === tab.id,
             }"
-            @click="selectToolTab(tab.id)"
+            @pointerup.stop.prevent="selectToolTab(tab.id)"
+            @click.stop.prevent="selectToolTab(tab.id)"
           >
             <Icon :icon="tab.icon" class="h-5 w-5 shrink-0" />
             <span class="min-w-0 truncate">{{ tab.label }}</span>
@@ -1963,6 +1964,7 @@ const JELLYFIN_IMAGE_REPAIR_BUCKETS = [
 ]
 const activeToolTab = ref('metadata')
 const metadataToolMenuOpen = ref(false)
+let lastMetadataMenuToggleAt = 0
 const loading = ref(false)
 const error = ref('')
 const items = ref([])
@@ -2382,6 +2384,9 @@ function syncMetadataMobileAction() {
         label: t('metadata.toolsMenu'),
         title: t('metadata.toolsMenu'),
         onClick: () => {
+          const now = Date.now()
+          if (now - lastMetadataMenuToggleAt < 350) return
+          lastMetadataMenuToggleAt = now
           metadataToolMenuOpen.value = !metadataToolMenuOpen.value
         },
       },
@@ -4256,16 +4261,21 @@ async function syncJellyfinAfterImageRepairs(repairedCount) {
 }
 
 .metadata-mobile-menu-backdrop {
-  @apply fixed inset-0 z-50 bg-black/30;
-  padding-top: calc(var(--app-header-height) + var(--app-safe-top) + 0.5rem);
+  @apply fixed z-40 bg-black/30;
+  top: calc(var(--app-header-height) + var(--app-safe-top));
+  right: 0;
+  bottom: calc(var(--app-bottom-nav-height) + var(--app-safe-bottom));
+  left: 0;
 }
 
 .metadata-mobile-menu {
-  @apply ml-auto mr-3 flex w-64 max-w-[calc(100vw-1.5rem)] flex-col gap-1 rounded-2xl p-2 shadow-2xl;
+  @apply ml-auto mr-3 mt-2 flex w-64 max-w-[calc(100vw-1.5rem)] flex-col gap-1 rounded-2xl p-2 shadow-2xl;
 }
 
 .metadata-mobile-menu-item {
-  @apply flex min-w-0 items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium text-base-content/70 transition-colors active:bg-white/10;
+  @apply flex min-h-11 min-w-0 items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium text-base-content/70 transition-colors active:bg-white/10;
+  touch-action: manipulation;
+}
 }
 
 .metadata-mobile-menu-item-active {

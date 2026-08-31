@@ -95,14 +95,19 @@
           :class="{
             'settings-mobile-menu-item-active': activeTab === tab.id,
           }"
-          @click="setActiveTab(tab.id)"
+          @pointerup.stop.prevent="setActiveTab(tab.id)"
+          @click.stop.prevent="setActiveTab(tab.id)"
         >
           {{ t(tab.labelKey) }}
         </button>
       </div>
     </div>
 
-    <div v-if="activeTab === 'accounts'" class="settings-tab-body space-y-6">
+    <div
+      v-if="mountedSettingsTabs.accounts"
+      v-show="activeTab === 'accounts'"
+      class="settings-tab-body space-y-6"
+    >
       <div v-if="authUser">
         <label
           class="block text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2"
@@ -237,7 +242,8 @@
     </div>
 
     <div
-      v-else-if="activeTab === 'general'"
+      v-if="mountedSettingsTabs.general"
+      v-show="activeTab === 'general'"
       class="settings-tab-body space-y-6"
     >
       <!-- App mode: on-device (serverless) vs remote server -->
@@ -888,7 +894,8 @@
     </div>
 
     <div
-      v-else-if="activeTab === 'api' && canUseAdminPages"
+      v-if="mountedSettingsTabs.api && canUseAdminPages"
+      v-show="activeTab === 'api'"
       class="settings-tab-body space-y-5"
     >
       <div>
@@ -1196,7 +1203,8 @@
     </div>
 
     <div
-      v-else-if="activeTab === 'logs' && canUseAdminPages"
+      v-if="mountedSettingsTabs.logs && canUseAdminPages"
+      v-show="activeTab === 'logs'"
       class="settings-tab-body space-y-5"
     >
       <div class="flex items-center justify-between gap-3">
@@ -1275,7 +1283,11 @@
       </ul>
     </div>
 
-    <div v-else-if="activeTab === 'about'" class="settings-tab-body space-y-5">
+    <div
+      v-if="mountedSettingsTabs.about"
+      v-show="activeTab === 'about'"
+      class="settings-tab-body space-y-5"
+    >
       <template v-if="!activeAboutSection">
         <div>
           <label
@@ -1420,7 +1432,11 @@
       </template>
     </div>
 
-    <div v-else-if="activeTab === 'help'" class="settings-tab-body space-y-5">
+    <div
+      v-if="mountedSettingsTabs.help"
+      v-show="activeTab === 'help'"
+      class="settings-tab-body space-y-5"
+    >
       <div class="flex items-start justify-between gap-3">
         <div>
           <label
@@ -1648,7 +1664,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick, reactive } from 'vue'
 import { useRoute } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import axios from 'axios'
@@ -1740,12 +1756,21 @@ const tabShellRef = ref(null)
 const tabMeasureRef = ref(null)
 const tabMenuRef = ref(null)
 const tabMenuOpen = ref(false)
+const mountedSettingsTabs = reactive({
+  general: true,
+  accounts: false,
+  api: false,
+  logs: false,
+  about: false,
+  help: false,
+})
 const showSettingsTabMenu = ref(isCapacitorNative())
 const isMobileAppBar = ref(false)
 const isNativeSettingsMenu = isCapacitorNative()
 const tabBarObserver = ref(null)
 const mobileBarQuery = ref(null)
 const activeAboutSectionId = ref('')
+let lastSettingsMenuToggleAt = 0
 
 const ALL_SETTINGS_TABS = [
   { id: 'general', labelKey: 'settings.generalTab' },
@@ -1795,6 +1820,9 @@ function syncSettingsMobileAction() {
         label: t('common.more'),
         title: t('common.more'),
         onClick: () => {
+          const now = Date.now()
+          if (now - lastSettingsMenuToggleAt < 350) return
+          lastSettingsMenuToggleAt = now
           tabMenuOpen.value = !tabMenuOpen.value
         },
       },
@@ -1844,6 +1872,7 @@ function onTabMenuDocumentClick(event) {
 
 function setActiveTab(tab) {
   if (!settingsTabs.value.some((item) => item.id === tab)) return
+  if (tab in mountedSettingsTabs) mountedSettingsTabs[tab] = true
   activeTab.value = tab
   tabMenuOpen.value = false
   nextTick(resetSettingsScroll)

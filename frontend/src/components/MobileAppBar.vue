@@ -70,7 +70,8 @@
           type="button"
           class="mobile-app-bar-icon shrink-0"
           :title="routeAction.title || routeAction.label || ''"
-          @click="routeAction.onClick?.()"
+          @pointerup.stop.prevent="routeAction.onClick?.()"
+          @click.stop.prevent="routeAction.onClick?.()"
         >
           <Icon
             :icon="routeAction.icon || 'clarity:menu-line'"

@@ -13,7 +13,16 @@ const Health = () => import('/src/views/Health.vue')
 const Metadata = () => import('/src/views/Metadata.vue')
 const Settings = () => import('/src/views/Settings.vue')
 
-const routePreloaders = [Artist, Monitor, Health, Settings]
+const routePreloaders = [
+  List,
+  Player,
+  Search,
+  Download,
+  Artist,
+  Monitor,
+  Health,
+  Settings,
+]
 
 export function preloadRouteComponents() {
   const preload = () => {
