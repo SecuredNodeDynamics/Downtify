@@ -3,6 +3,7 @@ let cachedLibraryItems = null
 let cachedServerKey = ''
 let prefetchPromise = null
 let backgroundRefreshPromise = null
+let backgroundRefreshIsServerRefresh = false
 let lastBackgroundRefreshAt = 0
 let libraryRevision = 0
 const libraryChangeListeners = new Set()
@@ -270,25 +271,31 @@ export function refreshLibraryInBackground(
   {
     serverKey = '',
     force = false,
+    refresh: serverRefresh = false,
     minIntervalMs = LIBRARY_BACKGROUND_REFRESH_MS,
   } = {}
 ) {
   if (!fetchLibrary) return Promise.resolve(getCachedLibraryItems() || [])
 
   const now = Date.now()
+  const isServerRefresh = Boolean(serverRefresh)
   if (
     !force &&
+    !isServerRefresh &&
     backgroundRefreshPromise === null &&
     now - lastBackgroundRefreshAt < minIntervalMs
   ) {
     return Promise.resolve(getCachedLibraryItems() || [])
   }
 
-  if (backgroundRefreshPromise) {
+  if (
+    backgroundRefreshPromise &&
+    (!isServerRefresh || backgroundRefreshIsServerRefresh)
+  ) {
     return backgroundRefreshPromise
   }
 
-  backgroundRefreshPromise = fetchLibraryItems(fetchLibrary, {
+  const request = fetchLibraryItems(fetchLibrary, {
     preferPrefetch: false,
   })
     .then((items) => {
@@ -297,8 +304,13 @@ export function refreshLibraryInBackground(
     })
     .catch(() => getCachedLibraryItems() || [])
     .finally(() => {
-      backgroundRefreshPromise = null
+      if (backgroundRefreshPromise === request) {
+        backgroundRefreshPromise = null
+        backgroundRefreshIsServerRefresh = false
+      }
     })
 
-  return backgroundRefreshPromise
+  backgroundRefreshPromise = request
+  backgroundRefreshIsServerRefresh = isServerRefresh
+  return request
 }

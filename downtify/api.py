@@ -2426,15 +2426,26 @@ def get_library_stats() -> dict[str, Any]:
 
 
 @router.get('/api/library/files')
-def get_library_files() -> list[dict[str, Any]]:
+def get_library_files(
+    refresh: bool = Query(False),
+) -> list[dict[str, Any]]:
     download_dir = _active_download_dir_or_default()
     root_key = str(download_dir.resolve())
     cache = state.library_files_cache
     cached_items = cache.get('items') or []
-    if cache.get('root') == root_key and cached_items:
+    use_cache = (
+        not refresh
+        and not state.library_files_dirty
+        and cache.get('root') == root_key
+        and bool(cached_items)
+    )
+    if use_cache:
         return list(cached_items)
-    if cache.get('building'):
+    if not refresh and cache.get('building') and cached_items:
         return list(cached_items)
+
+    if refresh:
+        clear_fast_library_entry_cache()
 
     try:
         items = list_library_files_fast(download_dir)
@@ -2446,9 +2457,13 @@ def get_library_files() -> list[dict[str, Any]]:
         'root': root_key,
         'items': items,
         'built_at': time.monotonic(),
-        'building': False,
+        'building': bool(cache.get('building')),
     }
-    schedule_library_files_cache_refresh()
+    if refresh:
+        state.library_files_dirty = True
+        schedule_library_files_cache_refresh(force=True)
+    else:
+        schedule_library_files_cache_refresh()
     return items
 
 

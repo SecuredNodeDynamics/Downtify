@@ -1573,7 +1573,7 @@ async function refreshFromHeader() {
   libraryRefresh.setFailed(false)
   error.value = ''
   try {
-    const items = await API.refreshLibraryInBackground(true)
+    const items = await API.refreshLibraryInBackground(true, { refresh: true })
     if (items.length > 0) {
       applyLibraryData(items)
       return
@@ -1815,7 +1815,7 @@ onMounted(() => {
   void refreshMonitoredArtists()
   void refresh()
   stopLibraryListener = onLibraryChanged(() => {
-    void refresh({ background: true })
+    void refresh({ background: true, force: true })
   })
 })
 

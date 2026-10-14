@@ -784,8 +784,11 @@ function listDownloads() {
   return API.get('/list')
 }
 
-function getLibraryFiles() {
-  return API.get('/api/library/files', { timeout: 60000 })
+function getLibraryFiles({ refresh = false } = {}) {
+  return API.get('/api/library/files', {
+    timeout: 60000,
+    params: refresh ? { refresh: true } : {},
+  })
 }
 
 function getLibraryStats() {
@@ -986,8 +989,8 @@ function libraryServerKey() {
   return buildApiBaseUrl(getServerConfig())
 }
 
-async function fetchLibraryItemsFromApi() {
-  const res = await getLibraryFiles()
+async function fetchLibraryItemsFromApi({ refresh = false } = {}) {
+  const res = await getLibraryFiles({ refresh })
   return Array.isArray(res.data) ? res.data : []
 }
 
@@ -1189,10 +1192,15 @@ function scheduleCoverWarm(items) {
 }
 
 function refreshLibraryInBackground(force = false, options = {}) {
-  return refreshLibrarySession(fetchLibraryItemsFromApi, {
-    serverKey: libraryServerKey(),
-    force,
-  }).then((items) => {
+  const refresh = Boolean(options.refresh)
+  return refreshLibrarySession(
+    () => fetchLibraryItemsFromApi({ refresh }),
+    {
+      serverKey: libraryServerKey(),
+      force,
+      refresh,
+    }
+  ).then((items) => {
     if (items?.length && options.warmCovers !== false) {
       scheduleCoverWarm(items)
     }
