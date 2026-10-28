@@ -2428,13 +2428,7 @@ def get_library_stats() -> dict[str, Any]:
 @router.get('/api/library/files')
 def get_library_files(
     refresh: bool = Query(False),
-    response: Response = None,
 ) -> list[dict[str, Any]]:
-    # A user-triggered refresh is an explicit request to see the filesystem as
-    # it exists on the connected server now.  Do not allow an HTTP cache (or
-    # the lightweight entry cache below) to turn it into a cached response.
-    if refresh and response is not None:
-        response.headers['Cache-Control'] = 'no-store'
     download_dir = _active_download_dir_or_default()
     root_key = str(download_dir.resolve())
     cache = state.library_files_cache

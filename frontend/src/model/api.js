@@ -787,11 +787,10 @@ function listDownloads() {
 function getLibraryFiles({ refresh = false } = {}) {
   return API.get('/api/library/files', {
     timeout: 60000,
-    params: refresh ? { refresh: true } : {},
-    // A manual library sync must reach the connected server.  Some webviews
-    // and reverse proxies are willing to cache GET JSON even with a query
-    // string, so make the user's intent explicit on the request too.
-    headers: refresh ? { 'Cache-Control': 'no-cache' } : {},
+    // The unique query value bypasses WebView/proxy GET caches without adding
+    // a non-simple request header (which would trigger a CORS preflight for
+    // connected-server clients).
+    params: refresh ? { refresh: true, _: Date.now() } : {},
   })
 }
 
