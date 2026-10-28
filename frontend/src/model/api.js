@@ -788,6 +788,10 @@ function getLibraryFiles({ refresh = false } = {}) {
   return API.get('/api/library/files', {
     timeout: 60000,
     params: refresh ? { refresh: true } : {},
+    // A manual library sync must reach the connected server.  Some webviews
+    // and reverse proxies are willing to cache GET JSON even with a query
+    // string, so make the user's intent explicit on the request too.
+    headers: refresh ? { 'Cache-Control': 'no-cache' } : {},
   })
 }
 
@@ -1193,14 +1197,11 @@ function scheduleCoverWarm(items) {
 
 function refreshLibraryInBackground(force = false, options = {}) {
   const refresh = Boolean(options.refresh)
-  return refreshLibrarySession(
-    () => fetchLibraryItemsFromApi({ refresh }),
-    {
-      serverKey: libraryServerKey(),
-      force,
-      refresh,
-    }
-  ).then((items) => {
+  return refreshLibrarySession(() => fetchLibraryItemsFromApi({ refresh }), {
+    serverKey: libraryServerKey(),
+    force,
+    refresh,
+  }).then((items) => {
     if (items?.length && options.warmCovers !== false) {
       scheduleCoverWarm(items)
     }

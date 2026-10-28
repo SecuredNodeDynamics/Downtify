@@ -2428,7 +2428,13 @@ def get_library_stats() -> dict[str, Any]:
 @router.get('/api/library/files')
 def get_library_files(
     refresh: bool = Query(False),
+    response: Response = None,
 ) -> list[dict[str, Any]]:
+    # A user-triggered refresh is an explicit request to see the filesystem as
+    # it exists on the connected server now.  Do not allow an HTTP cache (or
+    # the lightweight entry cache below) to turn it into a cached response.
+    if refresh and response is not None:
+        response.headers['Cache-Control'] = 'no-store'
     download_dir = _active_download_dir_or_default()
     root_key = str(download_dir.resolve())
     cache = state.library_files_cache
@@ -2448,7 +2454,16 @@ def get_library_files(
         clear_fast_library_entry_cache()
 
     try:
-        items = list_library_files_fast(download_dir)
+        # The normal route is deliberately cheap because it is loaded often.
+        # Manual refreshes, however, must be authoritative: use the complete
+        # scanner so files added directly to a server-mounted library appear
+        # in the response that drives the app listing, rather than only after
+        # a later background-cache rebuild.
+        items = (
+            list_library_files(download_dir, fetch_missing_genres=False)
+            if refresh
+            else list_library_files_fast(download_dir)
+        )
     except Exception:
         logger.opt(exception=True).warning('Library files listing failed')
         return list(cached_items)
@@ -2460,8 +2475,17 @@ def get_library_files(
         'building': bool(cache.get('building')),
     }
     if refresh:
-        state.library_files_dirty = True
-        schedule_library_files_cache_refresh(force=True)
+        state.library_files_dirty = False
+        state.library_stats_cache = {
+            'root': '',
+            'stats': None,
+            'built_at': 0.0,
+        }
+        state.health_cache = {
+            'payload': None,
+            'built_at': 0.0,
+            'key': None,
+        }
     else:
         schedule_library_files_cache_refresh()
     return items
