@@ -2454,16 +2454,10 @@ def get_library_files(
         clear_fast_library_entry_cache()
 
     try:
-        # The normal route is deliberately cheap because it is loaded often.
-        # Manual refreshes, however, must be authoritative: use the complete
-        # scanner so files added directly to a server-mounted library appear
-        # in the response that drives the app listing, rather than only after
-        # a later background-cache rebuild.
-        items = (
-            list_library_files(download_dir, fetch_missing_genres=False)
-            if refresh
-            else list_library_files_fast(download_dir)
-        )
+        # ``refresh`` cleared the per-file entry cache above.  The fast walker
+        # still walks every audio file, so newly added server files are picked
+        # up immediately without blocking the UI on the slower metadata scan.
+        items = list_library_files_fast(download_dir)
     except Exception:
         logger.opt(exception=True).warning('Library files listing failed')
         return list(cached_items)

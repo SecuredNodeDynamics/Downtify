@@ -33,7 +33,7 @@ def test_get_library_files_returns_artists_list(tmp_path, monkeypatch):
     assert items[0]['artists'] == ['Connor Price', 'Nic D']
 
 
-def test_manual_library_refresh_uses_authoritative_scan(tmp_path, monkeypatch):
+def test_manual_library_refresh_bypasses_stale_file_cache(tmp_path, monkeypatch):
     download_dir = tmp_path / 'downloads'
     download_dir.mkdir()
     old_cache = api.state.library_files_cache
@@ -43,11 +43,11 @@ def test_manual_library_refresh_uses_authoritative_scan(tmp_path, monkeypatch):
     old_health_cache = api.state.health_cache
     calls = []
 
-    def full_scan(root, *, fetch_missing_genres):
-        calls.append((root, fetch_missing_genres))
+    def fast_scan(root):
+        calls.append(root)
         return [{'file': 'Server Artist/track.mp3'}]
 
-    monkeypatch.setattr(api, 'list_library_files', full_scan)
+    monkeypatch.setattr(api, 'list_library_files_fast', fast_scan)
     try:
         api.state.default_download_dir = download_dir
         api.state.library_files_cache = {
@@ -69,7 +69,7 @@ def test_manual_library_refresh_uses_authoritative_scan(tmp_path, monkeypatch):
         api.state.health_cache = old_health_cache
 
     assert items == [{'file': 'Server Artist/track.mp3'}]
-    assert calls == [(download_dir, False)]
+    assert calls == [download_dir]
 
 
 def test_library_stats_and_summary_are_lightweight(tmp_path):
