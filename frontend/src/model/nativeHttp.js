@@ -29,6 +29,21 @@ export function shouldUseNativeHttpAdapter(config = {}) {
     return false
   }
   const path = requestPath(config)
+  const isLargePayload = LARGE_JSON_PATHS.some(
+    (prefix) => path === prefix || path.endsWith(prefix)
+  )
+  if (!isLargePayload) return true
+
+  // Android WebViews commonly reject clear-text requests to a LAN server even
+  // when the native HTTP stack can reach it. Library payloads are normally
+  // left on the WebView adapter for performance, but connectivity must win for
+  // an explicit HTTP server address.
+  try {
+    const rawUrl = axios.getUri(config)
+    if (new URL(rawUrl).protocol === 'http:') return true
+  } catch {
+    // Keep the existing WebView fallback for malformed/incomplete URLs.
+  }
   return !LARGE_JSON_PATHS.some(
     (prefix) => path === prefix || path.endsWith(prefix)
   )

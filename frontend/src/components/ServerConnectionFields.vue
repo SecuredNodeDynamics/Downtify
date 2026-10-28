@@ -144,6 +144,7 @@ import axios from 'axios'
 import { computed, ref } from 'vue'
 import { useI18n } from '../i18n'
 import API from '../model/api'
+import { capacitorAxiosAdapter } from '../model/nativeHttp'
 import {
   buildApiBaseUrl,
   canConnectToCurrentPage,
@@ -264,6 +265,10 @@ async function testActiveConnection() {
     const client = axios.create({
       baseURL: buildApiBaseUrl(parsed),
       timeout: 15000,
+      // The WebView blocks or preflights many direct HTTP requests to a LAN
+      // address. Use the same native transport as the rest of the mobile API
+      // client so testing a server is representative of actually using it.
+      ...(isCapacitorNative() ? { adapter: capacitorAxiosAdapter } : {}),
     })
     const [healthRes, versionRes] = await Promise.all([
       client.get('/api/health'),

@@ -134,5 +134,7 @@ def test_library_stats_and_summary_are_lightweight(tmp_path):
         'genres': 0,
     }
     assert summary['counts']['library'] == stats
-    assert summary['storage']['downloads']['audio_count'] == 1
+        # Health no longer blocks on a recursive filesystem walk before the
+        # asynchronous library cache has been populated.
+        assert summary['storage']['downloads']['audio_count'] == 0
     assert summary['tools']['ffmpeg']['available'] in {True, False}

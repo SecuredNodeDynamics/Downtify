@@ -27,17 +27,17 @@ describe('nativeHttp', () => {
     CapacitorHttp.request.mockReset()
   })
 
-  it('keeps large library payloads on the WebView adapter', () => {
+  it('uses native HTTP for clear-text server library payloads', () => {
     expect(
       shouldUseNativeHttpAdapter({
         url: '/api/library/files',
-        baseURL: 'https://downtify.example.com',
+        baseURL: 'http://10.128.1.63:8000',
       })
-    ).toBe(false)
+    ).toBe(true)
     expect(
       shouldUseNativeHttpAdapter({
         url: '/list',
-        baseURL: 'http://10.128.1.63:8000',
+        baseURL: 'https://downtify.example.com',
       })
     ).toBe(false)
   })

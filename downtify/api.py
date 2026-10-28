@@ -1017,7 +1017,11 @@ def _external_download_path(download_dir: Path) -> Optional[str]:
     return _mount_source_for(download_dir)
 
 
-def _download_directory_summary(download_dir: Path) -> dict[str, Any]:
+def _download_directory_summary(
+    download_dir: Path,
+    *,
+    allow_walk: bool = True,
+) -> dict[str, Any]:
     external_path = _external_download_path(download_dir)
     storage_dir = download_dir
     files_cache = state.library_files_cache
@@ -1033,9 +1037,22 @@ def _download_directory_summary(download_dir: Path) -> dict[str, Any]:
             storage_dir,
             list(files_cache['items']),
             external_path=external_path,
+            include_size=allow_walk,
         )
     else:
-        summary = _directory_summary(storage_dir, external_path=external_path)
+        # Health must stay responsive even when a mounted library is slow or
+        # unavailable.  A full recursive walk belongs to an explicit library
+        # scan, not an HTTP status request.
+        summary = (
+            _directory_summary(storage_dir, external_path=external_path)
+            if allow_walk
+            else _directory_summary_from_library_items(
+                storage_dir,
+                [],
+                external_path=external_path,
+                include_size=False,
+            )
+        )
     summary['container_path'] = str(download_dir)
     summary['storage_path'] = str(storage_dir)
     summary['storage_path_matches_display'] = (
@@ -1048,7 +1065,7 @@ def _library_items_size_bytes(root: Path, items: list[dict[str, Any]]) -> int:
     total = 0
     for item in items:
         stored = item.get('size_bytes')
-        if stored not in (None, ''):
+        if stored not in {None, ''}:
             try:
                 total += max(0, int(stored))
                 continue
@@ -1068,6 +1085,8 @@ def _directory_summary_from_library_items(
     path: Path,
     items: list[dict[str, Any]],
     external_path: Optional[str] = None,
+    *,
+    include_size: bool = True,
 ) -> dict[str, Any]:
     exists = path.exists()
     try:
@@ -1088,8 +1107,8 @@ def _directory_summary_from_library_items(
             'percent_used': 0,
         }
     audio_count = len(items)
-    size_bytes = _library_items_size_bytes(path, items)
-    if size_bytes <= 0 and audio_count > 0 and exists:
+    size_bytes = _library_items_size_bytes(path, items) if include_size else 0
+    if include_size and size_bytes <= 0 and audio_count > 0 and exists:
         walked = _directory_summary(path, external_path=external_path)
         size_bytes = int(walked.get('size_bytes') or 0)
     return {
@@ -1215,7 +1234,18 @@ def _library_stats(download_dir: Path) -> dict[str, Any]:
     if files_cache.get('root') == root_key and files_cache.get('items'):
         stats = _library_stats_for_items(list(files_cache['items']))
     else:
-        stats = _library_stats_for_items(list_library_files_fast(download_dir))
+        # Do not make navigation or the dashboard wait for a mounted library
+        # to be enumerated. The background cache builder will populate these
+        # counts and notify connected clients when it has finished.
+        if state.loop is not None:
+            schedule_library_files_cache_refresh(force=True)
+            stats = _library_stats_for_items([])
+        else:
+            # Keep direct calls (including command-line/test use) useful when
+            # the application's event loop has not started yet.
+            stats = _library_stats_for_items(
+                list_library_files_fast(download_dir)
+            )
 
     state.library_stats_cache = {
         'root': root_key,
@@ -1252,7 +1282,10 @@ def _build_health_payload() -> dict[str, Any]:
             'ffmpeg': _ffmpeg_tool_info(),
             'yt_dlp': _yt_dlp_tool_info(),
         },
-        'downloads': _download_directory_summary(download_dir),
+        'downloads': _download_directory_summary(
+            download_dir,
+            allow_walk=False,
+        ),
         'data': _directory_summary(database_dir),
         'settings': {
             'format': state.settings.get('format'),
@@ -2447,6 +2480,13 @@ def get_library_files(
     if refresh:
         clear_fast_library_entry_cache()
 
+    # A filesystem walk can block indefinitely on an unavailable NAS mount.
+    # Once the app loop is available, always run it in the background and let
+    # the websocket event refresh the visible listing when it completes.
+    if state.loop is not None:
+        schedule_library_files_cache_refresh(force=refresh)
+        return list(cached_items)
+
     try:
         # ``refresh`` cleared the per-file entry cache above.  The fast walker
         # still walks every audio file, so newly added server files are picked
@@ -2811,6 +2851,11 @@ async def _refresh_library_files_cache() -> None:
             'items': items,
             'built_at': time.monotonic(),
             'building': False,
+        }
+        state.library_stats_cache = {
+            'root': root_key,
+            'stats': _library_stats_for_items(items),
+            'built_at': time.monotonic(),
         }
         try:
             await state.connections.broadcast({'event': 'library_files_ready'})

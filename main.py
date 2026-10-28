@@ -280,21 +280,21 @@ def build_app() -> FastAPI:
 
     @app.get('/list')
     def list_downloads() -> list[str]:
-        audio_exts = {'.mp3', '.m4a', '.flac', '.ogg', '.wav', '.aac', '.opus'}
         base = api._active_download_dir().resolve()
-        if not base.exists():
-            return []
-        files: list[str] = []
-        # Walk recursively so per-playlist sub-folders show up alongside
-        # loose downloads in the library view.
-        for path in base.rglob('*'):
-            if not path.is_file():
-                continue
-            if path.suffix.lower() not in audio_exts:
-                continue
-            files.append(path.relative_to(base).as_posix())
-        files.sort()
-        return files
+        root_key = str(base)
+        cache = api.state.library_files_cache
+        if cache.get('root') == root_key and cache.get('items') is not None:
+            return [
+                str(item.get('file') or '')
+                for item in cache['items']
+                if str(item.get('file') or '')
+            ]
+
+        # This legacy fallback is used by Player and Library when metadata is
+        # unavailable. Never recursively walk a potentially remote directory
+        # on the request thread; the cache refresh runs off-thread instead.
+        api.schedule_library_files_cache_refresh(force=True)
+        return []
 
     @app.delete('/delete')
     def delete_download(file: str) -> dict:

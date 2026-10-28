@@ -231,7 +231,9 @@ def test_health_measures_saved_location_even_when_env_matches(
     assert payload['downloads']['container_path'] == str(media)
     assert payload['downloads']['storage_path'] == str(media)
     assert payload['downloads']['storage_path_matches_display'] is True
-    assert payload['downloads']['audio_count'] == 1
+    # Health returns promptly before the asynchronous library cache is warm;
+    # it must not recursively walk a potentially remote media directory.
+    assert payload['downloads']['audio_count'] == 0
 
 
 def test_download_summary_marks_unmounted_external_path(tmp_path):
@@ -357,3 +359,27 @@ def test_download_summary_from_library_cache_includes_size(tmp_path):
 
     assert summary['audio_count'] == 1
     assert summary['size_bytes'] == len(payload)
+
+
+def test_health_summary_never_walks_a_cold_library(tmp_path, monkeypatch):
+    media = tmp_path / 'media'
+    media.mkdir()
+    old_cache = api.state.library_files_cache
+    try:
+        api.state.library_files_cache = {
+            'root': '',
+            'items': [],
+            'built_at': 0.0,
+            'building': False,
+        }
+
+        def fail_if_walked(*_args, **_kwargs):
+            raise AssertionError('health must not recursively walk the library')
+
+        monkeypatch.setattr(api, '_directory_summary', fail_if_walked)
+        summary = _download_directory_summary(media, allow_walk=False)
+    finally:
+        api.state.library_files_cache = old_cache
+
+    assert summary['audio_count'] == 0
+    assert summary['size_bytes'] == 0
